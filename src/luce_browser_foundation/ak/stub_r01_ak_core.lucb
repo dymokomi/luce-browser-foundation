@@ -1887,6 +1887,20 @@ pub func hash_map_find_t_key_const[K, V, KT: Traits[K], TKey](this: const HashMa
 pub func hash_map_try_ensure_capacity[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, capacity: usize) -> !:
     trap("unported: AK::HashMap::try_ensure_capacity")
 
+## AK::OrderedHashMap::set (AK/HashMap.h:61, HashMap<K, V, KT, VT, IsOrdered = true>). Added by region r05:
+## the generator emitted OrderedHashMap as its own struct but no functions for it.
+pub func ordered_hash_map_set[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
+    trap("unported: AK::OrderedHashMap::set")
+
+## AK::OrderedHashMap::get (AK/HashMap.h:163, IsOrdered = true): the value for key, or none. Added by region
+## r05 (see ordered_hash_map_set).
+pub func ordered_hash_map_get_k_const[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*, key: K) -> const V*?:
+    trap("unported: AK::OrderedHashMap::get")
+
+## AK::OrderedHashMap::size (AK/HashMap.h:56, IsOrdered = true). Added by region r05 (see ordered_hash_map_set).
+pub func ordered_hash_map_size[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> usize:
+    trap("unported: AK::OrderedHashMap::size")
+
 ## Ported from AK/HashMap.h:161 AK::HashMap::ensure_capacity.
 pub func hash_map_ensure_capacity[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, capacity: usize):
     trap("unported: AK::HashMap::ensure_capacity")
@@ -4971,13 +4985,11 @@ pub func vector_data_const[T](this: const Vector[T]*) -> void*?:
     trap("unported: AK::Vector::data")
 
 ## Ported from AK/Vector.h:162 AK::Vector::at.
-# unmapped: RemoveReference<T>
-pub func vector_at_const[T](this: const Vector[T]*, i: usize) -> void*?:
+pub func vector_at_const[T](this: const Vector[T]*, i: usize) -> const T*:
     trap("unported: AK::Vector::at")
 
 ## Ported from AK/Vector.h:171 AK::Vector::at.
-# unmapped: RemoveReference<T>
-pub func vector_at[T](this: Vector[T]*, i: usize) -> void*?:
+pub func vector_at[T](this: Vector[T]*, i: usize) -> T*:
     trap("unported: AK::Vector::at")
 
 ## Ported from AK/Vector.h:180 AK::Vector::operator[].
@@ -5001,23 +5013,19 @@ pub func vector_get_const[T](this: const Vector[T]*, i: usize) -> void*?:
     trap("unported: AK::Vector::get")
 
 ## Ported from AK/Vector.h:197 AK::Vector::first.
-# unmapped: RemoveReference<T>
-pub func vector_first_const[T](this: const Vector[T]*) -> void*?:
+pub func vector_first_const[T](this: const Vector[T]*) -> const T*:
     trap("unported: AK::Vector::first")
 
 ## Ported from AK/Vector.h:198 AK::Vector::first.
-# unmapped: RemoveReference<T>
-pub func vector_first[T](this: Vector[T]*) -> void*?:
+pub func vector_first[T](this: Vector[T]*) -> T*:
     trap("unported: AK::Vector::first")
 
 ## Ported from AK/Vector.h:200 AK::Vector::last.
-# unmapped: RemoveReference<T>
-pub func vector_last_const[T](this: const Vector[T]*) -> void*?:
+pub func vector_last_const[T](this: const Vector[T]*) -> const T*:
     trap("unported: AK::Vector::last")
 
 ## Ported from AK/Vector.h:212 AK::Vector::last.
-# unmapped: RemoveReference<T>
-pub func vector_last[T](this: Vector[T]*) -> void*?:
+pub func vector_last[T](this: Vector[T]*) -> T*:
     trap("unported: AK::Vector::last")
 
 ## Ported from AK/Vector.h:225 AK::Vector::unsafe_last.
@@ -5094,7 +5102,7 @@ pub func vector_append_opaque[T](this: Vector[T]*, values: void*?, count: usize)
     trap("unported: AK::Vector::append")
 
 ## Ported from AK/Vector.h:352 AK::Vector::unchecked_append.
-pub func vector_unchecked_append_u[T, U](this: Vector[T]*, value: U):
+pub func vector_unchecked_append_u[T](this: Vector[T]*, value: T):
     trap("unported: AK::Vector::unchecked_append")
 
 ## Ported from AK/Vector.h:376 AK::Vector::unchecked_append.

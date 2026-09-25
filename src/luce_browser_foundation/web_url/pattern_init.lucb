@@ -1,0 +1,347 @@
+#==============================================================================================
+#
+#   pattern_init - URLPattern: processing a URLPatternInit
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Pattern/Init.cpp (lines 1-367) and
+#       Libraries/LibURL/Pattern/Init.h (lines 1-45).
+#
+#==============================================================================================
+
+# mark: Processing one component ================================================================
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:15 URL::Pattern::process_a_base_url_string.
+# https://urlpattern.spec.whatwg.org/#process-a-base-url-string
+func pattern_process_a_base_url_string(input: ak.String, type_: PatternProcessType) -> ak.String:
+    # 1. Assert: input is not null.
+    # 2. If type is not "pattern" return input.
+    if type_ != PatternProcessType.pattern:
+        return input
+
+    # 3. Return the result of escaping a pattern string given input.
+    return pattern_escape_a_pattern_string(input)
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:27 URL::Pattern::is_an_absolute_pathname.
+# https://urlpattern.spec.whatwg.org/#is-an-absolute-pathname
+func pattern_is_an_absolute_pathname(input: ak.String, type_: PatternProcessType) -> bool:
+    # 1. If input is the empty string, then return false.
+    if ak.string_is_empty(&input):
+        return false
+
+    let bytes = ak.string_base_bytes(&input.string_base)
+
+    # 2. If input[0] is U+002F (/), then return true.
+    if bytes[0] == '/':
+        return true
+
+    # 3. If type is "url", then return false.
+    if type_ == PatternProcessType.url:
+        return false
+
+    # 4. If input’s code point length is less than 2, then return false.
+    if bytes.length < 2:
+        return false
+
+    # 5. If input[0] is U+005C (\) and input[1] is U+002F (/), then return true.
+    if bytes[0] == '\\' and bytes[1] == '/':
+        return true
+
+    # 6. If input[0] is U+007B ({) and input[1] is U+002F (/), then return true.
+    if bytes[0] == '{' and bytes[1] == '/':
+        return true
+
+    # 7. Return false.
+    return false
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:58 URL::Pattern::process_protocol_for_init.
+# https://urlpattern.spec.whatwg.org/#process-protocol-for-init
+func pattern_process_protocol_for_init(value: ak.String, type_: PatternProcessType) -> ak.String!:
+    # 1. Let strippedValue be the given value with a single trailing U+003A (:) removed, if any.
+    var stripped_value = value
+    if ak.string_ends_with(&stripped_value, (u32)':'):
+        stripped_value = ak.string_substring_from_byte_offset_usize(&stripped_value, 0,
+                                                                    ak.string_base_byte_count(&stripped_value.string_base) - 1) else trap("MUST: String::substring_from_byte_offset")
+
+    # 2. If type is "pattern" then return strippedValue.
+    if type_ == PatternProcessType.pattern:
+        return stripped_value
+
+    # 3. Return the result of running canonicalize a protocol given strippedValue.
+    return try pattern_canonicalize_a_protocol(stripped_value)
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:74 URL::Pattern::process_username_for_init.
+# https://urlpattern.spec.whatwg.org/#process-username-for-init
+func pattern_process_username_for_init(value: ak.String, type_: PatternProcessType) -> ak.String:
+    # 1. If type is "pattern" then return value.
+    if type_ == PatternProcessType.pattern:
+        return value
+
+    # 2. Return the result of running canonicalize a username given value.
+    return pattern_canonicalize_a_username(value)
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:85 URL::Pattern::process_password_for_init.
+# https://urlpattern.spec.whatwg.org/#process-password-for-init
+func pattern_process_password_for_init(value: ak.String, type_: PatternProcessType) -> ak.String:
+    # 1. If type is "pattern" then return value.
+    if type_ == PatternProcessType.pattern:
+        return value
+
+    # 2. Return the result of running canonicalize a password given value.
+    return pattern_canonicalize_a_password(value)
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:96 URL::Pattern::process_hostname_for_init.
+# https://urlpattern.spec.whatwg.org/#process-hostname-for-init
+func pattern_process_hostname_for_init(value: ak.String, type_: PatternProcessType) -> ak.String!:
+    # 1. If type is "pattern" then return value.
+    if type_ == PatternProcessType.pattern:
+        return value
+
+    # 2. Return the result of running canonicalize a hostname given value.
+    return try pattern_canonicalize_a_hostname(value)
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:107 URL::Pattern::process_port_for_init.
+# https://urlpattern.spec.whatwg.org/#process-port-for-init
+func pattern_process_port_for_init(port_value: ak.String, protocol_value: ak.String, type_: PatternProcessType) -> ak.String!:
+    # 1. If type is "pattern" then return portValue.
+    if type_ == PatternProcessType.pattern:
+        return port_value
+
+    # 2. Return the result of running canonicalize a port given portValue and protocolValue.
+    return try pattern_canonicalize_a_port(port_value, protocol_value)
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:118 URL::Pattern::process_pathname_for_init.
+# https://urlpattern.spec.whatwg.org/#process-pathname-for-init
+func pattern_process_pathname_for_init(pathname_value: ak.String, protocol_value: ak.String, type_: PatternProcessType) -> ak.String!:
+    # 1. If type is "pattern" then return pathnameValue.
+    if type_ == PatternProcessType.pattern:
+        return pathname_value
+
+    # 2. If protocolValue is a special scheme or the empty string, then return the result of running canonicalize a
+    #    pathname given pathnameValue.
+    # NOTE: If the protocolValue is the empty string then no value was provided for protocol in the constructor
+    #       dictionary. Normally we do not special case empty string dictionary values, but in this case we treat
+    #       it as a special scheme in order to default to the most common pathname canonicalization.
+    if ak.string_is_empty(&protocol_value) or is_special_scheme(view_of(protocol_value)):
+        return pattern_canonicalize_a_pathname(pathname_value)
+
+    # 3. Return the result of running canonicalize an opaque pathname given pathnameValue.
+    return try pattern_canonicalize_an_opaque_pathname(pathname_value)
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:137 URL::Pattern::process_search_for_init.
+# https://urlpattern.spec.whatwg.org/#process-search-for-init
+func pattern_process_search_for_init(value: ak.String, type_: PatternProcessType) -> ak.String:
+    # 1. Let strippedValue be the given value with a single leading U+003F (?) removed, if any.
+    var stripped_value = value
+    if ak.string_starts_with(&stripped_value, (u32)'?'):
+        stripped_value = ak.string_substring_from_byte_offset(&stripped_value, 1) else trap("MUST: String::substring_from_byte_offset")
+
+    # 2. If type is "pattern" then return strippedValue.
+    if type_ == PatternProcessType.pattern:
+        return stripped_value
+
+    # 3. Return the result of running canonicalize a search given strippedValue.
+    return pattern_canonicalize_a_search(stripped_value)
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:153 URL::Pattern::process_hash_for_init.
+# https://urlpattern.spec.whatwg.org/#process-hash-for-init
+func pattern_process_hash_for_init(value: ak.String, type_: PatternProcessType) -> ak.String:
+    # 1. Let strippedValue be the given value with a single leading U+0023 (#) removed, if any.
+    var stripped_value = value
+    if ak.string_starts_with(&stripped_value, (u32)'#'):
+        stripped_value = ak.string_substring_from_byte_offset(&stripped_value, 1) else trap("MUST: String::substring_from_byte_offset")
+
+    # 2. If type is "pattern" then return strippedValue.
+    if type_ == PatternProcessType.pattern:
+        return stripped_value
+
+    # 3. Return the result of running canonicalize a hash given strippedValue.
+    return pattern_canonicalize_a_hash(stripped_value)
+
+# mark: Processing a URLPatternInit =============================================================
+
+## Ported from Libraries/LibURL/Pattern/Init.cpp:169 URL::Pattern::process_a_url_pattern_init.
+# https://urlpattern.spec.whatwg.org/#process-a-urlpatterninit
+pub func pattern_process_a_url_pattern_init(init: Init, type_: PatternProcessType, protocol: ak.String?, username: ak.String?, password: ak.String?, hostname: ak.String?, port: ak.String?, pathname: ak.String?, search: ak.String?, hash_: ak.String?) -> Init!:
+    # 1. Let result be the result of creating a new URLPatternInit.
+    var result: Init
+
+    # 2. If protocol is not null, set result["protocol"] to protocol.
+    if protocol != none:
+        result.protocol = protocol
+
+    # 3. If username is not null, set result["username"] to username.
+    if username != none:
+        result.username = username
+
+    # 4. If password is not null, set result["password"] to password.
+    if password != none:
+        result.password = password
+
+    # 5. If hostname is not null, set result["hostname"] to hostname.
+    if hostname != none:
+        result.hostname = hostname
+
+    # 6. If port is not null, set result["port"] to port.
+    if port != none:
+        result.port = port
+
+    # 7. If pathname is not null, set result["pathname"] to pathname.
+    if pathname != none:
+        result.pathname = pathname
+
+    # 8. If search is not null, set result["search"] to search.
+    if search != none:
+        result.search = search
+
+    # 9. If hash is not null, set result["hash"] to hash.
+    if hash_ != none:
+        result.hash = hash_
+
+    # 10. Let baseURL be null.
+    var base_url: Url? = none
+
+    # 11. If init["baseURL"] exists:
+    if let init_base_url = init.base_url:
+        # 1. Set baseURL to the result of running the basic URL parser on init["baseURL"].
+        base_url = parser_basic_parse(view_of(init_base_url))
+
+        # 2. If baseURL is failure, then throw a TypeError.
+        if base_url == none:
+            var message: ak.StringBuilder
+            ak.string_builder_construct(&message)
+            append_literal(&message, "Invalid base URL '")
+            append_string(&message, init_base_url)
+            append_literal(&message, "' provided for URLPattern")
+            try pattern_throw_builder(&message)
+        let parsed_base_url = base_url else trap("unreachable")
+
+        # 3. If init["protocol"] does not exist, then set result["protocol"] to the result of processing a base URL
+        #    string given baseURL’s scheme and type.
+        if init.protocol == none:
+            result.protocol = pattern_process_a_base_url_string(url_scheme(&parsed_base_url), type_)
+
+        # 4. If type is not "pattern" and init contains none of "protocol", "hostname", "port" and "username", then
+        #    set result["username"] to the result of processing a base URL string given baseURL’s username and type.
+        if (type_ != PatternProcessType.pattern and init.protocol == none and init.hostname == none and init.port == none and init.username == none):
+            result.username = pattern_process_a_base_url_string(url_username(&parsed_base_url), type_)
+
+        # 5. If type is not "pattern" and init contains none of "protocol", "hostname", "port", "username" and
+        #    "password", then set result["password"] to the result of processing a base URL string given baseURL’s
+        #    password and type.
+        if (type_ != PatternProcessType.pattern and init.protocol == none and init.hostname == none and init.port == none and init.username == none and init.password == none):
+            result.password = pattern_process_a_base_url_string(url_password(&parsed_base_url), type_)
+
+        # 6. If init contains neither "protocol" nor "hostname", then:
+        if init.protocol == none and init.hostname == none:
+            # 1. Let baseHost be the serialization of baseURL's host, if it is not null, and the empty string otherwise.
+            var base_host = empty_string()
+            if let host = url_host(&parsed_base_url):
+                base_host = host_serialize(&host)
+
+            # 2. Set result["hostname"] to the result of processing a base URL string given baseHost and type.
+            result.hostname = pattern_process_a_base_url_string(base_host, type_)
+
+        # 7. If init contains none of "protocol", "hostname", and "port", then:
+        if init.protocol == none and init.hostname == none and init.port == none:
+            let base_port = url_port(&parsed_base_url)
+            # 1. If baseURL’s port is null, then set result["port"] to the empty string.
+            if base_port == none:
+                result.port = empty_string()
+            # 2. Otherwise, set result["port"] to baseURL’s port, serialized.
+            else:
+                result.port = string_number(base_port else trap("unreachable"))
+
+        # 8. If init contains none of "protocol", "hostname", "port", and "pathname", then set result["pathname"] to
+        #    the result of processing a base URL string given the result of URL path serializing baseURL and type.
+        if init.protocol == none and init.hostname == none and init.port == none and init.pathname == none:
+            result.pathname = pattern_process_a_base_url_string(url_serialize_path(&parsed_base_url), type_)
+
+        # 9. If init contains none of "protocol", "hostname", "port", "pathname", and "search", then:
+        if (init.protocol == none and init.hostname == none and init.port == none and init.pathname == none and init.search == none):
+            # 1. Let baseQuery be baseURL’s query.
+            let base_query = url_query(&parsed_base_url)
+
+            # 2. If baseQuery is null, then set baseQuery to the empty string.
+            # 3. Set result["search"] to the result of processing a base URL string given baseQuery and type.
+            result.search = pattern_process_a_base_url_string(base_query else empty_string(), type_)
+
+        # 10. If init contains none of "protocol", "hostname", "port", "pathname", "search", and "hash", then:
+        if (init.protocol == none and init.hostname == none and init.port == none and init.pathname == none and init.search == none and init.hash == none):
+            # 1. Let baseFragment be baseURL’s fragment.
+            let base_fragment = url_fragment(&parsed_base_url)
+
+            # 2. If baseFragment is null, then set baseFragment to the empty string.
+            # 3. Set result["hash"] to the result of processing a base URL string given baseFragment and type.
+            result.hash = pattern_process_a_base_url_string(base_fragment else empty_string(), type_)
+
+    # 12. If init["protocol"] exists, then set result["protocol"] to the result of process protocol for init given init["protocol"] and type.
+    if let init_protocol = init.protocol:
+        result.protocol = try pattern_process_protocol_for_init(init_protocol, type_)
+
+    # 13. If init["username"] exists, then set result["username"] to the result of process username for init given init["username"] and type.
+    if let init_username = init.username:
+        result.username = pattern_process_username_for_init(init_username, type_)
+
+    # 14. If init["password"] exists, then set result["password"] to the result of process password for init given init["password"] and type.
+    if let init_password = init.password:
+        result.password = pattern_process_password_for_init(init_password, type_)
+
+    # 15. If init["hostname"] exists, then set result["hostname"] to the result of process hostname for init given init["hostname"] and type.
+    if let init_hostname = init.hostname:
+        result.hostname = try pattern_process_hostname_for_init(init_hostname, type_)
+
+    # 16. Let resultProtocolString be result["protocol"] if it exists; otherwise the empty string.
+    let result_protocol_string = result.protocol else empty_string()
+
+    # 17. If init["port"] exists, then set result["port"] to the result of process port for init given init["port"], resultProtocolString, and type.
+    if let init_port = init.port:
+        result.port = try pattern_process_port_for_init(init_port, result_protocol_string, type_)
+
+    # 18. If init["pathname"] exists:
+    if let init_pathname = init.pathname:
+        # 1. Set result["pathname"] to init["pathname"].
+        result.pathname = init_pathname
+
+        # 2. If the following are all true:
+        #     * baseURL is not null;
+        #     * baseURL does not have an opaque path; and
+        #     * the result of running is an absolute pathname given result["pathname"] and type is false,
+        #    then:
+        if let parsed_base_url = base_url:
+            if (not url_has_an_opaque_path(&parsed_base_url) and not pattern_is_an_absolute_pathname(result.pathname else trap("VERIFY: pathname"), type_)):
+                # 1. Let baseURLPath be the result of running process a base URL string given the result of URL path
+                #    serializing baseURL and type.
+                let base_url_path = pattern_process_a_base_url_string(url_serialize_path(&parsed_base_url), type_)
+
+                # 2. Let slash index be the index of the last U+002F (/) code point found in baseURLPath, interpreted as a
+                #    sequence of code points, or null if there are no instances of the code point.
+                let base_url_path_view = view_of(base_url_path)
+                let slash_index = ak.string_view_find_last_u8(&base_url_path_view, '/')
+
+                # 3. If slash index is not null:
+                if let index = slash_index:
+                    # 1. Let new pathname be the code point substring from 0 to slash index + 1 within baseURLPath.
+                    let new_pathname = ak.string_view_substring_view_usize(&base_url_path_view, 0, index + 1)
+
+                    # 2. Append result["pathname"] to the end of new pathname.
+                    # 3. Set result["pathname"] to new pathname.
+                    var joined: ak.StringBuilder
+                    ak.string_builder_construct(&joined)
+                    ak.string_builder_append_string_view(&joined, new_pathname)
+                    append_string(&joined, result.pathname else trap("VERIFY: pathname"))
+                    result.pathname = ak.string_builder_to_string(&joined) else trap("MUST: String::formatted")
+
+        # 3. Set result["pathname"] to the result of process pathname for init given result["pathname"], resultProtocolString, and type.
+        result.pathname = try pattern_process_pathname_for_init(result.pathname else trap("VERIFY: pathname"),
+                                                                result_protocol_string, type_)
+
+    # 19. If init["search"] exists then set result["search"] to the result of process search for init given init["search"] and type.
+    if let init_search = init.search:
+        result.search = pattern_process_search_for_init(init_search, type_)
+
+    # 20. If init["hash"] exists then set result["hash"] to the result of process hash for init given init["hash"] and type.
+    if let init_hash = init.hash:
+        result.hash = pattern_process_hash_for_init(init_hash, type_)
+
+    # 21. Return result.
+    return result

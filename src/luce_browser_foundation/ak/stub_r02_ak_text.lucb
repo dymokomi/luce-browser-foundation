@@ -1466,7 +1466,7 @@ pub func string_base_length_in_code_units(this: const StringBase*) -> usize:
     trap("unported: AK::Detail::StringBase::length_in_code_units")
 
 ## Ported from AK/StringBase.h:281 AK::Detail::StringBase::operator==.
-pub func string_base_eq(this: const StringBase*, other: StringBase) -> bool:
+pub func string_base_eq(this: const StringBase*, other: const StringBase*) -> bool:
     trap("unported: AK::Detail::StringBase::operator==")
 
 ## Ported from AK/StringBase.h:87 AK::Detail::StringBase::raw.
@@ -2112,7 +2112,7 @@ pub func string_view_to_ascii_titlecase_string(this: const StringView*) -> Strin
     trap("unported: AK::StringView::to_ascii_titlecase_string")
 
 ## Ported from AK/StringView.h:110 AK::StringView::find.
-pub func string_view_find_u8(this: const StringView*, needle: u8, start: usize = 0) -> u64?:
+pub func string_view_find_u8(this: const StringView*, needle: u8, start: usize = 0) -> usize?:
     trap("unported: AK::StringView::find")
 
 ## Ported from AK/StringView.h:111 AK::StringView::find.
@@ -2120,7 +2120,7 @@ pub func string_view_find_string_view(this: const StringView*, needle: StringVie
     trap("unported: AK::StringView::find")
 
 ## Ported from AK/StringView.h:112 AK::StringView::find_last.
-pub func string_view_find_last_u8(this: const StringView*, needle: u8) -> u64?:
+pub func string_view_find_last_u8(this: const StringView*, needle: u8) -> usize?:
     trap("unported: AK::StringView::find_last")
 
 ## Ported from AK/StringView.h:113 AK::StringView::find_last.
@@ -2136,7 +2136,7 @@ pub func string_view_find_all(this: const StringView*, needle: StringView) -> Ve
     trap("unported: AK::StringView::find_all")
 
 ## Ported from AK/StringView.h:119 AK::StringView::find_any_of.
-pub func string_view_find_any_of(this: const StringView*, needles: StringView, direction: SearchDirection = SearchDirection.forward) -> u64?:
+pub func string_view_find_any_of(this: const StringView*, needles: StringView, direction: SearchDirection = SearchDirection.forward) -> usize?:
     trap("unported: AK::StringView::find_any_of")
 
 ## Ported from AK/StringView.h:121 AK::StringView::substring_view.
@@ -2514,7 +2514,7 @@ pub func utf16_string_from_utf8_string_view(utf8_string: StringView) -> Utf16Str
     trap("unported: AK::Utf16String::from_utf8")
 
 ## Ported from AK/Utf16String.h:44 AK::Utf16String::from_utf8.
-pub func utf16_string_from_utf8_string(utf8_string: String) -> Utf16String:
+pub func utf16_string_from_utf8_string(utf8_string: const String*) -> Utf16String:
     trap("unported: AK::Utf16String::from_utf8")
 
 ## Ported from AK/Utf16String.h:49 AK::Utf16String::from_utf8.
@@ -3396,7 +3396,7 @@ pub func utf8_code_point_iterator_peek(this: const Utf8CodePointIterator*, offse
     trap("unported: AK::Utf8CodePointIterator::peek")
 
 ## Ported from AK/Utf8View.h:37 AK::Utf8CodePointIterator::operator-.
-pub func utf8_code_point_iterator_sub(this: const Utf8CodePointIterator*, other: Utf8CodePointIterator) -> isize:
+pub func utf8_code_point_iterator_sub(this: const Utf8CodePointIterator*, other: const Utf8CodePointIterator*) -> isize:
     trap("unported: AK::Utf8CodePointIterator::operator-")
 
 ## Ported from AK/Utf8View.h:42 AK::Utf8CodePointIterator::ptr.

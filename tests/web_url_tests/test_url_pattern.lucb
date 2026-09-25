@@ -1,0 +1,42 @@
+#==============================================================================================
+#
+#   test_url_pattern - Tests/LibURL/TestURLPattern.cpp
+#
+#   DESCRIPTION:
+#       The donor's URL pattern tests, ported one TEST_CASE to one test.
+#
+#==============================================================================================
+
+# MUST(URL::Pattern::Pattern::create("text"_string, base_url, ignore_case)).
+func must_create_pattern(text: str, ignore_case: web_url.IgnoreCase = web_url.IgnoreCase.no) -> web_url.Pattern:
+    return web_url.pattern_create(web_url.Input.string(value = web_url.string_lit(text)), none, ignore_case) catch failure:
+        print(f"Pattern::create failed: {failure.message}")
+        trap("MUST: Pattern::create")
+
+# MUST(pattern.match("text"_string, {})).value().
+func must_match(pattern: const web_url.Pattern*, text: str) -> web_url.Result:
+    let input = web_url.StringOrInitOrUrl.string(value = web_url.string_lit(text))
+    let result = web_url.pattern_match(pattern, input, none) else trap("MUST: Pattern::match")
+    return result else trap("VERIFY(result.has_value())")
+
+# EXPECT_EQ(groups.get("name"sv).value(), (Variant<String, Empty> { "expected"_string })).
+func expect_group(groups: const ak.OrderedHashMap[ak.String, ak.StringOrEmpty, ak.StringTraits]*, name: str, expected: str):
+    let value = ak.ordered_hash_map_get_k_const(groups, web_url.string_lit(name)) else trap("groups.get(name).value()")
+    match *value:
+        .string(string): expect_string(string, expected)
+        .empty: trap("expected a String, got Empty")
+
+test "url_pattern_matches_named_groups":
+    let pattern = must_create_pattern("https://example.com/:category/:id")
+    let result = must_match(&pattern, "https://example.com/books/42")
+
+    expect_string(result.protocol.input, "https")
+    expect_string(result.pathname.input, "/books/42")
+    expect_group(&result.pathname.groups, "category", "books")
+    expect_group(&result.pathname.groups, "id", "42")
+
+test "url_pattern_ignore_case_matching":
+    let pattern = must_create_pattern("https://example.com/:value", web_url.IgnoreCase.yes)
+    let result = must_match(&pattern, "https://example.com/CaseSensitive")
+
+    expect_group(&result.pathname.groups, "value", "CaseSensitive")

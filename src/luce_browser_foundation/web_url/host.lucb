@@ -1,0 +1,322 @@
+#==============================================================================================
+#
+#   host - Host: a domain, an IP address, an opaque host or an empty host
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Host.cpp (lines 1-262) with the inline functions of
+#       Libraries/LibURL/Host.h (lines 1-49). Host::has<T>() and Host::get<T>() are templates
+#       over the variant's alternatives; they become one function per alternative.
+#
+#==============================================================================================
+
+# mark: Construction and access =================================================================
+
+## Ported from Libraries/LibURL/Host.cpp:15 URL::Host::Host.
+pub func host_construct_host_variant_type(this: Host*, value: ak.HostVariantType):
+    this.m_value = value
+
+## Ported from Libraries/LibURL/Host.cpp:20 URL::Host::Host.
+pub func host_construct_string(this: Host*, string: ak.String):
+    this.m_value = ak.HostVariantType.string(value = string)
+
+## Ported from Libraries/LibURL/Host.h:31 URL::Host::has<IPv4Address>.
+pub func host_has_i_pv4_address(this: const Host*) -> bool:
+    match this.m_value:
+        .i_pv4_address(_): return true
+        _: return false
+
+## Ported from Libraries/LibURL/Host.h:31 URL::Host::has<IPv6Address>.
+pub func host_has_i_pv6_address(this: const Host*) -> bool:
+    match this.m_value:
+        .i_pv6_address(_): return true
+        _: return false
+
+## Ported from Libraries/LibURL/Host.h:31 URL::Host::has<String>.
+pub func host_has_string(this: const Host*) -> bool:
+    match this.m_value:
+        .string(_): return true
+        _: return false
+
+## Ported from Libraries/LibURL/Host.h:34 URL::Host::get<IPv4Address>.
+pub func host_get_i_pv4_address(this: const Host*) -> ak.IPv4Address:
+    match this.m_value:
+        .i_pv4_address(value): return value
+        _: trap("VERIFY: Host::get<IPv4Address> on another alternative")
+
+## Ported from Libraries/LibURL/Host.h:34 URL::Host::get<IPv6Address>.
+pub func host_get_i_pv6_address(this: const Host*) -> ak.IPv6Address:
+    match this.m_value:
+        .i_pv6_address(value): return value
+        _: trap("VERIFY: Host::get<IPv6Address> on another alternative")
+
+## Ported from Libraries/LibURL/Host.h:34 URL::Host::get<String>.
+pub func host_get_string(this: const Host*) -> ak.String:
+    match this.m_value:
+        .string(value): return value
+        _: trap("VERIFY: Host::get<String> on another alternative")
+
+## Ported from Libraries/LibURL/Host.h:36 URL::Host::operator== (defaulted: the variants are equal).
+pub func host_eq(this: const Host*, other: Host) -> bool:
+    match this.m_value:
+        .i_pv4_address(value):
+            match other.m_value:
+                .i_pv4_address(other_value): return value == other_value
+                _: return false
+        .i_pv6_address(value):
+            match other.m_value:
+                .i_pv6_address(other_value): return value == other_value
+                _: return false
+        .string(value):
+            match other.m_value:
+                .string(other_value): return string_equals(value, other_value)
+                _: return false
+
+## Ported from Libraries/LibURL/Host.h:38 URL::Host::value.
+pub func host_value(this: const Host*) -> ak.HostVariantType:
+    return this.m_value
+
+# mark: Serializers =============================================================================
+
+## Ported from Libraries/LibURL/Host.cpp:26 URL::serialize_ipv4_address.
+# https://url.spec.whatwg.org/#concept-ipv4-serializer
+func serialize_ipv4_address(address: ak.IPv4Address) -> ak.String:
+    # 1. Let output be the empty string.
+    # NOTE: Array to avoid prepend.
+    var output: u8[4]
+
+    # 2. Let n be the value of address.
+    var n = ak.i_pv4_address_to_u32(&address)
+
+    # 3. For each i in the range 1 to 4, inclusive:
+    for i: usize in 0..=3:
+        # 1. Prepend n % 256, serialized, to output.
+        output[3 - i] = (u8)(n % 256)
+
+        # 2. If i is not 4, then prepend U+002E (.) to output.
+        # NOTE: done at end
+
+        # 3. Set n to floor(n / 256).
+        n = n // 256
+
+    # 4. Return output.
+    # String::formatted("{}.{}.{}.{}", output[0], output[1], output[2], output[3])
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    for i: usize in 0..=3:
+        if i > 0:
+            ak.string_builder_append_u8(&builder, '.')
+        append_decimal(&builder, output[i])
+    return ak.string_builder_to_string(&builder) else trap("MUST: String::formatted")
+
+## Ported from Libraries/LibURL/Host.cpp:52 URL::find_the_ipv6_address_compressed_piece_index.
+# https://url.spec.whatwg.org/#find-the-ipv6-address-compressed-piece-index
+func find_the_ipv6_address_compressed_piece_index(address: ak.IPv6Address) -> usize?:
+    # 1. Let longestIndex be null.
+    var longest_index: usize? = none
+
+    # 2. Let longestSize be 1.
+    var longest_size: usize = 1
+
+    # 3. Let foundIndex be null.
+    var found_index: usize? = none
+
+    # 4. Let foundSize be 0.
+    var found_size: usize = 0
+
+    # 5. For each pieceIndex of address’s pieces’s indices:
+    for piece_index: usize in 0..<8:
+        # 1. If address’s pieces[pieceIndex] is not 0:
+        if ak.i_pv6_address_at(&address, piece_index) != 0:
+            # 1. If foundSize is greater than longestSize, then set longestIndex to foundIndex and longestSize to foundSize.
+            if found_size > longest_size:
+                longest_index = found_index
+                longest_size = found_size
+
+            # 2. Set foundIndex to null.
+            found_index = none
+
+            # 3. Set foundSize to 0.
+            found_size = 0
+        # 2. Otherwise:
+        else:
+            # 1. If foundIndex is null, then set foundIndex to pieceIndex.
+            if found_index == none:
+                found_index = piece_index
+
+            # 2. Increment foundSize by 1.
+            found_size += 1
+
+    # 6. If foundSize is greater than longestSize, then return foundIndex.
+    if found_size > longest_size:
+        return found_index
+
+    # 7. Return longestIndex.
+    return longest_index
+
+## Ported from Libraries/LibURL/Host.cpp:102 URL::serialize_ipv6_address.
+# https://url.spec.whatwg.org/#concept-ipv6-serializer
+func serialize_ipv6_address(address: ak.IPv6Address, output: ak.StringBuilder*):
+    # 1. Let output be the empty string.
+
+    # 2. Let compress be the result of finding the IPv6 address compressed piece index given address.
+    let compress = find_the_ipv6_address_compressed_piece_index(address)
+
+    # 3. Let ignore0 be false.
+    var ignore0 = false
+
+    # 4. For each pieceIndex of address’s pieces’s indices:
+    for piece_index: usize in 0..<8:
+        # 1. If ignore0 is true and address[pieceIndex] is 0, then continue.
+        if ignore0 and ak.i_pv6_address_at(&address, piece_index) == 0:
+            continue
+
+        # 2. Otherwise, if ignore0 is true, set ignore0 to false.
+        if ignore0:
+            ignore0 = false
+
+        # 3. If compress is pieceIndex, then:
+        if compress == piece_index:
+            # 1. Let separator be "::" if pieceIndex is 0, and U+003A (:) otherwise.
+            let separator = "::" if piece_index == 0 else ":"
+
+            # 2. Append separator to output.
+            append_literal(output, separator)
+
+            # 3. Set ignore0 to true and continue.
+            ignore0 = true
+            continue
+
+        # 4. Append address[pieceIndex], represented as the shortest possible lowercase hexadecimal number, to output.
+        append_hex_lowercase(output, ak.i_pv6_address_at(&address, piece_index))
+
+        # 5. If pieceIndex is not 7, then append U+003A (:) to output.
+        if piece_index != 7:
+            ak.string_builder_append_u8(output, ':')
+
+# 5. Return output.
+
+# mark: Kinds of host ===========================================================================
+
+## Ported from Libraries/LibURL/Host.cpp:147 URL::Host::is_domain.
+# https://url.spec.whatwg.org/#concept-domain
+pub func host_is_domain(this: const Host*) -> bool:
+    # A domain is a non-empty ASCII string that identifies a realm within a network.
+    match this.m_value:
+        .string(value): return not ak.string_is_empty(&value)
+        _: return false
+
+## Ported from Libraries/LibURL/Host.cpp:154 URL::Host::is_empty_host.
+# https://url.spec.whatwg.org/#empty-host
+pub func host_is_empty_host(this: const Host*) -> bool:
+    # An empty host is the empty string.
+    match this.m_value:
+        .string(value): return ak.string_is_empty(&value)
+        _: return false
+
+## Ported from Libraries/LibURL/Host.cpp:161 URL::Host::serialize.
+# https://url.spec.whatwg.org/#concept-host-serializer
+pub func host_serialize(this: const Host*) -> ak.String:
+    match this.m_value:
+        # 1. If host is an IPv4 address, return the result of running the IPv4 serializer on host.
+        .i_pv4_address(address):
+            return serialize_ipv4_address(address)
+        # 2. Otherwise, if host is an IPv6 address, return U+005B ([), followed by the result of running the IPv6 serializer on host, followed by U+005D (]).
+        .i_pv6_address(address):
+            var output: ak.StringBuilder
+            ak.string_builder_construct(&output)
+            ak.string_builder_append_u8(&output, '[')
+            serialize_ipv6_address(address, &output)
+            ak.string_builder_append_u8(&output, ']')
+            return ak.string_builder_to_string_without_validation(&output)
+        # 3. Otherwise, host is a domain, opaque host, or empty host, return host.
+        .string(string):
+            return string
+
+# mark: Public suffix and registrable domain ====================================================
+
+## Ported from Libraries/LibURL/Host.cpp:183 URL::Host::public_suffix.
+# https://url.spec.whatwg.org/#host-public-suffix
+pub func host_public_suffix(this: const Host*) -> ak.String?:
+    # 1. If host is not a domain, then return null.
+    if not host_is_domain(this):
+        return none
+
+    let host_string = host_get_string(this)
+
+    # 2. Let trailingDot be "." if host ends with "."; otherwise the empty string.
+    let trailing_dot = sv(".") if ak.string_ends_with(&host_string, (u32)'.') else sv("")
+
+    # 3. Let publicSuffix be the public suffix determined by running the Public Suffix List algorithm with host as domain. [PSL]
+
+    # NB: The PSL algorithm maintains trailing dots, so we strip it here since step 4 expects no trailing dot.
+    var host_without_trailing_dot = ak.string_bytes_as_string_view(&host_string)
+    if not ak.string_view_is_empty(&trailing_dot):
+        host_without_trailing_dot = ak.string_view_substring_view_usize(&host_without_trailing_dot, 0,
+                                                                        ak.string_view_length(&host_without_trailing_dot) - 1)
+
+    # FIXME: Unify this logic with registrable domain.
+    var public_suffix = public_suffix_data_get_public_suffix(public_suffix_data_the(), host_without_trailing_dot)
+    if public_suffix == none:
+        if let last_dot = ak.string_view_find_last_u8(&host_without_trailing_dot, '.'):
+            public_suffix = ak.string_from_utf8(ak.string_view_substring_view(&host_without_trailing_dot,
+                                                                              last_dot + 1)) else trap("MUST: String::from_utf8")
+        else:
+            public_suffix = ak.string_from_utf8(host_without_trailing_dot) else trap("MUST: String::from_utf8")
+    let suffix = public_suffix else trap("VERIFY: public suffix")
+
+    # 4. Assert: publicSuffix is an ASCII string that does not end with ".".
+    assert(ak.string_is_ascii(&suffix))
+    assert(not ak.string_ends_with(&suffix, (u32)'.'))
+
+    # 5. Return publicSuffix and trailingDot concatenated.
+    var result: ak.StringBuilder
+    ak.string_builder_construct(&result)
+    append_string(&result, suffix)
+    ak.string_builder_append_string_view(&result, trailing_dot)
+    return ak.string_builder_to_string(&result) else trap("MUST: String::formatted")
+
+## Ported from Libraries/LibURL/Host.cpp:220 URL::Host::registrable_domain.
+# https://url.spec.whatwg.org/#host-registrable-domain
+pub func host_registrable_domain(this: const Host*) -> ak.String?:
+    # 1. If host’s public suffix is null or host’s public suffix equals host, then return null.
+    let public_suffix = host_public_suffix(this) else return none
+    if string_equals(public_suffix, host_get_string(this)):
+        return none
+
+    # NOTE: If we got here, we know this Host is a String.
+    let host_string = host_get_string(this)
+
+    # 2. Let trailingDot be "." if host ends with "."; otherwise the empty string.
+    let trailing_dot = sv(".") if ak.string_ends_with(&host_string, (u32)'.') else sv("")
+
+    # 3. Let registrableDomain be the registrable domain determined by running the Public Suffix List algorithm with host as domain. [PSL]
+
+    # NB: The PSL algorithm maintains trailing dots, so we strip it here since step 4 expects no trailing dot.
+    var host_without_trailing_dot = ak.string_bytes_as_string_view(&host_string)
+    if not ak.string_view_is_empty(&trailing_dot):
+        host_without_trailing_dot = ak.string_view_substring_view_usize(&host_without_trailing_dot, 0,
+                                                                        ak.string_view_length(&host_without_trailing_dot) - 1)
+
+    # NB: If we do not find a registrable domain via the PSL, use everything after the second to last dot.
+    var registrable_domain = get_registrable_domain(host_without_trailing_dot)
+    if registrable_domain == none:
+        if let last_dot = ak.string_view_find_last_u8(&host_without_trailing_dot, '.'):
+            let before_last_dot = ak.string_view_substring_view_usize(&host_without_trailing_dot, 0, last_dot)
+            if let second_last_dot = ak.string_view_find_last_u8(&before_last_dot, '.'):
+                registrable_domain = ak.string_from_utf8(ak.string_view_substring_view(&host_without_trailing_dot,
+                                                                                       second_last_dot + 1)) else trap("MUST: String::from_utf8")
+
+    if registrable_domain == none:
+        registrable_domain = ak.string_from_utf8(host_without_trailing_dot) else trap("MUST: String::from_utf8")
+    let domain = registrable_domain else trap("VERIFY: registrable domain")
+
+    # 4. Assert: registrableDomain is an ASCII string that does not end with ".".
+    assert(ak.string_is_ascii(&domain))
+    assert(not ak.string_ends_with(&domain, (u32)'.'))
+
+    # 5. Return registrableDomain and trailingDot concatenated.
+    var result: ak.StringBuilder
+    ak.string_builder_construct(&result)
+    append_string(&result, domain)
+    ak.string_builder_append_string_view(&result, trailing_dot)
+    return ak.string_builder_to_string(&result) else trap("MUST: String::formatted")

@@ -1,0 +1,446 @@
+#==============================================================================================
+#
+#   url_1 - URL: its data, accessors, setters and serializers
+#
+#   DESCRIPTION:
+#       Port of the inline functions of Libraries/LibURL/URL.h (lines 82-245) and of
+#       Libraries/LibURL/URL.cpp lines 1-319 (URL::complete_url to URL::serialize_for_display).
+#       The rest of URL.cpp is url_2.lucb.
+#
+#       A URL keeps its data behind AK::CopyOnWrite<Data>. C++ shares the data between copies
+#       and clones it when a shared copy is written. Without reference counts sharing cannot be
+#       seen (DESIGN.md §3.3), so every write through `url_data_mutable` detaches the URL: the
+#       copies other code holds keep the data they saw, exactly as in C++.
+#
+#==============================================================================================
+
+# mark: Data ====================================================================================
+
+# URL::Data as it is initially (a URL in zeroed memory reads as a default-constructed URL).
+var s_empty_url_data: UrlData
+
+# m_data-> on a const URL.
+func url_data(this: const Url*) -> const UrlData*:
+    if (usize)this.m_data.m_value == 0:
+        return &s_empty_url_data
+    return this.m_data.m_value
+
+# m_data-> on a mutable URL: AK::CopyOnWrite::mutable_value().
+func url_data_mutable(this: Url*) -> UrlData*:
+    let data = url_data_clone(url_data(this))
+    this.m_data.m_value = data
+    return data
+
+## `URL::URL()` (defaulted): a URL whose data is new, empty URL::Data.
+pub func url_empty() -> Url:
+    let data = new UrlData else trap("out of memory")
+    return Url(m_data = ak.CopyOnWrite[UrlData](m_value = data))
+
+## Ported from Libraries/LibURL/URL.h:157 URL::URL::Data::clone.
+pub func url_data_clone(this: const UrlData*) -> UrlData*:
+    let clone = new UrlData else trap("out of memory")
+    clone.scheme = this.scheme
+    clone.username = this.username
+    clone.password = this.password
+    clone.host = this.host
+    clone.port = this.port
+    clone.paths = clone_vector(&this.paths)
+    clone.query = this.query
+    clone.fragment = this.fragment
+    clone.has_an_opaque_path = this.has_an_opaque_path
+    # NOTE: A blob's bytes are shared, not copied: nothing writes them after the entry is made.
+    clone.blob_url_entry = this.blob_url_entry
+    return clone
+
+# mark: Accessors (URL.h) =======================================================================
+
+## Ported from Libraries/LibURL/URL.h:89 URL::URL::scheme.
+pub func url_scheme(this: const Url*) -> ak.String:
+    return url_data(this).scheme
+
+## Ported from Libraries/LibURL/URL.h:90 URL::URL::username.
+pub func url_username(this: const Url*) -> ak.String:
+    return url_data(this).username
+
+## Ported from Libraries/LibURL/URL.h:91 URL::URL::password.
+pub func url_password(this: const Url*) -> ak.String:
+    return url_data(this).password
+
+## Ported from Libraries/LibURL/URL.h:92 URL::URL::host.
+pub func url_host(this: const Url*) -> Host?:
+    return url_data(this).host
+
+## Ported from Libraries/LibURL/URL.h:95 URL::URL::query.
+pub func url_query(this: const Url*) -> ak.String?:
+    return url_data(this).query
+
+## Ported from Libraries/LibURL/URL.h:96 URL::URL::fragment.
+pub func url_fragment(this: const Url*) -> ak.String?:
+    return url_data(this).fragment
+
+## Ported from Libraries/LibURL/URL.h:97 URL::URL::port.
+pub func url_port(this: const Url*) -> u16?:
+    return url_data(this).port
+
+## Ported from Libraries/LibURL/URL.h:99 URL::URL::path_segment_count.
+pub func url_path_segment_count(this: const Url*) -> usize:
+    return ak.vector_size(&url_data(this).paths)
+
+## Ported from Libraries/LibURL/URL.h:101 URL::URL::port_or_default.
+pub func url_port_or_default(this: const Url*) -> u16:
+    return url_data(this).port else (default_port_for_scheme(view_of(url_data(this).scheme)) else 0)
+
+## Ported from Libraries/LibURL/URL.h:105 URL::URL::has_an_opaque_path.
+# https://url.spec.whatwg.org/#url-opaque-path
+# A URL has an opaque path if its path is a URL path segment.
+pub func url_has_an_opaque_path(this: const Url*) -> bool:
+    return url_data(this).has_an_opaque_path
+
+## Ported from Libraries/LibURL/URL.h:109 URL::URL::includes_credentials.
+pub func url_includes_credentials(this: const Url*) -> bool:
+    return not ak.string_is_empty(&url_data(this).username) or not ak.string_is_empty(&url_data(this).password)
+
+## Ported from Libraries/LibURL/URL.h:110 URL::URL::is_special.
+pub func url_is_special(this: const Url*) -> bool:
+    return is_special_scheme(view_of(url_data(this).scheme))
+
+## Ported from Libraries/LibURL/URL.h:119 URL::URL::paths.
+pub func url_paths(this: const Url*) -> ak.Vector[ak.String]:
+    return url_data(this).paths
+
+## Ported from Libraries/LibURL/URL.h:120 URL::URL::set_query.
+pub func url_set_query(this: Url*, query: ak.String?):
+    url_data_mutable(this).query = query
+
+## Ported from Libraries/LibURL/URL.h:121 URL::URL::set_fragment.
+pub func url_set_fragment(this: Url*, fragment: ak.String?):
+    url_data_mutable(this).fragment = fragment
+
+## Ported from Libraries/LibURL/URL.h:122 URL::URL::set_has_an_opaque_path.
+pub func url_set_has_an_opaque_path(this: Url*, value: bool):
+    url_data_mutable(this).has_an_opaque_path = value
+
+## Ported from Libraries/LibURL/URL.h:124 URL::URL::append_slash.
+pub func url_append_slash(this: Url*):
+    # NOTE: To indicate that we want to end the path with a slash, we have to append an empty path segment.
+    ak.vector_append_t(&url_data_mutable(this).paths, empty_string())
+
+## Ported from Libraries/LibURL/URL.h:134 URL::URL::to_byte_string.
+pub func url_to_byte_string(this: const Url*) -> ak.ByteString:
+    let serialized = url_serialize(this)
+    return ak.string_to_byte_string(&serialized)
+
+## Ported from Libraries/LibURL/URL.h:135 URL::URL::to_string.
+pub func url_to_string(this: const Url*) -> ak.String:
+    return url_serialize(this)
+
+## Ported from Libraries/LibURL/URL.h:143 URL::URL::operator==.
+pub func url_eq(this: const Url*, other: Url) -> bool:
+    if (usize)url_data(this) == (usize)url_data(&other):
+        return true
+    return url_equals(this, other, ExcludeFragment.no)
+
+## Ported from Libraries/LibURL/URL.h:150 URL::URL::blob_url_entry.
+pub func url_blob_url_entry(this: const Url*) -> BlobUrlEntry?:
+    return url_data(this).blob_url_entry
+
+## Ported from Libraries/LibURL/URL.h:151 URL::URL::set_blob_url_entry.
+pub func url_set_blob_url_entry(this: Url*, entry: BlobUrlEntry?):
+    url_data_mutable(this).blob_url_entry = entry
+
+# mark: URL.cpp: paths, credentials, host and port ==============================================
+
+## Ported from Libraries/LibURL/URL.cpp:24 URL::URL::complete_url.
+pub func url_complete_url(this: const Url*, relative_url: ak.StringView) -> Url?:
+    return parser_basic_parse(relative_url, this)
+
+## Ported from Libraries/LibURL/URL.cpp:29 URL::URL::path_segment_at_index.
+pub func url_path_segment_at_index(this: const Url*, index: usize) -> ak.ByteString:
+    assert(index < url_path_segment_count(this))
+    return percent_decode(view_of(*ak.vector_at_const(&url_data(this).paths, index)))
+
+## Ported from Libraries/LibURL/URL.cpp:35 URL::URL::basename.
+pub func url_basename(this: const Url*) -> ak.ByteString:
+    if ak.vector_is_empty(&url_data(this).paths):
+        return empty_byte_string()
+    let last_segment = *ak.vector_last_const(&url_data(this).paths)
+    return percent_decode(view_of(last_segment))
+
+## Ported from Libraries/LibURL/URL.cpp:43 URL::URL::set_scheme.
+pub func url_set_scheme(this: Url*, scheme: ak.String):
+    url_data_mutable(this).scheme = scheme
+
+## Ported from Libraries/LibURL/URL.cpp:49 URL::URL::set_username.
+# https://url.spec.whatwg.org/#set-the-username
+pub func url_set_username(this: Url*, username: ak.StringView):
+    # To set the username given a url and username, set url’s username to the result of running UTF-8 percent-encode on username using the userinfo percent-encode set.
+    url_data_mutable(this).username = percent_encode(username, PercentEncodeSet.userinfo)
+
+## Ported from Libraries/LibURL/URL.cpp:56 URL::URL::set_password.
+# https://url.spec.whatwg.org/#set-the-password
+pub func url_set_password(this: Url*, password: ak.StringView):
+    # To set the password given a url and password, set url’s password to the result of running UTF-8 percent-encode on password using the userinfo percent-encode set.
+    url_data_mutable(this).password = percent_encode(password, PercentEncodeSet.userinfo)
+
+## Ported from Libraries/LibURL/URL.cpp:62 URL::URL::set_host.
+pub func url_set_host(this: Url*, host: Host):
+    url_data_mutable(this).host = host
+
+## Ported from Libraries/LibURL/URL.cpp:68 URL::URL::serialized_host.
+# https://url.spec.whatwg.org/#concept-host-serializer
+pub func url_serialized_host(this: const Url*) -> ak.String:
+    let host = url_data(this).host else trap("VERIFY: URL::serialized_host without a host")
+    return host_serialize(&host)
+
+## Ported from Libraries/LibURL/URL.cpp:73 URL::URL::set_port.
+pub func url_set_port(this: Url*, port: u16?):
+    if port == default_port_for_scheme(view_of(url_data(this).scheme)):
+        url_data_mutable(this).port = none
+        return
+    url_data_mutable(this).port = port
+
+## Ported from Libraries/LibURL/URL.cpp:82 URL::URL::set_paths.
+pub func url_set_paths(this: Url*, paths: ak.Vector[ak.ByteString]):
+    let data = url_data_mutable(this)
+    ak.vector_clear_with_capacity(&data.paths)
+    ak.vector_ensure_capacity(&data.paths, ak.vector_size(&paths))
+    for index in 0..<ak.vector_size(&paths):
+        let segment = *ak.vector_at_const(&paths, index)
+        ak.vector_unchecked_append_u(&data.paths, percent_encode(ak.byte_string_view(&segment), PercentEncodeSet.path))
+
+## Ported from Libraries/LibURL/URL.cpp:90 URL::URL::set_raw_paths.
+pub func url_set_raw_paths(this: Url*, paths: ak.Vector[ak.String]):
+    # by-value copy in C++
+    url_data_mutable(this).paths = clone_vector(&paths)
+
+## Ported from Libraries/LibURL/URL.cpp:95 URL::URL::append_path.
+pub func url_append_path(this: Url*, path: ak.StringView):
+    ak.vector_append_t(&url_data_mutable(this).paths, percent_encode(path, PercentEncodeSet.path))
+
+## Ported from Libraries/LibURL/URL.cpp:101 URL::URL::cannot_have_a_username_or_password_or_port.
+# https://url.spec.whatwg.org/#cannot-have-a-username-password-port
+pub func url_cannot_have_a_username_or_password_or_port(this: const Url*) -> bool:
+    # A URL cannot have a username/password/port if its host is null or the empty string, or its scheme is "file".
+    let host = url_data(this).host else return true
+    return host_is_empty_host(&host) or string_is(url_data(this).scheme, "file")
+
+## Ported from Libraries/LibURL/URL.cpp:108 URL::default_port_for_scheme.
+# https://url.spec.whatwg.org/#default-port
+pub func default_port_for_scheme(scheme: ak.StringView) -> u16?:
+    if view_is(scheme, "ftp"):
+        return 21
+    if view_is(scheme, "http"):
+        return 80
+    if view_is(scheme, "https"):
+        return 443
+    if view_is(scheme, "ws"):
+        return 80
+    if view_is(scheme, "wss"):
+        return 443
+    return none
+
+# mark: URL.cpp: creating URLs ==================================================================
+
+## Ported from Libraries/LibURL/URL.cpp:123 URL::create_with_file_scheme.
+pub func create_with_file_scheme(path: ak.ByteString, fragment: ak.ByteString, hostname: ak.ByteString) -> Url?:
+    var lexical_path: ak.LexicalPath = ---
+    ak.lexical_path_construct(&lexical_path, path)
+    if not ak.lexical_path_is_absolute(&lexical_path):
+        return none
+
+    var url_builder: ak.StringBuilder
+    ak.string_builder_construct(&url_builder)
+    append_literal(&url_builder, "file://")
+    ak.string_builder_append_string_view(&url_builder, ak.byte_string_view(&hostname))
+    let lexical_string = ak.lexical_path_string(&lexical_path)
+    ak.string_builder_append_string_view(&url_builder, ak.byte_string_view(&lexical_string))
+    if ak.byte_string_ends_with_u8(&path, '/'):
+        ak.string_builder_append_u8(&url_builder, '/')
+    if not ak.byte_string_is_empty(&fragment):
+        ak.string_builder_append_u8(&url_builder, '#')
+        ak.string_builder_append_string_view(&url_builder, ak.byte_string_view(&fragment))
+
+    return parser_basic_parse(ak.string_builder_string_view(&url_builder))
+
+## Ported from Libraries/LibURL/URL.cpp:143 URL::create_with_url_or_path.
+pub func create_with_url_or_path(url_or_path: ak.ByteString) -> Url?:
+    let url = parser_basic_parse(ak.byte_string_view(&url_or_path))
+    if url != none:
+        return url
+
+    let path = ak.lexical_path_canonicalized_path(url_or_path)
+    return create_with_file_scheme(path, empty_byte_string(), empty_byte_string())
+
+## Ported from Libraries/LibURL/URL.cpp:153 URL::create_with_data.
+pub func create_with_data(mime_type: ak.StringView, payload: ak.StringView, is_base64: bool = false) -> Url:
+    var url = url_empty()
+    url_set_has_an_opaque_path(&url, true)
+    url_set_scheme(&url, string_lit("data"))
+
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    ak.string_builder_append_string_view(&builder, mime_type)
+    if is_base64:
+        append_literal(&builder, ";base64")
+    ak.string_builder_append_u8(&builder, ',')
+    ak.string_builder_append_string_view(&builder, payload)
+    var paths: ak.Vector[ak.ByteString]
+    ak.vector_append_t(&paths, ak.string_builder_to_byte_string(&builder))
+    url_set_paths(&url, paths)
+    return url
+
+# The array behind special_schemes(), made on first use (StringView literals are not constants here).
+var s_special_schemes: ak.StringView[6]
+var s_special_schemes_made: bool
+
+## Ported from Libraries/LibURL/URL.cpp:170 URL::special_schemes.
+# https://url.spec.whatwg.org/#special-scheme
+pub func special_schemes() -> const ak.StringView[]:
+    if not s_special_schemes_made:
+        s_special_schemes = [
+            sv("ftp"),
+            sv("file"),
+            sv("http"),
+            sv("https"),
+            sv("ws"),
+            sv("wss"),
+        ]
+        s_special_schemes_made = true
+    return s_special_schemes
+
+## Ported from Libraries/LibURL/URL.cpp:184 URL::is_special_scheme.
+# https://url.spec.whatwg.org/#is-special
+pub func is_special_scheme(scheme: ak.StringView) -> bool:
+    # special_schemes().contains_slow(scheme)
+    for special_scheme in special_schemes():
+        if view_equals(special_scheme, scheme):
+            return true
+    return false
+
+# mark: URL.cpp: serializers ====================================================================
+
+## Ported from Libraries/LibURL/URL.cpp:190 URL::URL::serialize_path.
+# https://url.spec.whatwg.org/#url-path-serializer
+pub func url_serialize_path(this: const Url*) -> ak.String:
+    # 1. If url has an opaque path, then return url’s path.
+    if url_has_an_opaque_path(this):
+        return *ak.vector_at_const(&url_data(this).paths, 0)
+
+    # 2. Let output be the empty string.
+    var output: ak.StringBuilder
+    ak.string_builder_construct(&output)
+
+    # 3. For each segment of url’s path: append U+002F (/) followed by segment to output.
+    let paths = &url_data(this).paths
+    for index in 0..<ak.vector_size(paths):
+        ak.string_builder_append_u8(&output, '/')
+        append_string(&output, *ak.vector_at_const(paths, index))
+
+    # 4. Return output.
+    return ak.string_builder_to_string_without_validation(&output)
+
+## Ported from Libraries/LibURL/URL.cpp:211 URL::URL::file_path.
+# This function is used whenever a path is needed to access the actual file on disk.
+# On Windows serialize_path can produce a path like /C:/path/to/tst.htm, so the leading slash needs to be removed to obtain a valid path.
+pub func url_file_path(this: const Url*) -> ak.ByteString:
+    var path = percent_decode(view_of(url_serialize_path(this)))
+    if os.windows:
+        if ak.byte_string_starts_with_u8(&path, '/'):
+            path = ak.byte_string_substring(&path, 1)
+    return path
+
+## Ported from Libraries/LibURL/URL.cpp:222 URL::URL::serialize.
+# https://url.spec.whatwg.org/#concept-url-serializer
+pub func url_serialize(this: const Url*, exclude_fragment: ExcludeFragment = ExcludeFragment.no) -> ak.String:
+    let data = url_data(this)
+
+    # 1. Let output be url’s scheme and U+003A (:) concatenated.
+    var output: ak.StringBuilder
+    ak.string_builder_construct(&output)
+    append_string(&output, data.scheme)
+    ak.string_builder_append_u8(&output, ':')
+
+    # 2. If url’s host is non-null:
+    if data.host != none:
+        # 1. Append "//" to output.
+        append_literal(&output, "//")
+
+        # 2. If url includes credentials, then:
+        if url_includes_credentials(this):
+            # 1. Append url’s username to output.
+            append_string(&output, data.username)
+
+            # 2. If url’s password is not the empty string, then append U+003A (:), followed by url’s password, to output.
+            if not ak.string_is_empty(&data.password):
+                ak.string_builder_append_u8(&output, ':')
+                append_string(&output, data.password)
+
+            # 3. Append U+0040 (@) to output.
+            ak.string_builder_append_u8(&output, '@')
+
+        # 3. Append url’s host, serialized, to output.
+        append_string(&output, url_serialized_host(this))
+
+        # 4. If url’s port is non-null, append U+003A (:) followed by url’s port, serialized, to output.
+        if let port = data.port:
+            ak.string_builder_append_u8(&output, ':')
+            append_decimal(&output, port)
+
+    # 3. If url’s host is null, url does not have an opaque path, url’s path’s size is greater than 1, and url’s path[0] is the empty string, then append U+002F (/) followed by U+002E (.) to output.
+    if (url_host(this) == none and not url_has_an_opaque_path(this) and ak.vector_size(&data.paths) > 1 and ak.string_is_empty(ak.vector_at_const(&data.paths, 0))):
+        append_literal(&output, "/.")
+
+    # 4. Append the result of URL path serializing url to output.
+    append_string(&output, url_serialize_path(this))
+
+    # 5. If url’s query is non-null, append U+003F (?), followed by url’s query, to output.
+    if let query = data.query:
+        ak.string_builder_append_u8(&output, '?')
+        append_string(&output, query)
+
+    # 6. If exclude fragment is false and url’s fragment is non-null, then append U+0023 (#), followed by url’s fragment, to output.
+    if exclude_fragment == ExcludeFragment.no:
+        if let fragment = data.fragment:
+            ak.string_builder_append_u8(&output, '#')
+            append_string(&output, fragment)
+
+    # 7. Return output.
+    return ak.string_builder_to_string_without_validation(&output)
+
+## Ported from Libraries/LibURL/URL.cpp:284 URL::URL::serialize_for_display.
+# https://url.spec.whatwg.org/#url-rendering
+# NOTE: This does e.g. not display credentials.
+# FIXME: Parts of the URL other than the host should have their sequences of percent-encoded bytes replaced with code points
+#        resulting from percent-decoding those sequences converted to bytes, unless that renders those sequences invisible.
+pub func url_serialize_for_display(this: const Url*) -> ak.ByteString:
+    let data = url_data(this)
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    append_string(&builder, data.scheme)
+    ak.string_builder_append_u8(&builder, ':')
+
+    if data.host != none:
+        append_literal(&builder, "//")
+        append_string(&builder, url_serialized_host(this))
+        if let port = data.port:
+            ak.string_builder_append_u8(&builder, ':')
+            append_decimal(&builder, port)
+
+    if url_has_an_opaque_path(this):
+        append_string(&builder, *ak.vector_at_const(&data.paths, 0))
+    else:
+        if data.host == none and ak.vector_size(&data.paths) > 1 and ak.string_is_empty(ak.vector_at_const(&data.paths, 0)):
+            append_literal(&builder, "/.")
+        for index in 0..<ak.vector_size(&data.paths):
+            ak.string_builder_append_u8(&builder, '/')
+            append_string(&builder, *ak.vector_at_const(&data.paths, index))
+
+    if let query = data.query:
+        ak.string_builder_append_u8(&builder, '?')
+        append_string(&builder, query)
+
+    if let fragment = data.fragment:
+        ak.string_builder_append_u8(&builder, '#')
+        append_string(&builder, fragment)
+
+    return ak.string_builder_to_byte_string(&builder)

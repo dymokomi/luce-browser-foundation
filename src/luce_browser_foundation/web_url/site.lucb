@@ -1,0 +1,85 @@
+#==============================================================================================
+#
+#   site - Site: an opaque origin or a scheme-and-host
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Site.cpp (lines 1-82) and Libraries/LibURL/Site.h (lines 1-37).
+#
+#==============================================================================================
+
+## Ported from Libraries/LibURL/Site.cpp:12 URL::Site::obtain.
+# https://html.spec.whatwg.org/multipage/browsers.html#obtain-a-site
+pub func site_obtain(origin: Origin) -> Site:
+    # 1. If origin is an opaque origin, then return origin.
+    if origin_is_opaque(&origin):
+        return Site(m_value = OriginOrSchemeAndHost.origin(value = origin))
+
+    # 2. If origin's host's registrable domain is null, then return (origin's scheme, origin's host).
+    let origin_scheme_value = origin_scheme(&origin) else empty_string()
+
+    let host = origin_host(&origin)
+    let maybe_registrable_domain = host_registrable_domain(&host)
+    if maybe_registrable_domain == none:
+        return Site(m_value = OriginOrSchemeAndHost.scheme_and_host(
+            value = SchemeAndHost(scheme = origin_scheme_value, host = host)))
+    let registrable_domain = maybe_registrable_domain else trap("unreachable")
+
+    # 3. Return (origin's scheme, origin's host's registrable domain).
+    return Site(m_value = OriginOrSchemeAndHost.scheme_and_host(value = SchemeAndHost(scheme = origin_scheme_value,
+                                                                                      host = Host(m_value = ak.HostVariantType.string(value = registrable_domain)))))
+
+## Ported from Libraries/LibURL/Site.cpp:29 URL::Site::Site.
+pub func site_construct(this: Site*, value: OriginOrSchemeAndHost):
+    this.m_value = value
+
+## Ported from Libraries/LibURL/Site.cpp:35 URL::Site::is_same_site.
+# https://html.spec.whatwg.org/multipage/browsers.html#concept-site-same-site
+pub func site_is_same_site(this: const Site*, other: Site) -> bool:
+    match this.m_value:
+        .origin(origin):
+            match other.m_value:
+                # 1. If A and B are the same opaque origin, then return true.
+                # NOTE: Origins in sites are always opaque.
+                .origin(other_origin):
+                    return origin_opaque_data(&origin).nonce == origin_opaque_data(&other_origin).nonce
+                # 2. If A or B is an opaque origin, then return false.
+                .scheme_and_host(_):
+                    return false
+        .scheme_and_host(a):
+            match other.m_value:
+                # 2. If A or B is an opaque origin, then return false.
+                .origin(_):
+                    return false
+                .scheme_and_host(b):
+                    # 3. If A's and B's scheme values are different, then return false.
+                    if not string_equals(a.scheme, b.scheme):
+                        return false
+
+                    # 4. If A's and B's host values are not equal, then return false.
+                    if not host_eq(&a.host, b.host):
+                        return false
+
+                    # 5. Return true.
+                    return true
+
+## Ported from Libraries/LibURL/Site.cpp:61 URL::Site::serialize.
+# https://html.spec.whatwg.org/multipage/browsers.html#serialization-of-a-site
+pub func site_serialize(this: const Site*) -> ak.String:
+    match this.m_value:
+        # 1. If site is an opaque origin, then return "null".
+        .origin(_):
+            return string_lit("null")
+        .scheme_and_host(scheme_and_host):
+            # 2. Let result be site[0].
+            var result: ak.StringBuilder
+            ak.string_builder_construct(&result)
+            append_string(&result, scheme_and_host.scheme)
+
+            # 3. Append "://" to result.
+            append_literal(&result, "://")
+
+            # 4. Append site[1], serialized, to result.
+            append_string(&result, host_serialize(&scheme_and_host.host))
+
+            # 5. Return result.
+            return ak.string_builder_to_string_without_validation(&result)

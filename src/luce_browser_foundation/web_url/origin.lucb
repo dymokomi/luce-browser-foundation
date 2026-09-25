@@ -1,0 +1,207 @@
+#==============================================================================================
+#
+#   origin - Origin: an opaque origin or a (scheme, host, port, domain) tuple
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Origin.cpp (lines 1-161) with the inline functions of
+#       Libraries/LibURL/Origin.h (lines 1-89), including AK::Traits<URL::Origin>.
+#
+#==============================================================================================
+
+# mark: Construction and access =================================================================
+
+## Ported from Libraries/LibURL/Origin.h:31 URL::Origin::Origin.
+pub func origin_construct_origin_opaque_data(this: Origin*, opaque_data: OriginOpaqueData):
+    this.m_state = OriginTupleOrOriginOpaqueData.origin_opaque_data(value = opaque_data)
+
+## Ported from Libraries/LibURL/Origin.cpp:14 URL::Origin::create_opaque.
+pub func origin_create_opaque(type_: OriginOpaqueDataType = OriginOpaqueDataType.standard) -> Origin:
+    # Origin { OpaqueData { get_random<OpaqueData::Nonce>(), type } }: get_random<T> fills the bytes of a T.
+    var nonce: u8[16]
+    ak.fill_with_random(nonce)
+    return Origin(m_state = OriginTupleOrOriginOpaqueData.origin_opaque_data(
+        value = OriginOpaqueData(nonce = nonce, type_ = type_)))
+
+## Ported from Libraries/LibURL/Origin.cpp:19 URL::Origin::Origin.
+pub func origin_construct_optional_string(this: Origin*, scheme: ak.String?, host: Host, port: u16?, domain: ak.String? = none):
+    this.m_state = OriginTupleOrOriginOpaqueData.origin_tuple(
+        value = OriginTuple(scheme = scheme, host = host, port = port, domain = domain))
+
+## `Origin(scheme, host, port, domain)` as a value: the tuple origin of `origin_construct_optional_string`.
+pub func origin_tuple(scheme: ak.String?, host: Host, port: u16?, domain: ak.String? = none) -> Origin:
+    return Origin(m_state = OriginTupleOrOriginOpaqueData.origin_tuple(
+        value = OriginTuple(scheme = scheme, host = host, port = port, domain = domain)))
+
+# m_state.get<Tuple>().
+func origin_get_tuple(this: const Origin*) -> OriginTuple:
+    match this.m_state:
+        .origin_tuple(tuple): return tuple
+        .origin_opaque_data(_): trap("VERIFY: Origin tuple accessor on an opaque origin")
+
+## Ported from Libraries/LibURL/Origin.h:41 URL::Origin::is_opaque.
+# https://html.spec.whatwg.org/multipage/origin.html#concept-origin-opaque
+pub func origin_is_opaque(this: const Origin*) -> bool:
+    match this.m_state:
+        .origin_opaque_data(_): return true
+        .origin_tuple(_): return false
+
+## Ported from Libraries/LibURL/Origin.h:43 URL::Origin::scheme.
+pub func origin_scheme(this: const Origin*) -> ak.String?:
+    return origin_get_tuple(this).scheme
+
+## Ported from Libraries/LibURL/Origin.h:44 URL::Origin::host.
+pub func origin_host(this: const Origin*) -> Host:
+    return origin_get_tuple(this).host
+
+## Ported from Libraries/LibURL/Origin.h:45 URL::Origin::port.
+pub func origin_port(this: const Origin*) -> u16?:
+    return origin_get_tuple(this).port
+
+## Ported from Libraries/LibURL/Origin.h:46 URL::Origin::domain.
+pub func origin_domain(this: const Origin*) -> ak.String?:
+    return origin_get_tuple(this).domain
+
+## Ported from Libraries/LibURL/Origin.h:48 URL::Origin::opaque_data.
+pub func origin_opaque_data(this: const Origin*) -> OriginOpaqueData:
+    match this.m_state:
+        .origin_opaque_data(opaque_data): return opaque_data
+        .origin_tuple(_): trap("VERIFY: Origin::opaque_data on a tuple origin")
+
+# mark: Comparisons =============================================================================
+
+# host() == other.host().
+func origin_hosts_equal(a: Host, b: Host) -> bool:
+    return host_eq(&a, b)
+
+## Ported from Libraries/LibURL/Origin.cpp:29 URL::Origin::is_same_origin.
+# https://html.spec.whatwg.org/multipage/origin.html#same-origin
+pub func origin_is_same_origin(this: const Origin*, other: Origin) -> bool:
+    # 1. If A and B are the same opaque origin, then return true.
+    if origin_is_opaque(this) and origin_is_opaque(&other):
+        return origin_opaque_data(this).nonce == origin_opaque_data(&other).nonce
+
+    # 2. If A and B are both tuple origins and their schemes, hosts, and port are identical, then return true.
+    if (not origin_is_opaque(this) and not origin_is_opaque(&other) and optional_string_equals(origin_scheme(this), origin_scheme(&other)) and origin_hosts_equal(origin_host(this), origin_host(&other)) and origin_port(this) == origin_port(&other)):
+        return true
+
+    # 3. Return false.
+    return false
+
+## Ported from Libraries/LibURL/Origin.cpp:48 URL::Origin::is_same_origin_domain.
+# https://html.spec.whatwg.org/multipage/origin.html#same-origin-domain
+pub func origin_is_same_origin_domain(this: const Origin*, other: Origin) -> bool:
+    # 1. If A and B are the same opaque origin, then return true.
+    if origin_is_opaque(this) and origin_is_opaque(&other):
+        return origin_opaque_data(this).nonce == origin_opaque_data(&other).nonce
+
+    # 2. If A and B are both tuple origins, run these substeps:
+    if not origin_is_opaque(this) and not origin_is_opaque(&other):
+        # 1. If A and B's schemes are identical, and their domains are identical and non-null, then return true.
+        if (origin_domain(this) != none and optional_string_equals(origin_domain(this), origin_domain(&other)) and optional_string_equals(origin_scheme(this), origin_scheme(&other))):
+            return true
+
+        # 2. Otherwise, if A and B are same origin and their domains are identical and null, then return true.
+        if (origin_domain(this) == none and origin_domain(&other) == none and origin_is_same_origin(this, other)):
+            return true
+
+    # 3. Return false.
+    return false
+
+## Ported from Libraries/LibURL/Origin.cpp:74 URL::Origin::effective_domain.
+# https://html.spec.whatwg.org/multipage/origin.html#concept-origin-effective-domain
+pub func origin_effective_domain(this: const Origin*) -> Host?:
+    # 1. If origin is an opaque origin, then return null.
+    if origin_is_opaque(this):
+        return none
+
+    # 2. If origin's domain is non-null, then return origin's domain.
+    let tuple = origin_get_tuple(this)
+    if let domain = tuple.domain:
+        return Host(m_value = ak.HostVariantType.string(value = domain))
+
+    # 3. Return origin's host.
+    return tuple.host
+
+## Ported from Libraries/LibURL/Origin.cpp:90 URL::Origin::is_same_site.
+# https://html.spec.whatwg.org/multipage/browsers.html#same-site
+pub func origin_is_same_site(this: const Origin*, other: Origin) -> bool:
+    # 1. Let siteA be the result of obtaining a site given A.
+    let site_a = site_obtain(*this)
+
+    # 2. Let siteB be the result of obtaining a site given B.
+    let site_b = site_obtain(other)
+
+    # 3. If siteA is same site with siteB, then return true.
+    if site_is_same_site(&site_a, site_b):
+        return true
+
+    # 4. Return false.
+    return false
+
+## Ported from Libraries/LibURL/Origin.cpp:107 URL::Origin::serialize.
+# https://html.spec.whatwg.org/multipage/origin.html#ascii-serialisation-of-an-origin
+pub func origin_serialize(this: const Origin*) -> ak.String:
+    # 1. If origin is an opaque origin, then return "null"
+    if origin_is_opaque(this):
+        return string_lit("null")
+
+    # 2. Otherwise, let result be origin's scheme.
+    var result: ak.StringBuilder
+    ak.string_builder_construct(&result)
+    append_string(&result, origin_scheme(this) else empty_string())
+
+    # 3. Append "://" to result.
+    append_literal(&result, "://")
+
+    # 4. Append origin's host, serialized, to result.
+    let host = origin_host(this)
+    append_string(&result, host_serialize(&host))
+
+    # 5. If origin's port is non-null, append a U+003A COLON character (:), and origin's port, serialized, to result.
+    if let port = origin_port(this):
+        ak.string_builder_append_u8(&result, ':')
+        append_string(&result, string_number(port))
+
+    # 6. Return result
+    return ak.string_builder_to_string_without_validation(&result)
+
+## Ported from Libraries/LibURL/Origin.h:65 URL::Origin::operator==.
+pub func origin_eq(this: const Origin*, other: Origin) -> bool:
+    return origin_is_same_origin(this, other)
+
+## Ported from Libraries/LibURL/Origin.h:67 URL::Origin::is_opaque_file_origin.
+pub func origin_is_opaque_file_origin(this: const Origin*) -> bool:
+    return origin_is_opaque(this) and origin_opaque_data(this).type_ == OriginOpaqueDataType.file
+
+# mark: Traits ==================================================================================
+
+## Ported from Libraries/LibURL/Origin.cpp:137 AK::Traits<URL::Origin>::hash.
+pub func origin_traits_hash(origin: const Origin*) -> u32:
+    if origin_is_opaque(origin):
+        let nonce = origin_opaque_data(origin).nonce
+        # Random data, so the first u32 of the nonce is as good as hashing the entire thing.
+        return (((u32)nonce[0] << 24) | ((u32)nonce[1] << 16) | ((u32)nonce[2] << 8) | (u32)nonce[3])
+
+    let scheme = origin_scheme(origin) else empty_string()
+    var hash_value = ak.string_base_hash(&scheme.string_base)
+
+    if let port = origin_port(origin):
+        hash_value = ak.pair_int_hash(hash_value, port)
+
+    let host = origin_host(origin)
+    let serialized_host = host_serialize(&host)
+    hash_value = ak.pair_int_hash(hash_value, ak.string_base_hash(&serialized_host.string_base))
+
+    if let domain = origin_domain(origin):
+        hash_value = ak.pair_int_hash(hash_value, ak.string_base_hash(&domain.string_base))
+
+    return hash_value
+
+## AK::Traits<URL::Origin> (Libraries/LibURL/Origin.h:85): the port's hash, and equality as operator==
+## (DefaultTraits).
+pub struct OriginTraits: ak.Traits[Origin]:
+    var empty_: u8
+
+    pub func hash_of(key: const Origin*) -> u32: return origin_traits_hash(key)
+
+    pub func equals(a: const Origin*, b: const Origin*) -> bool: return origin_eq(a, *b)

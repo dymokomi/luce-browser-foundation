@@ -1,0 +1,405 @@
+#==============================================================================================
+#
+#   pattern_tokenizer - URLPattern: tokenizing a pattern string
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Pattern/Tokenizer.cpp (lines 1-440) and
+#       Libraries/LibURL/Pattern/Tokenizer.h (lines 1-117). Positions are code point indices,
+#       u32 in the tokenizer's helpers as in the C++.
+#
+#==============================================================================================
+
+# mark: Tokens ==================================================================================
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:13 URL::Pattern::Token::type_to_string.
+pub func token_type_to_string(type_: TokenType) -> ak.StringView:
+    match type_:
+        .open: return sv("Open")
+        .close: return sv("Close")
+        .regexp: return sv("Regexp")
+        .name: return sv("Name")
+        .char_: return sv("Char")
+        .escaped_char: return sv("EscapedChar")
+        .other_modifier: return sv("OtherModifier")
+        .asterisk: return sv("Asterisk")
+        .end: return sv("End")
+        .invalid_char: return sv("InvalidChar")
+        _: trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:40 URL::Pattern::Token::to_string.
+pub func token_to_string(this: const Token*) -> ak.String:
+    # String::formatted("{}, index: {}, value: '{}'", type_to_string(type), index, value)
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    ak.string_builder_append_string_view(&builder, token_type_to_string(this.type_))
+    append_literal(&builder, ", index: ")
+    append_decimal(&builder, this.index)
+    append_literal(&builder, ", value: '")
+    append_string(&builder, this.value)
+    ak.string_builder_append_u8(&builder, '\'')
+    return ak.string_builder_to_string(&builder) else trap("MUST: String::formatted")
+
+# mark: Tokenizing ==============================================================================
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:45 URL::Pattern::Tokenizer::Tokenizer.
+pub func tokenizer_construct(this: Tokenizer*, input: ak.Utf8View, policy: TokenizerPolicy):
+    this.m_input = input
+    this.m_policy = policy
+
+# tokenizer’s input's code point length.
+func tokenizer_input_length(this: const Tokenizer*) -> usize:
+    return ak.utf8_view_length(&this.m_input)
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:52 URL::Pattern::Tokenizer::tokenize.
+# https://urlpattern.spec.whatwg.org/#tokenize
+pub func tokenizer_tokenize(input: ak.Utf8View, policy: TokenizerPolicy) -> ak.Vector[Token]!:
+    assert(ak.utf8_view_validate_allow_lonely_surrogates(&input))
+
+    # 1. Let tokenizer be a new tokenizer.
+    # 2. Set tokenizer’s input to input.
+    # 3. Set tokenizer’s policy to policy.
+    var tokenizer: Tokenizer
+    tokenizer_construct(&tokenizer, input, policy)
+
+    # 4. While tokenizer’s index is less than tokenizer’s input's code point length:
+    while tokenizer.m_index < tokenizer_input_length(&tokenizer):
+        # 1. Run seek and get the next code point given tokenizer and tokenizer’s index.
+        tokenizer_seek_and_get_the_next_code_point(&tokenizer, (u32)tokenizer.m_index)
+
+        # 2. If tokenizer’s code point is U+002A (*):
+        if tokenizer.m_code_point == (u32)'*':
+            # 1. Run add a token with default position and length given tokenizer and "asterisk".
+            tokenizer_add_a_token_with_default_position_and_length(&tokenizer, TokenType.asterisk)
+
+            # 2. Continue.
+            continue
+
+        # 3. If tokenizer’s code point is U+002B (+) or U+003F (?):
+        if tokenizer.m_code_point == (u32)'+' or tokenizer.m_code_point == (u32)'?':
+            # 1. Run add a token with default position and length given tokenizer and "other-modifier".
+            tokenizer_add_a_token_with_default_position_and_length(&tokenizer, TokenType.other_modifier)
+
+            # 2. Continue.
+            continue
+
+        # 4. If tokenizer’s code point is U+005C (\):
+        if tokenizer.m_code_point == (u32)'\\':
+            # 1. If tokenizer’s index is equal to tokenizer’s input's code point length − 1:
+            if tokenizer.m_index == tokenizer_input_length(&tokenizer) - 1:
+                # 1. Run process a tokenizing error given tokenizer, tokenizer’s next index, and tokenizer’s index.
+                try tokenizer_process_a_tokenizing_error(&tokenizer, (u32)tokenizer.m_next_index, (u32)tokenizer.m_index)
+
+                # 2. Continue.
+                continue
+
+            # 2. Let escaped index be tokenizer’s next index.
+            let escaped_index = tokenizer.m_next_index
+
+            # 3. Run get the next code point given tokenizer.
+            tokenizer_get_the_next_code_point(&tokenizer)
+
+            # 4. Run add a token with default length given tokenizer, "escaped-char", tokenizer’s next index, and escaped index.
+            tokenizer_add_a_token_with_default_length(&tokenizer, TokenType.escaped_char, (u32)tokenizer.m_next_index, (u32)escaped_index)
+
+            # 5. Continue.
+            continue
+
+        # 5. If tokenizer’s code point is U+007B ({):
+        if tokenizer.m_code_point == (u32)'{':
+            # 1. Run add a token with default position and length given tokenizer and "open".
+            tokenizer_add_a_token_with_default_position_and_length(&tokenizer, TokenType.open)
+
+            # 2. Continue.
+            continue
+
+        # 6. If tokenizer’s code point is U+007D (}):
+        if tokenizer.m_code_point == (u32)'}':
+            # 1. Run add a token with default position and length given tokenizer and "close".
+            tokenizer_add_a_token_with_default_position_and_length(&tokenizer, TokenType.close)
+
+            # 2. Continue.
+            continue
+
+        # 1. If tokenizer’s code point is U+003A (:):
+        if tokenizer.m_code_point == (u32)':':
+            # 1. Let name position be tokenizer’s next index.
+            var name_position = tokenizer.m_next_index
+
+            # 2. Let name start be name position.
+            let name_start = name_position
+
+            # 3. While name position is less than tokenizer’s input's code point length:
+            while name_position < tokenizer_input_length(&tokenizer):
+                # 1. Run seek and get the next code point given tokenizer and name position.
+                tokenizer_seek_and_get_the_next_code_point(&tokenizer, (u32)name_position)
+
+                # 2. Let first code point be true if name position equals name start and false otherwise.
+                let first_code_point_flag = name_position == name_start
+
+                # 3. Let valid code point be the result of running is a valid name code point given tokenizer’s code point and first code point.
+                let valid_code_point = tokenizer_is_a_valid_name_code_point(tokenizer.m_code_point, first_code_point_flag)
+
+                # 4. If valid code point is false break.
+                if not valid_code_point:
+                    break
+
+                # 5. Set name position to tokenizer’s next index.
+                name_position = tokenizer.m_next_index
+
+            # 4. If name position is less than or equal to name start:
+            if name_position <= name_start:
+                # 1. Run process a tokenizing error given tokenizer, name start, and tokenizer’s index.
+                try tokenizer_process_a_tokenizing_error(&tokenizer, (u32)name_start, (u32)tokenizer.m_index)
+
+                # 2. Continue.
+                continue
+
+            # 5. Run add a token with default length given tokenizer, "name", name position, and name start.
+            tokenizer_add_a_token_with_default_length(&tokenizer, TokenType.name, (u32)name_position, (u32)name_start)
+
+            # 6. Continue.
+            continue
+
+        # 8. If tokenizer’s code point is U+0028 (():
+        if tokenizer.m_code_point == (u32)'(':
+            # 1. Let depth be 1.
+            var depth: u32 = 1
+
+            # 2. Let regexp position be tokenizer’s next index.
+            var regexp_position = tokenizer.m_next_index
+
+            # 3. Let regexp start be regexp position.
+            let regexp_start = regexp_position
+
+            # 4. Let error be false.
+            var error_seen = false
+
+            # 5. While regexp position is less than tokenizer’s input's code point length:
+            while regexp_position < tokenizer_input_length(&tokenizer):
+                # 1. Run seek and get the next code point given tokenizer and regexp position.
+                tokenizer_seek_and_get_the_next_code_point(&tokenizer, (u32)regexp_position)
+
+                # 2. If the result of running is ASCII given tokenizer’s code point is false:
+                if not ak.is_ascii(tokenizer.m_code_point):
+                    # 1. Run process a tokenizing error given tokenizer, regexp start, and tokenizer’s index.
+                    try tokenizer_process_a_tokenizing_error(&tokenizer, (u32)regexp_start, (u32)tokenizer.m_index)
+
+                    # 2. Set error to true.
+                    error_seen = true
+
+                    # 3. Break.
+                    break
+
+                # 3. If regexp position equals regexp start and tokenizer’s code point is U+003F (?):
+                if regexp_position == regexp_start and tokenizer.m_code_point == (u32)'?':
+                    # 1. Run process a tokenizing error given tokenizer, regexp start, and tokenizer’s index.
+                    try tokenizer_process_a_tokenizing_error(&tokenizer, (u32)regexp_start, (u32)tokenizer.m_index)
+
+                    # 2. Set error to true.
+                    error_seen = true
+
+                    # 3. Break.
+                    break
+
+                # 4. If tokenizer’s code point is U+005C (\):
+                if tokenizer.m_code_point == (u32)'\\':
+                    # 1. If regexp position equals tokenizer’s input's code point length − 1:
+                    if regexp_position == tokenizer_input_length(&tokenizer) - 1:
+                        # 1. Run process a tokenizing error given tokenizer, regexp start, and tokenizer’s index.
+                        try tokenizer_process_a_tokenizing_error(&tokenizer, (u32)regexp_start, (u32)tokenizer.m_index)
+
+                        # 2. Set error to true.
+                        error_seen = true
+
+                        # 3. Break
+                        break
+
+                    # 2. Run get the next code point given tokenizer.
+                    tokenizer_get_the_next_code_point(&tokenizer)
+
+                    # 3. If the result of running is ASCII given tokenizer’s code point is false:
+                    if not ak.is_ascii(tokenizer.m_code_point):
+                        # 1. Run process a tokenizing error given tokenizer, regexp start, and tokenizer’s index.
+                        try tokenizer_process_a_tokenizing_error(&tokenizer, (u32)regexp_start, (u32)tokenizer.m_index)
+
+                        # 2. Set error to true.
+                        error_seen = true
+
+                        # 3. Break.
+                        break
+
+                    # 4. Set regexp position to tokenizer’s next index.
+                    regexp_position = tokenizer.m_next_index
+
+                    # 5. Continue.
+                    continue
+
+                # 5. If tokenizer’s code point is U+0029 ()):
+                if tokenizer.m_code_point == (u32)')':
+                    # 1. Decrement depth by 1.
+                    depth -= 1
+
+                    # 1. If depth is 0:
+                    if depth == 0:
+                        # 1. Set regexp position to tokenizer’s next index.
+                        regexp_position = tokenizer.m_next_index
+
+                        # 2. Break.
+                        break
+                # 6. Otherwise if tokenizer’s code point is U+0028 (():
+                elif tokenizer.m_code_point == (u32)'(':
+                    # 1. Increment depth by 1.
+                    depth += 1
+
+                    # 2. If regexp position equals tokenizer’s input's code point length − 1:
+                    if regexp_position == tokenizer_input_length(&tokenizer) - 1:
+                        # 1. Run process a tokenizing error given tokenizer, regexp start, and tokenizer’s index.
+                        try tokenizer_process_a_tokenizing_error(&tokenizer, (u32)regexp_start, (u32)tokenizer.m_index)
+
+                        # 2. Set error to true.
+                        error_seen = true
+
+                        # 3. Break
+                        break
+
+                    # 3. Let temporary position be tokenizer’s next index.
+                    let temporary_position = tokenizer.m_next_index
+
+                    # 4. Run get the next code point given tokenizer.
+                    tokenizer_get_the_next_code_point(&tokenizer)
+
+                    # 5. If tokenizer’s code point is not U+003F (?):
+                    if tokenizer.m_code_point != (u32)'?':
+                        # 1. Run process a tokenizing error given tokenizer, regexp start, and tokenizer’s index.
+                        try tokenizer_process_a_tokenizing_error(&tokenizer, (u32)regexp_start, (u32)tokenizer.m_index)
+
+                        # 2. Set error to true.
+                        error_seen = true
+
+                        # 3. Break.
+                        break
+
+                    # 6. Set tokenizer’s next index to temporary position.
+                    tokenizer.m_next_index = temporary_position
+
+                # 7. Set regexp position to tokenizer’s next index.
+                regexp_position = tokenizer.m_next_index
+
+            # 6. If error is true continue.
+            if error_seen:
+                continue
+
+            # 7. If depth is not zero:
+            if depth != 0:
+                # 1. Run process a tokenizing error given tokenizer, regexp start, and tokenizer’s index.
+                try tokenizer_process_a_tokenizing_error(&tokenizer, (u32)regexp_start, (u32)tokenizer.m_index)
+
+                # 2. Continue.
+                continue
+
+            # 8. Let regexp length be regexp position − regexp start − 1.
+            let regexp_length = regexp_position - regexp_start - 1
+
+            # 9. If regexp length is zero:
+            if regexp_length == 0:
+                # 1. Run process a tokenizing error given tokenizer, regexp start, and tokenizer’s index.
+                try tokenizer_process_a_tokenizing_error(&tokenizer, (u32)regexp_start, (u32)tokenizer.m_index)
+
+                # 2. Continue.
+                continue
+
+            # 10. Run add a token given tokenizer, "regexp", regexp position, regexp start, and regexp length.
+            tokenizer_add_a_token(&tokenizer, TokenType.regexp, (u32)regexp_position, (u32)regexp_start, (u32)regexp_length)
+
+            # 11. Continue.
+            continue
+
+        # 9. Run add a token with default position and length given tokenizer and "char".
+        tokenizer_add_a_token_with_default_position_and_length(&tokenizer, TokenType.char_)
+
+    # 5. Run add a token with default length given tokenizer, "end", tokenizer’s index, and tokenizer’s index.
+    tokenizer_add_a_token_with_default_length(&tokenizer, TokenType.end, (u32)tokenizer.m_index, (u32)tokenizer.m_index)
+
+    # 6. Return tokenizer’s token list.
+    return tokenizer.m_token_list
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:355 URL::Pattern::Tokenizer::get_the_next_code_point.
+# https://urlpattern.spec.whatwg.org/#get-the-next-code-point
+pub func tokenizer_get_the_next_code_point(this: Tokenizer*):
+    # 1. Set tokenizer’s code point to the Unicode code point in tokenizer’s input at the position indicated by tokenizer’s next index.
+    let substring = ak.utf8_view_unicode_substring_view_usize(&this.m_input, this.m_next_index, 1)
+    let begin = ak.utf8_view_begin(&substring)
+    this.m_code_point = ak.utf8_code_point_iterator_deref(&begin)
+
+    # 2. Increment tokenizer’s next index by 1.
+    this.m_next_index += 1
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:365 URL::Pattern::Tokenizer::seek_and_get_the_next_code_point.
+# https://urlpattern.spec.whatwg.org/#seek-and-get-the-next-code-point
+pub func tokenizer_seek_and_get_the_next_code_point(this: Tokenizer*, index: u32):
+    # 1. Set tokenizer’s next index to index.
+    this.m_next_index = index
+
+    # 2. Run get the next code point given tokenizer.
+    tokenizer_get_the_next_code_point(this)
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:375 URL::Pattern::Tokenizer::add_a_token.
+# https://urlpattern.spec.whatwg.org/#add-a-token
+pub func tokenizer_add_a_token(this: Tokenizer*, type_: TokenType, next_position: u32, value_position: u32, value_length: u32):
+    # 1. Let token be a new token.
+    var token: Token
+    token_init_fields(&token)
+
+    # 2. Set token’s type to type.
+    token.type_ = type_
+
+    # 3. Set token’s index to tokenizer’s index.
+    token.index = (u32)this.m_index
+
+    # 4. Set token’s value to the code point substring from value position with length value length within tokenizer’s input.
+    let substring = ak.utf8_view_unicode_substring_view_usize(&this.m_input, value_position, value_length)
+    token.value = ak.string_from_utf8(ak.utf8_view_as_string(&substring)) else trap("MUST: String::from_utf8")
+
+    # 5. Append token to the back of tokenizer’s token list.
+    ak.vector_append_t(&this.m_token_list, token)
+
+    # 5. Set tokenizer’s index to next position.
+    this.m_index = next_position
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:397 URL::Pattern::Tokenizer::add_a_token_with_default_length.
+# https://urlpattern.spec.whatwg.org/#add-a-token-with-default-length
+pub func tokenizer_add_a_token_with_default_length(this: Tokenizer*, type_: TokenType, next_position: u32, value_position: u32):
+    # 1. Let computed length be next position − value position.
+    let computed_length = next_position - value_position
+
+    # 2. Run add a token given tokenizer, type, next position, value position, and computed length.
+    tokenizer_add_a_token(this, type_, next_position, value_position, computed_length)
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:407 URL::Pattern::Tokenizer::add_a_token_with_default_position_and_length.
+# https://urlpattern.spec.whatwg.org/#add-a-token-with-default-position-and-length
+pub func tokenizer_add_a_token_with_default_position_and_length(this: Tokenizer*, type_: TokenType):
+    # 1. Run add a token with default length given tokenizer, type, tokenizer’s next index, and tokenizer’s index.
+    tokenizer_add_a_token_with_default_length(this, type_, (u32)this.m_next_index, (u32)this.m_index)
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:414 URL::Pattern::Tokenizer::process_a_tokenizing_error.
+# https://urlpattern.spec.whatwg.org/#process-a-tokenizing-error
+pub func tokenizer_process_a_tokenizing_error(this: Tokenizer*, next_position: u32, value_position: u32) -> !:
+    # 1. If tokenizer’s policy is "strict", then throw a TypeError.
+    if this.m_policy == TokenizerPolicy.strict:
+        try pattern_throw("Error processing a token")  # FIXME: Improve this error!
+
+    # 2. Assert: tokenizer’s policy is "lenient".
+    assert(this.m_policy == TokenizerPolicy.lenient)
+
+    # 3. Run add a token with default length given tokenizer, "invalid-char", next position, and value position.
+    tokenizer_add_a_token_with_default_length(this, TokenType.invalid_char, next_position, value_position)
+
+## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:430 URL::Pattern::Tokenizer::is_a_valid_name_code_point.
+# https://urlpattern.spec.whatwg.org/#is-a-valid-name-code-point
+pub func tokenizer_is_a_valid_name_code_point(code_point: u32, first: bool) -> bool:
+    # 1. If first is true return the result of checking if code point is contained in the IdentifierStart set of code points.
+    if first:
+        return (code_point == (u32)'$' or code_point == (u32)'_' or web_unicode.code_point_has_identifier_start_property(code_point))
+
+    # 2. Otherwise return the result of checking if code point is contained in the IdentifierPart set of code points.
+    return code_point == (u32)'$' or web_unicode.code_point_has_identifier_continue_property(code_point)

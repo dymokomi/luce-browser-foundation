@@ -8,10 +8,13 @@
 #
 #==============================================================================================
 
-## AK::Traits<Url>: AK's hash and equality for the key type.
+## AK::Traits<Url>: AK's hash and equality for the key type. Filled by region r05 (Libraries/LibURL/URL.h:243:
+## the hash of the serialization; equality is DefaultTraits', operator==).
 pub struct UrlTraits: ak.Traits[Url]:
     var empty_: u8
 
-    func hash_of(key: const Url*) -> u32: trap("unported: AK::Traits<Url>::hash")
+    pub func hash_of(key: const Url*) -> u32:
+        let serialized = url_to_string(key)
+        return ak.string_base_hash(&serialized.string_base)
 
-    func equals(a: const Url*, b: const Url*) -> bool: trap("unported: AK::Traits<Url>::equals")
+    pub func equals(a: const Url*, b: const Url*) -> bool: return url_eq(a, *b)

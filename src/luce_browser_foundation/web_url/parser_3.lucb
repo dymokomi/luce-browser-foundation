@@ -1,0 +1,895 @@
+#==============================================================================================
+#
+#   parser_3 - URL::Parser::basic_parse: the basic URL parser's state machine
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Parser.cpp lines 708-952 (URL::Parser::basic_parse). The
+#       C++ lambdas over the input and its iterator (get_remaining,
+#       get_remaining_including_code_point, remaining_starts_with_two_ascii_hex_digits) are
+#       the helpers at the top. The state machine is one `match` in a loop, as the C++ is one
+#       `switch` in a `for (;;)`: `continue` skips "increase pointer by 1" at the bottom.
+#
+#==============================================================================================
+
+# mark: The lambdas over the input ==============================================================
+
+# iterator - input.begin(): the byte offset of the iterator.
+func parser_byte_offset(input: const ak.Utf8View*, iterator: const ak.Utf8CodePointIterator*) -> isize:
+    let begin = ak.utf8_view_begin(input)
+    return ak.utf8_code_point_iterator_sub(iterator, &begin)
+
+# The lambda get_remaining: the input after the current code point.
+func parser_get_remaining(input: const ak.Utf8View*, iterator: const ak.Utf8CodePointIterator*) -> ak.StringView:
+    let offset = (usize)parser_byte_offset(input, iterator) + ak.utf8_code_point_iterator_underlying_code_point_length_in_bytes(iterator)
+    let remaining = ak.utf8_view_substring_view(input, offset)
+    return ak.utf8_view_as_string(&remaining)
+
+# The lambda get_remaining_including_code_point: the input from the current code point on.
+func parser_get_remaining_including_code_point(input: const ak.Utf8View*, iterator: const ak.Utf8CodePointIterator*,
+                                               code_point: u32) -> ak.StringView:
+    if code_point == end_of_file:
+        return sv("")
+    let offset = ((usize)parser_byte_offset(input, iterator) + ak.utf8_code_point_iterator_underlying_code_point_length_in_bytes(iterator) - ak.unicode_utils_code_unit_length_for_code_point(code_point))
+    let remaining = ak.utf8_view_substring_view(input, offset)
+    return ak.utf8_view_as_string(&remaining)
+
+# The lambda remaining_starts_with_two_ascii_hex_digits.
+func parser_remaining_starts_with_two_ascii_hex_digits(iterator: const ak.Utf8CodePointIterator*) -> bool:
+    return (ak.is_ascii_hex_digit(ak.utf8_code_point_iterator_peek(iterator, 1) else end_of_file) and ak.is_ascii_hex_digit(ak.utf8_code_point_iterator_peek(iterator, 2) else end_of_file))
+
+# `++iterator`: increase pointer by 1.
+func parser_advance(iterator: ak.Utf8CodePointIterator*):
+    discard(ak.utf8_code_point_iterator_inc(iterator))
+
+# The code point substring from pointer to the end of input.
+func parser_substring_from_pointer(input: const ak.Utf8View*, iterator: const ak.Utf8CodePointIterator*) -> ak.StringView:
+    let substring = ak.utf8_view_substring_view(input, (usize)parser_byte_offset(input, iterator))
+    return ak.utf8_view_as_string(&substring)
+
+# A host of the empty string (`String {}` assigned to an Optional<Host>).
+func parser_empty_host() -> Host:
+    return Host(m_value = ak.HostVariantType.string(value = empty_string()))
+
+# mark: The basic URL parser ====================================================================
+
+## Ported from Libraries/LibURL/Parser.cpp:709 URL::Parser::basic_parse.
+# https://url.spec.whatwg.org/#concept-basic-url-parser
+pub func parser_basic_parse(raw_input: ak.StringView, base_url: const Url*? = none, url: Url*? = none, state_override: ParserState? = none, encoding: ak.StringView? = none) -> Url?:
+    var start_index: usize = 0
+    var end_index = ak.string_view_length(&raw_input)
+
+    # 1. If url is not given:
+    var url_buffer = url_empty()
+    var url_record: Url* = &url_buffer
+    if let given_url = url:
+        url_record = given_url
+    else:
+        # 1. Set url to a new URL.
+
+        # 2. If input contains any leading or trailing C0 control or space, invalid-URL-unit validation error.
+        # 3. Remove any leading and trailing C0 control or space from input.
+        var has_validation_error = false
+
+        while start_index < ak.string_view_length(&raw_input):
+            if not ak.is_ascii_c0_control_or_space(ak.string_view_at(&raw_input, start_index)):
+                break
+            has_validation_error = true
+            start_index += 1
+
+        while end_index > start_index:
+            if not ak.is_ascii_c0_control_or_space(ak.string_view_at(&raw_input, end_index - 1)):
+                break
+            has_validation_error = true
+            end_index -= 1
+
+        if has_validation_error:
+            report_validation_error()
+
+    let trimmed_input = ak.string_view_substring_view_usize(&raw_input, start_index, end_index - start_index)
+
+    # NOTE: URL Parsing expects a well formed UTF-8 'scalar' string but we may be passed through a String with lone surrogates.
+    var processed_input = ak.string_from_utf8_with_replacement_character(trimmed_input, ak.StringWithBomHandling.no)
+
+    # 2. If input contains any ASCII tab or newline, invalid-URL-unit validation error.
+    # 3. Remove all ASCII tab or newline from input.
+    if contains_ascii_tab_or_newline(view_of(processed_input)):
+        report_validation_error()
+        processed_input = remove_ascii_tab_or_newline(view_of(processed_input))
+
+    # 4. Let state be state override if given, or scheme start state otherwise.
+    var state = state_override else ParserState.scheme_start
+
+    # 5. Set encoding to the result of getting an output encoding from encoding.
+    var encoder: text_codec.Encoder*? = none
+    if let given_encoding = encoding:
+        encoder = text_codec.encoder_for(text_codec.get_output_encoding(given_encoding))
+    if encoder == none:
+        encoder = text_codec.encoder_for(sv("utf-8"))
+    assert(encoder != none)
+
+    # 6. Let buffer be the empty string.
+    var buffer: ak.StringBuilder
+    ak.string_builder_construct(&buffer)
+
+    # 7. Let atSignSeen, insideBrackets, and passwordTokenSeen be false.
+    var at_sign_seen = false
+    var inside_brackets = false
+    var password_token_seen = false
+    var username_builder: ak.StringBuilder
+    ak.string_builder_construct(&username_builder)
+    var password_builder: ak.StringBuilder
+    ak.string_builder_construct(&password_builder)
+
+    let input = utf8_view_of(view_of(processed_input))
+
+    # 8. Let pointer be a pointer for input.
+    var iterator = ak.utf8_view_begin(&input)
+    var code_point = end_of_file
+
+    # 9. Keep running the following state machine by switching on state. If after a run pointer points to the EOF code point, go to the next step. Otherwise, increase pointer by 1 and continue with the state machine.
+    # NOTE: "continue" should only be used to prevent incrementing the iterator, as this is done at the end of the loop.
+    #       ++iterator : "increase pointer by 1"
+    #       continue   : "decrease pointer by 1"
+    while true:
+        code_point = end_of_file
+        if not ak.utf8_code_point_iterator_done(&iterator):
+            code_point = ak.utf8_code_point_iterator_deref(&iterator)
+
+        match state:
+            # -> scheme start state, https://url.spec.whatwg.org/#scheme-start-state
+            .scheme_start:
+                # 1. If c is an ASCII alpha, append c, lowercased, to buffer, and set state to scheme state.
+                if ak.is_ascii_alpha(code_point):
+                    ak.string_builder_append_as_lowercase(&buffer, (u8)code_point)
+                    state = ParserState.scheme
+                # 2. Otherwise, if state override is not given, set state to no scheme state and decrease pointer by 1.
+                elif state_override == none:
+                    state = ParserState.no_scheme
+                    continue
+                # 3. Otherwise, return failure.
+                else:
+                    return none
+            # -> scheme state, https://url.spec.whatwg.org/#scheme-state
+            .scheme:
+                # 1. If c is an ASCII alphanumeric, U+002B (+), U+002D (-), or U+002E (.), append c, lowercased, to buffer.
+                if (ak.is_ascii_alphanumeric(code_point) or code_point == (u32)'+' or code_point == (u32)'-' or code_point == (u32)'.'):
+                    ak.string_builder_append_as_lowercase(&buffer, (u8)code_point)
+                # 2. Otherwise, if c is U+003A (:), then:
+                elif code_point == (u32)':':
+                    # 1. If state override is given, then:
+                    if state_override != none:
+                        # 1. If url’s scheme is a special scheme and buffer is not a special scheme, then return.
+                        if is_special_scheme(view_of(url_scheme(url_record))) and not is_special_scheme(ak.string_builder_string_view(&buffer)):
+                            return *url_record
+
+                        # 2. If url’s scheme is not a special scheme and buffer is a special scheme, then return.
+                        if not is_special_scheme(view_of(url_scheme(url_record))) and is_special_scheme(ak.string_builder_string_view(&buffer)):
+                            return *url_record
+
+                        # 3. If url includes credentials or has a non-null port, and buffer is "file", then return.
+                        if ((url_includes_credentials(url_record) or url_port(url_record) != none) and view_is(ak.string_builder_string_view(&buffer), "file")):
+                            return *url_record
+
+                        # 4. If url’s scheme is "file" and its host is an empty host, then return.
+                        if string_is(url_scheme(url_record), "file"):
+                            if let host = url_host(url_record):
+                                if host_is_empty_host(&host):
+                                    return *url_record
+
+                    # 2. Set url’s scheme to buffer.
+                    url_data_mutable(url_record).scheme = ak.string_builder_to_string_without_validation(&buffer)
+
+                    # 3. If state override is given, then:
+                    if state_override != none:
+                        # 1. If url’s port is url’s scheme’s default port, then set url’s port to null.
+                        if url_port(url_record) == default_port_for_scheme(view_of(url_scheme(url_record))):
+                            url_data_mutable(url_record).port = none
+
+                        # 2. Return.
+                        return *url_record
+
+                    # 4. Set buffer to the empty string.
+                    ak.string_builder_clear(&buffer)
+
+                    # 5. If url’s scheme is "file", then:
+                    if string_is(url_scheme(url_record), "file"):
+                        # 1. If remaining does not start with "//", special-scheme-missing-following-solidus validation error.
+                        let remaining = parser_get_remaining(&input, &iterator)
+                        if not ak.string_view_starts_with_string_view(&remaining, sv("//")):
+                            report_validation_error()
+                        # 2. Set state to file state.
+                        state = ParserState.file
+                    # 6. Otherwise, if url is special, base is non-null, and base’s scheme is url’s scheme:
+                    elif url_is_special(url_record) and base_url != none and parser_base_scheme_is(base_url, url_scheme(url_record)):
+                        # 1. Assert: base is special (and therefore does not have an opaque path).
+                        assert(url_is_special(parser_base(base_url)))
+
+                        # 2. Set state to special relative or authority state.
+                        state = ParserState.special_relative_or_authority
+                    # 7. Otherwise, if url is special, set state to special authority slashes state.
+                    elif url_is_special(url_record):
+                        state = ParserState.special_authority_slashes
+                    # 8. Otherwise, if remaining starts with an U+002F (/), set state to path or authority state and increase pointer by 1.
+                    elif parser_remaining_starts_with(&input, &iterator, "/"):
+                        state = ParserState.path_or_authority
+                        parser_advance(&iterator)
+                    # 9. Otherwise, set url’s path to the empty string and set state to opaque path state.
+                    else:
+                        url_data_mutable(url_record).has_an_opaque_path = true
+                        url_append_slash(url_record)
+                        state = ParserState.opaque_path
+                # 3. Otherwise, if state override is not given, set buffer to the empty string, state to no scheme state, and start over (from the first code point in input).
+                elif state_override == none:
+                    ak.string_builder_clear(&buffer)
+                    state = ParserState.no_scheme
+                    iterator = ak.utf8_view_begin(&input)
+                    continue
+                # 4. Otherwise, return failure.
+                else:
+                    return none
+            # -> no scheme state, https://url.spec.whatwg.org/#no-scheme-state
+            .no_scheme:
+                # 1. If base is null, or base has an opaque path and c is not U+0023 (#), missing-scheme-non-relative-URL validation error, return failure.
+                if base_url == none or (url_has_an_opaque_path(parser_base(base_url)) and code_point != (u32)'#'):
+                    report_validation_error()
+                    return none
+                # 2. Otherwise, if base has an opaque path and c is U+0023 (#), set url’s scheme to base’s scheme, url’s path to base’s path, url’s query
+                #    to base’s query,url’s fragment to the empty string, and set state to fragment state.
+                elif url_has_an_opaque_path(parser_base(base_url)) and code_point == (u32)'#':
+                    let base = parser_base(base_url)
+                    let data = url_data_mutable(url_record)
+                    data.scheme = url_data(base).scheme
+                    data.paths = clone_vector(&url_data(base).paths)
+                    data.query = url_data(base).query
+                    data.fragment = empty_string()
+                    data.has_an_opaque_path = true
+                    state = ParserState.fragment
+                # 3. Otherwise, if base’s scheme is not "file", set state to relative state and decrease pointer by 1.
+                elif not string_is(url_data(parser_base(base_url)).scheme, "file"):
+                    state = ParserState.relative
+                    continue
+                # 4. Otherwise, set state to file state and decrease pointer by 1.
+                else:
+                    state = ParserState.file
+                    continue
+            # -> special relative or authority state, https://url.spec.whatwg.org/#special-relative-or-authority-state
+            .special_relative_or_authority:
+                # 1. If c is U+002F (/) and remaining starts with U+002F (/), then set state to special authority ignore slashes state and increase pointer by 1.
+                if code_point == (u32)'/' and parser_remaining_starts_with(&input, &iterator, "/"):
+                    state = ParserState.special_authority_ignore_slashes
+                    parser_advance(&iterator)
+                # 2. Otherwise, special-scheme-missing-following-solidus validation error, set state to relative state and decrease pointer by 1.
+                else:
+                    report_validation_error()
+                    state = ParserState.relative
+                    continue
+            # -> path or authority state, https://url.spec.whatwg.org/#path-or-authority-state
+            .path_or_authority:
+                # 1. If c is U+002F (/), then set state to authority state.
+                if code_point == (u32)'/':
+                    state = ParserState.authority
+                # 2. Otherwise, set state to path state, and decrease pointer by 1.
+                else:
+                    state = ParserState.path
+                    continue
+            # -> relative state, https://url.spec.whatwg.org/#relative-state
+            .relative:
+                let base = parser_base(base_url)
+
+                # 1. Assert: base’s scheme is not "file".
+                assert(not string_is(url_scheme(base), "file"))
+
+                # 2. Set url’s scheme to base’s scheme.
+                url_data_mutable(url_record).scheme = url_data(base).scheme
+
+                # 3. If c is U+002F (/), then set state to relative slash state.
+                if code_point == (u32)'/':
+                    state = ParserState.relative_slash
+                # 4. Otherwise, if url is special and c is U+005C (\), invalid-reverse-solidus validation error, set state to relative slash state.
+                elif url_is_special(url_record) and code_point == (u32)'\\':
+                    report_validation_error()
+                    state = ParserState.relative_slash
+                # 5. Otherwise:
+                else:
+                    # 1. Set url’s username to base’s username, url’s password to base’s password, url’s host to base’s host, url’s port to base’s port, url’s path to a clone of base’s path, and url’s query to base’s query.
+                    let data = url_data_mutable(url_record)
+                    data.username = url_data(base).username
+                    data.password = url_data(base).password
+                    data.host = url_data(base).host
+                    data.port = url_data(base).port
+                    data.paths = clone_vector(&url_data(base).paths)
+                    data.query = url_data(base).query
+
+                    # 2. If c is U+003F (?), then set url’s query to the empty string, and state to query state.
+                    if code_point == (u32)'?':
+                        url_data_mutable(url_record).query = empty_string()
+                        state = ParserState.query
+                    # 3. Otherwise, if c is U+0023 (#), set url’s fragment to the empty string and state to fragment state.
+                    elif code_point == (u32)'#':
+                        url_data_mutable(url_record).fragment = empty_string()
+                        state = ParserState.fragment
+                    # 4. Otherwise, if c is not the EOF code point:
+                    elif code_point != end_of_file:
+                        # 1. Set url’s query to null.
+                        url_data_mutable(url_record).query = none
+
+                        # 2. Shorten url’s path.
+                        parser_shorten_urls_path(url_record)
+
+                        # 3. Set state to path state and decrease pointer by 1.
+                        state = ParserState.path
+                        continue
+            # -> relative slash state, https://url.spec.whatwg.org/#relative-slash-state
+            .relative_slash:
+                # 1. If url is special and c is U+002F (/) or U+005C (\), then:
+                if url_is_special(url_record) and (code_point == (u32)'/' or code_point == (u32)'\\'):
+                    # 1. If c is U+005C (\), invalid-reverse-solidus validation error.
+                    if code_point == (u32)'\\':
+                        report_validation_error()
+
+                    # 2. Set state to special authority ignore slashes state.
+                    state = ParserState.special_authority_ignore_slashes
+                # 2. Otherwise, if c is U+002F (/), then set state to authority state.
+                elif code_point == (u32)'/':
+                    state = ParserState.authority
+                # 3. Otherwise, set url’s username to base’s username, url’s password to base’s password, url’s host to base’s host, url’s port to base’s port, state to path state, and then, decrease pointer by 1.
+                else:
+                    let base = parser_base(base_url)
+                    let data = url_data_mutable(url_record)
+                    data.username = url_data(base).username
+                    data.password = url_data(base).password
+                    data.host = url_data(base).host
+                    data.port = url_data(base).port
+                    state = ParserState.path
+                    continue
+            # -> special authority slashes state, https://url.spec.whatwg.org/#special-authority-slashes-state
+            .special_authority_slashes:
+                # 1. If c is U+002F (/) and remaining starts with U+002F (/), then set state to special authority ignore slashes state and increase pointer by 1.
+                if code_point == (u32)'/' and parser_remaining_starts_with(&input, &iterator, "/"):
+                    state = ParserState.special_authority_ignore_slashes
+                    parser_advance(&iterator)
+                # 2. Otherwise, special-scheme-missing-following-solidus validation error, set state to special authority ignore slashes state and decrease pointer by 1.
+                else:
+                    report_validation_error()
+                    state = ParserState.special_authority_ignore_slashes
+                    continue
+            # -> special authority ignore slashes state, https://url.spec.whatwg.org/#special-authority-ignore-slashes-state
+            .special_authority_ignore_slashes:
+                # 1. If c is neither U+002F (/) nor U+005C (\), then set state to authority state and decrease pointer by 1.
+                if code_point != (u32)'/' and code_point != (u32)'\\':
+                    state = ParserState.authority
+                    continue
+                # 2. Otherwise, special-scheme-missing-following-solidus validation error.
+                else:
+                    report_validation_error()
+            # -> authority state, https://url.spec.whatwg.org/#authority-state
+            .authority:
+                let remaining = parser_get_remaining_including_code_point(&input, &iterator, code_point)
+
+                # Authority is delimited by '@/?#' and additionally '\' for special URLs
+                let delimiter = sv("@/?#\\") if url_is_special(url_record) else sv("@/?#")
+                let authority_end = ak.string_view_find_any_of(&remaining, delimiter)
+                let authority_length = authority_end else ak.string_view_length(&remaining)
+                let authority = ak.string_view_substring_view_usize(&remaining, 0, authority_length)
+                code_point = (u32)ak.string_view_at(&remaining, authority_length) if authority_length < ak.string_view_length(&remaining) else end_of_file
+
+                # 1. If c is U+0040 (@), then:
+                if code_point == (u32)'@':
+                    # 1. Invalid-credentials validation error.
+                    report_validation_error()
+
+                    # 2. If atSignSeen is true, then prepend "%40" to buffer.
+                    if at_sign_seen:
+                        if password_token_seen:
+                            append_literal(&password_builder, "%40")
+                        else:
+                            append_literal(&username_builder, "%40")
+
+                    # 3. Set atSignSeen to true.
+                    at_sign_seen = true
+
+                    # 4. For each codePoint in buffer:
+                    #     1. If codePoint is U+003A (:) and passwordTokenSeen is false, then set passwordTokenSeen to true and continue.
+                    #     2. Let encodedCodePoints be the result of running UTF-8 percent-encode codePoint using the userinfo percent-encode set.
+                    #     3. If passwordTokenSeen is true, then append encodedCodePoints to url’s password.
+                    #     4. Otherwise, append encodedCodePoints to url’s username.
+                    if password_token_seen:
+                        append_string(&password_builder, percent_encode(authority, PercentEncodeSet.userinfo))
+                    else:
+                        if let password_end = ak.string_view_find_u8(&authority, ':'):
+                            password_token_seen = true
+                            append_string(&username_builder, percent_encode(
+                                ak.string_view_substring_view_usize(&authority, 0, password_end), PercentEncodeSet.userinfo))
+                            append_string(&password_builder, percent_encode(
+                                ak.string_view_substring_view(&authority, password_end + 1), PercentEncodeSet.userinfo))
+                        else:
+                            append_string(&username_builder, percent_encode(authority, PercentEncodeSet.userinfo))
+
+                    # NB: Since we have batch processed the username/password, we need to move the iterator past those code points.
+                    iterator = ak.utf8_view_iterator_at_byte_offset_without_validation(&input,
+                                                                                       (usize)parser_byte_offset(&input, &iterator) + ak.string_view_length(&authority))
+                # 2. Otherwise, if one of the following is true:
+                #    * c is the EOF code point, U+002F (/), U+003F (?), or U+0023 (#)
+                #    * url is special and c is U+005C (\)
+                # NB: This is always the case per our search over authority above.
+                else:
+                    # then:
+
+                    # 1. If atSignSeen is true and buffer is the empty string, host-missing validation error, return failure.
+                    if at_sign_seen and ak.string_view_is_empty(&authority):
+                        report_validation_error()
+                        return none
+
+                    # 2. Decrease pointer by buffer’s code point length + 1, set buffer to the empty string, and set state to host state.
+                    iterator = ak.utf8_view_iterator_at_byte_offset_without_validation(&input,
+                                                                                       (usize)(parser_byte_offset(&input, &iterator) - 1))
+                    ak.string_builder_clear(&buffer)
+                    state = ParserState.host
+                    let data = url_data_mutable(url_record)
+                    data.password = ak.string_builder_to_string_without_validation(&password_builder)
+                    data.username = ak.string_builder_to_string_without_validation(&username_builder)
+            # 3. Otherwise, append c to buffer.
+            # NB: This is not needed as we do not process authority per codepoint over the buffer.
+            # -> host state, https://url.spec.whatwg.org/#host-state
+            # -> hostname state, https://url.spec.whatwg.org/#hostname-state
+            .host, .hostname:
+                # 1. If state override is given and url’s scheme is "file", then decrease pointer by 1 and set state to file host state.
+                if state_override != none and string_is(url_scheme(url_record), "file"):
+                    state = ParserState.file_host
+                    continue
+
+                # 2. Otherwise, if c is U+003A (:) and insideBrackets is false:
+                if code_point == (u32)':' and not inside_brackets:
+                    # 1. If buffer is the empty string, host-missing validation error, return failure.
+                    if ak.string_builder_is_empty(&buffer):
+                        report_validation_error()
+                        return none
+
+                    # 2. If state override is given and state override is hostname state, then return failure.
+                    if state_override == ParserState.hostname:
+                        return none
+
+                    # 3. Let host be the result of host parsing buffer with url is not special.
+                    # 4. If host is failure, then return failure.
+                    let host = parser_parse_host(ak.string_builder_string_view(&buffer), not url_is_special(url_record)) else return none
+
+                    # 5. Set url’s host to host, buffer to the empty string, and state to port state.
+                    url_data_mutable(url_record).host = host
+                    ak.string_builder_clear(&buffer)
+                    state = ParserState.port
+                # 3. Otherwise, if one of the following is true:
+                #    * c is the EOF code point, U+002F (/), U+003F (?), or U+0023 (#)
+                #    * url is special and c is U+005C (\)
+                elif ((code_point == end_of_file or code_point == (u32)'/' or code_point == (u32)'?' or code_point == (u32)'#') or (url_is_special(url_record) and code_point == (u32)'\\')):
+                    # then decrease pointer by 1, and:
+                    # NOTE: pointer decrement is done by the continue below
+
+                    # 1. If url is special and buffer is the empty string, host-missing validation error, return failure.
+                    if url_is_special(url_record) and ak.string_builder_is_empty(&buffer):
+                        report_validation_error()
+                        return none
+
+                    # 2. Otherwise, if state override is given, buffer is the empty string, and either url includes credentials or url’s port is non-null, then return failure.
+                    if (state_override != none and ak.string_builder_is_empty(&buffer) and (url_includes_credentials(url_record) or url_port(url_record) != none)):
+                        return none
+
+                    # 3. Let host be the result of host parsing buffer with url is not special.
+                    # 4. If host is failure, then return failure.
+                    let host = parser_parse_host(ak.string_builder_string_view(&buffer), not url_is_special(url_record)) else return none
+
+                    # 5. Set url’s host to host, buffer to the empty string, and state to path start state.
+                    url_data_mutable(url_record).host = host
+                    ak.string_builder_clear(&buffer)
+                    state = ParserState.port
+
+                    # 6. If state override is given, then return.
+                    if state_override != none:
+                        return *url_record
+
+                    continue
+                # 4. Otherwise:
+                else:
+                    # 1. If c is U+005B ([), then set insideBrackets to true.
+                    if code_point == (u32)'[':
+                        inside_brackets = true
+                    # 2. If c is U+005D (]), then set insideBrackets to false.
+                    elif code_point == (u32)']':
+                        inside_brackets = false
+
+                    # 3. Append c to buffer.
+                    ak.string_builder_append_code_point(&buffer, code_point)
+            # -> port state, https://url.spec.whatwg.org/#port-state
+            .port:
+                # 1. If c is an ASCII digit, append c to buffer.
+                if ak.is_ascii_digit(code_point):
+                    ak.string_builder_append_code_point(&buffer, code_point)
+
+                # 2. Otherwise, if one of the following is true:
+                #    * c is the EOF code point, U+002F (/), U+003F (?), or U+0023 (#);
+                #    * url is special and c is U+005C (\); or
+                #    * state override is given,
+                elif ((code_point == end_of_file or code_point == (u32)'/' or code_point == (u32)'?' or code_point == (u32)'#') or (url_is_special(url_record) and code_point == (u32)'\\') or state_override != none):
+                    # then:
+
+                    # 1. If buffer is not the empty string:
+                    if not ak.string_builder_is_empty(&buffer):
+                        # 1. Let port be the mathematical integer value that is represented by buffer in radix-10 using ASCII digits for digits with values 0 through 9.
+                        let port = parse_u16_no_trim(ak.string_builder_string_view(&buffer))
+
+                        # 2. If port is greater than 2^16 − 1, port-out-of-range validation error, return failure.
+                        # NOTE: This is done by to_number.
+                        if port == none:
+                            report_validation_error()
+                            return none
+                        let port_value = port else trap("unreachable")
+
+                        # 3. Set url’s port to null, if port is url’s scheme’s default port; otherwise to port.
+                        if port_value == default_port_for_scheme(view_of(url_scheme(url_record))):
+                            url_data_mutable(url_record).port = none
+                        else:
+                            url_data_mutable(url_record).port = port_value
+
+                        # 4. Set buffer to the empty string.
+                        ak.string_builder_clear(&buffer)
+
+                        # 5. If state override is given, then return.
+                        if state_override != none:
+                            return *url_record
+
+                    # 2. If state override is given, then return failure.
+                    if state_override != none:
+                        return none
+
+                    # 3. Set state to path start state and decrease pointer by 1.
+                    state = ParserState.path_start
+                    continue
+                # 3. Otherwise, port-invalid validation error, return failure.
+                else:
+                    report_validation_error()
+                    return none
+            # -> file state, https://url.spec.whatwg.org/#file-state
+            .file:
+                # 1. Set url’s scheme to "file".
+                url_data_mutable(url_record).scheme = string_lit("file")
+
+                # 2. Set url’s host to the empty string.
+                url_data_mutable(url_record).host = parser_empty_host()
+
+                # 3. If c is U+002F (/) or U+005C (\), then:
+                if code_point == (u32)'/' or code_point == (u32)'\\':
+                    # 1. If c is U+005C (\), invalid-reverse-solidus validation error.
+                    if code_point == (u32)'\\':
+                        report_validation_error()
+
+                    # 2. Set state to file slash state.
+                    state = ParserState.file_slash
+                # 4. Otherwise, if base is non-null and base’s scheme is "file":
+                elif base_url != none and parser_base_scheme_is(base_url, string_lit("file")):
+                    let base = parser_base(base_url)
+                    # 1. Set url’s host to base’s host, url’s path to a clone of base’s path, and url’s query to base’s query.
+                    let data = url_data_mutable(url_record)
+                    data.host = url_data(base).host
+                    data.paths = clone_vector(&url_data(base).paths)
+                    data.query = url_data(base).query
+
+                    # 2. If c is U+003F (?), then set url’s query to the empty string and state to query state.
+                    if code_point == (u32)'?':
+                        url_data_mutable(url_record).query = empty_string()
+                        state = ParserState.query
+                    # 3. Otherwise, if c is U+0023 (#), set url’s fragment to the empty string and state to fragment state.
+                    elif code_point == (u32)'#':
+                        url_data_mutable(url_record).fragment = empty_string()
+                        state = ParserState.fragment
+                    # 4. Otherwise, if c is not the EOF code point:
+                    elif code_point != end_of_file:
+                        # 1. Set url’s query to null.
+                        url_data_mutable(url_record).query = none
+
+                        # 2. If the code point substring from pointer to the end of input does not start with a Windows drive letter, then shorten url’s path.
+                        let substring_from_pointer = parser_substring_from_pointer(&input, &iterator)
+                        if not starts_with_windows_drive_letter(substring_from_pointer):
+                            parser_shorten_urls_path(url_record)
+                        # 3. Otherwise:
+                        else:
+                            # 1. File-invalid-Windows-drive-letter validation error.
+                            report_validation_error()
+
+                            # 2. Set url’s path to « ».
+                            ak.vector_clear(&url_data_mutable(url_record).paths)
+
+                        # 4. Set state to path state and decrease pointer by 1.
+                        state = ParserState.path
+                        continue
+                # 5. Otherwise, set state to path state, and decrease pointer by 1.
+                else:
+                    state = ParserState.path
+                    continue
+            # -> file slash state, https://url.spec.whatwg.org/#file-slash-state
+            .file_slash:
+                # 1. If c is U+002F (/) or U+005C (\), then:
+                if code_point == (u32)'/' or code_point == (u32)'\\':
+                    # 1. If c is U+005C (\), invalid-reverse-solidus validation error.
+                    if code_point == (u32)'\\':
+                        report_validation_error()
+
+                    # 2. Set state to file host state.
+                    state = ParserState.file_host
+                # 2. Otherwise:
+                else:
+                    # 1. If base is non-null and base’s scheme is "file", then:
+                    if base_url != none and parser_base_scheme_is(base_url, string_lit("file")):
+                        let base = parser_base(base_url)
+                        # 1. Set url’s host to base’s host.
+                        url_data_mutable(url_record).host = url_data(base).host
+
+                        # 2. If the code point substring from pointer to the end of input does not start with a Windows drive letter and base’s path[0] is a normalized Windows drive letter, then append base’s path[0] to url’s path.
+                        let substring_from_pointer = parser_substring_from_pointer(&input, &iterator)
+                        if (not starts_with_windows_drive_letter(substring_from_pointer) and is_normalized_windows_drive_letter(view_of(*ak.vector_at_const(&url_data(base).paths, 0)))):
+                            ak.vector_append_t(&url_data_mutable(url_record).paths, *ak.vector_at_const(&url_data(base).paths, 0))
+
+                    # 2. Set state to path state, and decrease pointer by 1.
+                    state = ParserState.path
+                    continue
+            # -> file host state, https://url.spec.whatwg.org/#file-host-state
+            .file_host:
+                # 1. If c is the EOF code point, U+002F (/), U+005C (\), U+003F (?), or U+0023 (#), then decrease pointer by 1 and then:
+                #    NOTE: decreasing the pointer is done at the bottom of this block.
+                if (code_point == end_of_file or code_point == (u32)'/' or code_point == (u32)'\\' or code_point == (u32)'?' or code_point == (u32)'#'):
+                    # 1. If state override is not given and buffer is a Windows drive letter, file-invalid-Windows-drive-letter-host validation error, set state to path state.
+                    if state_override == none and is_windows_drive_letter(ak.string_builder_string_view(&buffer)):
+                        report_validation_error()
+                        state = ParserState.path
+                    # 2. Otherwise, if buffer is the empty string, then:
+                    elif ak.string_builder_is_empty(&buffer):
+                        # 1. Set url’s host to the empty string.
+                        url_data_mutable(url_record).host = parser_empty_host()
+
+                        # 2. If state override is given, then return.
+                        if state_override != none:
+                            return *url_record
+
+                        # 3. Set state to path start state.
+                        state = ParserState.path_start
+                    # 3. Otherwise, run these steps:
+                    else:
+                        # 1. Let host be the result of host parsing buffer with url is not special.
+                        # 2. If host is failure, then return failure.
+                        var host = parser_parse_host(ak.string_builder_string_view(&buffer), not url_is_special(url_record)) else return none
+
+                        # 3. If host is "localhost", then set host to the empty string.
+                        if host_has_string(&host) and string_is(host_get_string(&host), "localhost"):
+                            host = parser_empty_host()
+
+                        # 4. Set url’s host to host.
+                        url_data_mutable(url_record).host = host
+
+                        # 5. If state override is given, then return.
+                        if state_override != none:
+                            return *url_record
+
+                        # 6. Set buffer to the empty string and state to path start state.
+                        ak.string_builder_clear(&buffer)
+                        state = ParserState.path_start
+
+                    # NOTE: Decrement specified at the top of this 'if' statement.
+                    continue
+                else:
+                    ak.string_builder_append_code_point(&buffer, code_point)
+            # -> path start state, https://url.spec.whatwg.org/#path-start-state
+            .path_start:
+                # 1. If url is special, then:
+                if url_is_special(url_record):
+                    # 1. If c is U+005C (\), invalid-reverse-solidus validation error.
+                    if code_point == (u32)'\\':
+                        report_validation_error()
+
+                    # 2. Set state to path state.
+                    state = ParserState.path
+
+                    # 3. If c is neither U+002F (/) nor U+005C (\), then decrease pointer by 1.
+                    if code_point != (u32)'/' and code_point != (u32)'\\':
+                        continue
+                # 2. Otherwise, if state override is not given and c is U+003F (?), set url’s query to the empty string and state to query state.
+                elif state_override == none and code_point == (u32)'?':
+                    url_data_mutable(url_record).query = empty_string()
+                    state = ParserState.query
+                # 3. Otherwise, if state override is not given and c is U+0023 (#), set url’s fragment to the empty string and state to fragment state.
+                elif state_override == none and code_point == (u32)'#':
+                    url_data_mutable(url_record).fragment = empty_string()
+                    state = ParserState.fragment
+                # 4. Otherwise, if c is not the EOF code point:
+                elif code_point != end_of_file:
+                    # 1. Set state to path state.
+                    state = ParserState.path
+
+                    # 2. If c is not U+002F (/), then decrease pointer by 1.
+                    if code_point != (u32)'/':
+                        continue
+                # 5. Otherwise, if state override is given and url’s host is null, append the empty string to url’s path.
+                elif state_override != none and url_host(url_record) == none:
+                    url_append_slash(url_record)
+            # -> path state, https://url.spec.whatwg.org/#path-state
+            .path:
+                # 1. If one of the following is true:
+                #    * c is the EOF code point or U+002F (/)
+                #    * url is special and c is U+005C (\)
+                #    * state override is not given and c is U+003F (?) or U+0023 (#)
+                if ((code_point == end_of_file or code_point == (u32)'/') or (url_is_special(url_record) and code_point == (u32)'\\') or (state_override == none and (code_point == (u32)'?' or code_point == (u32)'#'))):
+                    # then:
+
+                    # 1. If url is special and c is U+005C (\), invalid-reverse-solidus validation error.
+                    if url_is_special(url_record) and code_point == (u32)'\\':
+                        report_validation_error()
+
+                    # 2. If buffer is a double-dot URL path segment, then:
+                    if is_double_dot_path_segment(ak.string_builder_string_view(&buffer)):
+                        # 1. Shorten url’s path.
+                        parser_shorten_urls_path(url_record)
+
+                        # 2. If neither c is U+002F (/), nor url is special and c is U+005C (\), append the empty string to url’s path.
+                        if code_point != (u32)'/' and not (url_is_special(url_record) and code_point == (u32)'\\'):
+                            url_append_slash(url_record)
+                    # 3. Otherwise, if buffer is a single-dot URL path segment and if neither c is U+002F (/), nor url is special and c is U+005C (\), append the empty string to url’s path.
+                    elif (is_single_dot_path_segment(ak.string_builder_string_view(&buffer)) and code_point != (u32)'/' and not (url_is_special(url_record) and code_point == (u32)'\\')):
+                        url_append_slash(url_record)
+                    # 4. Otherwise, if buffer is not a single-dot URL path segment, then:
+                    elif not is_single_dot_path_segment(ak.string_builder_string_view(&buffer)):
+                        # 1. If url’s scheme is "file", url’s path is empty, and buffer is a Windows drive letter, then replace the second code point in buffer with U+003A (:).
+                        if (string_is(url_data(url_record).scheme, "file") and ak.vector_is_empty(&url_data(url_record).paths) and is_windows_drive_letter(ak.string_builder_string_view(&buffer))):
+                            let buffer_view = ak.string_builder_string_view(&buffer)
+                            let drive_letter = ak.string_view_at(&buffer_view, 0)
+                            ak.string_builder_clear(&buffer)
+                            ak.string_builder_append_u8(&buffer, drive_letter)
+                            ak.string_builder_append_u8(&buffer, ':')
+                        # 2. Append buffer to url’s path.
+                        ak.vector_append_t(&url_data_mutable(url_record).paths, ak.string_builder_to_string_without_validation(&buffer))
+
+                    # 5. Set buffer to the empty string.
+                    ak.string_builder_clear(&buffer)
+
+                    # 6. If c is U+003F (?), then set url’s query to the empty string and state to query state.
+                    if code_point == (u32)'?':
+                        url_data_mutable(url_record).query = empty_string()
+                        state = ParserState.query
+                    # 7. If c is U+0023 (#), then set url’s fragment to the empty string and state to fragment state.
+                    elif code_point == (u32)'#':
+                        url_data_mutable(url_record).fragment = empty_string()
+                        state = ParserState.fragment
+                # 2. Otherwise, run these steps
+                else:
+                    # 1. If c is not a URL code point and not U+0025 (%), invalid-URL-unit validation error.
+                    if not is_url_code_point(code_point) and code_point != (u32)'%':
+                        report_validation_error()
+
+                    # 2. If c is U+0025 (%) and remaining does not start with two ASCII hex digits, validation error.
+                    if code_point == (u32)'%' and not parser_remaining_starts_with_two_ascii_hex_digits(&iterator):
+                        report_validation_error()
+
+                    # 3. UTF-8 percent-encode c using the path percent-encode set and append the result to buffer.
+                    append_percent_encoded_if_necessary(&buffer, code_point, PercentEncodeSet.path)
+            # -> opaque path state, https://url.spec.whatwg.org/#cannot-be-a-base-url-path-state
+            .opaque_path:
+                # NOTE: This does not follow the spec exactly but rather uses the buffer and only sets the path on EOF.
+                assert(ak.vector_size(&url_data(url_record).paths) == 1 and ak.string_is_empty(ak.vector_at_const(&url_data(url_record).paths, 0)))
+
+                # 1. If c is U+003F (?), then set url’s query to the empty string and state to query state.
+                if code_point == (u32)'?':
+                    *ak.vector_at(&url_data_mutable(url_record).paths, 0) = ak.string_builder_to_string_without_validation(&buffer)
+                    url_data_mutable(url_record).query = empty_string()
+                    ak.string_builder_clear(&buffer)
+                    state = ParserState.query
+                # 2. Otherwise, if c is U+0023 (#), then set url’s fragment to the empty string and state to fragment state.
+                elif code_point == (u32)'#':
+                    # NOTE: This needs to be percent decoded since the member variables contain decoded data.
+                    *ak.vector_at(&url_data_mutable(url_record).paths, 0) = ak.string_builder_to_string_without_validation(&buffer)
+                    url_data_mutable(url_record).fragment = empty_string()
+                    ak.string_builder_clear(&buffer)
+                    state = ParserState.fragment
+                # 3. Otherwise, if c is U+0020 SPACE:
+                elif code_point == (u32)' ':
+                    # 1. If remaining starts with U+003F (?) or U+003F (#), then append "%20" to url’s path.
+                    let remaining = parser_get_remaining(&input, &iterator)
+                    if ak.string_view_starts_with_u8(&remaining, '?') or ak.string_view_starts_with_u8(&remaining, '#'):
+                        append_literal(&buffer, "%20")
+                    # 2. Otherwise, append U+0020 SPACE to url’s path.
+                    else:
+                        ak.string_builder_append_u8(&buffer, ' ')
+                # 4. Otherwise, if c is not the EOF code point:
+                elif code_point != end_of_file:
+                    # 1. If c is not a URL code point and not U+0025 (%), invalid-URL-unit validation error.
+                    if not is_url_code_point(code_point) and code_point != (u32)'%':
+                        report_validation_error()
+
+                    # 2. If c is U+0025 (%) and remaining does not start with two ASCII hex digits, invalid-URL-unit validation error.
+                    if code_point == (u32)'%' and not parser_remaining_starts_with_two_ascii_hex_digits(&iterator):
+                        report_validation_error()
+
+                    # 3. UTF-8 percent-encode c using the C0 control percent-encode set and append the result to url’s path.
+                    append_percent_encoded_if_necessary(&buffer, code_point, PercentEncodeSet.c0_control)
+                else:
+                    *ak.vector_at(&url_data_mutable(url_record).paths, 0) = ak.string_builder_to_string_without_validation(&buffer)
+                    ak.string_builder_clear(&buffer)
+            # -> query state, https://url.spec.whatwg.org/#query-state
+            .query:
+                # 1. If encoding is not UTF-8 and one of the following is true:
+                #     * url is not special
+                #     * url’s scheme is "ws" or "wss"
+                #  then set encoding to UTF-8.
+                if not url_is_special(url_record) or string_is(url_data(url_record).scheme, "ws") or string_is(url_data(url_record).scheme, "wss"):
+                    encoder = text_codec.encoder_for(sv("utf-8"))
+
+                # 2. If one of the following is true:
+                #    * state override is not given and c is U+0023 (#)
+                #    * c is the EOF code point
+                if (state_override == none and code_point == (u32)'#') or code_point == end_of_file:
+                    # then:
+
+                    # 1. Let queryPercentEncodeSet be the special-query percent-encode set if url is special; otherwise the query percent-encode set.
+                    let query_percent_encode_set = PercentEncodeSet.special_query if url_is_special(url_record) else PercentEncodeSet.query
+
+                    # 2. Percent-encode after encoding, with encoding, buffer, and queryPercentEncodeSet, and append the result to url’s query.
+                    url_data_mutable(url_record).query = parser_percent_encode_after_encoding(encoder else trap("VERIFY: encoder"),
+                                                                                              ak.string_builder_string_view(&buffer), query_percent_encode_set)
+
+                    # 3. Set buffer to the empty string.
+                    ak.string_builder_clear(&buffer)
+
+                    # 4. If c is U+0023 (#), then set url’s fragment to the empty string and state to fragment state.
+                    if code_point == (u32)'#':
+                        url_data_mutable(url_record).fragment = empty_string()
+                        state = ParserState.fragment
+                # 3. Otherwise, if c is not the EOF code point:
+                elif code_point != end_of_file:
+                    # 1. If c is not a URL code point and not U+0025 (%), invalid-URL-unit validation error.
+                    if not is_url_code_point(code_point) and code_point != (u32)'%':
+                        report_validation_error()
+
+                    # 2. If c is U+0025 (%) and remaining does not start with two ASCII hex digits, validation error.
+                    if code_point == (u32)'%' and not parser_remaining_starts_with_two_ascii_hex_digits(&iterator):
+                        report_validation_error()
+
+                    # 3. Append c to buffer.
+                    ak.string_builder_append_code_point(&buffer, code_point)
+            # -> fragment state, https://url.spec.whatwg.org/#fragment-state
+            .fragment:
+                # NOTE: This does not follow the spec exactly but rather uses the buffer and only sets the fragment on EOF.
+                # 1. If c is not the EOF code point, then:
+                if code_point != end_of_file:
+                    # 1. If c is not a URL code point and not U+0025 (%), invalid-URL-unit validation error.
+                    if not is_url_code_point(code_point) and code_point != (u32)'%':
+                        report_validation_error()
+
+                    # 2. If c is U+0025 (%) and remaining does not start with two ASCII hex digits, validation error.
+                    if code_point == (u32)'%' and not parser_remaining_starts_with_two_ascii_hex_digits(&iterator):
+                        report_validation_error()
+
+                    # 3. UTF-8 percent-encode c using the fragment percent-encode set and append the result to url’s fragment.
+                    # NOTE: The percent-encode is done on EOF on the entire buffer.
+                    ak.string_builder_append_code_point(&buffer, code_point)
+                else:
+                    let utf8_encoder = text_codec.encoder_for(sv("utf-8")) else trap("VERIFY: the UTF-8 encoder")
+                    url_data_mutable(url_record).fragment = parser_percent_encode_after_encoding(utf8_encoder,
+                                                                                                 ak.string_builder_string_view(&buffer), PercentEncodeSet.fragment)
+                    ak.string_builder_clear(&buffer)
+            _:
+                trap("VERIFY_NOT_REACHED")
+
+        if ak.utf8_code_point_iterator_done(&iterator):
+            break
+        parser_advance(&iterator)
+
+    # 10. Return url.
+    return *url_record
+
+# The base URL where the C++ dereferences Optional<URL const&> base_url (VERIFY: it is given).
+func parser_base(base_url: const Url*?) -> const Url*:
+    return base_url else trap("VERIFY: Optional<URL const&> base_url has no value")
+
+# base’s scheme is `scheme` (base is known to be non-null).
+func parser_base_scheme_is(base_url: const Url*?, scheme: ak.String) -> bool:
+    return string_equals(url_data(parser_base(base_url)).scheme, scheme)
+
+# get_remaining().starts_with(prefix).
+func parser_remaining_starts_with(input: const ak.Utf8View*, iterator: const ak.Utf8CodePointIterator*, prefix: str) -> bool:
+    let remaining = parser_get_remaining(input, iterator)
+    return ak.string_view_starts_with_string_view(&remaining, sv(prefix))

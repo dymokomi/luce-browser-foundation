@@ -1,0 +1,52 @@
+#==============================================================================================
+#
+#   tests_code_points - the module's own tests: code point classes and percent-encode sets
+#
+#   DESCRIPTION:
+#       Tests that need nothing from ak (they run while ak still has stubs). Everything that
+#       goes through ak's strings is tested by tests/web_url_tests (the donor's Tests/LibURL
+#       and expectations printed by the reference build).
+#
+#==============================================================================================
+
+test "percent_encode_sets":
+    # C0 control: below U+0020 and above U+007E.
+    assert(code_point_is_in_percent_encode_set(0x1F, PercentEncodeSet.c0_control))
+    assert(not code_point_is_in_percent_encode_set(0x20, PercentEncodeSet.c0_control))
+    assert(not code_point_is_in_percent_encode_set(0x7E, PercentEncodeSet.c0_control))
+    assert(code_point_is_in_percent_encode_set(0x7F, PercentEncodeSet.c0_control))
+    assert(code_point_is_in_percent_encode_set(0xE9, PercentEncodeSet.c0_control))
+    # Each set adds its characters to the one it builds on.
+    assert(code_point_is_in_percent_encode_set((u32)'`', PercentEncodeSet.fragment))
+    assert(not code_point_is_in_percent_encode_set((u32)'#', PercentEncodeSet.fragment))
+    assert(code_point_is_in_percent_encode_set((u32)'#', PercentEncodeSet.query))
+    assert(not code_point_is_in_percent_encode_set((u32)'\'', PercentEncodeSet.query))
+    assert(code_point_is_in_percent_encode_set((u32)'\'', PercentEncodeSet.special_query))
+    assert(code_point_is_in_percent_encode_set((u32)'?', PercentEncodeSet.path))
+    assert(code_point_is_in_percent_encode_set((u32)'{', PercentEncodeSet.path))
+    assert(not code_point_is_in_percent_encode_set((u32)'/', PercentEncodeSet.path))
+    assert(code_point_is_in_percent_encode_set((u32)'/', PercentEncodeSet.userinfo))
+    assert(code_point_is_in_percent_encode_set((u32)'|', PercentEncodeSet.userinfo))
+    assert(not code_point_is_in_percent_encode_set((u32)'&', PercentEncodeSet.userinfo))
+    assert(code_point_is_in_percent_encode_set((u32)'&', PercentEncodeSet.component))
+    assert(not code_point_is_in_percent_encode_set((u32)'~', PercentEncodeSet.component))
+    assert(code_point_is_in_percent_encode_set((u32)'~', PercentEncodeSet.application_xwww_form_urlencoded))
+    assert(not code_point_is_in_percent_encode_set((u32)'-', PercentEncodeSet.application_xwww_form_urlencoded))
+
+test "forbidden_host_code_points":
+    assert(is_forbidden_host_code_point(0))
+    assert(is_forbidden_host_code_point((u32)'#'))
+    assert(is_forbidden_host_code_point((u32)'|'))
+    assert(is_forbidden_host_code_point((u32)'\\'))
+    assert(not is_forbidden_host_code_point((u32)'%'))
+    assert(not is_forbidden_host_code_point((u32)'a'))
+
+test "parser_state_names":
+    assert(parser_state_name(ParserState.scheme_start) == "SchemeStart")
+    assert(parser_state_name(ParserState.special_authority_ignore_slashes) == "SpecialAuthorityIgnoreSlashes")
+    assert(parser_state_name(ParserState.fragment) == "Fragment")
+
+test "powers_of_256":
+    assert(pow_usize(256, 0) == 1)
+    assert(pow_usize(256, 3) == 16777216)
+    assert(pow_usize(256, 4) == 4294967296)

@@ -1,0 +1,95 @@
+#==============================================================================================
+#
+#   ecma_script_regex - regex::ECMAScriptRegex over luce-regex's ECMAScript dialect
+#
+#   DESCRIPTION:
+#       Replaces the part of Libraries/LibRegex/ECMAScriptRegex.h (lines 1-95) that LibURL's
+#       URL patterns use: compile, exec, test and capture_slot. LibRegex is Rust-backed and is
+#       not ported; DESIGN.md §7.1 puts regular expressions on luce-regex's ECMAScript dialect
+#       (QuickJS-exact syntax, errors and results). The class keeps the compiled program and
+#       the capture buffer of the last exec, as the C++ keeps them in its Impl.
+#
+#==============================================================================================
+
+## The error code of regex::ECMAScriptRegex::compile's failure; the message is the syntax error.
+pub let regex_compile_error: ErrorCode = ErrorCode.package(502)
+
+## regex::MatchResult (Libraries/LibRegex/ECMAScriptRegex.h:19).
+pub enum RegexMatchResult as i8:
+    match_ = 0
+    no_match = 1
+    limit_exceeded = 2
+
+## regex::ECMAScriptCompileFlags (Libraries/LibRegex/ECMAScriptRegex.h:25).
+pub struct RegexEcmaScriptCompileFlags:
+    pub var global: bool
+    pub var ignore_case: bool
+    pub var multiline: bool
+    pub var dot_all: bool
+    pub var unicode: bool
+    pub var unicode_sets: bool
+    pub var sticky: bool
+    pub var has_indices: bool
+
+## regex::ECMAScriptRegex::compile (Libraries/LibRegex/ECMAScriptRegex.h:45): the program for a UTF-8
+## pattern, or a failure with `regex_compile_error` whose message is the syntax error.
+pub func regex_ecma_script_regex_compile(utf8_pattern: ak.StringView, flags: RegexEcmaScriptCompileFlags) -> RegexEcmaScriptRegex*!:
+    var es_flags: i32 = 0
+    if flags.global:
+        es_flags |= regex.es_global
+    if flags.ignore_case:
+        es_flags |= regex.es_ignore_case
+    if flags.multiline:
+        es_flags |= regex.es_multiline
+    if flags.dot_all:
+        es_flags |= regex.es_dotall
+    if flags.unicode:
+        es_flags |= regex.es_unicode
+    if flags.unicode_sets:
+        es_flags |= regex.es_unicode_sets
+    if flags.sticky:
+        es_flags |= regex.es_sticky
+    if flags.has_indices:
+        es_flags |= regex.es_indices
+
+    let message = new u8[128] else trap("out of memory")
+    let program = regex.compile_ecmascript(ak.string_view_bytes(&utf8_pattern), es_flags, message, none)
+    if program == none:
+        var length: usize = 0
+        while length < message.length and message[length] != 0:
+            length += 1
+        error(regex_compile_error, (str)message[..<length])
+    let compiled = program else trap("unreachable")
+    # FIXME: The program lives in C memory and is never released: ECMAScriptRegex's destructor frees
+    #        it, and blob finalizers (DESIGN.md §3.3) do not exist yet.
+    let captures = new i32[(usize)(2 * regex.capture_count(compiled))] else trap("out of memory")
+    return new RegexEcmaScriptRegex(m_program = compiled, m_captures = captures) else trap("out of memory")
+
+# Runs the program over the input's code units from start_pos, filling the capture buffer.
+func regex_ecma_script_regex_run(this: const RegexEcmaScriptRegex*, input: ak.Utf16View, start_pos: usize) -> RegexMatchResult:
+    let program = (regex.Regex*)this.m_program
+    var result: i32 = 0
+    if ak.utf16_view_has_ascii_storage(&input):
+        result = regex.exec8(program, ak.utf16_view_ascii_span(&input), i32(start_pos), this.m_captures, none)
+    else:
+        result = regex.exec16(program, ak.utf16_view_utf16_span(&input), i32(start_pos), this.m_captures, none)
+    if result == regex.exec_match:
+        return RegexMatchResult.match_
+    if result == regex.exec_no_match:
+        return RegexMatchResult.no_match
+    return RegexMatchResult.limit_exceeded
+
+## regex::ECMAScriptRegex::exec (Libraries/LibRegex/ECMAScriptRegex.h:53): match and fill the capture buffer.
+pub func regex_ecma_script_regex_exec(this: const RegexEcmaScriptRegex*, input: ak.Utf16View, start_pos: usize) -> RegexMatchResult:
+    return regex_ecma_script_regex_run(this, input, start_pos)
+
+## regex::ECMAScriptRegex::capture_slot (Libraries/LibRegex/ECMAScriptRegex.h:58): a start (even slot) or end
+## (odd slot) code unit index of the last exec, or -1 for an unmatched capture.
+pub func regex_ecma_script_regex_capture_slot(this: const RegexEcmaScriptRegex*, slot: u32) -> i32:
+    if (usize)slot >= this.m_captures.length:
+        return -1
+    return this.m_captures[(usize)slot]
+
+## regex::ECMAScriptRegex::test (Libraries/LibRegex/ECMAScriptRegex.h:61): whether the input matches.
+pub func regex_ecma_script_regex_test(this: const RegexEcmaScriptRegex*, input: ak.Utf16View, start_pos: usize) -> RegexMatchResult:
+    return regex_ecma_script_regex_run(this, input, start_pos)

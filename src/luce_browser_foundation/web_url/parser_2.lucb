@@ -1,0 +1,268 @@
+#==============================================================================================
+#
+#   parser_2 - URL::Parser: domain to ASCII, the host parser, path and encoding helpers
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Parser.cpp lines 448-707 (ends_in_a_number_checker to
+#       remove_ascii_tab_or_newline).
+#
+#==============================================================================================
+
+# mark: Domains and hosts =======================================================================
+
+## Ported from Libraries/LibURL/Parser.cpp:449 URL::ends_in_a_number_checker.
+# https://url.spec.whatwg.org/#ends-in-a-number-checker
+func ends_in_a_number_checker(input: ak.StringView) -> bool:
+    # 1. Let parts be the result of strictly splitting input on U+002E (.).
+    var parts = ak.string_view_split_view_string_view(&input, sv("."), ak.SplitBehavior.keep_empty)
+
+    # 2. If the last item in parts is the empty string, then:
+    if ak.string_view_is_empty(ak.vector_last(&parts)):
+        # 1. If parts’s size is 1, then return false.
+        if ak.vector_size(&parts) == 1:
+            return false
+
+        # 2. Remove the last item from parts.
+        discard(ak.vector_take_last(&parts))
+
+    # 3. Let last be the last item in parts.
+    let last = *ak.vector_last(&parts)
+
+    # 4. If last is non-empty and contains only ASCII digits, then return true.
+    if not ak.string_view_is_empty(&last) and all_ascii(last, false):
+        return true
+
+    # 5. If parsing last as an IPv4 number does not return failure, then return true.
+    # NOTE: This is equivalent to checking that last is "0X" or "0x", followed by zero or more ASCII hex digits.
+    if (ak.string_view_starts_with_string_view(&last, sv("0x"), ak.CaseSensitivity.case_insensitive) and all_ascii(ak.string_view_substring_view(&last, 2), true)):
+        return true
+
+    # 6. Return false.
+    return false
+
+# all_of(view, is_ascii_digit), or all_of(view, is_ascii_hex_digit) when hex_digits.
+func all_ascii(view: ak.StringView, hex_digits: bool) -> bool:
+    for byte in ak.string_view_bytes(&view):
+        if hex_digits:
+            if not ak.is_ascii_hex_digit(byte):
+                return false
+        elif not ak.is_ascii_digit(byte):
+            return false
+    return true
+
+## Ported from Libraries/LibURL/Parser.cpp:481 URL::domain_to_ascii.
+# https://url.spec.whatwg.org/#concept-domain-to-ascii
+func domain_to_ascii(domain: ak.StringView, be_strict: bool) -> ak.String!:
+    # 1. Let result be the result of running Unicode ToASCII with domain_name set to domain,
+    #     CheckHyphens set to beStrict,
+    #     CheckBidi set to true,
+    #     CheckJoiners set to true,
+    #     UseSTD3ASCIIRules set to beStrict,
+    #     Transitional_Processing set to false,
+    #     VerifyDnsLength set to beStrict,
+    #     and IgnoreInvalidPunycode set to false. [UTS46]
+
+    # 2. If result is a failure value, domain-to-ASCII validation error, return failure.
+
+    # OPTIMIZATION: If beStrict is false, domain is an ASCII string, and strictly splitting domain on U+002E (.)
+    #               does not produce any item that starts with an ASCII case-insensitive match for "xn--", this
+    #               step is equivalent to ASCII lowercasing domain.
+    if not be_strict and ak.string_view_is_ascii(&domain):
+        # 3. If result is the empty string, domain-to-ASCII validation error, return failure.
+        if ak.string_view_is_empty(&domain):
+            error(ak.ak_error, "Empty domain")
+
+        var slow_path = false
+        let parts = ak.string_view_split_view_u8(&domain, '.')
+        for index in 0..<ak.vector_size(&parts):
+            if ak.string_view_starts_with_string_view(ak.vector_at_const(&parts, index), sv("xn--"),
+                                                      ak.CaseSensitivity.case_insensitive):
+                slow_path = true
+                break
+
+        if not slow_path:
+            return ak.string_view_to_ascii_lowercase_string(&domain)
+
+    let options = web_unicode.ToAsciiOptions(
+        check_hyphens = web_unicode.CheckHyphens.yes if be_strict else web_unicode.CheckHyphens.no,
+        check_bidi = web_unicode.CheckBidi.yes,
+        check_joiners = web_unicode.CheckJoiners.yes,
+        use_std3_ascii_rules = web_unicode.UseStd3AsciiRules.yes if be_strict else web_unicode.UseStd3AsciiRules.no,
+        transitional_processing = web_unicode.TransitionalProcessing.no,
+        verify_dns_length = web_unicode.VerifyDnsLength.yes if be_strict else web_unicode.VerifyDnsLength.no,
+        ignore_invalid_punycode = web_unicode.IgnoreInvalidPunycode.no,
+    )
+    let result = try web_unicode.idna_to_ascii(utf8_view_of(domain), options)
+
+    # 3. If result is the empty string, domain-to-ASCII validation error, return failure.
+    if ak.string_is_empty(&result):
+        error(ak.ak_error, "Empty domain")
+
+    # 4. Return result.
+    return result
+
+## Ported from Libraries/LibURL/Parser.cpp:534 URL::Parser::parse_host.
+# https://url.spec.whatwg.org/#concept-host-parser
+pub func parser_parse_host(input: ak.StringView, is_opaque: bool = false) -> Host?:
+    # 1. If input starts with U+005B ([), then:
+    if ak.string_view_starts_with_u8(&input, '['):
+        # 1. If input does not end with U+005D (]), IPv6-unclosed validation error, return failure.
+        if not ak.string_view_ends_with_u8(&input, ']'):
+            report_validation_error()
+            return none
+
+        # 2. Return the result of IPv6 parsing input with its leading U+005B ([) and trailing U+005D (]) removed.
+        let address = parse_ipv6_address(ak.string_view_substring_view_usize(&input, 1,
+                                                                             ak.string_view_length(&input) - 2)) else return none
+        return Host(m_value = ak.HostVariantType.i_pv6_address(value = address))
+
+    # 2. If isOpaque is true, then return the result of opaque-host parsing input.
+    if is_opaque:
+        return parse_opaque_host(input)
+
+    # 3. Assert: input is not the empty string.
+    assert(not ak.string_view_is_empty(&input))
+
+    # 4. Let domain be the result of running UTF-8 decode without BOM on the percent-decoding of input.
+    # NOTE: We do not need to do the UTF-8 decode without BOM as replacement is handled within domain_to_ascii.
+    let domain = percent_decode(input)
+
+    # 5. Let asciiDomain be the result of running domain to ASCII with domain and false.
+    # 6. If asciiDomain is failure, then return failure.
+    let ascii_domain: ak.String? = domain_to_ascii(ak.byte_string_view(&domain), false) catch:
+        recover none
+    let ascii_domain_value = ascii_domain else return none
+
+    # 7. If asciiDomain contains a forbidden domain code point, domain-invalid-code-point validation error, return failure.
+    for character in ak.string_base_bytes(&ascii_domain_value.string_base):
+        if is_forbidden_domain_code_point(character):
+            report_validation_error()
+            return none
+
+    # 8. If asciiDomain ends in a number, then return the result of IPv4 parsing asciiDomain.
+    if ends_in_a_number_checker(view_of(ascii_domain_value)):
+        let ipv4_host = parse_ipv4_address(view_of(ascii_domain_value)) else return none
+        return Host(m_value = ak.HostVariantType.i_pv4_address(value = ipv4_host))
+
+    # 9. Return asciiDomain.
+    return Host(m_value = ak.HostVariantType.string(value = ascii_domain_value))
+
+# mark: Windows drive letters and dot segments ==================================================
+
+## Ported from Libraries/LibURL/Parser.cpp:593 URL::starts_with_windows_drive_letter.
+# https://url.spec.whatwg.org/#start-with-a-windows-drive-letter
+pub func starts_with_windows_drive_letter(input: ak.StringView) -> bool:
+    if ak.string_view_length(&input) < 2:
+        return false
+    if (not ak.is_ascii_alpha(ak.string_view_at(&input, 0)) or not (ak.string_view_at(&input, 1) == ':' or ak.string_view_at(&input, 1) == '|')):
+        return false
+    if ak.string_view_length(&input) == 2:
+        return true
+    return literal_contains("/\\?#", ak.string_view_at(&input, 2))
+
+## Ported from Libraries/LibURL/Parser.cpp:604 URL::is_windows_drive_letter.
+pub func is_windows_drive_letter(input: ak.StringView) -> bool:
+    return (ak.string_view_length(&input) == 2 and ak.is_ascii_alpha(ak.string_view_at(&input, 0)) and (ak.string_view_at(&input, 1) == ':' or ak.string_view_at(&input, 1) == '|'))
+
+## Ported from Libraries/LibURL/Parser.cpp:609 URL::is_normalized_windows_drive_letter.
+pub func is_normalized_windows_drive_letter(input: ak.StringView) -> bool:
+    return ak.string_view_length(&input) == 2 and ak.is_ascii_alpha(ak.string_view_at(&input, 0)) and ak.string_view_at(&input, 1) == ':'
+
+## Ported from Libraries/LibURL/Parser.cpp:614 URL::is_single_dot_path_segment.
+pub func is_single_dot_path_segment(input: ak.StringView) -> bool:
+    return view_is(input, ".") or ak.string_view_equals_ignoring_ascii_case(&input, sv("%2e"))
+
+## Ported from Libraries/LibURL/Parser.cpp:619 URL::is_double_dot_path_segment.
+pub func is_double_dot_path_segment(input: ak.StringView) -> bool:
+    return (view_is(input, "..") or ak.string_view_equals_ignoring_ascii_case(&input, sv(".%2e")) or ak.string_view_equals_ignoring_ascii_case(&input, sv("%2e.")) or ak.string_view_equals_ignoring_ascii_case(&input, sv("%2e%2e")))
+
+# mark: Paths and percent-encoding ==============================================================
+
+## Ported from Libraries/LibURL/Parser.cpp:625 URL::Parser::shorten_urls_path.
+# https://url.spec.whatwg.org/#shorten-a-urls-path
+pub func parser_shorten_urls_path(url: Url*):
+    # 1. Assert: url does not have an opaque path.
+    assert(not url_has_an_opaque_path(url))
+
+    # 2. Let path be url’s path.
+    let path = &url_data_mutable(url).paths
+
+    # 3. If url’s scheme is "file", path’s size is 1, and path[0] is a normalized Windows drive letter, then return.
+    if (string_is(url_scheme(url), "file") and ak.vector_size(path) == 1 and is_normalized_windows_drive_letter(view_of(*ak.vector_at(path, 0)))):
+        return
+
+    # 4. Remove path’s last item, if any.
+    if not ak.vector_is_empty(path):
+        discard(ak.vector_take_last(path))
+
+# The captures of the two lambdas percent_encode_after_encoding hands to the encoder.
+struct ParserPercentEncodeAfterEncodingOutput:
+    var output: ak.StringBuilder*
+    var percent_encode_set: PercentEncodeSet
+    var space_as_plus: bool
+
+# The encoder's byte callback of percent_encode_after_encoding.
+func parser_percent_encode_after_encoding_on_byte(context: void*?, byte: u8):
+    let captures = (ParserPercentEncodeAfterEncodingOutput*)(context else trap("no captures"))
+    # 1. If spaceAsPlus is true and byte is 0x20 (SP), then append U+002B (+) to output and continue.
+    if captures.space_as_plus and byte == ' ':
+        ak.string_builder_append_u8(captures.output, '+')
+        return
+
+    # 2. Let isomorph be a code point whose value is byte’s value.
+    let isomorph: u32 = byte
+
+    # 3. Assert: percentEncodeSet includes all non-ASCII code points.
+
+    # 4. If isomorphic is not in percentEncodeSet, then append isomorph to output.
+    if not code_point_is_in_percent_encode_set(isomorph, captures.percent_encode_set):
+        ak.string_builder_append_code_point(captures.output, isomorph)
+
+    # 5. Otherwise, percent-encode byte and append the result to output.
+    else:
+        append_percent_encoded_byte(captures.output, byte)
+
+# The encoder's error callback of percent_encode_after_encoding.
+func parser_percent_encode_after_encoding_on_error(context: void*?, error_code_point: u32):
+    let captures = (ParserPercentEncodeAfterEncodingOutput*)(context else trap("no captures"))
+    # output.appendff("%26%23{}%3B", error)
+    append_literal(captures.output, "%26%23")
+    append_decimal(captures.output, error_code_point)
+    append_literal(captures.output, "%3B")
+
+## Ported from Libraries/LibURL/Parser.cpp:643 URL::Parser::percent_encode_after_encoding.
+# https://url.spec.whatwg.org/#string-percent-encode-after-encoding
+pub func parser_percent_encode_after_encoding(encoder: text_codec.Encoder*, input: ak.StringView, percent_encode_set: PercentEncodeSet, space_as_plus: bool = false) -> ak.String:
+    # 1. Let encodeOutput be an empty I/O queue.
+    var output: ak.StringBuilder
+    ak.string_builder_construct(&output)
+
+    var captures = ParserPercentEncodeAfterEncodingOutput(output = &output, percent_encode_set = percent_encode_set,
+                                                          space_as_plus = space_as_plus)
+
+    # 2. Set potentialError to the result of running encode or fail with inputQueue, encoder, and encodeOutput.
+    text_codec.encoder_process(encoder, utf8_view_of(input), ak.Function1[u8, unit](call = parser_percent_encode_after_encoding_on_byte, context = &captures), ak.Function1[u32, unit](call = parser_percent_encode_after_encoding_on_error, context = &captures)) else trap("MUST: Encoder::process")
+    # 3. For each byte of encodeOutput converted to a byte sequence:
+    # 4. If potentialError is non-null, then append "%26%23", followed by the shortest sequence of ASCII digits
+    #    representing potentialError in base ten, followed by "%3B", to output.
+
+    # 6. Return output.
+    return ak.string_builder_to_string(&output) else trap("MUST: StringBuilder::to_string")
+
+## Ported from Libraries/LibURL/Parser.cpp:689 URL::contains_ascii_tab_or_newline.
+func contains_ascii_tab_or_newline(input: ak.StringView) -> bool:
+    for character in ak.string_view_bytes(&input):
+        if character == '\t' or character == '\n' or character == '\r':
+            return true
+    return false
+
+## Ported from Libraries/LibURL/Parser.cpp:696 URL::remove_ascii_tab_or_newline.
+func remove_ascii_tab_or_newline(input: ak.StringView) -> ak.String:
+    var output: ak.StringBuilder
+    ak.string_builder_construct(&output)
+
+    for c in ak.string_view_bytes(&input):
+        if c != '\t' and c != '\n' and c != '\r':
+            ak.string_builder_append_u8(&output, c)
+
+    return ak.string_builder_to_string(&output) else trap("MUST: StringBuilder::to_string")

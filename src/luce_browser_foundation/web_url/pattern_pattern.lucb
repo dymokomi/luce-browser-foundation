@@ -1,0 +1,488 @@
+#==============================================================================================
+#
+#   pattern_pattern - URLPattern: creating a URL pattern and matching URLs against it
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Pattern/Pattern.cpp (lines 1-434) and the inline functions of
+#       Libraries/LibURL/Pattern/Pattern.h (lines 1-95).
+#
+#==============================================================================================
+
+# mark: Creating ================================================================================
+
+## Ported from Libraries/LibURL/Pattern/Pattern.cpp:16 URL::Pattern::hostname_pattern_is_an_ipv6_address.
+# https://urlpattern.spec.whatwg.org/#hostname-pattern-is-an-ipv6-address
+func pattern_hostname_pattern_is_an_ipv6_address(input: ak.String) -> bool:
+    # 1. If input’s code point length is less than 2, then return false.
+    if ak.string_base_byte_count(&input.string_base) < 2:
+        return false
+
+    # 2. Let input code points be input interpreted as a list of code points.
+    let input_code_points = ak.string_base_bytes(&input.string_base)
+
+    # 3. If input code points[0] is U+005B ([), then return true.
+    if input_code_points[0] == '[':
+        return true
+
+    # 4. If input code points[0] is U+007B ({) and input code points[1] is U+005B ([), then return true.
+    if input_code_points[0] == '{' and input_code_points[1] == '[':
+        return true
+
+    # 5. If input code points[0] is U+005C (\) and input code points[1] is U+005B ([), then return true.
+    if input_code_points[0] == '\\' and input_code_points[1] == '[':
+        return true
+
+    # 6. Return false.
+    return false
+
+# The lambda `[](String const& value) { return canonicalize_a_port(value); }`: the port's encoding callback.
+func pattern_create_port_encoding_callback(value: ak.String) -> ak.String!:
+    return try pattern_canonicalize_a_port(value)
+
+# processedInit[componentName]->code_points() for a component that is known to exist.
+func pattern_component_code_points(value: ak.String?) -> ak.Utf8View:
+    let string = value else trap("VERIFY: Optional::operator->")
+    return ak.string_code_points(&string)
+
+## Ported from Libraries/LibURL/Pattern/Pattern.cpp:42 URL::Pattern::Pattern::create.
+# https://urlpattern.spec.whatwg.org/#url-pattern-create
+pub func pattern_create(input: Input, base_url: ak.String? = none, ignore_case: IgnoreCase = IgnoreCase.no) -> Pattern!:
+    # 1. Let init be null.
+    var init: Init
+
+    match input:
+        # 2. If input is a scalar value string then:
+        .string(input_string):
+            # 1. Set init to the result of running parse a constructor string given input.
+            init = try constructor_string_parser_parse(ak.string_code_points(&input_string))
+
+            # 2. If baseURL is null and init["protocol"] does not exist, then throw a TypeError.
+            if base_url == none and init.protocol == none:
+                try pattern_throw("Relative URLPattern constructor must provide one of baseURL or protocol")
+
+            # 3. If baseURL is not null, set init["baseURL"] to baseURL.
+            if base_url != none:
+                init.base_url = base_url
+        # 3. Otherwise:
+        .init(input_init):
+            # 1. Assert: input is a URLPatternInit.
+
+            # 2. If baseURL is not null, then throw a TypeError.
+            if base_url != none:
+                try pattern_throw("Constructor with URLPatternInit should provide no baseURL")
+
+            # 3. Set init to input.
+            init = input_init
+
+    # 4. Let processedInit be the result of process a URLPatternInit given init, "pattern", null, null, null, null, null, null, null, and null.
+    var processed_init = try pattern_process_a_url_pattern_init(init, PatternProcessType.pattern, none, none, none, none, none,
+                                                                none, none, none)
+
+    # 5. For each componentName of « "protocol", "username", "password", "hostname", "port", "pathname", "search", "hash" »:
+    #     1. If processedInit[componentName] does not exist, then set processedInit[componentName] to "*".
+    if processed_init.protocol == none:
+        processed_init.protocol = string_lit("*")
+    if processed_init.username == none:
+        processed_init.username = string_lit("*")
+    if processed_init.password == none:
+        processed_init.password = string_lit("*")
+    if processed_init.hostname == none:
+        processed_init.hostname = string_lit("*")
+    if processed_init.port == none:
+        processed_init.port = string_lit("*")
+    if processed_init.pathname == none:
+        processed_init.pathname = string_lit("*")
+    if processed_init.search == none:
+        processed_init.search = string_lit("*")
+    if processed_init.hash == none:
+        processed_init.hash = string_lit("*")
+
+    # 6. If processedInit["protocol"] is a special scheme and processedInit["port"] is a string which represents its
+    #    corresponding default port in radix-10 using ASCII digits then set processedInit["port"] to the empty string.
+    let processed_protocol = processed_init.protocol else trap("unreachable")
+    if is_special_scheme(view_of(processed_protocol)):
+        let maybe_port = parse_u16_no_trim(view_of(processed_init.port else trap("unreachable")))
+        if let parsed_port = maybe_port:
+            if parsed_port == (default_port_for_scheme(view_of(processed_protocol)) else trap("VERIFY: Optional::value")):
+                processed_init.port = empty_string()
+
+    # 7. Let urlPattern be a new URL pattern.
+    var url_pattern: Pattern
+
+    # 8. Set urlPattern’s protocol component to the result of compiling a component given processedInit["protocol"],
+    #    canonicalize a protocol, and default options.
+    url_pattern.m_protocol_component = try component_compile(pattern_component_code_points(processed_init.protocol),
+                                                             pattern_canonicalize_a_protocol, options_default())
+
+    # 9. Set urlPattern’s username component to the result of compiling a component given processedInit["username"],
+    #    canonicalize a username, and default options.
+    url_pattern.m_username_component = try component_compile(pattern_component_code_points(processed_init.username),
+                                                             pattern_canonicalize_a_username, options_default())
+
+    # 10. Set urlPattern’s password component to the result of compiling a component given processedInit["password"],
+    #     canonicalize a password, and default options.
+    url_pattern.m_password_component = try component_compile(pattern_component_code_points(processed_init.password),
+                                                             pattern_canonicalize_a_password, options_default())
+
+    # 11. If the result running hostname pattern is an IPv6 address given processedInit["hostname"] is true, then set
+    #     urlPattern’s hostname component to the result of compiling a component given processedInit["hostname"],
+    #     canonicalize an IPv6 hostname, and hostname options.
+    if pattern_hostname_pattern_is_an_ipv6_address(processed_init.hostname else trap("unreachable")):
+        url_pattern.m_hostname_component = try component_compile(pattern_component_code_points(processed_init.hostname),
+                                                                 pattern_canonicalize_an_ipv6_hostname, options_hostname())
+    # 12. Otherwise, set urlPattern’s hostname component to the result of compiling a component given
+    #     processedInit["hostname"], canonicalize a hostname, and hostname options.
+    else:
+        url_pattern.m_hostname_component = try component_compile(pattern_component_code_points(processed_init.hostname),
+                                                                 pattern_canonicalize_a_hostname, options_hostname())
+
+    # 13. Set urlPattern’s port component to the result of compiling a component given processedInit["port"],
+    #     canonicalize a port, and default options.
+    url_pattern.m_port_component = try component_compile(pattern_component_code_points(processed_init.port),
+                                                         pattern_create_port_encoding_callback, options_default())
+
+    # 14. Let compileOptions be a copy of the default options with the ignore case property set to options["ignoreCase"].
+    var compile_options = options_default()
+    compile_options.ignore_case = ignore_case == IgnoreCase.yes
+
+    # 15. If the result of running protocol component matches a special scheme given urlPattern’s protocol component is true, then:
+    if pattern_protocol_component_matches_a_special_scheme(url_pattern.m_protocol_component):
+        # 1. Let pathCompileOptions be copy of the pathname options with the ignore case property set to options["ignoreCase"].
+        var path_compile_options = options_pathname()
+        path_compile_options.ignore_case = ignore_case == IgnoreCase.yes
+
+        # 2. Set urlPattern’s pathname component to the result of compiling a component given processedInit["pathname"],
+        #    canonicalize a pathname, and pathCompileOptions.
+        url_pattern.m_pathname_component = try component_compile(pattern_component_code_points(processed_init.pathname),
+                                                                 pattern_canonicalize_a_pathname, path_compile_options)
+    # 16. Otherwise set urlPattern’s pathname component to the result of compiling a component given
+    #     processedInit["pathname"], canonicalize an opaque pathname, and compileOptions.
+    else:
+        url_pattern.m_pathname_component = try component_compile(pattern_component_code_points(processed_init.pathname),
+                                                                 pattern_canonicalize_an_opaque_pathname, compile_options)
+
+    # 17. Set urlPattern’s search component to the result of compiling a component given processedInit["search"],
+    #     canonicalize a search, and compileOptions.
+    url_pattern.m_search_component = try component_compile(pattern_component_code_points(processed_init.search),
+                                                           pattern_canonicalize_a_search, compile_options)
+
+    # 18. Set urlPattern’s hash component to the result of compiling a component given processedInit["hash"],
+    #     canonicalize a hash, and compileOptions.
+    url_pattern.m_hash_component = try component_compile(pattern_component_code_points(processed_init.hash),
+                                                         pattern_canonicalize_a_hash, compile_options)
+
+    # 19. Return urlPattern.
+    return url_pattern
+
+# mark: Matching ================================================================================
+
+## Ported from Libraries/LibURL/Pattern/Pattern.cpp:167 URL::Pattern::Pattern::match.
+# https://urlpattern.spec.whatwg.org/#url-pattern-match
+pub func pattern_match(this: const Pattern*, input: StringOrInitOrUrl, base_url_string: ak.String?) -> (Result?)!:
+    # 1. Let protocol be the empty string.
+    var protocol = empty_string()
+
+    # 2. Let username be the empty string.
+    var username = empty_string()
+
+    # 3. Let password be the empty string.
+    var password = empty_string()
+
+    # 4. Let hostname be the empty string.
+    var hostname = empty_string()
+
+    # 5. Let port be the empty string.
+    var port = empty_string()
+
+    # 6. Let pathname be the empty string.
+    var pathname = empty_string()
+
+    # 7. Let search be the empty string.
+    var search = empty_string()
+
+    # 8. Let hash be the empty string.
+    var hash_value = empty_string()
+
+    # 9. Let inputs be an empty list.
+    var inputs: ak.Vector[Input]
+
+    match input:
+        # 10. If input is a URL, then append the serialization of input to inputs.
+        .url(input_url):
+            ak.vector_append_t(&inputs, Input.string(value = url_serialize(&input_url)))
+        # 11. Otherwise, append input to inputs.
+        .string(input_string):
+            ak.vector_append_t(&inputs, Input.string(value = input_string))
+        .init(input_init):
+            ak.vector_append_t(&inputs, Input.init(value = input_init))
+
+    match input:
+        # 12. If input is a URLPatternInit then:
+        .init(input_init):
+            # 1. If baseURLString was given, throw a TypeError.
+            if base_url_string != none:
+                try pattern_throw("Base URL cannot be provided when URLPatternInput is provided")
+
+            # 2. Let applyResult be the result of process a URLPatternInit given input, "url", protocol, username, password,
+            #    hostname, port, pathname, search, and hash. If this throws an exception, catch it, and return null.
+            let apply_result_or_error: Init? = pattern_process_a_url_pattern_init(input_init, PatternProcessType.url,
+                                                                                  protocol, username, password, hostname, port, pathname, search, hash_value) catch:
+                recover none
+            let apply_result = apply_result_or_error else return none
+
+            # 3. Set protocol to applyResult["protocol"].
+            protocol = apply_result.protocol else trap("VERIFY: Optional::value")
+
+            # 4. Set username to applyResult["username"].
+            username = apply_result.username else trap("VERIFY: Optional::value")
+
+            # 5. Set password to applyResult["password"].
+            password = apply_result.password else trap("VERIFY: Optional::value")
+
+            # 6. Set hostname to applyResult["hostname"].
+            hostname = apply_result.hostname else trap("VERIFY: Optional::value")
+
+            # 7. Set port to applyResult["port"].
+            port = apply_result.port else trap("VERIFY: Optional::value")
+
+            # 8. Set pathname to applyResult["pathname"].
+            pathname = apply_result.pathname else trap("VERIFY: Optional::value")
+
+            # 9. Set search to applyResult["search"].
+            search = apply_result.search else trap("VERIFY: Optional::value")
+
+            # 10. Set hash to applyResult["hash"].
+            hash_value = apply_result.hash else trap("VERIFY: Optional::value")
+        # 13. Otherwise:
+        _:
+            # 1. Let url be input.
+            var url = url_empty()
+            if let input_url = pattern_match_input_url(input):
+                url = input_url
+
+            # 2. If input is a USVString:
+            if let input_string = pattern_match_input_string(input):
+                # 1. Let baseURL be null.
+                var base_url: Url? = none
+
+                # 2. If baseURLString was given, then:
+                if let given_base_url_string = base_url_string:
+                    # 1. Set baseURL to the result of running the basic URL parser on baseURLString.
+                    base_url = parser_basic_parse(view_of(given_base_url_string))
+
+                    # 2. If baseURL is failure, return null.
+                    if base_url == none:
+                        return none
+
+                    # 3. Append baseURLString to inputs.
+                    ak.vector_append_t(&inputs, Input.string(value = given_base_url_string))
+
+                # 3. Set url to the result of running the basic URL parser on input with baseURL.
+                # 4. If url is failure, return null.
+                var maybe_url: Url? = none
+                if let parsed_base_url = base_url:
+                    maybe_url = parser_basic_parse(view_of(input_string), &parsed_base_url)
+                else:
+                    maybe_url = parser_basic_parse(view_of(input_string))
+                url = maybe_url else return none
+
+            # 3. Assert: url is a URL.
+
+            # 4. Set protocol to url’s scheme.
+            protocol = url_scheme(&url)
+
+            # 5. Set username to url’s username.
+            username = url_username(&url)
+
+            # 6. Set password to url’s password.
+            password = url_password(&url)
+
+            # 7. Set hostname to url’s host, serialized, or the empty string if the value is null.
+            if let host = url_host(&url):
+                hostname = host_serialize(&host)
+            else:
+                hostname = empty_string()
+
+            # 8. Set port to url’s port, serialized, or the empty string if the value is null.
+            if let url_port_value = url_port(&url):
+                port = string_number(url_port_value)
+            else:
+                port = empty_string()
+
+            # 9. Set pathname to the result of URL path serializing url.
+            pathname = url_serialize_path(&url)
+
+            # 10. Set search to url’s query or the empty string if the value is null.
+            search = url_query(&url) else empty_string()
+
+            # 11. Set hash to url’s fragment or the empty string if the value is null.
+            hash_value = url_fragment(&url) else empty_string()
+
+    # 14. Let protocolExecResult be RegExpBuiltinExec(urlPattern’s protocol component's regular expression, protocol).
+    let protocol_exec_result = component_execute(&this.m_protocol_component, protocol)
+    if not protocol_exec_result.success:
+        return none
+
+    # 15. Let usernameExecResult be RegExpBuiltinExec(urlPattern’s username component's regular expression, username).
+    let username_exec_result = component_execute(&this.m_username_component, username)
+    if not username_exec_result.success:
+        return none
+
+    # 16. Let passwordExecResult be RegExpBuiltinExec(urlPattern’s password component's regular expression, password).
+    let password_exec_result = component_execute(&this.m_password_component, password)
+    if not password_exec_result.success:
+        return none
+
+    # 17. Let hostnameExecResult be RegExpBuiltinExec(urlPattern’s hostname component's regular expression, hostname).
+    let hostname_exec_result = component_execute(&this.m_hostname_component, hostname)
+    if not hostname_exec_result.success:
+        return none
+
+    # 18. Let portExecResult be RegExpBuiltinExec(urlPattern’s port component's regular expression, port).
+    let port_exec_result = component_execute(&this.m_port_component, port)
+    if not port_exec_result.success:
+        return none
+
+    # 19. Let pathnameExecResult be RegExpBuiltinExec(urlPattern’s pathname component's regular expression, pathname).
+    let pathname_exec_result = component_execute(&this.m_pathname_component, pathname)
+    if not pathname_exec_result.success:
+        return none
+
+    # 20. Let searchExecResult be RegExpBuiltinExec(urlPattern’s search component's regular expression, search).
+    let search_exec_result = component_execute(&this.m_search_component, search)
+    if not search_exec_result.success:
+        return none
+
+    # 21. Let hashExecResult be RegExpBuiltinExec(urlPattern’s hash component's regular expression, hash).
+    let hash_exec_result = component_execute(&this.m_hash_component, hash_value)
+    if not hash_exec_result.success:
+        return none
+
+    # 22. If protocolExecResult, usernameExecResult, passwordExecResult, hostnameExecResult, portExecResult,
+    #     pathnameExecResult, searchExecResult, or hashExecResult are null then return null.
+    # NOTE: Done in steps above at point of exec.
+
+    # 23. Let result be a new URLPatternResult.
+    var result: Result
+
+    # 24. Set result["inputs"] to inputs.
+    result.inputs = inputs
+
+    # 25. Set result["protocol"] to the result of creating a component match result given urlPattern’s protocol
+    #     component, protocol, and protocolExecResult.
+    result.protocol = component_create_match_result(&this.m_protocol_component, protocol, protocol_exec_result)
+
+    # 26. Set result["username"] to the result of creating a component match result given urlPattern’s username
+    #     component, username, and usernameExecResult.
+    result.username = component_create_match_result(&this.m_username_component, username, username_exec_result)
+
+    # 27. Set result["password"] to the result of creating a component match result given urlPattern’s password
+    #     component, password, and passwordExecResult.
+    result.password = component_create_match_result(&this.m_password_component, password, password_exec_result)
+
+    # 28. Set result["hostname"] to the result of creating a component match result given urlPattern’s hostname
+    #     component, hostname, and hostnameExecResult.
+    result.hostname = component_create_match_result(&this.m_hostname_component, hostname, hostname_exec_result)
+
+    # 29. Set result["port"] to the result of creating a component match result given urlPattern’s port component,
+    #     port, and portExecResult.
+    result.port = component_create_match_result(&this.m_port_component, port, port_exec_result)
+
+    # 30. Set result["pathname"] to the result of creating a component match result given urlPattern’s pathname
+    #     component, pathname, and pathnameExecResult.
+    result.pathname = component_create_match_result(&this.m_pathname_component, pathname, pathname_exec_result)
+
+    # 31. Set result["search"] to the result of creating a component match result given urlPattern’s search component,
+    #     search, and searchExecResult.
+    result.search = component_create_match_result(&this.m_search_component, search, search_exec_result)
+
+    # 32. Set result["hash"] to the result of creating a component match result given urlPattern’s hash component,
+    #     hash, and hashExecResult.
+    result.hash = component_create_match_result(&this.m_hash_component, hash_value, hash_exec_result)
+
+    # 33. Return result.
+    return result
+
+# input.get_pointer<URL>() of Pattern::match.
+func pattern_match_input_url(input: StringOrInitOrUrl) -> Url?:
+    match input:
+        .url(url): return url
+        _: return none
+
+# input.get_pointer<String>() of Pattern::match.
+func pattern_match_input_string(input: StringOrInitOrUrl) -> ak.String?:
+    match input:
+        .string(string): return string
+        _: return none
+
+## Ported from Libraries/LibURL/Pattern/Pattern.cpp:396 URL::Pattern::Pattern::has_regexp_groups.
+# https://urlpattern.spec.whatwg.org/#url-pattern-has-regexp-groups
+pub func pattern_has_regexp_groups(this: const Pattern*) -> bool:
+    # 1. If urlPattern’s protocol component has regexp groups is true, then return true.
+    if this.m_protocol_component.has_regexp_groups:
+        return true
+
+    # 2. If urlPattern’s username component has regexp groups is true, then return true.
+    if this.m_username_component.has_regexp_groups:
+        return true
+
+    # 3. If urlPattern’s password component has regexp groups is true, then return true.
+    if this.m_password_component.has_regexp_groups:
+        return true
+
+    # 4. If urlPattern’s hostname component has regexp groups is true, then return true.
+    if this.m_hostname_component.has_regexp_groups:
+        return true
+
+    # 5. If urlPattern’s port component has regexp groups is true, then return true.
+    if this.m_port_component.has_regexp_groups:
+        return true
+
+    # 6. If urlPattern’s pathname component has regexp groups is true, then return true.
+    if this.m_pathname_component.has_regexp_groups:
+        return true
+
+    # 7. If urlPattern’s search component has regexp groups is true, then return true.
+    if this.m_search_component.has_regexp_groups:
+        return true
+
+    # 8. If urlPattern’s hash component has regexp groups is true, then return true.
+    if this.m_hash_component.has_regexp_groups:
+        return true
+
+    # 9. Return false.
+    return false
+
+# mark: Components (Pattern.h) ==================================================================
+
+## Ported from Libraries/LibURL/Pattern/Pattern.h:52 URL::Pattern::Pattern::protocol_component.
+pub func pattern_protocol_component(this: const Pattern*) -> Component:
+    return this.m_protocol_component
+
+## Ported from Libraries/LibURL/Pattern/Pattern.h:53 URL::Pattern::Pattern::username_component.
+pub func pattern_username_component(this: const Pattern*) -> Component:
+    return this.m_username_component
+
+## Ported from Libraries/LibURL/Pattern/Pattern.h:54 URL::Pattern::Pattern::password_component.
+pub func pattern_password_component(this: const Pattern*) -> Component:
+    return this.m_password_component
+
+## Ported from Libraries/LibURL/Pattern/Pattern.h:55 URL::Pattern::Pattern::hostname_component.
+pub func pattern_hostname_component(this: const Pattern*) -> Component:
+    return this.m_hostname_component
+
+## Ported from Libraries/LibURL/Pattern/Pattern.h:56 URL::Pattern::Pattern::port_component.
+pub func pattern_port_component(this: const Pattern*) -> Component:
+    return this.m_port_component
+
+## Ported from Libraries/LibURL/Pattern/Pattern.h:57 URL::Pattern::Pattern::pathname_component.
+pub func pattern_pathname_component(this: const Pattern*) -> Component:
+    return this.m_pathname_component
+
+## Ported from Libraries/LibURL/Pattern/Pattern.h:58 URL::Pattern::Pattern::search_component.
+pub func pattern_search_component(this: const Pattern*) -> Component:
+    return this.m_search_component
+
+## Ported from Libraries/LibURL/Pattern/Pattern.h:59 URL::Pattern::Pattern::hash_component.
+pub func pattern_hash_component(this: const Pattern*) -> Component:
+    return this.m_hash_component

@@ -1,0 +1,526 @@
+#==============================================================================================
+#
+#   test_url - Tests/LibURL/TestURL.cpp
+#
+#   DESCRIPTION:
+#       The donor's URL tests, ported one TEST_CASE to one test (the AK_OS_WINDOWS variant of
+#       create_with_file_scheme is left out, as on the donor's POSIX builds).
+#
+#==============================================================================================
+
+# mark: Parsing and serializing =================================================================
+
+# The expectations every case of the "basic" test checks.
+func expect_basic(text: str, scheme: str, host: str, port: u16, path: str, query: str?, fragment: str?):
+    let url = parse(text) else trap("EXPECT_EQ(url.has_value(), true)")
+    expect_string(web_url.url_scheme(&url), scheme)
+    expect_string(web_url.url_serialized_host(&url), host)
+    assert(web_url.url_port_or_default(&url) == port)
+    expect_string(web_url.url_serialize_path(&url), path)
+    if let expected_query = query:
+        expect_optional_string(web_url.url_query(&url), expected_query)
+    else:
+        assert(web_url.url_query(&url) == none)
+    if let expected_fragment = fragment:
+        expect_optional_string(web_url.url_fragment(&url), expected_fragment)
+    else:
+        assert(web_url.url_fragment(&url) == none)
+
+test "basic":
+    expect_basic("http://www.serenityos.org", "http", "www.serenityos.org", 80, "/", none, none)
+    expect_basic("https://www.serenityos.org/index.html", "https", "www.serenityos.org", 443, "/index.html", none, none)
+    expect_basic("https://www.serenityos.org1/index.html", "https", "www.serenityos.org1", 443, "/index.html", none, none)
+    expect_basic("https://localhost:1234/~anon/test/page.html", "https", "localhost", 1234, "/~anon/test/page.html", none, none)
+    expect_basic("http://www.serenityos.org/index.html?#", "http", "www.serenityos.org", 80, "/index.html", "", "")
+    expect_basic("http://www.serenityos.org/index.html?foo=1&bar=2", "http", "www.serenityos.org", 80, "/index.html",
+                 "foo=1&bar=2", none)
+    expect_basic("http://www.serenityos.org/index.html#fragment", "http", "www.serenityos.org", 80, "/index.html", none,
+                 "fragment")
+    expect_basic("http://www.serenityos.org/index.html?foo=1&bar=2&baz=/?#frag/ment?test#", "http", "www.serenityos.org", 80,
+                 "/index.html", "foo=1&bar=2&baz=/?", "frag/ment?test#")
+
+test "some_bad_urls":
+    assert(parse("http//serenityos.org") == none)
+    assert(parse("serenityos.org") == none)
+    assert(parse("://serenityos.org") == none)
+    assert(parse("://:80") == none)
+    assert(parse("http://serenityos.org:80:80/") == none)
+    assert(parse("http://serenityos.org:80:80") == none)
+    assert(parse("http://serenityos.org:abc") == none)
+    assert(parse("http://serenityos.org:abc:80") == none)
+    assert(parse("http://serenityos.org:abc:80/") == none)
+
+test "serialization":
+    expect_serialization(must_parse("http://www.serenityos.org/"), "http://www.serenityos.org/")
+    expect_serialization(must_parse("http://www.serenityos.org:0/"), "http://www.serenityos.org:0/")
+    expect_serialization(must_parse("http://www.serenityos.org:80/"), "http://www.serenityos.org/")
+    expect_serialization(must_parse("http://www.serenityos.org:81/"), "http://www.serenityos.org:81/")
+    expect_serialization(must_parse("https://www.serenityos.org:443/foo/bar.html?query#fragment"),
+                         "https://www.serenityos.org/foo/bar.html?query#fragment")
+
+# mark: file: URLs ==============================================================================
+
+test "file_url_with_hostname":
+    let url = must_parse("file://courage/my/file")
+    expect_string(web_url.url_scheme(&url), "file")
+    expect_string(web_url.url_serialized_host(&url), "courage")
+    assert(web_url.url_port_or_default(&url) == 0)
+    expect_string(web_url.url_serialize_path(&url), "/my/file")
+    expect_serialization(url, "file://courage/my/file")
+    assert(web_url.url_query(&url) == none)
+    assert(web_url.url_fragment(&url) == none)
+
+test "file_url_with_localhost":
+    let url = must_parse("file://localhost/my/file")
+    expect_string(web_url.url_scheme(&url), "file")
+    expect_string(web_url.url_serialized_host(&url), "")
+    expect_string(web_url.url_serialize_path(&url), "/my/file")
+    expect_serialization(url, "file:///my/file")
+
+test "file_url_without_hostname":
+    let url = must_parse("file:///my/file")
+    expect_string(web_url.url_scheme(&url), "file")
+    expect_string(web_url.url_serialized_host(&url), "")
+    expect_string(web_url.url_serialize_path(&url), "/my/file")
+    expect_serialization(url, "file:///my/file")
+
+test "file_url_with_encoded_characters":
+    let url = must_parse("file:///my/file/test%23file.txt")
+    expect_string(web_url.url_scheme(&url), "file")
+    expect_string(web_url.url_serialize_path(&url), "/my/file/test%23file.txt")
+    expect_byte_string(web_url.percent_decode(web_url.view_of(web_url.url_serialize_path(&url))), "/my/file/test#file.txt")
+    assert(web_url.url_query(&url) == none)
+    assert(web_url.url_fragment(&url) == none)
+
+test "file_url_with_fragment":
+    let url = must_parse("file:///my/file#fragment")
+    expect_string(web_url.url_scheme(&url), "file")
+    expect_string(web_url.url_serialize_path(&url), "/my/file")
+    assert(web_url.url_query(&url) == none)
+    expect_optional_string(web_url.url_fragment(&url), "fragment")
+
+test "file_url_with_root_path":
+    let url = must_parse("file:///")
+    expect_string(web_url.url_scheme(&url), "file")
+    expect_string(web_url.url_serialize_path(&url), "/")
+
+test "file_url_serialization":
+    expect_serialization(must_parse("file://courage/my/file"), "file://courage/my/file")
+    expect_serialization(must_parse("file://localhost/my/file"), "file:///my/file")
+    expect_serialization(must_parse("file:///my/file"), "file:///my/file")
+    expect_serialization(must_parse("file:///my/directory/"), "file:///my/directory/")
+    expect_serialization(must_parse("file:///my/file%23test"), "file:///my/file%23test")
+    expect_serialization(must_parse("file:///my/file#fragment"), "file:///my/file#fragment")
+
+# base.complete_url("relative").serialize().
+func expect_completed(base: str, relative: str, expected: str):
+    let base_url = must_parse(base)
+    let url = web_url.url_complete_url(&base_url, web_url.sv(relative)) else trap("URL::complete_url failed")
+    expect_serialization(url, expected)
+
+test "file_url_relative":
+    expect_completed("https://vkoskiv.com/index.html", "/static/foo.js", "https://vkoskiv.com/static/foo.js")
+    expect_completed("file:///home/vkoskiv/test/index.html", "/static/foo.js", "file:///static/foo.js")
+    expect_completed("https://vkoskiv.com/index.html", "static/foo.js", "https://vkoskiv.com/static/foo.js")
+    expect_completed("file:///home/vkoskiv/test/index.html", "static/foo.js", "file:///home/vkoskiv/test/static/foo.js")
+
+# mark: Opaque paths ============================================================================
+
+test "about_url":
+    let url = must_parse("about:blank")
+    expect_string(web_url.url_scheme(&url), "about")
+    assert(web_url.url_host(&url) == none)
+    expect_string(web_url.url_serialize_path(&url), "blank")
+    assert(web_url.url_query(&url) == none)
+    assert(web_url.url_fragment(&url) == none)
+    expect_serialization(url, "about:blank")
+
+test "mailto_url":
+    let url = must_parse("mailto:mail@example.com")
+    expect_string(web_url.url_scheme(&url), "mailto")
+    assert(web_url.url_host(&url) == none)
+    assert(web_url.url_port_or_default(&url) == 0)
+    assert(web_url.url_path_segment_count(&url) == 1)
+    expect_byte_string(web_url.url_path_segment_at_index(&url, 0), "mail@example.com")
+    assert(web_url.url_query(&url) == none)
+    assert(web_url.url_fragment(&url) == none)
+    expect_serialization(url, "mailto:mail@example.com")
+
+test "mailto_url_with_subject":
+    let url = must_parse("mailto:mail@example.com?subject=test")
+    expect_string(web_url.url_scheme(&url), "mailto")
+    assert(web_url.url_host(&url) == none)
+    assert(web_url.url_port_or_default(&url) == 0)
+    assert(web_url.url_path_segment_count(&url) == 1)
+    expect_byte_string(web_url.url_path_segment_at_index(&url, 0), "mail@example.com")
+    expect_optional_string(web_url.url_query(&url), "subject=test")
+    assert(web_url.url_fragment(&url) == none)
+    expect_serialization(url, "mailto:mail@example.com?subject=test")
+
+test "trailing_slash_with_complete_url":
+    expect_completed("http://a/b/", "c/", "http://a/b/c/")
+    expect_completed("http://a/b/", "c", "http://a/b/c")
+    expect_completed("http://a/b", "c/", "http://a/c/")
+    expect_completed("http://a/b", "c", "http://a/c")
+
+test "trailing_port":
+    let url = must_parse("http://example.com:8086")
+    assert(web_url.url_port_or_default(&url) == 8086)
+
+test "port_overflow":
+    assert(parse("http://example.com:123456789/") == none)
+
+test "equality":
+    let a = must_parse("http://serenityos.org")
+    assert(web_url.url_equals(&a, must_parse("http://serenityos.org#test"), web_url.ExcludeFragment.yes))
+    let b = must_parse("http://example.com/index.html")
+    assert(web_url.url_eq(&b, must_parse("http://ex%61mple.com/index.html")))
+    let c = must_parse("file:///my/file")
+    assert(web_url.url_eq(&c, must_parse("file://localhost/my/file")))
+    let d = must_parse("http://serenityos.org/index.html")
+    assert(not web_url.url_eq(&d, must_parse("http://serenityos.org/test.html")))
+
+test "create_with_file_scheme":
+    var maybe_url = web_url.create_with_file_scheme(byte_string("/home/anon/README.md"), byte_string(""), byte_string(""))
+    var url = maybe_url else trap("EXPECT(maybe_url.has_value())")
+    expect_string(web_url.url_scheme(&url), "file")
+    assert(web_url.url_port_or_default(&url) == 0)
+    assert(web_url.url_path_segment_count(&url) == 3)
+    expect_byte_string(web_url.url_path_segment_at_index(&url, 0), "home")
+    expect_byte_string(web_url.url_path_segment_at_index(&url, 1), "anon")
+    expect_byte_string(web_url.url_path_segment_at_index(&url, 2), "README.md")
+    expect_string(web_url.url_serialize_path(&url), "/home/anon/README.md")
+    assert(web_url.url_query(&url) == none)
+    assert(web_url.url_fragment(&url) == none)
+
+    maybe_url = web_url.create_with_file_scheme(byte_string("/home/anon/"), byte_string(""), byte_string(""))
+    url = maybe_url else trap("EXPECT(maybe_url.has_value())")
+    assert(web_url.url_path_segment_count(&url) == 3)
+    expect_byte_string(web_url.url_path_segment_at_index(&url, 0), "home")
+    expect_byte_string(web_url.url_path_segment_at_index(&url, 1), "anon")
+    expect_byte_string(web_url.url_path_segment_at_index(&url, 2), "")
+    expect_string(web_url.url_serialize_path(&url), "/home/anon/")
+
+    url = must_parse("file:///home/anon/")
+    expect_string(web_url.url_serialize_path(&url), "/home/anon/")
+
+test "complete_url":
+    let base_url = must_parse("http://serenityos.org/index.html#fragment")
+    let url = web_url.url_complete_url(&base_url, web_url.sv("test.html")) else trap("EXPECT(url.has_value())")
+    expect_string(web_url.url_scheme(&url), "http")
+    expect_string(web_url.url_serialized_host(&url), "serenityos.org")
+    expect_string(web_url.url_serialize_path(&url), "/test.html")
+    assert(web_url.url_query(&url) == none)
+    assert(not web_url.url_has_an_opaque_path(&url))
+
+    let completed = web_url.url_complete_url(&base_url, web_url.sv("../index.html#fragment")) else trap("complete_url failed")
+    assert(web_url.url_equals(&completed, base_url))
+
+# mark: Whitespace and code points ==============================================================
+
+test "leading_whitespace":
+    let url = must_parse("   https://foo.com/")
+    expect_byte_string(web_url.url_to_byte_string(&url), "https://foo.com/")
+
+test "trailing_whitespace":
+    let url = must_parse("https://foo.com/   ")
+    expect_byte_string(web_url.url_to_byte_string(&url), "https://foo.com/")
+
+test "leading_and_trailing_whitespace":
+    let url = must_parse("      https://foo.com/   ")
+    expect_byte_string(web_url.url_to_byte_string(&url), "https://foo.com/")
+
+test "unicode":
+    let url = must_parse("http://example.com/_ünicöde_téxt_©")
+    expect_string(web_url.url_serialize_path(&url), "/_%C3%BCnic%C3%B6de_t%C3%A9xt_%C2%A9")
+    expect_byte_string(web_url.percent_decode(web_url.view_of(web_url.url_serialize_path(&url))), "/_ünicöde_téxt_©")
+    assert(web_url.url_query(&url) == none)
+    assert(web_url.url_fragment(&url) == none)
+
+test "query_with_non_ascii":
+    let url = must_parse("http://example.com/?utf8=✓")
+    expect_string(web_url.url_serialize_path(&url), "/")
+    expect_optional_string(web_url.url_query(&url), "utf8=%E2%9C%93")
+    assert(web_url.url_fragment(&url) == none)
+
+    let shift_jis_url = web_url.parser_basic_parse(web_url.sv("http://example.com/?shift_jis=✓"), none, none, none,
+                                                   web_url.sv("shift_jis")) else trap("EXPECT(url.has_value())")
+    expect_string(web_url.url_serialize_path(&shift_jis_url), "/")
+    expect_optional_string(web_url.url_query(&shift_jis_url), "shift_jis=%26%2310003%3B")
+    assert(web_url.url_fragment(&shift_jis_url) == none)
+
+test "fragment_with_non_ascii":
+    let url = must_parse("http://example.com/#✓")
+    expect_string(web_url.url_serialize_path(&url), "/")
+    assert(web_url.url_query(&url) == none)
+    expect_optional_string(web_url.url_fragment(&url), "%E2%9C%93")
+
+    let shift_jis_url = web_url.parser_basic_parse(web_url.sv("http://example.com/#✓"), none, none, none,
+                                                   web_url.sv("shift_jis")) else trap("EXPECT(url.has_value())")
+    expect_string(web_url.url_serialize_path(&shift_jis_url), "/")
+    assert(web_url.url_query(&shift_jis_url) == none)
+    expect_optional_string(web_url.url_fragment(&shift_jis_url), "%E2%9C%93")
+
+test "complete_file_url_with_base":
+    let url = must_parse("file:///home/index.html")
+    expect_string(web_url.url_serialize_path(&url), "/home/index.html")
+    assert(web_url.url_path_segment_count(&url) == 2)
+    expect_byte_string(web_url.url_path_segment_at_index(&url, 0), "home")
+    expect_byte_string(web_url.url_path_segment_at_index(&url, 1), "index.html")
+
+    let sub_url = web_url.url_complete_url(&url, web_url.sv("js/app.js")) else trap("EXPECT(sub_url.has_value())")
+    expect_string(web_url.url_serialize_path(&sub_url), "/home/js/app.js")
+
+test "empty_url_with_base_url":
+    let base_url = must_parse("https://foo.com/")
+    let parsed_url = web_url.parser_basic_parse(web_url.sv(""), &base_url) else trap("EXPECT_EQ(parsed_url.has_value(), true)")
+    assert(web_url.url_equals(&base_url, parsed_url))
+
+test "google_street_view":
+    let streetview_url = "https://www.google.co.uk/maps/@53.3354159,-1.9573545,3a,75y,121.1h,75.67t/data=!3m7!1e1!3m5!1sSY8xCv17jAX4S7SRdV38hg!2e0!6shttps:%2F%2Fstreetviewpixels-pa.googleapis.com%2Fv1%2Fthumbnail%3Fpanoid%3DSY8xCv17jAX4S7SRdV38hg%26cb_client%3Dmaps_sv.tactile.gps%26w%3D203%26h%3D100%26yaw%3D188.13148%26pitch%3D0%26thumbfov%3D100!7i13312!8i6656"
+    expect_serialization(must_parse(streetview_url), streetview_url)
+
+# mark: Hosts ===================================================================================
+
+test "ipv6_address":
+    let ipv6_url = must_parse("http://[::1]/index.html")
+    expect_string(web_url.url_serialized_host(&ipv6_url), "[::1]")
+    expect_string(web_url.url_to_string(&ipv6_url), "http://[::1]/index.html")
+
+    let pieces_url = must_parse("http://[0:f:0:0:f:f:0:0]/index.html")
+    expect_string(web_url.url_serialized_host(&pieces_url), "[0:f::f:f:0:0]")
+    expect_string(web_url.url_to_string(&pieces_url), "http://[0:f::f:f:0:0]/index.html")
+
+    let long_url = must_parse("https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]/index.html")
+    expect_string(web_url.url_serialized_host(&long_url), "[2001:db8:85a3::8a2e:370:7334]")
+    expect_string(web_url.url_to_string(&long_url), "https://[2001:db8:85a3::8a2e:370:7334]/index.html")
+
+    assert(parse("https://[oops]/index.html") == none)
+
+# URL::Parser::basic_parse("text"sv)->serialized_host() is "expected".
+func expect_serialized_host(text: str, expected: str):
+    let url = must_parse(text)
+    expect_string(web_url.url_serialized_host(&url), expected)
+
+test "ipv4_address":
+    expect_serialized_host("http://127.0.0.1/index.html", "127.0.0.1")
+    expect_serialized_host("http://0x.0x.0", "0.0.0.0")
+    assert(parse("https://127..0.0.1") == none)
+    expect_serialized_host("http://256", "0.0.1.0")
+    expect_serialized_host("http://888888888", "52.251.94.56")
+    assert(parse("http://9111111111") == none)
+
+test "username_and_password":
+    # The strings here outgrow the test runner's fixed buffer: allocate from the heap.
+    with memory.heap:
+        let url = must_parse("http://username:password@test.com/index.html")
+        expect_string(web_url.url_serialized_host(&url), "test.com")
+        expect_string(web_url.url_username(&url), "username")
+        expect_string(web_url.url_password(&url), "password")
+
+        let encoded = must_parse("http://username%21%24%25:password%21%24%25@test.com/index.html")
+        expect_string(web_url.url_serialized_host(&encoded), "test.com")
+        expect_string(web_url.url_username(&encoded), "username%21%24%25")
+        expect_string(web_url.url_password(&encoded), "password%21%24%25")
+        expect_byte_string(web_url.percent_decode(web_url.view_of(web_url.url_username(&encoded))), "username!$%")
+        expect_byte_string(web_url.percent_decode(web_url.view_of(web_url.url_password(&encoded))), "password!$%")
+
+        let username = repeated('a', 50000)
+        let long_username_url = concatenated("http://", username, ":@test.com/index.html")
+        let long_username = web_url.parser_basic_parse(web_url.view_of(long_username_url)) else trap("EXPECT(url.has_value())")
+        expect_string(web_url.url_serialized_host(&long_username), "test.com")
+        assert(web_url.string_equals(web_url.url_username(&long_username), username))
+        let empty_password = web_url.url_password(&long_username)
+        assert(ak.string_is_empty(&empty_password))
+
+        let password = repeated('a', 50000)
+        let long_password_url = concatenated("http://:", password, "@test.com/index.html")
+        let long_password = web_url.parser_basic_parse(web_url.view_of(long_password_url)) else trap("EXPECT(url.has_value())")
+        expect_string(web_url.url_serialized_host(&long_password), "test.com")
+        let empty_username = web_url.url_username(&long_password)
+        assert(ak.string_is_empty(&empty_username))
+        assert(web_url.string_equals(web_url.url_password(&long_password), password))
+
+test "ascii_only_url":
+    let upper_case_url = must_parse("HTTP://EXAMPLE.COM:80/INDEX.HTML#FRAGMENT")
+    expect_string(web_url.url_scheme(&upper_case_url), "http")
+    expect_string(web_url.url_serialized_host(&upper_case_url), "example.com")
+    expect_byte_string(web_url.url_to_byte_string(&upper_case_url), "http://example.com/INDEX.HTML#FRAGMENT")
+
+    let mixed_case_url = must_parse("hTtP://eXaMpLe.CoM:80/iNdEx.HtMl#fRaGmEnT")
+    expect_string(web_url.url_scheme(&mixed_case_url), "http")
+    expect_string(web_url.url_serialized_host(&mixed_case_url), "example.com")
+    expect_byte_string(web_url.url_to_byte_string(&mixed_case_url), "http://example.com/iNdEx.HtMl#fRaGmEnT")
+
+test "invalid_domain_code_points":
+    assert(parse("http://example%25.com") == none)
+    assert(parse("http://thing\u{7}y/'") == none)
+
+# mark: Public suffixes, sites and origins ======================================================
+
+# URL::get_registrable_domain("host"sv) is "expected", or null when expected is none.
+func expect_registrable_domain(host: str, expected: str?):
+    let domain = web_url.get_registrable_domain(web_url.sv(host))
+    if let expected_domain = expected:
+        expect_optional_string(domain, expected_domain)
+    else:
+        assert(domain == none)
+
+test "get_registrable_domain":
+    expect_registrable_domain("", none)
+    expect_registrable_domain("foobar", none)
+    expect_registrable_domain("com", none)
+    expect_registrable_domain(".com", none)
+    expect_registrable_domain("example.com", "example.com")
+    expect_registrable_domain(".example.com", "example.com")
+    expect_registrable_domain("www.example.com", "example.com")
+    expect_registrable_domain("sub.www.example.com", "example.com")
+    expect_registrable_domain("github.io", none)
+    expect_registrable_domain("ladybird.github.io", "ladybird.github.io")
+    let a_example = must_parse_host("a.example")
+    expect_optional_string(web_url.host_registrable_domain(&a_example), "a.example")
+    let b_example = must_parse_host("b.b.example")
+    expect_optional_string(web_url.host_registrable_domain(&b_example), "b.example")
+
+# URL::Parser::parse_host("host"sv)->public_suffix() is "expected", or null when expected is none.
+func expect_public_suffix(host: str, expected: str?):
+    let parsed = must_parse_host(host)
+    let suffix = web_url.host_public_suffix(&parsed)
+    if let expected_suffix = expected:
+        expect_optional_string(suffix, expected_suffix)
+    else:
+        assert(suffix == none)
+
+test "public_suffix":
+    expect_public_suffix("com", "com")
+    expect_public_suffix("example.com", "com")
+    expect_public_suffix("www.example.com", "com")
+    expect_public_suffix("EXAMPLE.COM", "com")
+    expect_public_suffix("www.example.com.", "com.")
+    expect_public_suffix("github.io", "github.io")
+    expect_public_suffix("whatwg.github.io", "github.io")
+    expect_public_suffix("إختبار", "xn--kgbechtv")
+    expect_public_suffix("example.إختبار", "xn--kgbechtv")
+    expect_public_suffix("sub.example.إختبار", "xn--kgbechtv")
+    expect_public_suffix("[2001:0db8:85a3:0000:0000:8a2e:0370:7334]", none)
+
+test "same_site":
+    let opaque_origin = web_url.origin_create_opaque()
+    let second_opaque_origin = web_url.origin_create_opaque()
+
+    let site1_https_url = must_parse("https://www.ladybird.org")
+    let site1_https_second_url = must_parse("https://www.ladybird.org/some/file/path")
+    let site1_http_url = must_parse("http://www.ladybird.org")
+
+    let site2_https_url = must_parse("https://www.serenityos.org")
+
+    assert(not web_url.origin_is_same_site(&opaque_origin, second_opaque_origin))
+    assert(web_url.origin_is_same_site(&opaque_origin, opaque_origin))
+    assert(not web_url.origin_is_same_site(&opaque_origin, web_url.url_origin(&site1_https_url)))
+
+    let site1_https_origin = web_url.url_origin(&site1_https_url)
+    assert(web_url.origin_is_same_site(&site1_https_origin, web_url.url_origin(&site1_https_second_url)))
+    assert(not web_url.origin_is_same_site(&site1_https_origin, web_url.url_origin(&site1_http_url)))
+    assert(not web_url.origin_is_same_site(&site1_https_origin, web_url.url_origin(&site2_https_url)))
+
+# URL::Parser::basic_parse("text"sv).value().origin().
+func origin_of(text: str) -> web_url.Origin:
+    let url = must_parse(text)
+    return web_url.url_origin(&url)
+
+# URL::Origin { "https"_string, host, port, domain }.
+func relaxed_origin(scheme: str, host: str, port: u16, domain: str) -> web_url.Origin:
+    return web_url.origin_tuple(web_url.string_lit(scheme), web_url.Host(m_value = ak.HostVariantType.string(
+        value = web_url.string_lit(host))), port, web_url.string_lit(domain))
+
+test "same_origin_domain":
+    let opaque1 = web_url.origin_create_opaque()
+    let opaque2 = web_url.origin_create_opaque()
+
+    # Opaque origins
+    assert(web_url.origin_is_same_origin_domain(&opaque1, opaque1))
+    assert(not web_url.origin_is_same_origin_domain(&opaque1, opaque2))
+
+    let https_origin = origin_of("https://www.ladybird.org")
+
+    # Opaque and tuple origin
+    assert(not web_url.origin_is_same_origin_domain(&opaque1, https_origin))
+
+    let https_default = origin_of("https://www.ladybird.org")
+    let https_path = origin_of("https://www.ladybird.org/some/path")
+    let https_443 = origin_of("https://www.ladybird.org:443")
+    let https_444 = origin_of("https://www.ladybird.org:444")
+
+    # Same scheme + host + effective port
+    assert(web_url.origin_is_same_origin_domain(&https_default, https_path))
+    assert(web_url.origin_is_same_origin_domain(&https_default, https_443))
+    assert(not web_url.origin_is_same_origin_domain(&https_default, https_444))
+
+    let http_origin = origin_of("http://www.ladybird.org")
+
+    # Scheme mismatch
+
+    assert(not web_url.origin_is_same_origin_domain(&https_default, http_origin))
+
+    let other_host = origin_of("https://www.serenityos.org")
+    let subdomain = origin_of("https://sub.ladybird.org")
+
+    # Host mismatch (no domain relaxation)
+    assert(not web_url.origin_is_same_origin_domain(&https_default, other_host))
+    assert(not web_url.origin_is_same_origin_domain(&https_default, subdomain))
+
+    let ip1 = origin_of("https://127.0.0.1")
+    let ip2 = origin_of("https://127.0.0.1:443")
+    let ip3 = origin_of("https://127.0.0.2")
+
+    # IP literals
+    assert(web_url.origin_is_same_origin_domain(&ip1, ip2))
+    assert(not web_url.origin_is_same_origin_domain(&ip1, ip3))
+
+    let file1 = origin_of("file:///tmp/a.txt")
+    let file2 = origin_of("file:///tmp/b.txt")
+
+    # File scheme
+    assert(not web_url.origin_is_same_origin_domain(&file1, file2))
+
+    let a_relaxed = relaxed_origin("https", "a.ladybird.org", 443, "ladybird.org")
+    let b_relaxed = relaxed_origin("https", "b.ladybird.org", 443, "ladybird.org")
+    let b_unrelaxed = origin_of("https://b.ladybird.org")
+    let c_relaxed = relaxed_origin("https", "c.serenityos.org", 443, "serenityos.org")
+    let http_relaxed = relaxed_origin("http", "a.ladybird.org", 80, "ladybird.org")
+
+    # Origin domain
+    assert(web_url.origin_is_same_origin_domain(&a_relaxed, b_relaxed))
+    assert(not web_url.origin_is_same_origin_domain(&a_relaxed, b_unrelaxed))
+    assert(not web_url.origin_is_same_origin_domain(&a_relaxed, c_relaxed))
+    assert(not web_url.origin_is_same_origin_domain(&a_relaxed, http_relaxed))
+    assert(not web_url.origin_is_same_origin_domain(&opaque1, a_relaxed))
+
+# resource:// URLs are internal browser resources. They share a single tuple origin regardless
+# of host, so that same-origin checks pass between any resource:// documents or worker scripts.
+test "resource_url_origin":
+    let url_a = must_parse("resource://ladybird/pdfjs/web/viewer.html")
+    let url_b = must_parse("resource://ladybird/pdfjs/build/pdf.worker.mjs")
+    let url_c = must_parse("resource://icons/something.png")
+
+    # resource:// origins must be tuple origins, not opaque.
+    let origin_a = web_url.url_origin(&url_a)
+    assert(not web_url.origin_is_opaque(&origin_a))
+
+    # All resource:// URLs share the same origin regardless of host or path.
+    assert(web_url.origin_is_same_origin(&origin_a, web_url.url_origin(&url_b)))
+    assert(web_url.origin_is_same_origin(&origin_a, web_url.url_origin(&url_c)))
+
+    # resource:// and https:// are never same-origin.
+    let https_origin = origin_of("https://ladybird.org")
+    assert(not web_url.origin_is_same_origin(&origin_a, https_origin))
+
+    # resource:// and an opaque origin are never same-origin.
+    assert(not web_url.origin_is_same_origin(&origin_a, web_url.origin_create_opaque()))
+
+test "authority_state_lots_of_at_symbols":
+    # The strings here outgrow the test runner's fixed buffer: allocate from the heap.
+    with memory.heap:
+        let many_at_symbols = repeated('@', 500000)
+        let horror_url = concatenated("ws::", many_at_symbols, "")
+        assert(web_url.parser_basic_parse(web_url.view_of(horror_url)) == none)

@@ -1,0 +1,247 @@
+#==============================================================================================
+#
+#   test_pinned - LibURL behaviour the donor's tests do not cover, pinned to the donor
+#
+#   DESCRIPTION:
+#       Every expectation here was printed by a local program linked against the reference
+#       build's LibURL (Ladybird 47c82b38d0) for the same input: serializations, origins and
+#       sites, percent-encode sets, setters, hashes, the URLPattern tokenizer, component
+#       compilation, pattern matching, errors and the canonicalize/escape helpers.
+#
+#==============================================================================================
+
+# mark: URLs, origins, sites ===================================================================
+
+# The serialization, display serialization, origin and site of a parsed URL.
+func expect_url(text: str, serialized: str, display: str, origin: str, site: str):
+    let url = must_parse(text)
+    expect_string(web_url.url_serialize(&url), serialized)
+    expect_byte_string(web_url.url_serialize_for_display(&url), display)
+    let url_origin = web_url.url_origin(&url)
+    expect_string(web_url.origin_serialize(&url_origin), origin)
+    let url_site = web_url.site_obtain(url_origin)
+    expect_string(web_url.site_serialize(&url_site), site)
+
+test "serializations_origins_and_sites":
+    expect_url("https://user:pass@www.example.com:8080/a/b?c=d#e", "https://user:pass@www.example.com:8080/a/b?c=d#e",
+               "https://www.example.com:8080/a/b?c=d#e", "https://www.example.com:8080", "https://example.com")
+    expect_url("blob:https://example.org/uuid", "blob:https://example.org/uuid", "blob:https://example.org/uuid",
+               "https://example.org", "https://example.org")
+    expect_url("data:text/plain,hi", "data:text/plain,hi", "data:text/plain,hi", "null", "null")
+    expect_url("http://[2001:db8::1]:81/", "http://[2001:db8::1]:81/", "http://[2001:db8::1]:81/", "http://[2001:db8::1]:81",
+               "http://[2001:db8::1]")
+    expect_url("http://[::ffff:192.168.0.1]/", "http://[::ffff:c0a8:1]/", "http://[::ffff:c0a8:1]/", "http://[::ffff:c0a8:1]",
+               "http://[::ffff:c0a8:1]")
+    expect_url("http://[1:0:0:2:0:0:0:3]/", "http://[1:0:0:2::3]/", "http://[1:0:0:2::3]/", "http://[1:0:0:2::3]",
+               "http://[1:0:0:2::3]")
+    expect_url("web+demo:/.//not-a-host/", "web+demo:/.//not-a-host/", "web+demo:/.//not-a-host/", "null", "null")
+    expect_url("non-special://host/./a/../b", "non-special://host/b", "non-special://host/b", "null", "null")
+    expect_url("http://example.com/foo/%2e%2E/bar", "http://example.com/bar", "http://example.com/bar", "http://example.com",
+               "http://example.com")
+    expect_url("file:///C|/demo", "file:///C:/demo", "file:///C:/demo", "null", "null")
+    expect_url("https://example.com/a b?c d#e f", "https://example.com/a%20b?c%20d#e%20f", "https://example.com/a%20b?c%20d#e%20f",
+               "https://example.com", "https://example.com")
+    expect_url("http://www.example.co.uk/", "http://www.example.co.uk/", "http://www.example.co.uk/", "http://www.example.co.uk",
+               "http://example.co.uk")
+    expect_url("sc:\\../", "sc:\\../", "sc:\\../", "null", "null")
+
+# mark: Percent-encoding ========================================================================
+
+test "percent_encode_sets":
+    expect_string(web_url.percent_encode(web_url.sv("a b&c/d?e=é"), web_url.PercentEncodeSet.component), "a%20b%26c%2Fd%3Fe%3D%C3%A9")
+    expect_string(web_url.percent_encode(web_url.sv("a b&c/d?e=é~"), web_url.PercentEncodeSet.application_xwww_form_urlencoded,
+                                         web_url.SpaceAsPlus.yes), "a+b%26c%2Fd%3Fe%3D%C3%A9%7E")
+    expect_string(web_url.percent_encode(web_url.sv("a b#c[d]é"), web_url.PercentEncodeSet.encode_uri), "a%20b#c%5Bd%5D%C3%A9")
+    expect_byte_string(web_url.percent_decode(web_url.sv("%41%4g%%2")), "A%4g%%2")
+
+# mark: Setters, creation, hashes ===============================================================
+
+test "setters_and_creation":
+    var url = must_parse("http://example.com/")
+    web_url.url_set_port(&url, 80)
+    expect_serialization(url, "http://example.com/")
+    web_url.url_set_port(&url, 8080)
+    expect_serialization(url, "http://example.com:8080/")
+    web_url.url_set_username(&url, web_url.sv("us er"))
+    web_url.url_set_password(&url, web_url.sv("p@ss"))
+    expect_serialization(url, "http://us%20er:p%40ss@example.com:8080/")
+
+    expect_serialization(web_url.create_with_data(web_url.sv("text/html"), web_url.sv("<b>x</b>"), true),
+                         "data:text/html;base64,%3Cb%3Ex%3C/b%3E")
+    expect_serialization(web_url.about_blank(), "about:blank")
+    assert(web_url.is_webui_url(web_url.about_bookmarks()))
+    assert(not web_url.is_webui_url(web_url.about_blank()))
+
+test "copies_do_not_share_data":
+    let original = must_parse("http://example.com/a")
+    var copy = original
+    web_url.url_set_fragment(&copy, web_url.string_lit("x"))
+    web_url.url_append_path(&copy, web_url.sv("b"))
+    expect_serialization(original, "http://example.com/a")
+    expect_serialization(copy, "http://example.com/a/b#x")
+
+test "hashes":
+    let host = web_url.Host(m_value = ak.HostVariantType.string(value = web_url.string_lit("example.com")))
+    let origin = web_url.origin_tuple(web_url.string_lit("https"), host, 8443)
+    expect_string(web_url.origin_serialize(&origin), "https://example.com:8443")
+    assert(web_url.origin_traits_hash(&origin) == 2815486899)
+    let origin_without_port = web_url.origin_tuple(web_url.string_lit("https"), host, none)
+    assert(web_url.origin_traits_hash(&origin_without_port) == 2211665253)
+    let url = must_parse("https://example.com/x")
+    var traits: web_url.UrlTraits
+    assert(traits.hash_of(&url) == 235779869)
+
+# mark: URLPattern pieces =======================================================================
+
+# The to_string() of every token of Tokenizer::tokenize(input, policy), one per line.
+func expect_tokens(input: str, policy: web_url.TokenizerPolicy, expected: const str[]):
+    let view = web_url.utf8_view_of(web_url.sv(input))
+    let tokens = web_url.tokenizer_tokenize(view, policy) else trap("MUST: Tokenizer::tokenize")
+    assert(ak.vector_size(&tokens) == expected.length)
+    for index in 0..<expected.length:
+        expect_string(web_url.token_to_string(ak.vector_at_const(&tokens, index)), expected[index])
+
+test "tokenizer":
+    expect_tokens("/foo/:bar(\\d+)?/*{baz}+", web_url.TokenizerPolicy.strict, [
+        "Char, index: 0, value: '/'",
+        "Char, index: 1, value: 'f'",
+        "Char, index: 2, value: 'o'",
+        "Char, index: 3, value: 'o'",
+        "Char, index: 4, value: '/'",
+        "Name, index: 5, value: 'bar'",
+        "Regexp, index: 9, value: '\\d+'",
+        "OtherModifier, index: 14, value: '?'",
+        "Char, index: 15, value: '/'",
+        "Asterisk, index: 16, value: '*'",
+        "Open, index: 17, value: '{'",
+        "Char, index: 18, value: 'b'",
+        "Char, index: 19, value: 'a'",
+        "Char, index: 20, value: 'z'",
+        "Close, index: 21, value: '}'",
+        "OtherModifier, index: 22, value: '+'",
+        "End, index: 23, value: ''",
+    ])
+    expect_tokens("(a(?:b))\\", web_url.TokenizerPolicy.lenient, [
+        "Regexp, index: 0, value: 'a(?:b)'",
+        "InvalidChar, index: 8, value: '\\'",
+        "End, index: 9, value: ''",
+    ])
+    let strict_error = web_url.tokenizer_tokenize(web_url.utf8_view_of(web_url.sv("(a(b))")), web_url.TokenizerPolicy.strict) catch:
+        expect_string(web_url.pattern_take_error_info().message, "Error processing a token")
+        return
+    discard(strict_error)
+    trap("expected a tokenizing error")
+
+# The encoding callback that leaves text as it is.
+func identity_callback(value: ak.String) -> ak.String!:
+    return value
+
+# Component::compile(input, identity, options): its pattern string, group names and has regexp groups.
+func expect_component(input: str, options: web_url.Options, pattern_string: str, names: const str[], has_regexp_groups: bool):
+    let component = web_url.component_compile(web_url.utf8_view_of(web_url.sv(input)), identity_callback, options) catch failure:
+        print(f"Component::compile failed: {failure.message}")
+        trap("MUST: Component::compile")
+    expect_string(component.pattern_string, pattern_string)
+    assert(ak.vector_size(&component.group_name_list) == names.length)
+    for index in 0..<names.length:
+        expect_string(*ak.vector_at_const(&component.group_name_list, index), names[index])
+    assert(component.has_regexp_groups == has_regexp_groups)
+
+# Component::compile(input, identity, options) fails with `message`.
+func expect_component_error(input: str, options: web_url.Options, message: str):
+    let component = web_url.component_compile(web_url.utf8_view_of(web_url.sv(input)), identity_callback, options) catch:
+        expect_string(web_url.pattern_take_error_info().message, message)
+        return
+    discard(component)
+    trap("expected Component::compile to fail")
+
+test "component_compile":
+    let no_names: str[1] = [""]
+    expect_component("/foo/:bar/*", web_url.options_pathname(), "/foo/:bar/*", ["bar", "0"], false)
+    expect_component("/books/:id(\\d+)?", web_url.options_pathname(), "/books/:id(\\d+)?", ["id"], true)
+    expect_component("{a.}?example.com", web_url.options_hostname(), "{a.}?example.com", no_names[..<0], false)
+    expect_component_error("/:a/:a", web_url.options_pathname(), "Duplicate name 'a' provided in URL pattern")
+    expect_component_error("/foo{", web_url.options_pathname(), "Missing required token 'Close' in URL pattern")
+    expect_component("*.:tld", web_url.options_hostname(), "*.:tld", ["0", "tld"], false)
+    expect_component(":a:b", web_url.options_default(), ":a:b", ["a", "b"], false)
+    expect_component("/(\\d+)/:x*/(.*)", web_url.options_pathname(), "/(\\d+)/:x*/*", ["0", "x", "1"], true)
+
+# mark: URLPattern matching =====================================================================
+
+# pattern.match(input, base_url) with a string input.
+func match_string(pattern: const web_url.Pattern*, text: str, base_url: ak.String?) -> web_url.Result?:
+    let input = web_url.StringOrInitOrUrl.string(value = web_url.string_lit(text))
+    return web_url.pattern_match(pattern, input, base_url) else trap("MUST: Pattern::match")
+
+# groups.get(name).value().get<String>().
+func group_string(groups: const ak.OrderedHashMap[ak.String, ak.StringOrEmpty, ak.StringTraits]*, name: str) -> ak.String:
+    let value = ak.ordered_hash_map_get_k_const(groups, web_url.string_lit(name)) else trap("groups.get(name).value()")
+    match *value:
+        .string(string): return string
+        .empty: trap("expected a String, got Empty")
+
+test "pattern_create_and_match":
+    let pattern = must_create_pattern("https://*.example.com/:path*")
+    expect_string(web_url.pattern_protocol_component(&pattern).pattern_string, "https")
+    expect_string(web_url.pattern_hostname_component(&pattern).pattern_string, "*.example.com")
+    expect_string(web_url.pattern_pathname_component(&pattern).pattern_string, "/:path*")
+    expect_string(web_url.pattern_port_component(&pattern).pattern_string, "")
+    expect_string(web_url.pattern_search_component(&pattern).pattern_string, "*")
+    assert(not web_url.pattern_has_regexp_groups(&pattern))
+
+    let result = match_string(&pattern, "https://www.example.com/a/b?x#y", none) else trap("expected a match")
+    expect_string(result.hostname.input, "www.example.com")
+    expect_string(result.pathname.input, "/a/b")
+    expect_string(group_string(&result.hostname.groups, "0"), "www")
+    expect_string(group_string(&result.pathname.groups, "path"), "a/b")
+
+    assert(match_string(&pattern, "http://www.example.com/", none) == none)
+
+    var init: web_url.Init
+    init.pathname = web_url.string_lit("/a/b")
+    init.hostname = web_url.string_lit("x.example.com")
+    init.protocol = web_url.string_lit("https")
+    let init_result = web_url.pattern_match(&pattern, web_url.StringOrInitOrUrl.init(value = init), none) else trap("MUST")
+    let init_match = init_result else trap("expected a match")
+    expect_string(init_match.pathname.input, "/a/b")
+
+    let based = match_string(&pattern, "/relative", web_url.string_lit("https://a.example.com/base/")) else trap("expected a match")
+    expect_string(based.pathname.input, "/relative")
+
+test "pattern_with_base_url_and_regexp":
+    let input = web_url.Input.string(value = web_url.string_lit("/api/(\\d+)"))
+    let pattern = web_url.pattern_create(input, web_url.string_lit("https://example.org")) else trap("MUST: Pattern::create")
+    assert(web_url.pattern_has_regexp_groups(&pattern))
+    expect_string(web_url.pattern_pathname_component(&pattern).pattern_string, "/api/(\\d+)")
+    expect_string(web_url.pattern_protocol_component(&pattern).pattern_string, "https")
+    expect_string(web_url.pattern_hostname_component(&pattern).pattern_string, "example.org")
+    let result = match_string(&pattern, "https://example.org/api/123", none) else trap("expected a match")
+    expect_string(group_string(&result.pathname.groups, "0"), "123")
+
+# Pattern::create(input, base_url) fails with `message`.
+func expect_create_error(text: str, base_url: ak.String?, message: str):
+    let pattern = web_url.pattern_create(web_url.Input.string(value = web_url.string_lit(text)), base_url) catch:
+        expect_string(web_url.pattern_take_error_info().message, message)
+        return
+    discard(pattern)
+    trap("expected Pattern::create to fail")
+
+test "pattern_errors":
+    expect_create_error("/:a/:a", web_url.string_lit("https://x"), "Duplicate name 'a' provided in URL pattern")
+    expect_create_error("foo", none, "Relative URLPattern constructor must provide one of baseURL or protocol")
+    expect_create_error("https://x/([", none, "Error processing a token")
+
+# mark: Canonicalizing and escaping =============================================================
+
+test "canonicalize_and_escape":
+    expect_string(web_url.pattern_canonicalize_a_protocol(web_url.string_lit("HTTP")) else trap("MUST"), "http")
+    expect_string(web_url.pattern_canonicalize_a_hostname(web_url.string_lit("ExAmple.COM")) else trap("MUST"), "example.com")
+    expect_string(web_url.pattern_canonicalize_a_port(web_url.string_lit("0080"), web_url.string_lit("http")) else trap("MUST"), "")
+    expect_string(web_url.pattern_canonicalize_a_pathname(web_url.string_lit("a/../b c")), "%20c")
+    expect_string(web_url.pattern_canonicalize_an_opaque_pathname(web_url.string_lit("a b")) else trap("MUST"), "a b")
+    expect_string(web_url.pattern_canonicalize_a_search(web_url.string_lit("a b#")), "a%20b%23")
+    expect_string(web_url.pattern_canonicalize_a_hash(web_url.string_lit("a b`")), "a%20b%60")
+    expect_string(web_url.pattern_canonicalize_an_ipv6_hostname(web_url.string_lit("[::AB]")) else trap("MUST"), "[::ab]")
+    expect_string(web_url.pattern_escape_a_pattern_string(web_url.string_lit("a+b*c?:{}()\\")), "a\\+b\\*c\\?\\:\\{\\}\\(\\)\\\\")
+    expect_string(web_url.pattern_escape_a_regexp_string(web_url.string_lit(".+*?^${}()[]|/\\x")),
+                  "\\.\\+\\*\\?\\^\\$\\{\\}\\(\\)\\[\\]\\|\\/\\\\x")

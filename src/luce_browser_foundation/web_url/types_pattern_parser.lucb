@@ -10,12 +10,18 @@
 #
 #==============================================================================================
 
+## URL::Pattern::PatternParser::EncodingCallback (Libraries/LibURL/Pattern/PatternParser.h:25): a function that
+## validates and encodes a simple text piece of a pattern string, or throws. Fixed by region r05: the generated
+## `ak.Function1[const ak.String*, ak.String]` could not fail, and every callback the donor passes (the
+## canonicalize functions and one capture-free lambda) is a plain function.
+pub type EncodingCallback = func(ak.String) -> ak.String!
+
 # mark: PatternParser ===========================================================================
 
 ## URL::Pattern::PatternParser (Libraries/LibURL/Pattern/PatternParser.h:18).
 pub struct PatternParser:
     pub var m_token_list: ak.Vector[Token]
-    pub var m_encoding_callback: ak.Function1[const ak.String*, ak.String]
+    pub var m_encoding_callback: EncodingCallback
     pub var m_segment_wildcard_regexp: ak.String
     pub var m_part_list: ak.Vector[Part]
     pub var m_pending_fixed_value: ak.StringBuilder

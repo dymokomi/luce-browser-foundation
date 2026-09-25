@@ -1,0 +1,51 @@
+#==============================================================================================
+#
+#   pattern_part - URLPattern: a part of a parsed pattern string
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Pattern/Part.cpp (lines 1-64) and
+#       Libraries/LibURL/Pattern/Part.h (lines 1-79).
+#
+#==============================================================================================
+
+## Ported from Libraries/LibURL/Pattern/Part.cpp:12 URL::Pattern::Part::Part.
+pub func part_construct(this: Part*, type_: PartType, value: ak.String, modifier: PartModifier):
+    this.type_ = type_
+    this.value = value
+    this.modifier = modifier
+
+## Ported from Libraries/LibURL/Pattern/Part.cpp:19 URL::Pattern::Part::Part.
+pub func part_construct_string(this: Part*, type_: PartType, value: ak.String, modifier: PartModifier, name: ak.String, prefix: ak.String, suffix: ak.String):
+    this.type_ = type_
+    this.value = value
+    this.modifier = modifier
+    this.name = name
+    this.prefix = prefix
+    this.suffix = suffix
+
+## Ported from Libraries/LibURL/Pattern/Part.cpp:29 URL::Pattern::Part::type_to_string.
+pub func part_type_to_string(type_: PartType) -> ak.StringView:
+    match type_:
+        .fixed_text: return sv("FixedText")
+        .regexp: return sv("Regexp")
+        .segment_wildcard: return sv("SegmentWildcard")
+        .full_wildcard: return sv("FullWildcard")
+        _: trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibURL/Pattern/Part.cpp:46 URL::Pattern::Part::convert_modifier_to_string.
+# https://urlpattern.spec.whatwg.org/#convert-a-modifier-to-a-string
+pub func part_convert_modifier_to_string(modifier: PartModifier) -> ak.StringView:
+    # 1. If modifier is "zero-or-more", then return "*".
+    if modifier == PartModifier.zero_or_more:
+        return sv("*")
+
+    # 2. If modifier is "optional", then return "?".
+    if modifier == PartModifier.optional:
+        return sv("?")
+
+    # 3. If modifier is "one-or-more", then return "+".
+    if modifier == PartModifier.one_or_more:
+        return sv("+")
+
+    # 4. Return the empty string.
+    return sv("")

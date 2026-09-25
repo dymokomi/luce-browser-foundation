@@ -1,0 +1,220 @@
+#==============================================================================================
+#
+#   support - Helpers the LibURL port shares: literals, string equality, integer formatting
+#
+#   DESCRIPTION:
+#       Not a donor file. The spellings the C++ gets from AK's operators and templates, written
+#       once for the module (DESIGN.md §2.6, §2.8): `"foo"sv` and `"foo"_string` literals,
+#       `String == String` / `String == StringView` (ak.String has no `==`, §3.3), copies of
+#       vectors (§3.3 rule 2), the AK/Debug.h switches LibURL reads, the pattern-error slot
+#       (PatternErrorOr's ErrorInfo, §2.10), and the integer formats LibURL passes to
+#       AK::Format (`{}`, `{:x}`, `{:02X}`) and to the generic AK::parse_number<u32> /
+#       StringView::to_number<u16> / String::number, whose generic stubs cannot compute on T.
+#
+#==============================================================================================
+
+# mark: Debug switches and errors ===============================================================
+
+## AK/Debug.h URL_PARSER_DEBUG (0 in the donor build). The dbgln_if bodies are not ported while it is off.
+pub let url_parser_debug: bool = false
+
+## AK/Debug.h URL_PATTERN_DEBUG (0 in the donor build). The dbgln_if bodies are not ported while it is off.
+pub let url_pattern_debug: bool = false
+
+## The error code of a URL::Pattern::PatternErrorOr failure (a TypeError for web callers); the
+## ErrorInfo is kept in a slot, read with `pattern_take_error_info` (DESIGN.md §2.10).
+pub let pattern_error: ErrorCode = ErrorCode.package(501)
+
+# The ErrorInfo of the last pattern failure. It is read right after the failure, before the next
+# allocation can collect the message.
+var s_pattern_error_info: ErrorInfo?
+
+## `return ErrorInfo { "..."_string };` from a PatternErrorOr function: store the error and fail.
+pub func pattern_throw(message: str) -> never!:
+    s_pattern_error_info = ErrorInfo(message = string_lit(message))
+    error(pattern_error, message)
+
+## `return ErrorInfo { MUST(String::formatted(...)) };`: store the formatted message and fail.
+pub func pattern_throw_string(message: ak.String) -> never!:
+    s_pattern_error_info = ErrorInfo(message = message)
+    error(pattern_error, "URLPattern TypeError")
+
+## `return ErrorInfo { MUST(String::formatted(...)) };` with the message built in a StringBuilder.
+pub func pattern_throw_builder(message: ak.StringBuilder*) -> never!:
+    let text = ak.string_builder_to_string(message) else trap("MUST: String::formatted")
+    try pattern_throw_string(text)
+
+## The ErrorInfo of the last failure with `pattern_error` (the result of `release_error()`).
+pub func pattern_take_error_info() -> ErrorInfo:
+    let info = s_pattern_error_info else trap("no pending URLPattern error")
+    s_pattern_error_info = none
+    return info
+
+# mark: Literals and equality ===================================================================
+
+## `"text"sv`.
+pub func sv(text: str) -> ak.StringView:
+    return ak.literalsv_u8(text.bytes.data, text.length)
+
+## `"text"_string`.
+pub func string_lit(text: str) -> ak.String:
+    return ak.literalstring(text.bytes.data, text.length)
+
+## `String {}`: the empty string (all-zero, DESIGN.md §2.3).
+pub func empty_string() -> ak.String:
+    var result: ak.String
+    return result
+
+## `a == b` for two Strings.
+pub func string_equals(a: ak.String, b: ak.String) -> bool:
+    return ak.string_base_eq(&a.string_base, &b.string_base)
+
+## `a == b` for a String and a StringView (AK compares the bytes).
+pub func string_equals_view(a: ak.String, b: ak.StringView) -> bool:
+    let view = ak.string_bytes_as_string_view(&a)
+    return ak.string_view_eq_string_view(&view, b)
+
+## `a == "literal"` for a String.
+pub func string_is(a: ak.String, literal: str) -> bool:
+    return string_equals_view(a, sv(literal))
+
+## `a == b` for two StringViews.
+pub func view_equals(a: ak.StringView, b: ak.StringView) -> bool:
+    return ak.string_view_eq_string_view(&a, b)
+
+## `a == "literal"` for a StringView.
+pub func view_is(a: ak.StringView, literal: str) -> bool:
+    return view_equals(a, sv(literal))
+
+## `a == b` for two Optional<String>s (both null, or both present and equal).
+pub func optional_string_equals(a: ak.String?, b: ak.String?) -> bool:
+    if let x = a:
+        if let y = b:
+            return string_equals(x, y)
+        return false
+    return b == none
+
+## `"characters"sv.contains(code_point)`: whether a code point is one of the given ASCII bytes.
+pub func literal_contains(characters: str, code_point: u32) -> bool:
+    for byte in characters.bytes:
+        if (u32)byte == code_point:
+            return true
+    return false
+
+## `builder.append(string)` for a String.
+pub func append_string(builder: ak.StringBuilder*, string: ak.String):
+    ak.string_builder_append_string_view(builder, ak.string_bytes_as_string_view(&string))
+
+## `builder.append("literal"sv)`.
+pub func append_literal(builder: ak.StringBuilder*, literal: str):
+    ak.string_builder_append_string_view(builder, sv(literal))
+
+## `string.bytes_as_string_view()` for a String value.
+pub func view_of(string: ak.String) -> ak.StringView:
+    return ak.string_bytes_as_string_view(&string)
+
+## `Utf8View(input)`.
+pub func utf8_view_of(input: ak.StringView) -> ak.Utf8View:
+    var view: ak.Utf8View
+    ak.utf8_view_construct_string_view(&view, input)
+    return view
+
+## `ByteString {}`: the empty ByteString.
+pub func empty_byte_string() -> ak.ByteString:
+    let empty = sv("")
+    return ak.string_view_to_byte_string(&empty)
+
+# mark: Containers ==============================================================================
+
+## A copy of a vector (DESIGN.md §3.3 rule 2: C++ copies a Vector where Luce shares its buffer).
+pub func clone_vector[T](source: const ak.Vector[T]*) -> ak.Vector[T]:
+    var result: ak.Vector[T]
+    ak.vector_ensure_capacity(&result, ak.vector_size(source))
+    for index in 0..<ak.vector_size(source):
+        ak.vector_append_t(&result, *ak.vector_at_const(source, index))
+    return result
+
+# mark: Integer formats =========================================================================
+
+let hex_digits_upper: str = "0123456789ABCDEF"
+let hex_digits_lower: str = "0123456789abcdef"
+
+## `builder.appendff("%{:02X}", byte)`: a percent sign and two uppercase hex digits.
+pub func append_percent_encoded_byte(builder: ak.StringBuilder*, byte: u32):
+    ak.string_builder_append_u8(builder, '%')
+    ak.string_builder_append_u8(builder, hex_digits_upper.bytes[(usize)((byte >> 4) & 0xf)])
+    ak.string_builder_append_u8(builder, hex_digits_upper.bytes[(usize)(byte & 0xf)])
+
+## `builder.appendff("{:x}", value)`: the shortest lowercase hexadecimal representation.
+pub func append_hex_lowercase(builder: ak.StringBuilder*, value: u64):
+    var digits: u8[16]
+    var count: usize = 0
+    var rest = value
+    while true:
+        digits[count] = hex_digits_lower.bytes[(usize)(rest & 0xf)]
+        count += 1
+        rest = rest >> 4
+        if rest == 0:
+            break
+    while count > 0:
+        count -= 1
+        ak.string_builder_append_u8(builder, digits[count])
+
+## `builder.appendff("{}", value)` for an unsigned integer.
+pub func append_decimal(builder: ak.StringBuilder*, value: u64):
+    var digits: u8[20]
+    var count: usize = 0
+    var rest = value
+    while true:
+        digits[count] = (u8)('0' + (u8)(rest % 10))
+        count += 1
+        rest = rest // 10
+        if rest == 0:
+            break
+    while count > 0:
+        count -= 1
+        ak.string_builder_append_u8(builder, digits[count])
+
+## `String::number(value)` for an unsigned integer.
+pub func string_number(value: u64) -> ak.String:
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    append_decimal(&builder, value)
+    return ak.string_builder_to_string_without_validation(&builder)
+
+## `AK::parse_number<u32>(input, TrimWhitespace::No, radix)` (AK/StringConversions.cpp): the value of
+## input's digits in radix 8, 10 or 16, or none when input is empty, holds a non-digit, or overflows.
+pub func parse_u32_no_trim(input: ak.StringView, radix: u32) -> u32?:
+    let bytes = ak.string_view_bytes(&input)
+    if bytes.length == 0:
+        return none
+    var value: u32 = 0
+    for byte in bytes:
+        var digit: u32 = 0
+        if byte >= '0' and byte <= '9':
+            digit = (u32)(byte - '0')
+        elif byte >= 'a' and byte <= 'f':
+            digit = (u32)(byte - 'a') + 10
+        elif byte >= 'A' and byte <= 'F':
+            digit = (u32)(byte - 'A') + 10
+        else:
+            return none
+        if digit >= radix:
+            return none
+        let scaled = value *? radix else return none
+        value = scaled +? digit else return none
+    return value
+
+## `StringView::to_number<u16>(TrimWhitespace::No)`: the decimal value of input, or none when input is
+## empty, holds a non-digit (no sign is accepted for an unsigned type), or does not fit in 16 bits.
+pub func parse_u16_no_trim(input: ak.StringView) -> u16?:
+    let bytes = ak.string_view_bytes(&input)
+    if bytes.length == 0:
+        return none
+    var value: u16 = 0
+    for byte in bytes:
+        if byte < '0' or byte > '9':
+            return none
+        let scaled = value *? 10 else return none
+        value = scaled +? (u16)(byte - '0') else return none
+    return value
