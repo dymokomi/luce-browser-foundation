@@ -1,0 +1,124 @@
+#==============================================================================================
+#
+#   ipv4_address - IPv4Address: an IPv4 address as four octets in one u32
+#
+#   DESCRIPTION:
+#       Port of AK/IPv4Address.h (lines 1-155). The first octet is the low byte of m_data.
+#       The `formatted("{}.{}.{}.{}", ...)` of the string conversions writes the decimal
+#       octets directly (the same text; AK's formatter belongs to region r03).
+#
+#==============================================================================================
+
+## Ported from AK/IPv4Address.h:32 AK::IPv4Address::IPv4Address(u32, u32, u32, u32).
+pub func i_pv4_address_construct_u32(this: IPv4Address*, a: u32, b: u32, c_: u32, d: u32):
+    this.m_data = (d << 24) | (c_ << 16) | (b << 8) | a
+
+## Ported from AK/IPv4Address.h:37 AK::IPv4Address::IPv4Address(u8 const[4]).
+pub func i_pv4_address_construct_array_u8(this: IPv4Address*, data: u8[4]):
+    this.m_data = ((u32)data[3] << 24) | ((u32)data[2] << 16) | ((u32)data[1] << 8) | (u32)data[0]
+
+## Ported from AK/IPv4Address.h:42 AK::IPv4Address::IPv4Address(NetworkOrdered<u32>).
+pub func i_pv4_address_construct_big_endian(this: IPv4Address*, address: BigEndian[u32]):
+    this.m_data = big_endian_to_t(&address)
+
+## `IPv4Address(a, b, c, d)`: the value form of the octets constructor.
+pub func i_pv4_address_from_octets(a: u32, b: u32, c_: u32, d: u32) -> IPv4Address:
+    var address = IPv4Address()
+    i_pv4_address_construct_u32(&address, a, b, c_, d)
+    return address
+
+## Ported from AK/IPv4Address.h:47 AK::IPv4Address::operator[]: octet `i`, 0 the first.
+pub func i_pv4_address_at(this: const IPv4Address*, i: i32) -> u8:
+    assert(i >= 0 and i < 4)
+    return (u8)i_pv4_address_octet(this, (IPv4AddressSubnetClass)i)
+
+## "a.b.c.d" of four octets, in the given order.
+func i_pv4_address_dotted(builder: StringBuilder*, first: u32, second: u32, third: u32, fourth: u32):
+    var buffer: u8[26]
+    string_builder_append_string_view(builder, string_view_from_bytes(create_string_from_number_digits(buffer, first, false)))
+    string_builder_append_u8(builder, '.')
+    string_builder_append_string_view(builder, string_view_from_bytes(create_string_from_number_digits(buffer, second, false)))
+    string_builder_append_u8(builder, '.')
+    string_builder_append_string_view(builder, string_view_from_bytes(create_string_from_number_digits(buffer, third, false)))
+    string_builder_append_u8(builder, '.')
+    string_builder_append_string_view(builder, string_view_from_bytes(create_string_from_number_digits(buffer, fourth, false)))
+
+## Ported from AK/IPv4Address.h:53 AK::IPv4Address::to_byte_string.
+pub func i_pv4_address_to_byte_string(this: const IPv4Address*) -> ByteString:
+    var builder = string_builder_new()
+    i_pv4_address_dotted(&builder, i_pv4_address_octet(this, .a), i_pv4_address_octet(this, .b), i_pv4_address_octet(this, .c_), i_pv4_address_octet(this, .d))
+    return string_builder_to_byte_string(&builder)
+
+## Ported from AK/IPv4Address.h:62 AK::IPv4Address::to_byte_string_reversed.
+pub func i_pv4_address_to_byte_string_reversed(this: const IPv4Address*) -> ByteString:
+    var builder = string_builder_new()
+    i_pv4_address_dotted(&builder, i_pv4_address_octet(this, .d), i_pv4_address_octet(this, .c_), i_pv4_address_octet(this, .b), i_pv4_address_octet(this, .a))
+    return string_builder_to_byte_string(&builder)
+
+## Ported from AK/IPv4Address.h:71 AK::IPv4Address::to_string.
+pub func i_pv4_address_to_string(this: const IPv4Address*) -> String!:
+    var builder = string_builder_new()
+    i_pv4_address_dotted(&builder, i_pv4_address_octet(this, .a), i_pv4_address_octet(this, .b), i_pv4_address_octet(this, .c_), i_pv4_address_octet(this, .d))
+    return try string_builder_to_string(&builder)
+
+## The `parts[i].to_number<u32>().value_or(256)` of IPv4Address::from_string.
+func i_pv4_address_part(parts: const Vector[StringView]*, index: usize) -> u32:
+    let buffer = parts.m_outline_buffer else trap("VERIFY: empty parts")
+    let part = buffer[index]
+    return string_view_to_number_u32(&part) else 256
+
+## Ported from AK/IPv4Address.h:80 AK::IPv4Address::from_string: the address of "a.b.c.d",
+## "a.b.d", "a.d" or "d" (each part at most 255).
+pub func i_pv4_address_from_string(string: StringView) -> IPv4Address?:
+    let parts = string_view_split_view_u8(&string, '.')
+
+    var a: u32 = 0
+    var b: u32 = 0
+    var c_: u32 = 0
+    var d: u32 = 0
+
+    let size = vector_size(&parts)
+    if size == 1:
+        d = i_pv4_address_part(&parts, 0)
+    elif size == 2:
+        a = i_pv4_address_part(&parts, 0)
+        d = i_pv4_address_part(&parts, 1)
+    elif size == 3:
+        a = i_pv4_address_part(&parts, 0)
+        b = i_pv4_address_part(&parts, 1)
+        d = i_pv4_address_part(&parts, 2)
+    elif size == 4:
+        a = i_pv4_address_part(&parts, 0)
+        b = i_pv4_address_part(&parts, 1)
+        c_ = i_pv4_address_part(&parts, 2)
+        d = i_pv4_address_part(&parts, 3)
+    else:
+        return none
+
+    if a > 255 or b > 255 or c_ > 255 or d > 255:
+        return none
+    return i_pv4_address_from_octets(a, b, c_, d)
+
+## Ported from AK/IPv4Address.h:112 AK::IPv4Address::netmask_from_cidr.
+pub func i_pv4_address_netmask_from_cidr(cidr: i32) -> IPv4Address:
+    assert(cidr >= 0 and cidr <= 32)
+    let value = (u32)((u64)0xffffffff << (u64)(32 - cidr))
+    return i_pv4_address_from_octets((value & 0xff000000) >> 24, (value & 0xff0000) >> 16, (value & 0xff00) >> 8, value & 0xff)
+
+## Ported from AK/IPv4Address.h:119 AK::IPv4Address::to_in_addr_t.
+pub func i_pv4_address_to_in_addr_t(this: const IPv4Address*) -> u32:
+    return this.m_data
+
+## Ported from AK/IPv4Address.h:120 AK::IPv4Address::to_u32.
+pub func i_pv4_address_to_u32(this: const IPv4Address*) -> u32:
+    return this.m_data
+
+## Ported from AK/IPv4Address.h:125 AK::IPv4Address::is_zero.
+pub func i_pv4_address_is_zero(this: const IPv4Address*) -> bool:
+    return this.m_data == 0
+
+## Ported from AK/IPv4Address.h:131 AK::IPv4Address::octet.
+func i_pv4_address_octet(this: const IPv4Address*, subnet: IPv4AddressSubnetClass) -> u32:
+    let bits_per_byte: u32 = 8
+    let bits_to_shift = bits_per_byte * (u32)subnet
+    return (this.m_data >> bits_to_shift) & 0x0000_00ff

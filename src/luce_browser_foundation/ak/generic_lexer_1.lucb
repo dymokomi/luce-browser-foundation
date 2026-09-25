@@ -1,0 +1,471 @@
+#==============================================================================================
+#
+#   generic_lexer_1 - GenericLexer<char>: a cursor over a StringView, and its predicates
+#
+#   DESCRIPTION:
+#       Port of AK/GenericLexer.h (lines 1-490) for CharType = char, with is_any_of,
+#       is_not_any_of, is_path_separator and is_quote.
+#
+#       GenericLexer<CharType> is `GenericLexer[TCharType]`. A generic body cannot turn a code
+#       unit into a TCharType, so the template is instantiated by hand: these generic_lexer_*
+#       functions are GenericLexer<char> over `GenericLexer[u8]` (ViewType StringView, the
+#       m_input field) and generic_lexer_2 holds GenericLexer<char16_t> as utf16_generic_lexer_*
+#       over `GenericLexer[u16]`. The char-only overloads of the C++ that take a StringView keep
+#       the `_string_view` name here (ViewType is StringView). Predicates are CharPredicate
+#       structs (CodePointPredicate for the UTF-16 lexer); ctype-like functions are wrapped in
+#       CharPredicateFunction.
+#
+#==============================================================================================
+
+# mark: Predicates ==============================================================================
+
+## Ported from AK/GenericLexer.h:20 AK::is_any_of: a predicate matching the characters of `values`.
+pub func is_any_of(values: StringView) -> IsAnyOf:
+    return IsAnyOf(values = values)
+
+## Ported from AK/GenericLexer.h:25 AK::is_not_any_of: a predicate matching characters not in `values`.
+pub func is_not_any_of(values: StringView) -> IsNotAnyOf:
+    return IsNotAnyOf(values = values)
+
+## Ported from AK/GenericLexer.h:30 AK::is_path_separator: `is_any_of("/\\"sv)`.
+pub func is_path_separator() -> IsAnyOf:
+    return is_any_of(sv("/\\"))
+
+## Ported from AK/GenericLexer.h:31 AK::is_quote: `is_any_of("'\""sv)`.
+pub func is_quote() -> IsAnyOf:
+    return is_any_of(sv("'\""))
+
+## The lambda of AK::is_any_of: `values.contains(c)`.
+pub struct IsAnyOf: CharPredicate:
+    pub var values: StringView
+
+    pub func matches(ch: u8) -> bool:
+        return string_view_contains_u8(&self.values, ch)
+
+## The lambda of AK::is_not_any_of: `!values.contains(c)`.
+pub struct IsNotAnyOf: CharPredicate:
+    pub var values: StringView
+
+    pub func matches(ch: u8) -> bool:
+        return not string_view_contains_u8(&self.values, ch)
+
+## A plain function (such as is_ascii_digit) used as a CharPredicate.
+pub struct CharPredicateFunction: CharPredicate:
+    pub var function: func(u32) -> bool
+
+    pub func matches(ch: u8) -> bool:
+        return self.function(ch)
+
+# mark: Construction and position ===============================================================
+
+## Ported from AK/GenericLexer.h:47 AK::Detail::GenericLexer::GenericLexer<CharType>(ViewType).
+pub func generic_lexer_construct(this: GenericLexer[u8]*, input: StringView):
+    this.m_input = input
+    this.m_index = 0
+
+## `GenericLexer lexer(input)`: the value form of the constructor.
+pub func generic_lexer_new(input: StringView) -> GenericLexer[u8]:
+    var lexer: GenericLexer[u8]
+    generic_lexer_construct(&lexer, input)
+    return lexer
+
+## Ported from AK/GenericLexer.h:52 AK::Detail::GenericLexer::tell.
+pub func generic_lexer_tell(this: const GenericLexer[u8]*) -> usize:
+    return this.m_index
+
+## Ported from AK/GenericLexer.h:53 AK::Detail::GenericLexer::tell_remaining.
+pub func generic_lexer_tell_remaining(this: const GenericLexer[u8]*) -> usize:
+    return generic_lexer_input_length(this) - this.m_index
+
+## Ported from AK/GenericLexer.h:55 AK::Detail::GenericLexer::remaining.
+pub func generic_lexer_remaining(this: const GenericLexer[u8]*) -> StringView:
+    return string_view_substring_view(&this.m_input, this.m_index)
+
+## Ported from AK/GenericLexer.h:56 AK::Detail::GenericLexer::input.
+pub func generic_lexer_input(this: const GenericLexer[u8]*) -> StringView:
+    return this.m_input
+
+## Ported from AK/GenericLexer.h:58 AK::Detail::GenericLexer::is_eof.
+pub func generic_lexer_is_eof(this: const GenericLexer[u8]*) -> bool:
+    return this.m_index >= generic_lexer_input_length(this)
+
+## Ported from AK/GenericLexer.h:60 AK::Detail::GenericLexer::peek: the character `offset` ahead,
+## or '\0' past the end.
+pub func generic_lexer_peek(this: const GenericLexer[u8]*, offset: usize = 0) -> u8:
+    return generic_lexer_code_unit_at(this, this.m_index + offset) if this.m_index + offset < generic_lexer_input_length(this) else 0
+
+## Ported from AK/GenericLexer.h:65 AK::Detail::GenericLexer::peek_string.
+pub func generic_lexer_peek_string(this: const GenericLexer[u8]*, length: usize, offset: usize = 0) -> StringView?:
+    if this.m_index + offset + length > generic_lexer_input_length(this):
+        return none
+    return string_view_substring_view_usize(&this.m_input, this.m_index + offset, length)
+
+# mark: Matching ================================================================================
+
+## Ported from AK/GenericLexer.h:72 AK::Detail::GenericLexer::next_is(CharType).
+pub func generic_lexer_next_is_t_char_type(this: const GenericLexer[u8]*, expected: u8) -> bool:
+    return generic_lexer_peek(this) == expected
+
+## Ported from AK/GenericLexer.h:83 AK::Detail::GenericLexer::next_is(ViewType).
+pub func generic_lexer_next_is_string_view(this: const GenericLexer[u8]*, expected: StringView) -> bool:
+    let length = string_view_length(&expected)
+    let next = generic_lexer_peek_string(this, length) else return false
+    return string_view_eq_string_view(&next, expected)
+
+## Ported from AK/GenericLexer.h:101 AK::Detail::GenericLexer::retreat.
+pub func generic_lexer_retreat(this: GenericLexer[u8]*):
+    assert(this.m_index > 0)
+    this.m_index -= 1
+
+## Ported from AK/GenericLexer.h:107 AK::Detail::GenericLexer::retreat(size_t).
+pub func generic_lexer_retreat_usize(this: GenericLexer[u8]*, count: usize):
+    assert(this.m_index >= count)
+    this.m_index -= count
+
+## Ported from AK/GenericLexer.h:113 AK::Detail::GenericLexer::consume.
+pub func generic_lexer_consume(this: GenericLexer[u8]*) -> u8:
+    assert(not generic_lexer_is_eof(this))
+    let ch = generic_lexer_code_unit_at(this, this.m_index)
+    this.m_index += 1
+    return ch
+
+## Ported from AK/GenericLexer.h:119 AK::Detail::GenericLexer::consume_specific(CharType).
+pub func generic_lexer_consume_specific_t_char_type(this: GenericLexer[u8]*, next: u8) -> bool:
+    if not generic_lexer_next_is_t_char_type(this, next):
+        return false
+
+    generic_lexer_ignore(this)
+    return true
+
+## Ported from AK/GenericLexer.h:134 AK::Detail::GenericLexer::consume_specific(ViewType).
+pub func generic_lexer_consume_specific_string_view(this: GenericLexer[u8]*, next: StringView) -> bool:
+    if not generic_lexer_next_is_string_view(this, next):
+        return false
+
+    generic_lexer_ignore(this, string_view_length(&next))
+    return true
+
+## Ported from AK/GenericLexer.h:157 AK::Detail::GenericLexer::consume_escaped_character.
+pub func generic_lexer_consume_escaped_character(this: GenericLexer[u8]*, escape_char: u8 = '\\', escape_map: StringView = StringView()) -> u8:
+    # The C++ default escape map, "n\nr\rt\tb\bf\f"sv (a default here must be a constant).
+    let map = sv("n\nr\rt\tb\u{8}f\u{c}") if string_view_characters_without_null_termination(&escape_map) == none else escape_map
+    if not generic_lexer_consume_specific_t_char_type(this, escape_char):
+        return generic_lexer_consume(this)
+
+    let c_ = generic_lexer_consume(this)
+
+    var i: usize = 0
+    while i < string_view_length(&map):
+        if c_ == string_view_at(&map, i):
+            return string_view_at(&map, i + 1)
+        i += 2
+
+    return c_
+
+## Ported from AK/GenericLexer.h:173 AK::Detail::GenericLexer::consume(size_t): consume a number of
+## characters.
+pub func generic_lexer_consume_usize(this: GenericLexer[u8]*, count: usize) -> StringView:
+    let start = this.m_index
+    let available = generic_lexer_input_length(this) - this.m_index
+    let length = count if count < available else available
+    this.m_index += length
+
+    return string_view_substring_view_usize(&this.m_input, start, length)
+
+## Ported from AK/GenericLexer.h:183 AK::Detail::GenericLexer::consume_all: consume the rest of the
+## input.
+pub func generic_lexer_consume_all(this: GenericLexer[u8]*) -> StringView:
+    let rest = string_view_substring_view_usize(&this.m_input, this.m_index, generic_lexer_input_length(this) - this.m_index)
+    this.m_index = generic_lexer_input_length(this)
+    return rest
+
+## Ported from AK/GenericLexer.h:191 AK::Detail::GenericLexer::consume_line: consume until a new
+## line is found.
+pub func generic_lexer_consume_line(this: GenericLexer[u8]*) -> StringView:
+    let start = this.m_index
+    while not generic_lexer_is_eof(this) and generic_lexer_peek(this) != '\r' and generic_lexer_peek(this) != '\n':
+        this.m_index += 1
+
+    let length = this.m_index - start
+    discard(generic_lexer_consume_specific_t_char_type(this, '\r'))
+    discard(generic_lexer_consume_specific_t_char_type(this, '\n'))
+
+    return string_view_substring_view_usize(&this.m_input, start, length)
+
+## Ported from AK/GenericLexer.h:205 AK::Detail::GenericLexer::consume_until(CharType): consume and
+## return characters until `stop` is peeked.
+pub func generic_lexer_consume_until_t_char_type(this: GenericLexer[u8]*, stop: u8) -> StringView:
+    let start = this.m_index
+    while not generic_lexer_is_eof(this) and generic_lexer_peek(this) != stop:
+        this.m_index += 1
+
+    let length = this.m_index - start
+    return string_view_substring_view_usize(&this.m_input, start, length)
+
+## Ported from AK/GenericLexer.h:222 AK::Detail::GenericLexer::consume_until(ViewType): consume and
+## return characters until the string `stop` is found.
+pub func generic_lexer_consume_until_string_view(this: GenericLexer[u8]*, stop: StringView) -> StringView:
+    let start = this.m_index
+    while not generic_lexer_is_eof(this) and not generic_lexer_next_is_string_view(this, stop):
+        this.m_index += 1
+
+    let length = this.m_index - start
+    return string_view_substring_view_usize(&this.m_input, start, length)
+
+## Ported from AK/GenericLexer.h:235 AK::Detail::GenericLexer::consume_quoted_string: a string
+## surrounded by single or double quotes, without the quotes. An escape character can be
+## provided to capture the enclosing quotes; it stays in the result.
+pub func generic_lexer_consume_quoted_string(this: GenericLexer[u8]*, escape_char: u8 = 0) -> StringView:
+    let quote = is_quote()
+    if not generic_lexer_next_is_tt_predicate(this, &quote):
+        return StringView()
+
+    let quote_char = generic_lexer_consume(this)
+    let start = this.m_index
+    while not generic_lexer_is_eof(this):
+        if generic_lexer_next_is_t_char_type(this, escape_char):
+            this.m_index += 1
+        elif generic_lexer_next_is_t_char_type(this, quote_char):
+            break
+        this.m_index += 1
+    let length = this.m_index - start
+
+    if generic_lexer_peek(this) != quote_char:
+        # Restore the index in case the string is unterminated
+        this.m_index = start - 1
+        return StringView()
+
+    # Ignore closing quote
+    generic_lexer_ignore(this)
+
+    return string_view_substring_view_usize(&this.m_input, start, length)
+
+# mark: Integers and escapes ====================================================================
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<T>, for
+## every integer type at once: the magnitude and sign of an optionally signed decimal integer
+## whose magnitude fits `unsigned_maximum` (MakeUnsigned<T>'s maximum) and T (`maximum`). Fails
+## with EINVAL or ERANGE and leaves the position unchanged.
+func generic_lexer_consume_decimal_integer_magnitude(this: GenericLexer[u8]*, maximum: u64, unsigned_maximum: u64, is_unsigned: bool) -> (u64, bool)!:
+    let rollback_position = this.m_index
+
+    var has_minus_sign = false
+
+    if generic_lexer_next_is_t_char_type(this, '+') or generic_lexer_next_is_t_char_type(this, '-'):
+        if generic_lexer_consume(this) == '-':
+            has_minus_sign = true
+
+    let digits = CharPredicateFunction(function = is_ascii_digit)
+    let number_view = generic_lexer_consume_while(this, &digits)
+    if string_view_is_empty(&number_view):
+        this.m_index = rollback_position
+        error(ak_errno_error, "EINVAL")
+
+    let parsed = parse_number_string_view_u64(number_view, TrimWhitespace.no)
+    let number = parsed else 0
+    if parsed == none or number > unsigned_maximum:
+        this.m_index = rollback_position
+        error(ak_errno_error, "ERANGE")
+
+    return try consume_decimal_integer_check_range(&this.m_index, rollback_position, number, has_minus_sign, maximum, is_unsigned)
+
+## The range checks consume_decimal_integer<T> makes after parsing the digits (shared by the
+## char and char16_t lexers).
+func consume_decimal_integer_check_range(index: usize*, rollback_position: usize, number: u64, has_minus_sign: bool, maximum: u64, is_unsigned: bool) -> (u64, bool)!:
+    if not has_minus_sign:
+        if maximum < number:
+            # This is only possible in a signed case.
+            *index = rollback_position
+            error(ak_errno_error, "ERANGE")
+
+        return (number, false)
+
+    if is_unsigned:
+        if number != 0:
+            *index = rollback_position
+            error(ak_errno_error, "ERANGE")
+
+        return (0, false)
+
+    let max_value = maximum + 1
+    if number > max_value:
+        *index = rollback_position
+        error(ak_errno_error, "ERANGE")
+
+    return (number, true)
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<i8>.
+pub func generic_lexer_consume_decimal_integer_i8(this: GenericLexer[u8]*) -> i8!:
+    let (magnitude, negative) = try generic_lexer_consume_decimal_integer_magnitude(this, 0x7f, 0xff, false)
+    return (i8)(0 -% magnitude) if negative else (i8)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<i16>.
+pub func generic_lexer_consume_decimal_integer_i16(this: GenericLexer[u8]*) -> i16!:
+    let (magnitude, negative) = try generic_lexer_consume_decimal_integer_magnitude(this, 0x7fff, 0xffff, false)
+    return (i16)(0 -% magnitude) if negative else (i16)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<i32>.
+pub func generic_lexer_consume_decimal_integer_i32(this: GenericLexer[u8]*) -> i32!:
+    let (magnitude, negative) = try generic_lexer_consume_decimal_integer_magnitude(this, 0x7fffffff, 0xffffffff, false)
+    return (i32)(0 -% magnitude) if negative else (i32)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<i64>.
+pub func generic_lexer_consume_decimal_integer_i64(this: GenericLexer[u8]*) -> i64!:
+    let (magnitude, negative) = try generic_lexer_consume_decimal_integer_magnitude(this, 0x7fffffffffffffff, 0xffffffffffffffff, false)
+    return (i64)(0 -% magnitude) if negative else (i64)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<u8>.
+pub func generic_lexer_consume_decimal_integer_u8(this: GenericLexer[u8]*) -> u8!:
+    let (magnitude, _negative) = try generic_lexer_consume_decimal_integer_magnitude(this, 0xff, 0xff, true)
+    return (u8)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<u16>.
+pub func generic_lexer_consume_decimal_integer_u16(this: GenericLexer[u8]*) -> u16!:
+    let (magnitude, _negative) = try generic_lexer_consume_decimal_integer_magnitude(this, 0xffff, 0xffff, true)
+    return (u16)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<u32>.
+pub func generic_lexer_consume_decimal_integer_u32(this: GenericLexer[u8]*) -> u32!:
+    let (magnitude, _negative) = try generic_lexer_consume_decimal_integer_magnitude(this, 0xffffffff, 0xffffffff, true)
+    return (u32)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<u64>.
+pub func generic_lexer_consume_decimal_integer_u64(this: GenericLexer[u8]*) -> u64!:
+    let (magnitude, _negative) = try generic_lexer_consume_decimal_integer_magnitude(this, 0xffffffffffffffff, 0xffffffffffffffff, true)
+    return magnitude
+
+## Ported from AK/GenericLexer.h:311 AK::Detail::GenericLexer::consume_escaped_code_point: a
+## `\uXXXX` (optionally a surrogate pair) or `\u{X...}` escape.
+pub func generic_lexer_consume_escaped_code_point(this: GenericLexer[u8]*, combine_surrogate_pairs: bool = true) -> UnicodeEscapeResult:
+    if not generic_lexer_consume_specific_string_view(this, sv("\\u")):
+        return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.malformed_unicode_escape)
+
+    if generic_lexer_next_is_t_char_type(this, '{'):
+        return generic_lexer_decode_code_point(this)
+    return generic_lexer_decode_single_or_paired_surrogate(this, combine_surrogate_pairs)
+
+## Ported from AK/GenericLexer.h:321 AK::Detail::GenericLexer::ignore.
+pub func generic_lexer_ignore(this: GenericLexer[u8]*, count: usize = 1):
+    let available = generic_lexer_input_length(this) - this.m_index
+    this.m_index += count if count < available else available
+
+## Ported from AK/GenericLexer.h:327 AK::Detail::GenericLexer::ignore_until(CharType).
+pub func generic_lexer_ignore_until_t_char_type(this: GenericLexer[u8]*, stop: u8):
+    while not generic_lexer_is_eof(this) and generic_lexer_peek(this) != stop:
+        this.m_index += 1
+
+# mark: Predicates ==============================================================================
+
+## Ported from AK/GenericLexer.h:349 AK::Detail::GenericLexer::next_is(TPredicate): test the next
+## character against a condition.
+pub func generic_lexer_next_is_tt_predicate[TTPredicate: CharPredicate](this: const GenericLexer[u8]*, pred: const TTPredicate*) -> bool:
+    return pred.matches(generic_lexer_peek(this))
+
+## Ported from AK/GenericLexer.h:356 AK::Detail::GenericLexer::consume_while: consume and return
+## characters while `pred` returns true.
+pub func generic_lexer_consume_while[TTPredicate: CharPredicate](this: GenericLexer[u8]*, pred: const TTPredicate*) -> StringView:
+    let start = this.m_index
+    while not generic_lexer_is_eof(this) and pred.matches(generic_lexer_peek(this)):
+        this.m_index += 1
+
+    let length = this.m_index - start
+    return string_view_substring_view_usize(&this.m_input, start, length)
+
+## Ported from AK/GenericLexer.h:368 AK::Detail::GenericLexer::consume_until(TPredicate): consume
+## and return characters until `pred` returns true.
+pub func generic_lexer_consume_until_tt_predicate[TTPredicate: CharPredicate](this: GenericLexer[u8]*, pred: const TTPredicate*) -> StringView:
+    let start = this.m_index
+    while not generic_lexer_is_eof(this) and not pred.matches(generic_lexer_peek(this)):
+        this.m_index += 1
+
+    let length = this.m_index - start
+    return string_view_substring_view_usize(&this.m_input, start, length)
+
+## Ported from AK/GenericLexer.h:379 AK::Detail::GenericLexer::consume_specific_with_predicate.
+pub func generic_lexer_consume_specific_with_predicate[TTPredicate: CharPredicate](this: GenericLexer[u8]*, pred: const TTPredicate*) -> bool:
+    if generic_lexer_is_eof(this) or not pred.matches(generic_lexer_peek(this)):
+        return false
+
+    generic_lexer_ignore(this)
+    return true
+
+## Ported from AK/GenericLexer.h:390 AK::Detail::GenericLexer::ignore_while: ignore characters
+## while `pred` returns true.
+pub func generic_lexer_ignore_while[TTPredicate: CharPredicate](this: GenericLexer[u8]*, pred: const TTPredicate*):
+    while not generic_lexer_is_eof(this) and pred.matches(generic_lexer_peek(this)):
+        this.m_index += 1
+
+## Ported from AK/GenericLexer.h:398 AK::Detail::GenericLexer::ignore_until(TPredicate): ignore
+## characters until `pred` returns true.
+pub func generic_lexer_ignore_until_tt_predicate[TTPredicate: CharPredicate](this: GenericLexer[u8]*, pred: const TTPredicate*):
+    while not generic_lexer_is_eof(this) and not pred.matches(generic_lexer_peek(this)):
+        this.m_index += 1
+
+# mark: Decoding ================================================================================
+
+## Ported from AK/GenericLexer.h:405 AK::Detail::GenericLexer::decode_code_point: the `{X...}`
+## part of a `\u{X...}` escape.
+pub func generic_lexer_decode_code_point(this: GenericLexer[u8]*) -> UnicodeEscapeResult:
+    let starts_with_open_bracket = generic_lexer_consume_specific_t_char_type(this, '{')
+    assert(starts_with_open_bracket)
+
+    let hex_digit = CharPredicateFunction(function = is_ascii_hex_digit)
+    var code_point: u32 = 0
+
+    while true:
+        if not generic_lexer_next_is_tt_predicate(this, &hex_digit):
+            return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.malformed_unicode_escape)
+
+        let new_code_point = (code_point << 4) | parse_ascii_hex_digit(generic_lexer_consume(this))
+        if new_code_point < code_point:
+            return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.unicode_escape_overflow)
+
+        code_point = new_code_point
+        if generic_lexer_consume_specific_t_char_type(this, '}'):
+            break
+
+    if is_unicode(code_point):
+        return UnicodeEscapeResult.success(code_point = code_point)
+    return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.unicode_escape_overflow)
+
+## The `decode_one_surrogate` lambda of decode_single_or_paired_surrogate: four hex digits.
+func generic_lexer_decode_one_surrogate(this: GenericLexer[u8]*) -> u16?:
+    let surrogate_length: usize = 4
+    let hex_digit = CharPredicateFunction(function = is_ascii_hex_digit)
+    var surrogate: u16 = 0
+
+    for _i in 0..<surrogate_length:
+        if not generic_lexer_next_is_tt_predicate(this, &hex_digit):
+            return none
+
+        surrogate = (surrogate << 4) | (u16)parse_ascii_hex_digit(generic_lexer_consume(this))
+
+    return surrogate
+
+## Ported from AK/GenericLexer.h:430 AK::Detail::GenericLexer::decode_single_or_paired_surrogate:
+## the `XXXX` part of a `\uXXXX` escape, joined with a following `\uXXXX` low surrogate.
+pub func generic_lexer_decode_single_or_paired_surrogate(this: GenericLexer[u8]*, combine_surrogate_pairs: bool = true) -> UnicodeEscapeResult:
+    let high_surrogate = generic_lexer_decode_one_surrogate(this) else return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.malformed_unicode_escape)
+    if not unicode_utils_is_utf16_high_surrogate(high_surrogate):
+        return UnicodeEscapeResult.success(code_point = high_surrogate)
+    if not combine_surrogate_pairs or not generic_lexer_consume_specific_string_view(this, sv("\\u")):
+        return UnicodeEscapeResult.success(code_point = high_surrogate)
+
+    if generic_lexer_next_is_t_char_type(this, '{'):
+        generic_lexer_retreat_usize(this, 2)
+        return UnicodeEscapeResult.success(code_point = high_surrogate)
+
+    let low_surrogate = generic_lexer_decode_one_surrogate(this) else return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.malformed_unicode_escape)
+    if unicode_utils_is_utf16_low_surrogate(low_surrogate):
+        return UnicodeEscapeResult.success(code_point = unicode_utils_decode_utf16_surrogate_pair(high_surrogate, low_surrogate))
+
+    generic_lexer_retreat_usize(this, 6)
+    return UnicodeEscapeResult.success(code_point = high_surrogate)
+
+## Ported from AK/GenericLexer.h:470 AK::Detail::GenericLexer::input_length.
+pub func generic_lexer_input_length(this: const GenericLexer[u8]*) -> usize:
+    return string_view_length(&this.m_input)
+
+## Ported from AK/GenericLexer.h:478 AK::Detail::GenericLexer::code_unit_at.
+pub func generic_lexer_code_unit_at(this: const GenericLexer[u8]*, index: usize) -> u8:
+    return string_view_at(&this.m_input, index)

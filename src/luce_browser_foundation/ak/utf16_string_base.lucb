@@ -68,6 +68,66 @@ pub func utf16_string_base_utf16_view(this: const Utf16StringBase*) -> Utf16View
     let data = utf16_string_base_data_without_union_member_assertion(this) else return utf16_view_new()
     return utf16_string_data_utf16_view(data)
 
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<i8>.
+pub func utf16_string_base_to_number_i8(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_i8(&view, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<i16>.
+pub func utf16_string_base_to_number_i16(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_i16(&view, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<i32>.
+pub func utf16_string_base_to_number_i32(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_i32(&view, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<i64>.
+pub func utf16_string_base_to_number_i64(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_i64(&view, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<u8>.
+pub func utf16_string_base_to_number_u8(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_u8(&view, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<u16>.
+pub func utf16_string_base_to_number_u16(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_u16(&view, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<u32>.
+pub func utf16_string_base_to_number_u32(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_u32(&view, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<u64>.
+pub func utf16_string_base_to_number_u64(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_u64(&view, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<f32>.
+pub func utf16_string_base_to_number_f32(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_f32(&view, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<f64>.
+pub func utf16_string_base_to_number_f64(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_f64(&view, trim_whitespace, base_)
+
+
 # mark: Comparison ==============================================================================
 
 ## Ported from AK/Utf16StringBase.h:131 AK::Detail::Utf16StringBase::operator==(Utf16StringBase const&).

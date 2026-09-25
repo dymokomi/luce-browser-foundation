@@ -302,6 +302,56 @@ pub func string_number_f64(value: f64) -> String:
     var params = type_erased_format_params_for_f64(&parameter, value)
     return string_vformatted(sv("{}"), &params) else trap("MUST: String::number")
 
+## Ported from AK/String.h:199 AK::String::to_number<i8>.
+pub func string_to_number_i8(this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    return parse_number_string_view_i8(string_bytes_as_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/String.h:199 AK::String::to_number<i16>.
+pub func string_to_number_i16(this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    return parse_number_string_view_i16(string_bytes_as_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/String.h:199 AK::String::to_number<i32>.
+pub func string_to_number_i32(this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    return parse_number_string_view_i32(string_bytes_as_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/String.h:199 AK::String::to_number<i64>.
+pub func string_to_number_i64(this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    return parse_number_string_view_i64(string_bytes_as_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/String.h:199 AK::String::to_number<u8>.
+pub func string_to_number_u8(this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    return parse_number_string_view_u8(string_bytes_as_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/String.h:199 AK::String::to_number<u16>.
+pub func string_to_number_u16(this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    return parse_number_string_view_u16(string_bytes_as_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/String.h:199 AK::String::to_number<u32>.
+pub func string_to_number_u32(this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    return parse_number_string_view_u32(string_bytes_as_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/String.h:199 AK::String::to_number<u64>.
+pub func string_to_number_u64(this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    return parse_number_string_view_u64(string_bytes_as_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/String.h:199 AK::String::to_number<f32>.
+pub func string_to_number_f32(this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    return parse_number_string_view_f32(string_bytes_as_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/String.h:199 AK::String::to_number<f64>.
+pub func string_to_number_f64(this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    return parse_number_string_view_f64(string_bytes_as_string_view(this), trim_whitespace, base_)
+
+
 ## Ported from AK/String.cpp:188 AK::String::vformatted.
 pub func string_vformatted(fmtstr: StringView, params: TypeErasedFormatParams*) -> String!:
     var builder = string_builder_new()

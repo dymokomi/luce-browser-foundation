@@ -1,0 +1,50 @@
+#==============================================================================================
+#
+#   hex - hexadecimal encoding and decoding of bytes
+#
+#   DESCRIPTION:
+#       Port of AK/Hex.h (lines 1-37) and AK/Hex.cpp (lines 1-46).
+#
+#==============================================================================================
+
+## Ported from AK/Hex.h:16 AK::decode_hex_digit: the value of a hex digit, or 255.
+pub func decode_hex_digit(digit: u8) -> u8:
+    if digit >= '0' and digit <= '9':
+        return digit - '0'
+    if digit >= 'a' and digit <= 'f':
+        return 10 + (digit - 'a')
+    if digit >= 'A' and digit <= 'F':
+        return 10 + (digit - 'A')
+    return 255
+
+## Ported from AK/Hex.cpp:14 AK::decode_hex: the bytes of an even-length hex string.
+pub func decode_hex(input: StringView) -> ByteBuffer!:
+    if (string_view_length(&input) % 2) != 0:
+        error(ak_error, "Hex string was not an even length")
+
+    var output = try byte_buffer_create_zeroed(string_view_length(&input) // 2)
+
+    for i in 0..<(string_view_length(&input) // 2):
+        let c1 = decode_hex_digit(string_view_at(&input, i * 2))
+        if c1 >= 16:
+            error(ak_error, "Hex string contains invalid digit")
+
+        let c2 = decode_hex_digit(string_view_at(&input, i * 2 + 1))
+        if c2 >= 16:
+            error(ak_error, "Hex string contains invalid digit")
+
+        *byte_buffer_at(&output, i) = (c1 << 4) + c2
+
+    return output
+
+## Ported from AK/Hex.cpp:36 AK::encode_hex: lowercase hex digits of `input`.
+pub func encode_hex(input: const u8[]) -> ByteString:
+    var output = string_builder_new_usize(input.length * 2)
+
+    let hex_digits = "0123456789abcdef".bytes
+    for ch in input:
+        # output.appendff("{:02x}", ch)
+        string_builder_append_u8(&output, hex_digits[ch >> 4])
+        string_builder_append_u8(&output, hex_digits[ch & 0xf])
+
+    return string_builder_to_byte_string(&output)

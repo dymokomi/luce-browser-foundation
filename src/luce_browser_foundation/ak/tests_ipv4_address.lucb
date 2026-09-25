@@ -1,0 +1,118 @@
+#==============================================================================================
+#
+#   tests_ipv4_address - tests of IPv4Address
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestIPv4Address.cpp; the static_asserts are checked at run time.
+#       from_string splits into a Vector and to_byte_string builds with a StringBuilder
+#       (region r01), so those tests are gated on ak_core_is_ported.
+#
+#==============================================================================================
+
+test "ipv4: should default constructor with 0s":
+    let addr = IPv4Address()
+
+    assert(i_pv4_address_is_zero(&addr))
+
+test "ipv4: should construct from c array":
+    var addr = IPv4Address()
+    i_pv4_address_construct_array_u8(&addr, [1, 2, 3, 4])
+
+    assert(not i_pv4_address_is_zero(&addr))
+
+test "ipv4: should construct from u32":
+    if not ak_core_is_ported:
+        return
+    var a: BigEndian[u32]
+    big_endian_construct(&a, 0x11_22_33_44)
+    var addr = IPv4Address()
+    i_pv4_address_construct_big_endian(&addr, a)
+
+    assert(not i_pv4_address_is_zero(&addr))
+    assert(i_pv4_address_to_u32(&addr) == 0x11_22_33_44)
+
+test "ipv4: should get octets by byte offset":
+    let addr = i_pv4_address_from_octets(1, 25, 39, 42)
+
+    assert(1 == i_pv4_address_at(&addr, 0))
+    assert(25 == i_pv4_address_at(&addr, 1))
+    assert(39 == i_pv4_address_at(&addr, 2))
+    assert(42 == i_pv4_address_at(&addr, 3))
+
+test "ipv4: should convert to string":
+    if not ak_core_is_ported:
+        return
+    let addr = i_pv4_address_from_octets(1, 25, 39, 42)
+
+    let text = i_pv4_address_to_byte_string(&addr)
+    assert(byte_string_eq_string_view(&text, sv("1.25.39.42")))
+    let reversed = i_pv4_address_to_byte_string_reversed(&addr)
+    assert(byte_string_eq_string_view(&reversed, sv("42.39.25.1")))
+    let string = i_pv4_address_to_string(&addr) else trap("to_string")
+    assert(string_eq_string_view(&string, sv("1.25.39.42")))
+
+## Asserts that `text` parses to the octets a.b.c.d.
+func tests_ipv4_expect_octets(text: str, a: u8, b: u8, c_: u8, d: u8):
+    let addr = i_pv4_address_from_string(sv(text)) else trap("from_string failed")
+    assert(a == i_pv4_address_at(&addr, 0))
+    assert(b == i_pv4_address_at(&addr, 1))
+    assert(c_ == i_pv4_address_at(&addr, 2))
+    assert(d == i_pv4_address_at(&addr, 3))
+
+test "ipv4: should make ipv4 address from string":
+    if not ak_core_is_ported:
+        return
+    tests_ipv4_expect_octets("192.168.0.1", 192, 168, 0, 1)
+
+test "ipv4: should make empty optional from bad string":
+    if not ak_core_is_ported:
+        return
+    assert(i_pv4_address_from_string(sv("bad string")) == none)
+
+test "ipv4: should make empty optional from out of range values":
+    if not ak_core_is_ported:
+        return
+    assert(i_pv4_address_from_string(sv("192.168.0.500")) == none)
+
+test "ipv4: should fill d octet from 1 part":
+    if not ak_core_is_ported:
+        return
+    tests_ipv4_expect_octets("1", 0, 0, 0, 1)
+
+test "ipv4: should fill a and d octets from 2 parts":
+    if not ak_core_is_ported:
+        return
+    tests_ipv4_expect_octets("192.1", 192, 0, 0, 1)
+
+test "ipv4: should fill a b d octets from 3 parts":
+    if not ak_core_is_ported:
+        return
+    tests_ipv4_expect_octets("192.168.1", 192, 168, 0, 1)
+
+test "ipv4: should convert to in addr t":
+    let addr = i_pv4_address_from_octets(1, 2, 3, 4)
+
+    assert(0x04_03_02_01 == i_pv4_address_to_in_addr_t(&addr))
+
+test "ipv4: should convert to u32":
+    let addr = i_pv4_address_from_octets(1, 2, 3, 4)
+
+    assert(0x04_03_02_01 == i_pv4_address_to_u32(&addr))
+
+test "ipv4: should compare":
+    let addr_a = i_pv4_address_from_octets(1, 2, 3, 4)
+    let addr_b = i_pv4_address_from_octets(1, 2, 3, 5)
+
+    assert(addr_a != addr_b)
+    assert(addr_a == addr_a)
+
+test "ipv4: netmask from cidr":
+    assert(i_pv4_address_netmask_from_cidr(24) == i_pv4_address_from_octets(255, 255, 255, 0))
+
+    assert(i_pv4_address_netmask_from_cidr(0) == i_pv4_address_from_octets(0, 0, 0, 0))
+    assert(i_pv4_address_netmask_from_cidr(32) == i_pv4_address_from_octets(255, 255, 255, 255))
+
+    assert(i_pv4_address_netmask_from_cidr(28) == i_pv4_address_from_octets(255, 255, 255, 240))
+    assert(i_pv4_address_netmask_from_cidr(22) == i_pv4_address_from_octets(255, 255, 252, 0))
+    assert(i_pv4_address_netmask_from_cidr(14) == i_pv4_address_from_octets(255, 252, 0, 0))
+    assert(i_pv4_address_netmask_from_cidr(6) == i_pv4_address_from_octets(252, 0, 0, 0))

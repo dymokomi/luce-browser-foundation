@@ -1,0 +1,370 @@
+#==============================================================================================
+#
+#   tests_generic_lexer - GenericLexer and Utf16GenericLexer tests
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestGenericLexer.cpp. The constexpr/static_assert cases run at run
+#       time; each case checks the char lexer and then the char16_t lexer.
+#
+#==============================================================================================
+
+## `[](auto c) { return is_ascii_alpha(c) || is_ascii_space(c); }` for the char lexer.
+struct TestLexerAlphaOrSpace: CharPredicate:
+    var unused: u8
+
+    func matches(ch: u8) -> bool:
+        return is_ascii_alpha(ch) or is_ascii_space(ch)
+
+## The same predicate for the char16_t lexer.
+struct TestLexerAlphaOrSpaceCodePoint: CodePointPredicate:
+    var unused: u8
+
+    func matches(code_point: u32) -> bool:
+        return is_ascii_alpha(code_point) or is_ascii_space(code_point)
+
+## `[](auto c) { return c == expected; }` for the char lexer.
+struct TestLexerIs: CharPredicate:
+    var expected: u8
+
+    func matches(ch: u8) -> bool:
+        return ch == self.expected
+
+## The same predicate for the char16_t lexer.
+struct TestLexerIsCodePoint: CodePointPredicate:
+    var expected: u32
+
+    func matches(code_point: u32) -> bool:
+        return code_point == self.expected
+
+test "GenericLexer: should_constexpr_construct_from_empty_string_view":
+    let sut = generic_lexer_new(StringView())
+    assert(generic_lexer_is_eof(&sut))
+    let utf16_sut = utf16_generic_lexer_new(utf16_view_new())
+    assert(utf16_generic_lexer_is_eof(&utf16_sut))
+
+test "GenericLexer: should_construct_from_string_view":
+    let sut = generic_lexer_new(sv("abcdef"))
+    assert(not generic_lexer_is_eof(&sut))
+    let utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    assert(not utf16_generic_lexer_is_eof(&utf16_sut))
+
+test "GenericLexer: should_constexpr_tell":
+    let sut = generic_lexer_new(sv("abcdef"))
+    assert(generic_lexer_tell(&sut) == 0)
+    let utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    assert(utf16_generic_lexer_tell(&utf16_sut) == 0)
+
+test "GenericLexer: should_constexpr_tell_remaining":
+    let sut = generic_lexer_new(sv("abcdef"))
+    assert(generic_lexer_tell_remaining(&sut) == 6)
+    let utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    assert(utf16_generic_lexer_tell_remaining(&utf16_sut) == 6)
+
+test "GenericLexer: should_constexpr_peek":
+    let sut = generic_lexer_new(sv("abcdef"))
+    assert(generic_lexer_peek(&sut) == 'a')
+    assert(generic_lexer_peek(&sut, 2) == 'c')
+    assert(generic_lexer_peek(&sut, 100) == 0)
+    let utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'a')
+    assert(utf16_generic_lexer_peek(&utf16_sut, 2) == (u16)'c')
+    assert(utf16_generic_lexer_peek(&utf16_sut, 100) == 0)
+
+test "GenericLexer: should_constexpr_next_is":
+    let sut = generic_lexer_new(sv("abcdef"))
+    assert(generic_lexer_next_is_t_char_type(&sut, 'a'))
+    assert(generic_lexer_next_is_string_view(&sut, sv("abc")))
+    let utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    assert(utf16_generic_lexer_next_is_u8(&utf16_sut, 'a'))
+    assert(utf16_generic_lexer_next_is_string_view(&utf16_sut, sv("abc")))
+
+test "GenericLexer: should_constexpr_retreat":
+    var sut = generic_lexer_new(sv("abcdef"))
+    discard(generic_lexer_consume(&sut))
+    generic_lexer_retreat(&sut)
+    assert(generic_lexer_peek(&sut) == 'a')
+    var utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    discard(utf16_generic_lexer_consume(&utf16_sut))
+    utf16_generic_lexer_retreat(&utf16_sut)
+    assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'a')
+
+test "GenericLexer: should_constexpr_consume_1":
+    var sut = generic_lexer_new(sv("abcdef"))
+    discard(generic_lexer_consume(&sut))
+    assert(generic_lexer_peek(&sut) == 'b')
+    var utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    discard(utf16_generic_lexer_consume(&utf16_sut))
+    assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'b')
+
+test "GenericLexer: should_constexpr_consume_specific_char":
+    var sut = generic_lexer_new(sv("abcdef"))
+    discard(generic_lexer_consume_specific_t_char_type(&sut, 'a'))
+    assert(generic_lexer_peek(&sut) == 'b')
+    var utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    discard(utf16_generic_lexer_consume_specific_u8(&utf16_sut, 'a'))
+    assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'b')
+
+test "GenericLexer: should_constexpr_consume_specific_string_view":
+    var sut = generic_lexer_new(sv("abcdef"))
+    assert(generic_lexer_consume_specific_string_view(&sut, sv("ab")))
+    assert(generic_lexer_peek(&sut) == 'c')
+    var utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    assert(utf16_generic_lexer_consume_specific_string_view(&utf16_sut, sv("abcd")))
+    assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'e')
+
+test "GenericLexer: should_constexpr_consume_specific_with_predicate":
+    var sut = generic_lexer_new(sv("h e l l o !"))
+    let pred = TestLexerAlphaOrSpace(unused = 0)
+    for _i in 0..<100:
+        discard(generic_lexer_consume_specific_with_predicate(&sut, &pred))
+    assert(generic_lexer_peek(&sut) == '!')
+    var utf16_sut = utf16_generic_lexer_new(utf16_sv("h e l l o !"))
+    let utf16_pred = TestLexerAlphaOrSpaceCodePoint(unused = 0)
+    for _i in 0..<100:
+        discard(utf16_generic_lexer_consume_specific_with_predicate(&utf16_sut, &utf16_pred))
+    assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'!')
+
+test "GenericLexer: should_constexpr_ignore_until":
+    var sut = generic_lexer_new(sv("abcdef"))
+    generic_lexer_ignore_until_t_char_type(&sut, 'd')
+    assert(generic_lexer_peek(&sut) == 'd')
+    var utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    utf16_generic_lexer_ignore_until_u8(&utf16_sut, 'd')
+    assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'d')
+
+test "GenericLexer: should_constexpr_next_is_pred":
+    let pred = TestLexerIs(expected = 'a')
+    let sut = generic_lexer_new(sv("abcdef"))
+    assert(generic_lexer_next_is_tt_predicate(&sut, &pred))
+    let utf16_pred = TestLexerIsCodePoint(expected = (u32)'a')
+    let utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    assert(utf16_generic_lexer_next_is_tt_predicate(&utf16_sut, &utf16_pred))
+
+test "GenericLexer: should_constexpr_ignore_while_pred":
+    let pred = TestLexerIs(expected = 'a')
+    var sut = generic_lexer_new(sv("abcdef"))
+    generic_lexer_ignore_while(&sut, &pred)
+    assert(generic_lexer_peek(&sut) == 'b')
+    let utf16_pred = TestLexerIsCodePoint(expected = (u32)'a')
+    var utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    utf16_generic_lexer_ignore_while(&utf16_sut, &utf16_pred)
+    assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'b')
+
+test "GenericLexer: should_constexpr_ignore_until_pred":
+    let pred = TestLexerIs(expected = 'c')
+    var sut = generic_lexer_new(sv("abcdef"))
+    generic_lexer_ignore_until_tt_predicate(&sut, &pred)
+    assert(generic_lexer_peek(&sut) == 'c')
+    let utf16_pred = TestLexerIsCodePoint(expected = (u32)'c')
+    var utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
+    utf16_generic_lexer_ignore_until_tt_predicate(&utf16_sut, &utf16_pred)
+    assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'c')
+
+## The CHECK macro of consume_escaped_code_point: both lexers decode `input` to `expected`.
+func test_consume_escaped_code_point(input: str, expected: UnicodeEscapeResult, combine_surrogate_pairs: bool = true):
+    var lexer = generic_lexer_new(sv(input))
+    let actual = generic_lexer_consume_escaped_code_point(&lexer, combine_surrogate_pairs)
+    assert(actual == expected)
+
+    var utf16_lexer = utf16_generic_lexer_new(utf16_sv(input))
+    let utf16_actual = utf16_generic_lexer_consume_escaped_code_point(&utf16_lexer, combine_surrogate_pairs)
+    assert(utf16_actual == expected)
+
+## The expected value of a successful decode.
+func test_code_point(code_point: u32) -> UnicodeEscapeResult:
+    return UnicodeEscapeResult.success(code_point = code_point)
+
+test "GenericLexer: consume_escaped_code_point":
+    let malformed = UnicodeEscapeResult.failure(reason = UnicodeEscapeError.malformed_unicode_escape)
+    let overflow = UnicodeEscapeResult.failure(reason = UnicodeEscapeError.unicode_escape_overflow)
+
+    test_consume_escaped_code_point("\\u", malformed)
+    test_consume_escaped_code_point("\\u{", malformed)
+    test_consume_escaped_code_point("\\u{1", malformed)
+    test_consume_escaped_code_point("\\u{}", malformed)
+    test_consume_escaped_code_point("\\u{x}", malformed)
+
+    test_consume_escaped_code_point("\\u{110000}", overflow)
+    test_consume_escaped_code_point("\\u{f00000000}", overflow)
+
+    test_consume_escaped_code_point("\\u{0}", test_code_point(0))
+    test_consume_escaped_code_point("\\u{41}", test_code_point(0x41))
+    test_consume_escaped_code_point("\\u{ffff}", test_code_point(0xffff))
+    test_consume_escaped_code_point("\\u{10ffff}", test_code_point(0x10ffff))
+
+    test_consume_escaped_code_point("\\u1", malformed)
+    test_consume_escaped_code_point("\\u11", malformed)
+    test_consume_escaped_code_point("\\u111", malformed)
+    test_consume_escaped_code_point("\\u111x", malformed)
+    test_consume_escaped_code_point("\\ud800\\u", malformed)
+    test_consume_escaped_code_point("\\ud800\\u1", malformed)
+    test_consume_escaped_code_point("\\ud800\\u11", malformed)
+    test_consume_escaped_code_point("\\ud800\\u111", malformed)
+    test_consume_escaped_code_point("\\ud800\\u111x", malformed)
+
+    test_consume_escaped_code_point("\\u0000", test_code_point(0x0))
+    test_consume_escaped_code_point("\\u0041", test_code_point(0x41))
+    test_consume_escaped_code_point("\\uffff", test_code_point(0xffff))
+
+    test_consume_escaped_code_point("\\ud83d", test_code_point(0xd83d))
+    test_consume_escaped_code_point("\\ud83d\\u1111", test_code_point(0xd83d))
+    test_consume_escaped_code_point("\\ud83d\\ude00", test_code_point(0x1f600))
+    test_consume_escaped_code_point("\\ud83d\\ude00", test_code_point(0xd83d), false)
+
+## Both lexers are at `expected` (the `tell()` checks of the integer cases).
+func test_check_lexer_position(char_lexer: const GenericLexer[u8]*, utf16_lexer: const GenericLexer[u16]*, expected: usize):
+    assert(generic_lexer_tell(char_lexer) == expected)
+    assert(utf16_generic_lexer_tell(utf16_lexer) == expected)
+
+test "GenericLexer: consume_decimal_integer_correctly_parses":
+    # CHECK_PARSES_INTEGER(test, expected, type) for each type, on both lexers.
+    let u8_cases: (str, u8)[4] = [("0", 0), ("-0", 0), ("10", 10), ("255", 255)]
+    for (text, expected) in u8_cases:
+        var lexer = generic_lexer_new(sv(text))
+        var utf16_lexer = utf16_generic_lexer_new(utf16_sv(text))
+        assert((generic_lexer_consume_decimal_integer_u8(&lexer) else trap("u8")) == expected)
+        assert((utf16_generic_lexer_consume_decimal_integer_u8(&utf16_lexer) else trap("u8")) == expected)
+        test_check_lexer_position(&lexer, &utf16_lexer, text.length)
+    let u16_cases: (str, u16)[4] = [("0", 0), ("-0", 0), ("1234", 1234), ("65535", 65535)]
+    for (text, expected) in u16_cases:
+        var lexer = generic_lexer_new(sv(text))
+        var utf16_lexer = utf16_generic_lexer_new(utf16_sv(text))
+        assert((generic_lexer_consume_decimal_integer_u16(&lexer) else trap("u16")) == expected)
+        assert((utf16_generic_lexer_consume_decimal_integer_u16(&utf16_lexer) else trap("u16")) == expected)
+        test_check_lexer_position(&lexer, &utf16_lexer, text.length)
+    let u32_cases: (str, u32)[4] = [("0", 0), ("-0", 0), ("1234", 1234), ("4294967295", 4294967295)]
+    for (text, expected) in u32_cases:
+        var lexer = generic_lexer_new(sv(text))
+        var utf16_lexer = utf16_generic_lexer_new(utf16_sv(text))
+        assert((generic_lexer_consume_decimal_integer_u32(&lexer) else trap("u32")) == expected)
+        assert((utf16_generic_lexer_consume_decimal_integer_u32(&utf16_lexer) else trap("u32")) == expected)
+        test_check_lexer_position(&lexer, &utf16_lexer, text.length)
+    let u64_cases: (str, u64)[4] = [("0", 0), ("-0", 0), ("1234", 1234), ("18446744073709551615", 18446744073709551615)]
+    for (text, expected) in u64_cases:
+        var lexer = generic_lexer_new(sv(text))
+        var utf16_lexer = utf16_generic_lexer_new(utf16_sv(text))
+        assert((generic_lexer_consume_decimal_integer_u64(&lexer) else trap("u64")) == expected)
+        assert((utf16_generic_lexer_consume_decimal_integer_u64(&utf16_lexer) else trap("u64")) == expected)
+        test_check_lexer_position(&lexer, &utf16_lexer, text.length)
+    let i8_cases: (str, i8)[6] = [("0", 0), ("-0", 0), ("10", 10), ("-10", -10), ("127", 127), ("-128", -128)]
+    for (text, expected) in i8_cases:
+        var lexer = generic_lexer_new(sv(text))
+        var utf16_lexer = utf16_generic_lexer_new(utf16_sv(text))
+        assert((generic_lexer_consume_decimal_integer_i8(&lexer) else trap("i8")) == expected)
+        assert((utf16_generic_lexer_consume_decimal_integer_i8(&utf16_lexer) else trap("i8")) == expected)
+        test_check_lexer_position(&lexer, &utf16_lexer, text.length)
+    let i16_cases: (str, i16)[6] = [("0", 0), ("-0", 0), ("1234", 1234), ("-1234", -1234), ("32767", 32767), ("-32768", -32768)]
+    for (text, expected) in i16_cases:
+        var lexer = generic_lexer_new(sv(text))
+        var utf16_lexer = utf16_generic_lexer_new(utf16_sv(text))
+        assert((generic_lexer_consume_decimal_integer_i16(&lexer) else trap("i16")) == expected)
+        assert((utf16_generic_lexer_consume_decimal_integer_i16(&utf16_lexer) else trap("i16")) == expected)
+        test_check_lexer_position(&lexer, &utf16_lexer, text.length)
+    let i32_cases: (str, i32)[6] = [("0", 0), ("-0", 0), ("1234", 1234), ("-1234", -1234), ("2147483647", 2147483647), ("-2147483648", -2147483648)]
+    for (text, expected) in i32_cases:
+        var lexer = generic_lexer_new(sv(text))
+        var utf16_lexer = utf16_generic_lexer_new(utf16_sv(text))
+        assert((generic_lexer_consume_decimal_integer_i32(&lexer) else trap("i32")) == expected)
+        assert((utf16_generic_lexer_consume_decimal_integer_i32(&utf16_lexer) else trap("i32")) == expected)
+        test_check_lexer_position(&lexer, &utf16_lexer, text.length)
+    let i64_cases: (str, i64)[6] = [("0", 0), ("-0", 0), ("1234", 1234), ("-1234", -1234), ("9223372036854775807", 9223372036854775807), ("-9223372036854775808", -9223372036854775808)]
+    for (text, expected) in i64_cases:
+        var lexer = generic_lexer_new(sv(text))
+        var utf16_lexer = utf16_generic_lexer_new(utf16_sv(text))
+        assert((generic_lexer_consume_decimal_integer_i64(&lexer) else trap("i64")) == expected)
+        assert((utf16_generic_lexer_consume_decimal_integer_i64(&utf16_lexer) else trap("i64")) == expected)
+        test_check_lexer_position(&lexer, &utf16_lexer, text.length)
+
+## The errno name a consume_decimal_integer call failed with, or "" when it succeeded.
+func test_decimal_integer_error(text: str, type_name: str) -> (str, str):
+    var lexer = generic_lexer_new(sv(text))
+    var utf16_lexer = utf16_generic_lexer_new(utf16_sv(text))
+    var char_error = ""
+    var utf16_error = ""
+    if type_name == "u8":
+        discard(generic_lexer_consume_decimal_integer_u8(&lexer) catch failure:
+            char_error = failure.message
+            recover 0)
+        discard(utf16_generic_lexer_consume_decimal_integer_u8(&utf16_lexer) catch failure:
+            utf16_error = failure.message
+            recover 0)
+    elif type_name == "u16":
+        discard(generic_lexer_consume_decimal_integer_u16(&lexer) catch failure:
+            char_error = failure.message
+            recover 0)
+        discard(utf16_generic_lexer_consume_decimal_integer_u16(&utf16_lexer) catch failure:
+            utf16_error = failure.message
+            recover 0)
+    elif type_name == "u32":
+        discard(generic_lexer_consume_decimal_integer_u32(&lexer) catch failure:
+            char_error = failure.message
+            recover 0)
+        discard(utf16_generic_lexer_consume_decimal_integer_u32(&utf16_lexer) catch failure:
+            utf16_error = failure.message
+            recover 0)
+    elif type_name == "u64":
+        discard(generic_lexer_consume_decimal_integer_u64(&lexer) catch failure:
+            char_error = failure.message
+            recover 0)
+        discard(utf16_generic_lexer_consume_decimal_integer_u64(&utf16_lexer) catch failure:
+            utf16_error = failure.message
+            recover 0)
+    elif type_name == "i8":
+        discard(generic_lexer_consume_decimal_integer_i8(&lexer) catch failure:
+            char_error = failure.message
+            recover 0)
+        discard(utf16_generic_lexer_consume_decimal_integer_i8(&utf16_lexer) catch failure:
+            utf16_error = failure.message
+            recover 0)
+    elif type_name == "i16":
+        discard(generic_lexer_consume_decimal_integer_i16(&lexer) catch failure:
+            char_error = failure.message
+            recover 0)
+        discard(utf16_generic_lexer_consume_decimal_integer_i16(&utf16_lexer) catch failure:
+            utf16_error = failure.message
+            recover 0)
+    elif type_name == "i32":
+        discard(generic_lexer_consume_decimal_integer_i32(&lexer) catch failure:
+            char_error = failure.message
+            recover 0)
+        discard(utf16_generic_lexer_consume_decimal_integer_i32(&utf16_lexer) catch failure:
+            utf16_error = failure.message
+            recover 0)
+    else:
+        discard(generic_lexer_consume_decimal_integer_i64(&lexer) catch failure:
+            char_error = failure.message
+            recover 0)
+        discard(utf16_generic_lexer_consume_decimal_integer_i64(&utf16_lexer) catch failure:
+            utf16_error = failure.message
+            recover 0)
+    # The position is rolled back on failure.
+    test_check_lexer_position(&lexer, &utf16_lexer, 0)
+    return (char_error, utf16_error)
+
+test "GenericLexer: consume_decimal_integer_fails_with_correct_error":
+    let cases: (str, str, str)[20] = [
+        ("Well hello GenericLexer!", "u64", "EINVAL"),
+        ("+", "u64", "EINVAL"),
+        ("+WHF", "u64", "EINVAL"),
+        ("-WHF", "u64", "EINVAL"),
+        ("-1", "u8", "ERANGE"),
+        ("-100", "u8", "ERANGE"),
+        ("-1", "u16", "ERANGE"),
+        ("-100", "u16", "ERANGE"),
+        ("-1", "u32", "ERANGE"),
+        ("-100", "u32", "ERANGE"),
+        ("-1", "u64", "ERANGE"),
+        ("-100", "u64", "ERANGE"),
+        ("-129", "i8", "ERANGE"),
+        ("128", "i8", "ERANGE"),
+        ("-32769", "i16", "ERANGE"),
+        ("32768", "i16", "ERANGE"),
+        ("-2147483649", "i32", "ERANGE"),
+        ("2147483648", "i32", "ERANGE"),
+        ("-9223372036854775809", "i64", "ERANGE"),
+        ("9223372036854775808", "i64", "ERANGE"),
+    ]
+    for (text, type_name, expected) in cases:
+        let (char_error, utf16_error) = test_decimal_integer_error(text, type_name)
+        assert(char_error == expected)
+        assert(utf16_error == expected)

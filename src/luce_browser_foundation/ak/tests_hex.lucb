@@ -1,0 +1,60 @@
+#==============================================================================================
+#
+#   tests_hex - tests of Hex
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestHex.cpp (should_constexpr_decode_hex_digit runs at run time),
+#       plus tests of decode_hex/encode_hex pinned to the donor's behaviour (they use
+#       ByteBuffer and StringBuilder, region r01, so they are gated on ak_core_is_ported).
+#
+#==============================================================================================
+
+test "hex: should decode hex digit":
+    assert(0 == decode_hex_digit('0'))
+    assert(1 == decode_hex_digit('1'))
+    assert(2 == decode_hex_digit('2'))
+    assert(3 == decode_hex_digit('3'))
+    assert(4 == decode_hex_digit('4'))
+    assert(5 == decode_hex_digit('5'))
+    assert(6 == decode_hex_digit('6'))
+    assert(7 == decode_hex_digit('7'))
+    assert(8 == decode_hex_digit('8'))
+    assert(9 == decode_hex_digit('9'))
+    assert(10 == decode_hex_digit('a'))
+    assert(11 == decode_hex_digit('b'))
+    assert(12 == decode_hex_digit('c'))
+    assert(13 == decode_hex_digit('d'))
+    assert(14 == decode_hex_digit('e'))
+    assert(15 == decode_hex_digit('f'))
+    assert(10 == decode_hex_digit('A'))
+    assert(11 == decode_hex_digit('B'))
+    assert(12 == decode_hex_digit('C'))
+    assert(13 == decode_hex_digit('D'))
+    assert(14 == decode_hex_digit('E'))
+    assert(15 == decode_hex_digit('F'))
+    assert(255 == decode_hex_digit('g'))
+    assert(255 == decode_hex_digit(' '))
+
+test "hex: decode and encode":
+    if not ak_core_is_ported:
+        return
+    let decoded = decode_hex(sv("48656c6C6f00ff")) else trap("decode_hex")
+    let bytes = byte_buffer_span_const(&decoded)
+    assert(compare_bytes(bytes, b"Hello\x00\xff") == 0 and bytes.length == 7)
+
+    var odd_failed = false
+    discard(decode_hex(sv("abc")) catch:
+        odd_failed = true
+        recover ByteBuffer())
+    assert(odd_failed)
+
+    var digit_failed = false
+    discard(decode_hex(sv("zz")) catch:
+        digit_failed = true
+        recover ByteBuffer())
+    assert(digit_failed)
+
+    let encoded = encode_hex(b"\xde\xad\x0f\x00")
+    assert(byte_string_eq_string_view(&encoded, sv("dead0f00")))
+    let empty = encode_hex(b"")
+    assert(byte_string_is_empty(&empty))

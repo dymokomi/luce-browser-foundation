@@ -114,6 +114,56 @@ pub func byte_string_number_f64(value: f64) -> ByteString:
     var params = type_erased_format_params_for_f64(&parameter, value)
     return byte_string_vformatted(sv("{}"), &params)
 
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<i8>.
+pub func byte_string_to_number_i8(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    return parse_number_string_view_i8(byte_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<i16>.
+pub func byte_string_to_number_i16(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    return parse_number_string_view_i16(byte_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<i32>.
+pub func byte_string_to_number_i32(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    return parse_number_string_view_i32(byte_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<i64>.
+pub func byte_string_to_number_i64(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    return parse_number_string_view_i64(byte_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<u8>.
+pub func byte_string_to_number_u8(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    return parse_number_string_view_u8(byte_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<u16>.
+pub func byte_string_to_number_u16(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    return parse_number_string_view_u16(byte_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<u32>.
+pub func byte_string_to_number_u32(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    return parse_number_string_view_u32(byte_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<u64>.
+pub func byte_string_to_number_u64(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    return parse_number_string_view_u64(byte_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<f32>.
+pub func byte_string_to_number_f32(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    return parse_number_string_view_f32(byte_string_view(this), trim_whitespace, base_)
+
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<f64>.
+pub func byte_string_to_number_f64(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    return parse_number_string_view_f64(byte_string_view(this), trim_whitespace, base_)
+
+
 # mark: Case and trimming =======================================================================
 
 ## Ported from AK/ByteString.cpp:245 AK::ByteString::to_lowercase.

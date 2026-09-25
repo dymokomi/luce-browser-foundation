@@ -542,6 +542,56 @@ pub func string_view_count_string_view(this: const StringView*, needle: StringVi
 pub func string_view_count_u8(this: const StringView*, needle: u8) -> usize:
     return string_utils_count_u8(*this, needle)
 
+## Ported from AK/StringView.h:348 AK::StringView::to_number<i8>.
+pub func string_view_to_number_i8(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    return parse_number_string_view_i8(*this, trim_whitespace, base_)
+
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<i16>.
+pub func string_view_to_number_i16(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    return parse_number_string_view_i16(*this, trim_whitespace, base_)
+
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<i32>.
+pub func string_view_to_number_i32(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    return parse_number_string_view_i32(*this, trim_whitespace, base_)
+
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<i64>.
+pub func string_view_to_number_i64(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    return parse_number_string_view_i64(*this, trim_whitespace, base_)
+
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<u8>.
+pub func string_view_to_number_u8(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    return parse_number_string_view_u8(*this, trim_whitespace, base_)
+
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<u16>.
+pub func string_view_to_number_u16(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    return parse_number_string_view_u16(*this, trim_whitespace, base_)
+
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<u32>.
+pub func string_view_to_number_u32(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    return parse_number_string_view_u32(*this, trim_whitespace, base_)
+
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<u64>.
+pub func string_view_to_number_u64(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    return parse_number_string_view_u64(*this, trim_whitespace, base_)
+
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<f32>.
+pub func string_view_to_number_f32(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    return parse_number_string_view_f32(*this, trim_whitespace, base_)
+
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<f64>.
+pub func string_view_to_number_f64(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    return parse_number_string_view_f64(*this, trim_whitespace, base_)
+
+
 ## Ported from AK/StringView.h:357 AK::StringView::StringView(Badge<SentinelOptionalTraits>,
 ## nullptr_t): the view with no characters pointer.
 pub func string_view_construct_string_view(this: StringView*):

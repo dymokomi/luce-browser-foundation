@@ -1,0 +1,378 @@
+#==============================================================================================
+#
+#   simdutf_base64 - the simdutf base64 routines AK's Base64 calls, as plain loops
+#
+#   DESCRIPTION:
+#       simdutf (v7.4.0 in the donor build) is replaced, not ported: this is its scalar
+#       base64 kernel (src/scalar/base64.h) and the base64_to_binary_safe driver of
+#       src/implementation.cpp, which every SIMD kernel matches result for result. Only the
+#       options AK uses exist: the default and URL alphabets with or without padding (the
+#       "accept garbage" options are left out, so ignore_garbage is always false), and the
+#       four last-chunk handling modes. The d0..d3 lookup tables of the fast path are not
+#       needed: the fast path decodes full quads of valid characters exactly as the general
+#       loop does.
+#
+#==============================================================================================
+
+# mark: Options and results =====================================================================
+
+## simdutf::base64_options (the values AK uses; base64_reverse_padding is 2).
+pub enum SimdutfBase64Options as u64:
+    base64_default = 0
+    base64_url = 1
+    base64_default_no_padding = 2
+    base64_url_with_padding = 3
+
+## simdutf::last_chunk_handling_options.
+pub enum SimdutfLastChunkHandling as u64:
+    loose = 0
+    strict = 1
+    stop_before_partial = 2
+    only_full_chunks = 3
+
+## simdutf::full_result: an error, the input and output positions, and whether the error was
+## a padding error (the input position is then the first '=').
+pub struct SimdutfFullResult:
+    pub var error: SimdutfErrorCode
+    pub var input_count: usize
+    pub var output_count: usize
+    pub var padding_error: bool
+
+## simdutf::is_partial.
+func simdutf_base64_is_partial(options: SimdutfLastChunkHandling) -> bool:
+    return options == SimdutfLastChunkHandling.stop_before_partial or options == SimdutfLastChunkHandling.only_full_chunks
+
+## Whether the options use the URL alphabet (`options & base64_url`).
+func simdutf_base64_is_url(options: SimdutfBase64Options) -> bool:
+    return ((u64)options & 1) != 0
+
+## The value of `to_base64_value[c]` / `to_base64_url_value[c]`: 0-63 for an alphabet
+## character, 64 for ASCII white space (tab, LF, FF, CR, space), 255 otherwise.
+func simdutf_base64_value(c: u8, options: SimdutfBase64Options) -> u8:
+    if c >= 'A' and c <= 'Z':
+        return c - 'A'
+    if c >= 'a' and c <= 'z':
+        return c - 'a' + 26
+    if c >= '0' and c <= '9':
+        return c - '0' + 52
+    if simdutf_base64_is_url(options):
+        if c == '-':
+            return 62
+        if c == '_':
+            return 63
+    else:
+        if c == '+':
+            return 62
+        if c == '/':
+            return 63
+    if c == 0x09 or c == 0x0a or c == 0x0c or c == 0x0d or c == 0x20:
+        return 64
+    return 255
+
+## scalar::base64::is_ignorable (simdutf::base64_ignorable) without garbage acceptance.
+func simdutf_base64_ignorable(c: u8, options: SimdutfBase64Options) -> bool:
+    return simdutf_base64_value(c, options) == 64
+
+# mark: Decoding ================================================================================
+
+## scalar::base64::reduced_input.
+struct SimdutfBase64ReducedInput:
+    var equalsigns: usize
+    var equallocation: usize
+    var srclen: usize
+    var full_input_length: usize
+
+## scalar::base64::find_end: the padding characters, the location of the first one, and the
+## input length without trailing padding and white space.
+func simdutf_base64_find_end(src: const u8[], options: SimdutfBase64Options) -> SimdutfBase64ReducedInput:
+    var srclen = src.length
+    var equalsigns: usize = 0
+    # We intentionally include trailing spaces in the full input length.
+    let full_input_length = srclen
+    # skip trailing spaces
+    while srclen > 0 and simdutf_base64_value(src[srclen - 1], options) == 64:
+        srclen -= 1
+    var equallocation = srclen # location of the first padding character if any
+    if srclen > 0 and src[srclen - 1] == '=':
+        # This is the last '=' sign.
+        equallocation = srclen - 1
+        srclen -= 1
+        equalsigns = 1
+        # skip trailing spaces
+        while srclen > 0 and simdutf_base64_value(src[srclen - 1], options) == 64:
+            srclen -= 1
+        if srclen > 0 and src[srclen - 1] == '=':
+            # This is the second '=' sign.
+            equallocation = srclen - 1
+            srclen -= 1
+            equalsigns = 2
+    return SimdutfBase64ReducedInput(equalsigns = equalsigns, equallocation = equallocation, srclen = srclen, full_input_length = full_input_length)
+
+## A full_result without a padding error.
+func simdutf_base64_result(error_code: SimdutfErrorCode, input_count: usize, output_count: usize) -> SimdutfFullResult:
+    return SimdutfFullResult(error = error_code, input_count = input_count, output_count = output_count, padding_error = false)
+
+## scalar::base64::base64_tail_decode_impl: decodes `src` (padding already removed) into
+## `dst`; with `check_capacity` it stops with OUTPUT_BUFFER_TOO_SMALL rather than overrun.
+func simdutf_base64_tail_decode_impl(check_capacity: bool, dst: u8[], src: const u8[], padding_characters: usize, options: SimdutfBase64Options, last_chunk_options: SimdutfLastChunkHandling) -> SimdutfFullResult:
+    var src_position: usize = 0
+    var dst_position: usize = 0
+    var buffer: u8[4]
+
+    while true:
+        let srccur = src_position
+        var idx: usize = 0
+        # we need at least four characters.
+        while idx < 4 and src_position < src.length:
+            let c = src[src_position]
+
+            let code = simdutf_base64_value(c, options)
+            buffer[idx] = code
+            if code <= 63:
+                idx += 1
+            elif code > 64:
+                return simdutf_base64_result(.invalid_base64_character, src_position, dst_position)
+            # else: we have a space or a newline. We ignore it.
+            src_position += 1
+        if idx != 4:
+            # We never should have that the number of base64 characters + the number of padding
+            # characters is more than 4.
+            if idx + padding_characters > 4:
+                return SimdutfFullResult(error = .invalid_base64_character, input_count = src_position, output_count = dst_position, padding_error = true)
+
+            # The idea here is that in loose mode, if there is padding at all, it must be used to
+            # form 4-wise chunk. However, in loose mode, we do accept no padding at all.
+            if last_chunk_options == SimdutfLastChunkHandling.loose and idx >= 2 and padding_characters > 0 and ((idx + padding_characters) & 3) != 0:
+                return SimdutfFullResult(error = .invalid_base64_character, input_count = src_position, output_count = dst_position, padding_error = true)
+            # The idea here is that in strict mode, we do not want to accept incomplete base64
+            # chunks. So if the chunk was otherwise valid, we return BASE64_INPUT_REMAINDER.
+            if last_chunk_options == SimdutfLastChunkHandling.strict and idx >= 2 and ((idx + padding_characters) & 3) != 0:
+                # The partial chunk was at src - idx
+                return SimdutfFullResult(error = .base64_input_remainder, input_count = src_position, output_count = dst_position, padding_error = true)
+            # If there is a partial chunk with insufficient padding, with stop_before_partial, we
+            # need to just ignore it. In "only full" mode, skip the minute there are padding
+            # characters.
+            if (last_chunk_options == SimdutfLastChunkHandling.stop_before_partial and (padding_characters + idx < 4) and idx != 0 and (idx >= 2 or padding_characters == 0)) or (last_chunk_options == SimdutfLastChunkHandling.only_full_chunks and (idx >= 2 or padding_characters == 0)):
+                # partial means that we are *not* going to consume the read characters. We need
+                # to rewind the src pointer.
+                return simdutf_base64_result(.success, srccur, dst_position)
+            if idx == 2:
+                let triple = ((u32)buffer[0] << 18) + ((u32)buffer[1] << 12)
+                if last_chunk_options == SimdutfLastChunkHandling.strict and (triple & 0xffff) != 0:
+                    return simdutf_base64_result(.base64_extra_bits, src_position, dst_position)
+                if check_capacity and dst.length - dst_position < 1:
+                    return simdutf_base64_result(.output_buffer_too_small, srccur, dst_position)
+                dst[dst_position] = (u8)(triple >> 16)
+                dst_position += 1
+            elif idx == 3:
+                let triple = ((u32)buffer[0] << 18) + ((u32)buffer[1] << 12) + ((u32)buffer[2] << 6)
+                if last_chunk_options == SimdutfLastChunkHandling.strict and (triple & 0xff) != 0:
+                    return simdutf_base64_result(.base64_extra_bits, src_position, dst_position)
+                if check_capacity and dst.length - dst_position < 2:
+                    return simdutf_base64_result(.output_buffer_too_small, srccur, dst_position)
+                dst[dst_position] = (u8)(triple >> 16)
+                dst[dst_position + 1] = (u8)(triple >> 8)
+                dst_position += 2
+            elif idx == 1 and (not simdutf_base64_is_partial(last_chunk_options) or padding_characters > 0):
+                return simdutf_base64_result(.base64_input_remainder, src_position, dst_position)
+            elif idx == 0 and padding_characters > 0:
+                return SimdutfFullResult(error = .invalid_base64_character, input_count = src_position, output_count = dst_position, padding_error = true)
+            return simdutf_base64_result(.success, src_position, dst_position)
+        if check_capacity and dst.length - dst_position < 3:
+            return simdutf_base64_result(.output_buffer_too_small, srccur, dst_position)
+        let triple = ((u32)buffer[0] << 18) + ((u32)buffer[1] << 12) + ((u32)buffer[2] << 6) + (u32)buffer[3]
+        dst[dst_position] = (u8)(triple >> 16)
+        dst[dst_position + 1] = (u8)(triple >> 8)
+        dst[dst_position + 2] = (u8)triple
+        dst_position += 3
+
+## scalar::base64::patch_tail_result.
+func simdutf_base64_patch_tail_result(r: SimdutfFullResult, equallocation: usize, full_input_length: usize, last_chunk_options: SimdutfLastChunkHandling) -> SimdutfFullResult:
+    var result = r
+    if result.padding_error:
+        result.input_count = equallocation
+
+    if result.error == SimdutfErrorCode.success:
+        if not simdutf_base64_is_partial(last_chunk_options):
+            # A success when we are not in stop_before_partial mode means that we have consumed
+            # the whole input buffer.
+            result.input_count = full_input_length
+        elif result.output_count % 3 != 0:
+            result.input_count = full_input_length
+    return result
+
+## scalar::base64::base64_to_binary_details_impl / _safe_impl: decodes all of `input`, checking
+## the output capacity when `check_capacity`.
+func simdutf_base64_to_binary_details(check_capacity: bool, input: const u8[], output: u8[], options: SimdutfBase64Options, last_chunk_options: SimdutfLastChunkHandling) -> SimdutfFullResult:
+    let ri = simdutf_base64_find_end(input, options)
+    let equallocation = ri.equallocation
+    let equalsigns = ri.equalsigns
+    let length = ri.srclen
+    let full_input_length = ri.full_input_length
+    if length == 0:
+        if equalsigns > 0:
+            return simdutf_base64_result(.invalid_base64_character, equallocation, 0)
+        return simdutf_base64_result(.success, full_input_length, 0)
+    var r = simdutf_base64_tail_decode_impl(check_capacity, output, input[..<length], equalsigns, options, last_chunk_options)
+    r = simdutf_base64_patch_tail_result(r, equallocation, full_input_length, last_chunk_options)
+    if not simdutf_base64_is_partial(last_chunk_options) and r.error == SimdutfErrorCode.success and equalsigns > 0:
+        # additional checks
+        if (r.output_count % 3 == 0) or ((r.output_count % 3) + 1 + equalsigns != 4):
+            return simdutf_base64_result(.invalid_base64_character, equallocation, r.output_count)
+    # When is_partial(last_chunk_options) is true, we must either end with the end of the stream
+    # (beyond whitespace) or right after a non-ignorable character or at the very beginning of
+    # the stream. See https://tc39.es/proposal-arraybuffer-base64/spec/#sec-frombase64
+    if simdutf_base64_is_partial(last_chunk_options) and r.error == SimdutfErrorCode.success and r.input_count < full_input_length:
+        # First check if we can extend the input to the end of the stream
+        while r.input_count < full_input_length and simdutf_base64_ignorable(input[r.input_count], options):
+            r.input_count += 1
+        # If we are still not at the end of the stream, then we must backtrack to the last
+        # non-ignorable character.
+        if r.input_count < full_input_length:
+            while r.input_count > 0 and simdutf_base64_ignorable(input[r.input_count - 1], options):
+                r.input_count -= 1
+    return r
+
+## slow_base64_to_binary_safe_impl (src/implementation.cpp): decodes up to the first bad
+## character; `outlen` receives the bytes written.
+func simdutf_slow_base64_to_binary_safe(input: const u8[], output: u8[], outlen: usize*, options: SimdutfBase64Options, last_chunk_options: SimdutfLastChunkHandling) -> SimdutfResult:
+    let ri = simdutf_base64_find_end(input, options)
+    let equallocation = ri.equallocation
+    let equalsigns = ri.equalsigns
+    let length = ri.srclen
+    let full_input_length = ri.full_input_length
+    if length == 0:
+        *outlen = 0
+        if equalsigns > 0:
+            return SimdutfResult(error = .invalid_base64_character, count = equallocation)
+        return SimdutfResult(error = .success, count = 0)
+
+    var r = simdutf_base64_tail_decode_impl(true, output[..<*outlen], input[..<length], equalsigns, options, last_chunk_options)
+    r = simdutf_base64_patch_tail_result(r, equallocation, full_input_length, last_chunk_options)
+    *outlen = r.output_count
+    if not simdutf_base64_is_partial(last_chunk_options) and r.error == SimdutfErrorCode.success and equalsigns > 0:
+        # additional checks
+        if (*outlen % 3 == 0) or ((*outlen % 3) + 1 + equalsigns != 4):
+            r.error = SimdutfErrorCode.invalid_base64_character
+    return SimdutfResult(error = r.error, count = r.input_count)
+
+## simdutf::base64_to_binary_safe (base64_to_binary_safe_impl): decodes `input` into the first
+## `*outlen` bytes of `output` and sets `*outlen` to the bytes written; `count` of the result is
+## the input consumed (or the error position).
+pub func simdutf_base64_to_binary_safe(input: const u8[], output: u8[], outlen: usize*, options: SimdutfBase64Options, last_chunk_handling_options: SimdutfLastChunkHandling, decode_up_to_bad_char: bool) -> SimdutfResult:
+    let length = input.length
+    var remaining_input_length = length
+    var remaining_output_length = *outlen
+    var input_position: usize = 0
+    var output_position: usize = 0
+
+    # We also do a first pass using the fast path to decode as much as possible
+    let safe_length = simdutf_base64_length_from_binary(remaining_output_length // 3 * 3, options)
+    let safe_input = remaining_input_length if remaining_input_length < safe_length else safe_length
+    let done_with_partial = safe_input == remaining_input_length
+    var r = simdutf_base64_to_binary_details(false, input[..<safe_input], output, options, last_chunk_handling_options if done_with_partial else SimdutfLastChunkHandling.only_full_chunks)
+    input_position += r.input_count
+    output_position += r.output_count
+    remaining_input_length -= r.input_count
+    remaining_output_length -= r.output_count
+    if r.error != SimdutfErrorCode.success:
+        # There is an error. We return.
+        if decode_up_to_bad_char and r.error == SimdutfErrorCode.invalid_base64_character:
+            return simdutf_slow_base64_to_binary_safe(input, output, outlen, options, last_chunk_handling_options)
+        *outlen = output_position
+        return SimdutfResult(error = r.error, count = input_position)
+
+    if done_with_partial:
+        # We are done. We have decoded everything.
+        *outlen = output_position
+        return SimdutfResult(error = .success, count = input_position)
+    # We have decoded some data, but we still have some data to decode. We need to decode the
+    # rest of the input buffer.
+    r = simdutf_base64_to_binary_details(true, input[input_position..], output[output_position..<output_position + remaining_output_length], options, last_chunk_handling_options)
+    input_position += r.input_count
+    output_position += r.output_count
+
+    if r.error != SimdutfErrorCode.success:
+        # There is an error. We return.
+        if decode_up_to_bad_char and r.error == SimdutfErrorCode.invalid_base64_character:
+            return simdutf_slow_base64_to_binary_safe(input, output, outlen, options, last_chunk_handling_options)
+        *outlen = output_position
+        return SimdutfResult(error = r.error, count = input_position)
+    if input_position < length:
+        # We cannot process the entire input in one go, so we need to process it in two steps:
+        # first the fast path, then the slow path. In some cases, the processing might 'eat up'
+        # trailing ignorable characters in the fast path, but that can be a problem. See
+        # https://tc39.es/proposal-arraybuffer-base64/spec/#sec-frombase64
+        while input_position > 0 and simdutf_base64_ignorable(input[input_position - 1], options):
+            input_position -= 1
+    *outlen = output_position
+    return SimdutfResult(error = .success, count = input_position)
+
+## simdutf::maximal_binary_length_from_base64: an upper bound of the decoded length. We follow
+## https://infra.spec.whatwg.org/#forgiving-base64-decode
+pub func simdutf_maximal_binary_length_from_base64(input: const u8[]) -> usize:
+    let length = input.length
+    var padding: usize = 0
+    if length > 0:
+        if input[length - 1] == '=':
+            padding += 1
+            if length > 1 and input[length - 2] == '=':
+                padding += 1
+    let actual_length = length - padding
+    if actual_length % 4 <= 1:
+        return actual_length // 4 * 3
+    # if we have a valid input, then the remainder must be 2 or 3 adding one or two extra bytes.
+    return actual_length // 4 * 3 + (actual_length % 4) - 1
+
+# mark: Encoding ================================================================================
+
+## Whether the options pad the output: by default without the URL alphabet, inverted by
+## base64_reverse_padding.
+func simdutf_base64_use_padding(options: SimdutfBase64Options) -> bool:
+    let url = simdutf_base64_is_url(options)
+    let reverse_padding = ((u64)options & 2) != 0
+    return (not url) != reverse_padding
+
+## simdutf::base64_length_from_binary.
+pub func simdutf_base64_length_from_binary(length: usize, options: SimdutfBase64Options) -> usize:
+    if not simdutf_base64_use_padding(options):
+        return length // 3 * 4 + ((length % 3) + 1 if (length % 3) != 0 else 0)
+    return (length + 2) // 3 * 4 # We use padding to make the length a multiple of 4.
+
+## simdutf::binary_to_base64 (scalar::base64::tail_encode_base64): the characters written.
+pub func simdutf_binary_to_base64(src: const u8[], dst: u8[], options: SimdutfBase64Options) -> usize:
+    let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".bytes if simdutf_base64_is_url(options) else "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".bytes
+    let use_padding = simdutf_base64_use_padding(options)
+    var out: usize = 0
+    var i: usize = 0
+    while i + 2 < src.length:
+        let t1 = src[i]
+        let t2 = src[i + 1]
+        let t3 = src[i + 2]
+        dst[out] = alphabet[t1 >> 2]
+        dst[out + 1] = alphabet[((t1 & 0x03) << 4) | ((t2 >> 4) & 0x0f)]
+        dst[out + 2] = alphabet[((t2 & 0x0f) << 2) | ((t3 >> 6) & 0x03)]
+        dst[out + 3] = alphabet[t3 & 0x3f]
+        out += 4
+        i += 3
+    let rest = src.length - i
+    if rest == 1:
+        let t1 = src[i]
+        dst[out] = alphabet[t1 >> 2]
+        dst[out + 1] = alphabet[(t1 & 0x03) << 4]
+        out += 2
+        if use_padding:
+            dst[out] = '='
+            dst[out + 1] = '='
+            out += 2
+    elif rest == 2:
+        let t1 = src[i]
+        let t2 = src[i + 1]
+        dst[out] = alphabet[t1 >> 2]
+        dst[out + 1] = alphabet[((t1 & 0x03) << 4) | ((t2 >> 4) & 0x0f)]
+        dst[out + 2] = alphabet[(t2 & 0x0f) << 2]
+        out += 3
+        if use_padding:
+            dst[out] = '='
+            out += 1
+    return out

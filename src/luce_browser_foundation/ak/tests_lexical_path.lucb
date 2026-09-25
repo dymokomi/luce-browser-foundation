@@ -1,0 +1,273 @@
+#==============================================================================================
+#
+#   tests_lexical_path - tests of LexicalPath
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestLexicalPath.cpp. Every LexicalPath splits its string into a
+#       Vector (region r01), so all tests are gated on ak_core_is_ported.
+#
+#==============================================================================================
+
+## `LexicalPath path(text)`.
+func tests_lexical_path(text: str) -> LexicalPath:
+    return lexical_path_new(byte_string_from_str(text))
+
+## Whether a ByteString equals `expected`.
+func tests_lexical_path_equals(string: ByteString, expected: str) -> bool:
+    return byte_string_eq_string_view(&string, sv(expected))
+
+## Whether a view equals `expected`.
+func tests_lexical_path_view_equals(view: StringView, expected: str) -> bool:
+    return string_view_equals(&view, expected)
+
+## Whether `LexicalPath::relative_path(path, prefix)` is `expected`.
+func tests_lexical_path_relative(path: str, prefix: str, expected: str) -> bool:
+    let relative = lexical_path_relative_path(sv(path), sv(prefix)) else return false
+    return tests_lexical_path_equals(relative, expected)
+
+## Part `index` of the path.
+func tests_lexical_path_part(path: const LexicalPath*, index: usize) -> StringView:
+    return test_vector_at(lexical_path_parts_view(path), index)
+
+test "lexical path: relative path":
+    if not ak_core_is_ported:
+        return
+    assert(tests_lexical_path_relative("/tmp/abc.txt", "/tmp", "abc.txt"))
+    assert(tests_lexical_path_relative("/tmp/abc.txt", "/tmp/", "abc.txt"))
+    assert(tests_lexical_path_relative("/tmp/abc.txt", "/", "tmp/abc.txt"))
+    assert(tests_lexical_path_relative("/tmp/abc.txt", "/usr", "../tmp/abc.txt"))
+
+    assert(lexical_path_relative_path(sv("/tmp/foo.txt"), sv("tmp")) == none)
+    assert(lexical_path_relative_path(sv("tmp/foo.txt"), sv("/tmp")) == none)
+
+    assert(tests_lexical_path_relative("/tmp/foo/bar/baz.txt", "/tmp/bar/foo/", "../../foo/bar/baz.txt"))
+
+test "lexical path: regular absolute path":
+    if not ak_core_is_ported:
+        return
+    let path = tests_lexical_path("/home/anon/foo.txt")
+    assert(tests_lexical_path_equals(lexical_path_string(&path), "/home/anon/foo.txt"))
+    assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), "/home/anon"))
+    assert(tests_lexical_path_view_equals(lexical_path_basename_lexical_path_strip_extension(&path), "foo.txt"))
+    assert(tests_lexical_path_view_equals(lexical_path_title(&path), "foo"))
+    assert(tests_lexical_path_view_equals(lexical_path_extension(&path), "txt"))
+    assert(lexical_path_has_extension(&path, sv(".txt")))
+    assert(lexical_path_has_extension(&path, sv("txt")))
+    assert(not lexical_path_has_extension(&path, sv("txxt")))
+    assert(test_vector_size(lexical_path_parts_view(&path)) == 3)
+    assert(tests_lexical_path_view_equals(tests_lexical_path_part(&path, 0), "home"))
+    assert(tests_lexical_path_view_equals(tests_lexical_path_part(&path, 1), "anon"))
+    assert(tests_lexical_path_view_equals(tests_lexical_path_part(&path, 2), "foo.txt"))
+    assert(tests_lexical_path_view_equals(lexical_path_basename_lexical_path_strip_extension(&path, .yes), "foo"))
+
+test "lexical path: regular relative path":
+    if not ak_core_is_ported:
+        return
+    let path = tests_lexical_path("anon/foo.txt")
+    assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), "anon"))
+    assert(tests_lexical_path_view_equals(lexical_path_basename_lexical_path_strip_extension(&path), "foo.txt"))
+    assert(test_vector_size(lexical_path_parts_view(&path)) == 2)
+    assert(tests_lexical_path_view_equals(tests_lexical_path_part(&path, 0), "anon"))
+    assert(tests_lexical_path_view_equals(tests_lexical_path_part(&path, 1), "foo.txt"))
+
+test "lexical path: single dot":
+    if not ak_core_is_ported:
+        return
+    let first = tests_lexical_path("/home/./anon/foo.txt")
+    assert(tests_lexical_path_equals(lexical_path_string(&first), "/home/anon/foo.txt"))
+    let second = tests_lexical_path("./test.txt")
+    assert(tests_lexical_path_equals(lexical_path_string(&second), "test.txt"))
+    let third = tests_lexical_path("./../test.txt")
+    assert(tests_lexical_path_equals(lexical_path_string(&third), "../test.txt"))
+
+test "lexical path: relative path with dotdot":
+    if not ak_core_is_ported:
+        return
+    let path = tests_lexical_path("anon/../../foo.txt")
+    assert(tests_lexical_path_equals(lexical_path_string(&path), "../foo.txt"))
+    assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), ".."))
+    assert(tests_lexical_path_view_equals(lexical_path_basename_lexical_path_strip_extension(&path), "foo.txt"))
+    assert(test_vector_size(lexical_path_parts_view(&path)) == 2)
+    assert(tests_lexical_path_view_equals(tests_lexical_path_part(&path, 0), ".."))
+    assert(tests_lexical_path_view_equals(tests_lexical_path_part(&path, 1), "foo.txt"))
+
+test "lexical path: absolute path with dotdot":
+    if not ak_core_is_ported:
+        return
+    let first = tests_lexical_path("/test/../foo.txt")
+    assert(tests_lexical_path_equals(lexical_path_string(&first), "/foo.txt"))
+    let second = tests_lexical_path("/../../foo.txt")
+    assert(tests_lexical_path_equals(lexical_path_string(&second), "/foo.txt"))
+
+test "lexical path: more dotdot paths":
+    if not ak_core_is_ported:
+        return
+    assert(tests_lexical_path_equals(lexical_path_canonicalized_path(byte_string_from_str("/home/user/../../not/home")), "/not/home"))
+    assert(tests_lexical_path_equals(lexical_path_canonicalized_path(byte_string_from_str("/../../../../")), "/"))
+    assert(tests_lexical_path_equals(lexical_path_canonicalized_path(byte_string_from_str("./../../../../")), "../../../.."))
+    assert(tests_lexical_path_equals(lexical_path_canonicalized_path(byte_string_from_str("../../../../../")), "../../../../.."))
+
+test "lexical path: the root path":
+    if not ak_core_is_ported:
+        return
+    let path = tests_lexical_path("/")
+    assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), "/"))
+    assert(tests_lexical_path_view_equals(lexical_path_basename_lexical_path_strip_extension(&path), "/"))
+    assert(tests_lexical_path_view_equals(lexical_path_title(&path), "/"))
+    assert(test_vector_size(lexical_path_parts_view(&path)) == 0)
+    assert(lexical_path_is_root(&path))
+
+test "lexical path: the dot path":
+    if not ak_core_is_ported:
+        return
+    let path = tests_lexical_path(".")
+    assert(tests_lexical_path_equals(lexical_path_string(&path), "."))
+    assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), "."))
+    assert(tests_lexical_path_view_equals(lexical_path_basename_lexical_path_strip_extension(&path), "."))
+    assert(tests_lexical_path_view_equals(lexical_path_title(&path), "."))
+
+test "lexical path: double slash":
+    if not ak_core_is_ported:
+        return
+    let path = tests_lexical_path("//home/anon/foo.txt")
+    assert(tests_lexical_path_equals(lexical_path_string(&path), "/home/anon/foo.txt"))
+
+test "lexical path: trailing slash":
+    if not ak_core_is_ported:
+        return
+    let path = tests_lexical_path("/home/anon/")
+    assert(tests_lexical_path_equals(lexical_path_string(&path), "/home/anon"))
+    assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), "/home"))
+    assert(tests_lexical_path_view_equals(lexical_path_basename_lexical_path_strip_extension(&path), "anon"))
+    assert(test_vector_size(lexical_path_parts_view(&path)) == 2)
+
+## Whether `LexicalPath::absolute_path(dir_path, target)` is `expected`.
+func tests_lexical_path_absolute(dir_path: str, target: str, expected: str) -> bool:
+    return tests_lexical_path_equals(lexical_path_absolute_path(byte_string_from_str(dir_path), byte_string_from_str(target)), expected)
+
+test "lexical path: resolve absolute path":
+    if not ak_core_is_ported:
+        return
+    assert(tests_lexical_path_absolute("/home/anon", "foo.txt", "/home/anon/foo.txt"))
+    assert(tests_lexical_path_absolute("/home/anon/", "foo.txt", "/home/anon/foo.txt"))
+    assert(tests_lexical_path_absolute("/home/anon", "././foo.txt", "/home/anon/foo.txt"))
+    assert(tests_lexical_path_absolute("/home/anon/quux", "../foo.txt", "/home/anon/foo.txt"))
+    assert(tests_lexical_path_absolute("/home/anon/quux", "../test/foo.txt", "/home/anon/test/foo.txt"))
+    assert(tests_lexical_path_absolute("quux", "../test/foo.txt", "test/foo.txt"))
+    assert(tests_lexical_path_absolute("quux", "../../test/foo.txt", "../test/foo.txt"))
+    assert(tests_lexical_path_absolute("quux/bar", "../../test/foo.txt", "test/foo.txt"))
+    assert(tests_lexical_path_absolute("quux/bar/", "../../test/foo.txt", "test/foo.txt"))
+
+test "lexical path: has extension":
+    if not ak_core_is_ported:
+        return
+    let simple = tests_lexical_path("/tmp/simple.png")
+    assert(lexical_path_has_extension(&simple, sv(".png")))
+    assert(lexical_path_has_extension(&simple, sv(".pnG")))
+    assert(lexical_path_has_extension(&simple, sv(".PNG")))
+
+    let upper = tests_lexical_path("/TMP/SIMPLE.PNG")
+    assert(lexical_path_has_extension(&upper, sv(".png")))
+    assert(lexical_path_has_extension(&upper, sv(".pnG")))
+    assert(lexical_path_has_extension(&upper, sv(".PNG")))
+
+    let dot_png = tests_lexical_path(".png")
+    assert(lexical_path_has_extension(&dot_png, sv(".png")))
+
+    let png = tests_lexical_path("png")
+    assert(not lexical_path_has_extension(&png, sv(".png")))
+
+test "lexical path: join":
+    if not ak_core_is_ported:
+        return
+    var one: StringView[1] = [sv("foo.txt")]
+    let first = lexical_path_join(sv("anon"), one)
+    assert(tests_lexical_path_equals(lexical_path_string(&first), "anon/foo.txt"))
+    one[0] = sv("anon/foo.txt")
+    let second = lexical_path_join(sv("/home"), one)
+    assert(tests_lexical_path_equals(lexical_path_string(&second), "/home/anon/foo.txt"))
+    one[0] = sv("foo.txt")
+    let third = lexical_path_join(sv("/"), one)
+    assert(tests_lexical_path_equals(lexical_path_string(&third), "/foo.txt"))
+    var two: StringView[2] = [sv("anon"), sv("foo.txt")]
+    let fourth = lexical_path_join(sv("/home"), two)
+    assert(tests_lexical_path_equals(lexical_path_string(&fourth), "/home/anon/foo.txt"))
+
+test "lexical path: append":
+    if not ak_core_is_ported:
+        return
+    let path = tests_lexical_path("/home/anon/")
+    let new_path = lexical_path_append(&path, sv("foo.txt"))
+    assert(tests_lexical_path_equals(lexical_path_string(&new_path), "/home/anon/foo.txt"))
+
+test "lexical path: parent":
+    if not ak_core_is_ported:
+        return
+    let first = tests_lexical_path("/home/anon/foo.txt")
+    let first_parent = lexical_path_parent(&first)
+    assert(tests_lexical_path_equals(lexical_path_string(&first_parent), "/home/anon"))
+
+    let second = tests_lexical_path("anon/foo.txt")
+    let second_parent = lexical_path_parent(&second)
+    assert(tests_lexical_path_equals(lexical_path_string(&second_parent), "anon"))
+
+    let third = tests_lexical_path("foo.txt")
+    let third_parent = lexical_path_parent(&third)
+    assert(tests_lexical_path_equals(lexical_path_string(&third_parent), "."))
+    let parent_of_parent = lexical_path_parent(&third_parent)
+    assert(tests_lexical_path_equals(lexical_path_string(&parent_of_parent), ".."))
+
+    let root = tests_lexical_path("/")
+    let root_parent = lexical_path_parent(&root)
+    assert(tests_lexical_path_equals(lexical_path_string(&root_parent), "/"))
+
+## `a.is_child_of(b)` for two path strings.
+func tests_lexical_path_is_child_of(child: str, parent: str) -> bool:
+    let child_path = tests_lexical_path(child)
+    let parent_path = tests_lexical_path(parent)
+    return lexical_path_is_child_of(&child_path, &parent_path)
+
+test "lexical path: is child of":
+    if not ak_core_is_ported:
+        return
+    let parent = tests_lexical_path("/a/parent/directory")
+    let child = tests_lexical_path("/a/parent/directory/a/child")
+    let mismatching = tests_lexical_path("/not/a/child/directory")
+    assert(lexical_path_is_child_of(&child, &parent))
+    assert(lexical_path_is_child_of(&child, &child))
+    assert(lexical_path_is_child_of(&parent, &parent))
+    assert(not lexical_path_is_child_of(&parent, &child))
+    assert(not lexical_path_is_child_of(&mismatching, &parent))
+
+    let parent_parent = lexical_path_parent(&parent)
+    assert(lexical_path_is_child_of(&parent, &parent_parent))
+    let child_up_1 = lexical_path_parent(&child)
+    let child_up_2 = lexical_path_parent(&child_up_1)
+    assert(lexical_path_is_child_of(&child_up_2, &parent))
+    let child_up_3 = lexical_path_parent(&child_up_2)
+    assert(not lexical_path_is_child_of(&child_up_3, &parent))
+
+    assert(tests_lexical_path_is_child_of("/", "/"))
+    assert(tests_lexical_path_is_child_of("/any", "/"))
+    assert(tests_lexical_path_is_child_of("/child/directory", "/"))
+
+    assert(tests_lexical_path_is_child_of("folder/sub", "folder"))
+    assert(tests_lexical_path_is_child_of("/folder/sub", "/folder"))
+
+    assert(tests_lexical_path_is_child_of("folder", "/folder"))
+    assert(tests_lexical_path_is_child_of("folder", "/folder/sub"))
+    assert(tests_lexical_path_is_child_of("folder/sub", "/folder"))
+    assert(tests_lexical_path_is_child_of("folder/sub", "/folder/sub"))
+
+    assert(not tests_lexical_path_is_child_of("/folder", "folder"))
+    assert(not tests_lexical_path_is_child_of("/folder/sub", "folder"))
+    assert(not tests_lexical_path_is_child_of("/folder/sub", "folder/sub"))
+
+test "source location: pieces":
+    # SourceLocation has no donor test; pinned to SourceLocation.h.
+    let location = source_location_current("file.cpp".bytes.data, 42, "function".bytes.data)
+    let file = source_location_filename(&location)
+    assert(string_view_equals(&file, "file.cpp"))
+    let function = source_location_function_name(&location)
+    assert(string_view_equals(&function, "function"))
+    assert(source_location_line_number(&location) == 42)

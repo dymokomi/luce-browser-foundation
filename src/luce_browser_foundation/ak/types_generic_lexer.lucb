@@ -9,24 +9,26 @@
 #
 #==============================================================================================
 
-## AK::is_path_separator (AK/GenericLexer.h:30).
-# C++ initializer: is_any_of ( "/\\"sv )
-pub var is_path_separator: void*?
-
-## AK::is_quote (AK/GenericLexer.h:31).
-# C++ initializer: is_any_of ( "'\""sv )
-pub var is_quote: void*?
-
 ## AK::UnicodeEscapeError (AK/GenericLexer.h:33).
 pub enum UnicodeEscapeError as i32:
     malformed_unicode_escape = 0
     unicode_escape_overflow = 1
 
+## `Result<u32, UnicodeEscapeError>` (AK/Result.h, unmapped by the generator): a decoded code
+## point or the escape error (hand-written by r02).
+pub enum UnicodeEscapeResult:
+    success(code_point: u32)
+    failure(reason: UnicodeEscapeError)
+
 # mark: GenericLexer ============================================================================
 
-## AK::Detail::GenericLexer (AK/GenericLexer.h:41): a generic struct.
+## AK::Detail::GenericLexer (AK/GenericLexer.h:41): a generic struct. The C++ ViewType is
+## StringView for GenericLexer<char> (`GenericLexer[u8]`, the generic_lexer_* functions) and
+## Utf16View for GenericLexer<char16_t> (`GenericLexer[u16]`, the utf16_generic_lexer_*
+## functions); each lexer uses its own field (hand-edited by r02).
 pub struct GenericLexer[TCharType]:
-    pub var m_input: void*?  # unmapped: Conditional<IsSame<CharType, char>, StringView, Utf16View>
+    pub var m_input: StringView  # ViewType of GenericLexer<char>
+    pub var m_utf16_input: Utf16View  # ViewType of GenericLexer<char16_t>
     pub var m_index: usize  # C++ default: { 0 }
 
 # mark: LineTrackingLexer =======================================================================
@@ -35,7 +37,7 @@ pub struct GenericLexer[TCharType]:
 pub struct LineTrackingLexer:
     pub var generic_lexer: GenericLexer[u8]  # base AK::Detail::GenericLexer<char>
     pub var m_first_line_start_position: LineTrackingLexerPosition
-    pub var m_line_start_positions: RedBlackTree[u64, u64]*
+    pub var m_line_start_positions: RedBlackTree[usize, usize]*
     pub var m_largest_known_line_start_position: usize  # C++ default: { 0 }
 
 # mark: LineTrackingLexerPosition ===============================================================

@@ -219,6 +219,56 @@ pub func utf16_fly_string_to_ascii_titlecase(this: const Utf16FlyString*) -> Utf
     let view = utf16_fly_string_view(this)
     return utf16_fly_string_from_utf16_string(utf16_view_to_ascii_titlecase(&view))
 
+## Ported from AK/Utf16FlyString.h:87 AK::Utf16FlyString::to_number<i8>.
+pub func utf16_fly_string_to_number_i8(this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    return utf16_string_base_to_number_i8(&this.m_data, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16FlyString.h:87 AK::Utf16FlyString::to_number<i16>.
+pub func utf16_fly_string_to_number_i16(this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    return utf16_string_base_to_number_i16(&this.m_data, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16FlyString.h:87 AK::Utf16FlyString::to_number<i32>.
+pub func utf16_fly_string_to_number_i32(this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    return utf16_string_base_to_number_i32(&this.m_data, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16FlyString.h:87 AK::Utf16FlyString::to_number<i64>.
+pub func utf16_fly_string_to_number_i64(this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    return utf16_string_base_to_number_i64(&this.m_data, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16FlyString.h:87 AK::Utf16FlyString::to_number<u8>.
+pub func utf16_fly_string_to_number_u8(this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    return utf16_string_base_to_number_u8(&this.m_data, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16FlyString.h:87 AK::Utf16FlyString::to_number<u16>.
+pub func utf16_fly_string_to_number_u16(this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    return utf16_string_base_to_number_u16(&this.m_data, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16FlyString.h:87 AK::Utf16FlyString::to_number<u32>.
+pub func utf16_fly_string_to_number_u32(this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    return utf16_string_base_to_number_u32(&this.m_data, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16FlyString.h:87 AK::Utf16FlyString::to_number<u64>.
+pub func utf16_fly_string_to_number_u64(this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    return utf16_string_base_to_number_u64(&this.m_data, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16FlyString.h:87 AK::Utf16FlyString::to_number<f32>.
+pub func utf16_fly_string_to_number_f32(this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    return utf16_string_base_to_number_f32(&this.m_data, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16FlyString.h:87 AK::Utf16FlyString::to_number<f64>.
+pub func utf16_fly_string_to_number_f64(this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    return utf16_string_base_to_number_f64(&this.m_data, trim_whitespace, base_)
+
+
 # mark: Comparison and queries ==================================================================
 
 ## Ported from AK/Utf16FlyString.h:97 AK::Utf16FlyString::operator==(Utf16FlyString const&).

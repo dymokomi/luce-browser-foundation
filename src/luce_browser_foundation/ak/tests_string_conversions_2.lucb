@@ -1,0 +1,162 @@
+#==============================================================================================
+#
+#   tests_string_conversions_2 - parse_first_number and parse_number edge cases
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestStringConversions.cpp: the special values of simple_cases,
+#       partial_parse_stops_at_right_spot, invalid_parse, detect_out_of_range_values and
+#       parse_completely_must_be_just_floating_point. Every check runs over a StringView and
+#       over UTF-16 storage (the C++'s u"..."sv).
+#
+#==============================================================================================
+
+## `parse_number<double>` of `text` over a StringView and over UTF-16 storage; both must agree.
+func test_parse_complete_double(text: str) -> f64?:
+    with memory.heap:
+        let from_bytes = parse_number_string_view_f64(sv(text), TrimWhitespace.no)
+        let utf16 = utf16_string_from_utf8_without_validation(sv(text))
+        var view = utf16_string_base_utf16_view(&utf16.utf16_string_base)
+        let storage = new u16[text.length + 1] else trap("out of memory")
+        if utf16_view_has_ascii_storage(&view):
+            view = test_conversions_utf16(text, storage)
+        let from_code_units = parse_number_utf16_view_f64(view, TrimWhitespace.no)
+        if from_bytes == none:
+            assert(from_code_units == none)
+            return none
+        let value = from_bytes else trap("unreachable")
+        let other = from_code_units else trap("parse over UTF-16 failed")
+        assert(value.bits() == other.bits())
+        return value
+
+## `parse_number<float>` of `text`, both ways.
+func test_parse_complete_float(text: str) -> f32?:
+    with memory.heap:
+        let from_bytes = parse_number_string_view_f32(sv(text), TrimWhitespace.no)
+        let storage = new u16[text.length + 1] else trap("out of memory")
+        let from_code_units = parse_number_utf16_view_f32(test_conversions_utf16(text, storage), TrimWhitespace.no)
+        if from_bytes == none:
+            assert(from_code_units == none)
+            return none
+        let value = from_bytes else trap("unreachable")
+        assert(value.bits() == (from_code_units else trap("parse over UTF-16 failed")).bits())
+        return value
+
+## `parse_first_number<double>` of `text`, both ways: the value's bits and the characters taken.
+func test_parse_first_double(text: str) -> (u64, usize)?:
+    with memory.heap:
+        let storage = new u16[text.length + 1] else trap("out of memory")
+        let from_code_units = parse_first_number_utf16_view_f64(test_conversions_utf16(text, storage))
+        let maybe_from_bytes = parse_first_number_string_view_f64(sv(text))
+        if maybe_from_bytes == none:
+            assert(from_code_units == none)
+            return none
+        let from_bytes = maybe_from_bytes else trap("unreachable")
+        let other = from_code_units else trap("parse over UTF-16 failed")
+        assert(from_bytes.value.bits() == other.value.bits())
+        assert(from_bytes.characters_parsed == other.characters_parsed)
+        return (from_bytes.value.bits(), from_bytes.characters_parsed)
+
+test "StringConversions: simple_cases (special values)":
+    let negative_zero: u64 = 0x8000000000000000
+    assert((test_parse_complete_double("0") else trap("0")).bits() == 0)
+    assert((test_parse_complete_double("-0") else trap("-0")).bits() == negative_zero)
+    assert((test_parse_complete_double("-0.") else trap("-0.")).bits() == negative_zero)
+    assert((test_parse_complete_double("-0.0") else trap("-0.0")).bits() == negative_zero)
+
+    assert((test_parse_complete_double("67677557565221539913") else trap("big")) == 67677557565221539913.0)
+
+    assert((test_parse_complete_double("2.4703282292062327208828439643411068618252990130716238221279284125033775363510437593264991818081799618989828234772285886546332835517796989819938739800539093906315035659515570226392290858392449105184435931802849936536152500319370457678249219365623669863658480757001585769269903706311928279558551332927834338409351978015531246597263579574622766465272827220056374006485499977096599470454020828166226237857393450736339007967761930577506740176324673600968951340535537458516661134223766678604162159680461914467291840300530057530849048765391711386591646239524912623653881879636239373280423891018672348497668235089863388587925628302755995657524455507255189313690836254779186948667994968324049705821028513185451396213837722826145437693412532098591327667236328125e-324") else trap("zero")) == 0.0)
+    assert((test_parse_complete_double("2.4703282292062327208828439643411068618252990130716238221279284125033775363510437593264991818081799618989828234772285886546332835517796989819938739800539093906315035659515570226392290858392449105184435931802849936536152500319370457678249219365623669863658480757001585769269903706311928279558551332927834338409351978015531246597263579574622766465272827220056374006485499977096599470454020828166226237857393450736339007967761930577506740176324673600968951340535537458516661134223766678604162159680461914467291840300530057530849048765391711386591646239524912623653881879636239373280423891018672348497668235089863388587925628302755995657524455507255189313690836254779186948667994968324049705821028513185451396213837722826145437693412532098591327667236328124999e-324") else trap("zero")) == 0.0)
+
+    # EXPECT_TO_PARSE_TO_VALUE_EQUAL_TO
+    assert((test_parse_complete_double("1e-324") else trap("v")).bits() == 0)
+    assert((test_parse_complete_double("-1e-324") else trap("v")).bits() == negative_zero)
+    assert((test_parse_complete_double("+.09289376810193062") else trap("v")) == 0.09289376810193062)
+    assert((test_parse_complete_double("-.09289376810193062") else trap("v")) == -0.09289376810193062)
+    assert((test_parse_complete_double("+.0e10") else trap("v")).bits() == 0)
+    assert((test_parse_complete_double("-.0e10") else trap("v")).bits() == negative_zero)
+
+## EXPECT_TO_PARSE_TO_INFINITY: `text`, "+" `text` and "-" `text` overflow to ±infinity.
+func test_parse_to_infinity(text: str):
+    with memory.heap:
+        let positive = new u8[text.length + 1] else trap("out of memory")
+        let negative = new u8[text.length + 1] else trap("out of memory")
+        positive[0] = '+'
+        negative[0] = '-'
+        copy_bytes(positive[1..], text.bytes)
+        copy_bytes(negative[1..], text.bytes)
+        let infinity: u64 = 0x7ff0000000000000
+        let infinity_f32: u32 = 0x7f800000
+        assert((test_parse_complete_double(text) else trap("inf")).bits() == infinity)
+        assert((test_parse_complete_double((str)positive) else trap("inf")).bits() == infinity)
+        assert((test_parse_complete_double((str)negative) else trap("inf")).bits() == infinity | 0x8000000000000000)
+        assert((test_parse_complete_float(text) else trap("inf")).bits() == infinity_f32)
+        assert((test_parse_complete_float((str)positive) else trap("inf")).bits() == infinity_f32)
+        assert((test_parse_complete_float((str)negative) else trap("inf")).bits() == infinity_f32 | 0x80000000)
+
+test "StringConversions: simple_cases (infinities)":
+    test_parse_to_infinity("123.456e789")
+    test_parse_to_infinity("123456.456789e789")
+    test_parse_to_infinity("1438456663141390273526118207642235581183227845246331231162636653790368152091394196930365828634687637948157940776599182791387527135353034738357134110310609455693900824193549772792016543182680519740580354365467985440183598701312257624545562331397018329928613196125590274187720073914818062530830316533158098624984118889298281371812288789537310599037529113415438738954894752124724983067241108764488346454376699018673078404751121414804937224240805993123816932326223683090770561597570457793932985826162604255884529134126396282202126526253389383421806727954588525596114379801269094096329805054803089299736996870951258573010877404407451953846698609198213926882692078557033228265259305481198526059813164469187586693257335779522020407645498684263339921905227556616698129967412891282231685504660671277927198290009824680186319750978665734576683784255802269708917361719466043175201158849097881370477111850171579869056016061666173029059588433776015644439705050377554277696143928278093453792803846252715966016733222646442382892123940052441346822429721593884378212558701004356924243030059517489346646577724622498919752597382095222500311124181823512251071356181769376577651390028297796156208815375089159128394945710515861334486267101797497111125909272505194792870889617179758703442608016143343262159998149700606597792535574457560429226974273443630323818747730771316763398572110874959981923732463076884528677392654150010269822239401993427482376513231389212353583573566376915572650916866553612366187378959554983566712767093372906030188976220169058025354973622211666504549316958271880975697143546564469806791358707318873075708383345004090151974068325838177531266954177406661392229801349994695941509935655355652985723782153570084089560139142231.738475042362596875449154552392299548947138162081694168675340677843807613129780449323363759027012972466987370921816813162658754726545121090545507240267000456594786540949605260722461937870630634874991729398208026467698131898691830012167897399682179601734569071423681e-733")
+    test_parse_to_infinity("3e182947912346759234")
+    test_parse_to_infinity("3e70000000000000")
+    test_parse_to_infinity("3e70000000000")
+    test_parse_to_infinity("3e70000000")
+    test_parse_to_infinity("1e681")
+    test_parse_to_infinity("7e312")
+    test_parse_to_infinity("184467440737095516151234567890e2147483639")
+
+## EXPECT_PARSE_TO_VALUE_AND_CONSUME_CHARS
+func test_parse_first_consumes(text: str, bits: u64, characters: usize):
+    let (value_bits, parsed) = test_parse_first_double(text) else trap("parse_first_number failed")
+    assert(value_bits == bits)
+    assert(parsed == characters)
+
+test "StringConversions: partial_parse_stops_at_right_spot":
+    test_parse_first_consumes("0x", 0, 1)
+    test_parse_first_consumes("0e", 0, 1)
+    test_parse_first_consumes("0e+", 0, 1)
+    test_parse_first_consumes("0e1", 0, 3)
+    test_parse_first_consumes("0beef", 0, 1)
+    test_parse_first_consumes("0p123", 0, 1)
+    test_parse_first_consumes("0e1", 0, 3)
+    test_parse_first_consumes("0e1abc", 0, 3)
+    test_parse_first_consumes("0e1e1", 0, 3)
+    test_parse_first_consumes("0e1+", 0, 3)
+    test_parse_first_consumes("0e-+1", 0, 1)
+
+test "StringConversions: invalid_parse":
+    let failures: str[17] = ["", "e", ".", "-.", "+.", ".e", "-.e", "+.e", ".e1", "-.e1", "+.e1", "++2", "++1", "++0", "++2e1", "++1e1", "++0e1"]
+    for text in failures:
+        assert(test_parse_first_double(text) == none)
+    let bases: str[7] = ["1", "1.", "1e1", "1.e1", "1.0e1", "1.0e+1", "1.0e-1"]
+    let signs: str[4] = ["++", "--", "+-", "-+"]
+    var buffer: u8[16]
+    for base_text in bases:
+        for sign_text in signs:
+            let text = format(buffer, f"{sign_text}{base_text}") else trap("format")
+            assert(test_parse_first_double(text) == none)
+
+test "StringConversions: detect_out_of_range_values":
+    let (small, _small_length) = test_parse_first_double("10e-10000") else trap("small")
+    assert(small == 0)
+    let (negative_small, _negative_small_length) = test_parse_first_double("-10e-10000") else trap("small")
+    assert(negative_small == 0x8000000000000000)
+    let (large, _large_length) = test_parse_first_double("10e10000") else trap("large")
+    assert(large == 0x7ff0000000000000)
+    let (negative_large, _negative_large_length) = test_parse_first_double("-10e10000") else trap("large")
+    assert(negative_large == 0xfff0000000000000)
+
+test "StringConversions: parse_completely_must_be_just_floating_point":
+    let failures: str[39] = [
+        "", "-", "+", "++1", "+-1", "-+1", "--1",
+        "1 ", "1. ", "1e ", "1.e ", "1.e123 ",
+        "-1 ", "-1. ", "-1e ", "-1.e ", "-1.e123 ",
+        "1A", "1.C", "1e*", "1.e(", "1.e123]", "1.e123&", "1.e123               ",
+        ":1234567890", "1:234567890", "12:34567890", "123:4567890", "1234:567890", "12345:67890",
+        "123456:7890", "1234567:890", "12345678:90", "123456789:0", "1234567890:",
+        "1;234567890", "1234567;890", "1=234567890", "1234567=890",
+    ]
+    for text in failures:
+        assert(test_parse_complete_double(text) == none)
+

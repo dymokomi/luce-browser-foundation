@@ -1,0 +1,138 @@
+#==============================================================================================
+#
+#   tests_ipv6_address - tests of IPv6Address
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestIPv6Address.cpp; the static_asserts are checked at run time.
+#       to_string builds with a StringBuilder and from_string splits into a Vector (region
+#       r01), so those tests are gated on ak_core_is_ported.
+#
+#==============================================================================================
+
+## `IPv6Address(data)`.
+func tests_ipv6_address(data: u8[16]) -> IPv6Address:
+    var addr = IPv6Address()
+    i_pv6_address_construct_array_u8(&addr, data)
+    return addr
+
+## Asserts that `data` prints as `expected`.
+func tests_ipv6_expect_string(data: u8[16], expected: str):
+    let addr = tests_ipv6_address(data)
+    let text = i_pv6_address_to_string(&addr) else trap("MUST: to_string")
+    assert(string_eq_string_view(&text, sv(expected)))
+
+## Asserts that `text` parses to the address of `data`.
+func tests_ipv6_expect_parse(text: str, data: u8[16]):
+    let addr = i_pv6_address_from_string(sv(text)) else trap("from_string failed")
+    assert(addr == tests_ipv6_address(data))
+
+## Asserts that `text` parses as an IPv4-mapped address of a.b.c.d.
+func tests_ipv6_expect_mapped(text: str, a: u32, b: u32, c_: u32, d: u32):
+    let addr = i_pv6_address_from_string(sv(text)) else trap("from_string failed")
+    let mapped = i_pv6_address_ipv4_mapped_address(&addr) else trap("not mapped")
+    assert(mapped == i_pv4_address_from_octets(a, b, c_, d))
+
+test "ipv6: should default constructor with 0s":
+    let addr = IPv6Address()
+
+    assert(i_pv6_address_is_zero(&addr))
+
+test "ipv6: should construct from c array":
+    let addr = tests_ipv6_address([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+
+    assert(not i_pv6_address_is_zero(&addr))
+
+test "ipv6: should get groups by index":
+    let addr = tests_ipv6_address([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+
+    assert(0x102 == i_pv6_address_at(&addr, 0))
+    assert(0x304 == i_pv6_address_at(&addr, 1))
+    assert(0x506 == i_pv6_address_at(&addr, 2))
+    assert(0x708 == i_pv6_address_at(&addr, 3))
+    assert(0x90a == i_pv6_address_at(&addr, 4))
+    assert(0xb0c == i_pv6_address_at(&addr, 5))
+    assert(0xd0e == i_pv6_address_at(&addr, 6))
+    assert(0xf10 == i_pv6_address_at(&addr, 7))
+
+test "ipv6: should convert to string":
+    if not ak_core_is_ported:
+        return
+    tests_ipv6_expect_string([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "102:304:506:708:90a:b0c:d0e:f10")
+    let zero = IPv6Address()
+    let zero_text = i_pv6_address_to_string(&zero) else trap("MUST: to_string")
+    assert(string_eq_string_view(&zero_text, sv("::")))
+    tests_ipv6_expect_string([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], "::1")
+    tests_ipv6_expect_string([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "1::")
+    tests_ipv6_expect_string([1, 2, 0, 0, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 16], "102:0:506:708:900::10")
+    tests_ipv6_expect_string([1, 2, 0, 0, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0], "102:0:506:708:900::")
+    tests_ipv6_expect_string([0, 0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "::304:506:708:90a:b0c:d0e:f10")
+    tests_ipv6_expect_string([1, 2, 3, 4, 0, 0, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "102:304::708:90a:b0c:d0e:f10")
+
+test "ipv6: should make ipv6 address from string":
+    if not ak_core_is_ported:
+        return
+    assert(i_pv6_address_from_string(sv(":::")) == none)
+    assert(i_pv6_address_from_string(sv(":::1")) == none)
+    assert(i_pv6_address_from_string(sv("1:::")) == none)
+    tests_ipv6_expect_parse("102:304:506:708:90a:b0c:d0e:f10", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+    tests_ipv6_expect_parse("::", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    tests_ipv6_expect_parse("::1", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+    tests_ipv6_expect_parse("1::", [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    tests_ipv6_expect_parse("102:0:506:708:900::10", [1, 2, 0, 0, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 16])
+    tests_ipv6_expect_parse("102:0:506:708:900::", [1, 2, 0, 0, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0])
+    tests_ipv6_expect_parse("::304:506:708:90a:b0c:d0e:f10", [0, 0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+    tests_ipv6_expect_parse("102:304::708:90a:b0c:d0e:f10", [1, 2, 3, 4, 0, 0, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+    tests_ipv6_expect_parse("[102:304::708:90a:b0c:d0e:f10]", [1, 2, 3, 4, 0, 0, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+    tests_ipv6_expect_parse("[::304:506:708:90a:b0c:d0e:f10]", [0, 0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+
+test "ipv6: should not make ipv6 address from string":
+    if not ak_core_is_ported:
+        return
+    assert(i_pv6_address_from_string(sv("[102:0:506:708:900::10")) == none)
+    assert(i_pv6_address_from_string(sv("102:0:506:708:900::10]")) == none)
+    assert(i_pv6_address_from_string(sv("[::304:506:708:90a:b0c:d0e:f10]]")) == none)
+    assert(i_pv6_address_from_string(sv("[[::304:506:708:90a:b0c:d0e:f10]")) == none)
+    assert(i_pv6_address_from_string(sv("[[::304:506:708:90a:b0c:d0e:f10]]")) == none)
+
+test "ipv6: ipv4 mapped ipv6":
+    if not ak_core_is_ported:
+        return
+    let ipv4_address_to_map = i_pv4_address_from_string(sv("192.168.0.1")) else trap("from_string")
+    var mapped_address = IPv6Address()
+    i_pv6_address_construct_i_pv4_address(&mapped_address, ipv4_address_to_map)
+    assert(i_pv6_address_is_ipv4_mapped(&mapped_address))
+    assert(ipv4_address_to_map == (i_pv6_address_ipv4_mapped_address(&mapped_address) else trap("mapped")))
+    let text = i_pv6_address_to_string(&mapped_address) else trap("MUST: to_string")
+    assert(string_eq_string_view(&text, sv("::ffff:192.168.0.1")))
+    tests_ipv6_expect_mapped("::FFFF:192.168.1.9", 192, 168, 1, 9)
+    tests_ipv6_expect_mapped("::0:0:ffff:192.168.1.7", 192, 168, 1, 7)
+    tests_ipv6_expect_mapped("0:0:0::ffff:192.168.2.5", 192, 168, 2, 5)
+    assert(i_pv6_address_from_string(sv("::abcd:192.168.1.9")) == none)
+    assert(i_pv6_address_from_string(sv("::::ffff:192.168.1.9")) == none)
+    assert(i_pv6_address_from_string(sv("ffff::ffff:192.168.1.9")) == none)
+    assert(i_pv6_address_from_string(sv("0::0::ffff:192.168.1.9")) == none)
+    assert(i_pv6_address_from_string(sv("::0::ffff:192.168.1.9")) == none)
+    assert(i_pv6_address_from_string(sv(":0:ffff:192.168.1.9")) == none)
+
+test "ipv6: should make empty optional from bad string":
+    if not ak_core_is_ported:
+        return
+    assert(i_pv6_address_from_string(sv("bad string")) == none)
+
+test "ipv6: should make empty optional from out of range values":
+    if not ak_core_is_ported:
+        return
+    assert(i_pv6_address_from_string(sv("::10000")) == none)
+
+test "ipv6: should only compare bytes from address":
+    let addr_a = tests_ipv6_address([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+    let addr_b = tests_ipv6_address([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17])
+    let addr_c = tests_ipv6_address([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17])
+
+    assert(addr_a != addr_b)
+    assert(addr_a == addr_a)
+    assert(addr_b == addr_c)
+
+test "ipv6: loopback":
+    let loopback = i_pv6_address_loopback()
+    assert(i_pv6_address_at(&loopback, 7) == 1 and not i_pv6_address_is_ipv4_mapped(&loopback))

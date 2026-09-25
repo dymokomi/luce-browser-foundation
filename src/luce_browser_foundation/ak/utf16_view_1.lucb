@@ -303,6 +303,76 @@ pub func utf16_view_utf16_span(this: const Utf16View*) -> const u16[]:
     let utf16 = utf16_view_utf16_pointer(this) else trap("VERIFY: UTF-16 view without storage")
     return u16[]((u16*)utf16, utf16_view_length_in_code_units(this))
 
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<i8>.
+pub func utf16_view_to_number_i8(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_i8(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_i8(*this, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<i16>.
+pub func utf16_view_to_number_i16(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_i16(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_i16(*this, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<i32>.
+pub func utf16_view_to_number_i32(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_i32(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_i32(*this, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<i64>.
+pub func utf16_view_to_number_i64(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_i64(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_i64(*this, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<u8>.
+pub func utf16_view_to_number_u8(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_u8(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_u8(*this, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<u16>.
+pub func utf16_view_to_number_u16(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_u16(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_u16(*this, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<u32>.
+pub func utf16_view_to_number_u32(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_u32(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_u32(*this, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<u64>.
+pub func utf16_view_to_number_u64(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_u64(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_u64(*this, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<f32>.
+pub func utf16_view_to_number_f32(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_f32(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_f32(*this, trim_whitespace, base_)
+
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<f64>.
+pub func utf16_view_to_number_f64(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_f64(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_f64(*this, trim_whitespace, base_)
+
+
 # mark: Comparison ==============================================================================
 
 ## Ported from AK/Utf16View.h:215 AK::Utf16View::operator==(Utf16View const&).

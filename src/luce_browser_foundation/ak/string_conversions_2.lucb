@@ -1,0 +1,498 @@
+#==============================================================================================
+#
+#   string_conversions_2 - parse_first_number, parse_number and parse_hexadecimal_number
+#
+#   DESCRIPTION:
+#       Port of AK/StringConversions.cpp (lines 70-153) and the declarations of
+#       AK/StringConversions.h (lines 1-51). The C++ templates are explicitly instantiated for
+#       i8, i16, i32, long, long long, u8, u16, u32, unsigned long, unsigned long long, float and
+#       double; here each instantiation is a function with the type as suffix (long and long long
+#       are i64, the unsigned ones u64). Generated one-liners, in the .cpp's order.
+#
+#==============================================================================================
+
+# mark: parse_first_number ====================================================================
+
+## Ported from AK/StringConversions.cpp:70 AK::parse_first_number<i8>(StringView, TrimWhitespace, int):
+## the i8 at the start of `string` and the characters it took.
+pub func parse_first_number_string_view_i8(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[i8]?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_bytes(string_view_bytes(&trimmed)), base_, true, 0x7f) else return none
+    return ParseFirstNumberResult[i8](value = ((i8)(0 -% scanned.magnitude) if scanned.negative else (i8)scanned.magnitude), characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:70 AK::parse_first_number<i16>(StringView, TrimWhitespace, int):
+## the i16 at the start of `string` and the characters it took.
+pub func parse_first_number_string_view_i16(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[i16]?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_bytes(string_view_bytes(&trimmed)), base_, true, 0x7fff) else return none
+    return ParseFirstNumberResult[i16](value = ((i16)(0 -% scanned.magnitude) if scanned.negative else (i16)scanned.magnitude), characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:70 AK::parse_first_number<i32>(StringView, TrimWhitespace, int):
+## the i32 at the start of `string` and the characters it took.
+pub func parse_first_number_string_view_i32(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[i32]?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_bytes(string_view_bytes(&trimmed)), base_, true, 0x7fffffff) else return none
+    return ParseFirstNumberResult[i32](value = ((i32)(0 -% scanned.magnitude) if scanned.negative else (i32)scanned.magnitude), characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:70 AK::parse_first_number<i64>(StringView, TrimWhitespace, int):
+## the i64 at the start of `string` and the characters it took.
+pub func parse_first_number_string_view_i64(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[i64]?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_bytes(string_view_bytes(&trimmed)), base_, true, 0x7fffffffffffffff) else return none
+    return ParseFirstNumberResult[i64](value = ((i64)(0 -% scanned.magnitude) if scanned.negative else (i64)scanned.magnitude), characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:70 AK::parse_first_number<u8>(StringView, TrimWhitespace, int):
+## the u8 at the start of `string` and the characters it took.
+pub func parse_first_number_string_view_u8(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[u8]?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_bytes(string_view_bytes(&trimmed)), base_, false, 0xff) else return none
+    return ParseFirstNumberResult[u8](value = (u8)scanned.magnitude, characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:70 AK::parse_first_number<u16>(StringView, TrimWhitespace, int):
+## the u16 at the start of `string` and the characters it took.
+pub func parse_first_number_string_view_u16(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[u16]?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_bytes(string_view_bytes(&trimmed)), base_, false, 0xffff) else return none
+    return ParseFirstNumberResult[u16](value = (u16)scanned.magnitude, characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:70 AK::parse_first_number<u32>(StringView, TrimWhitespace, int):
+## the u32 at the start of `string` and the characters it took.
+pub func parse_first_number_string_view_u32(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[u32]?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_bytes(string_view_bytes(&trimmed)), base_, false, 0xffffffff) else return none
+    return ParseFirstNumberResult[u32](value = (u32)scanned.magnitude, characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:70 AK::parse_first_number<u64>(StringView, TrimWhitespace, int):
+## the u64 at the start of `string` and the characters it took.
+pub func parse_first_number_string_view_u64(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[u64]?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_bytes(string_view_bytes(&trimmed)), base_, false, 0xffffffffffffffff) else return none
+    return ParseFirstNumberResult[u64](value = (u64)scanned.magnitude, characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:70 AK::parse_first_number<f32>(StringView, TrimWhitespace, int):
+## the f32 at the start of `string` and the characters it took.
+pub func parse_first_number_string_view_f32(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[f32]?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+    return from_chars_f32(from_chars_input_bytes(string_view_bytes(&trimmed)))
+
+## Ported from AK/StringConversions.cpp:70 AK::parse_first_number<f64>(StringView, TrimWhitespace, int):
+## the f64 at the start of `string` and the characters it took.
+pub func parse_first_number_string_view_f64(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[f64]?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+    return from_chars_f64(from_chars_input_bytes(string_view_bytes(&trimmed)))
+
+## Ported from AK/StringConversions.cpp:79 AK::parse_first_number<i8>(Utf16View const&, TrimWhitespace, int).
+pub func parse_first_number_utf16_view_i8(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[i8]?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_first_number_string_view_i8(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_code_units(utf16_view_utf16_span(&trimmed_string)), base_, true, 0x7f) else return none
+    return ParseFirstNumberResult[i8](value = ((i8)(0 -% scanned.magnitude) if scanned.negative else (i8)scanned.magnitude), characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:79 AK::parse_first_number<i16>(Utf16View const&, TrimWhitespace, int).
+pub func parse_first_number_utf16_view_i16(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[i16]?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_first_number_string_view_i16(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_code_units(utf16_view_utf16_span(&trimmed_string)), base_, true, 0x7fff) else return none
+    return ParseFirstNumberResult[i16](value = ((i16)(0 -% scanned.magnitude) if scanned.negative else (i16)scanned.magnitude), characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:79 AK::parse_first_number<i32>(Utf16View const&, TrimWhitespace, int).
+pub func parse_first_number_utf16_view_i32(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[i32]?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_first_number_string_view_i32(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_code_units(utf16_view_utf16_span(&trimmed_string)), base_, true, 0x7fffffff) else return none
+    return ParseFirstNumberResult[i32](value = ((i32)(0 -% scanned.magnitude) if scanned.negative else (i32)scanned.magnitude), characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:79 AK::parse_first_number<i64>(Utf16View const&, TrimWhitespace, int).
+pub func parse_first_number_utf16_view_i64(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[i64]?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_first_number_string_view_i64(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_code_units(utf16_view_utf16_span(&trimmed_string)), base_, true, 0x7fffffffffffffff) else return none
+    return ParseFirstNumberResult[i64](value = ((i64)(0 -% scanned.magnitude) if scanned.negative else (i64)scanned.magnitude), characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:79 AK::parse_first_number<u8>(Utf16View const&, TrimWhitespace, int).
+pub func parse_first_number_utf16_view_u8(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[u8]?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_first_number_string_view_u8(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_code_units(utf16_view_utf16_span(&trimmed_string)), base_, false, 0xff) else return none
+    return ParseFirstNumberResult[u8](value = (u8)scanned.magnitude, characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:79 AK::parse_first_number<u16>(Utf16View const&, TrimWhitespace, int).
+pub func parse_first_number_utf16_view_u16(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[u16]?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_first_number_string_view_u16(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_code_units(utf16_view_utf16_span(&trimmed_string)), base_, false, 0xffff) else return none
+    return ParseFirstNumberResult[u16](value = (u16)scanned.magnitude, characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:79 AK::parse_first_number<u32>(Utf16View const&, TrimWhitespace, int).
+pub func parse_first_number_utf16_view_u32(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[u32]?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_first_number_string_view_u32(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_code_units(utf16_view_utf16_span(&trimmed_string)), base_, false, 0xffffffff) else return none
+    return ParseFirstNumberResult[u32](value = (u32)scanned.magnitude, characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:79 AK::parse_first_number<u64>(Utf16View const&, TrimWhitespace, int).
+pub func parse_first_number_utf16_view_u64(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[u64]?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_first_number_string_view_u64(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+    let scanned = from_chars_integer(from_chars_input_code_units(utf16_view_utf16_span(&trimmed_string)), base_, false, 0xffffffffffffffff) else return none
+    return ParseFirstNumberResult[u64](value = (u64)scanned.magnitude, characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:79 AK::parse_first_number<f32>(Utf16View const&, TrimWhitespace, int).
+pub func parse_first_number_utf16_view_f32(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[f32]?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_first_number_string_view_f32(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+    return from_chars_f32(from_chars_input_code_units(utf16_view_utf16_span(&trimmed_string)))
+
+## Ported from AK/StringConversions.cpp:79 AK::parse_first_number<f64>(Utf16View const&, TrimWhitespace, int).
+pub func parse_first_number_utf16_view_f64(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[f64]?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_first_number_string_view_f64(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+    return from_chars_f64(from_chars_input_code_units(utf16_view_utf16_span(&trimmed_string)))
+
+# mark: parse_number ==========================================================================
+
+## Ported from AK/StringConversions.cpp:98 AK::parse_number<i8>(StringView, TrimWhitespace, int):
+## the i8 that is all of `string` (after trimming), or none.
+pub func parse_number_string_view_i8(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+
+    let result = parse_first_number_string_view_i8(trimmed, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != string_view_length(&trimmed):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:98 AK::parse_number<i16>(StringView, TrimWhitespace, int):
+## the i16 that is all of `string` (after trimming), or none.
+pub func parse_number_string_view_i16(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+
+    let result = parse_first_number_string_view_i16(trimmed, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != string_view_length(&trimmed):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:98 AK::parse_number<i32>(StringView, TrimWhitespace, int):
+## the i32 that is all of `string` (after trimming), or none.
+pub func parse_number_string_view_i32(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+
+    let result = parse_first_number_string_view_i32(trimmed, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != string_view_length(&trimmed):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:98 AK::parse_number<i64>(StringView, TrimWhitespace, int):
+## the i64 that is all of `string` (after trimming), or none.
+pub func parse_number_string_view_i64(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+
+    let result = parse_first_number_string_view_i64(trimmed, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != string_view_length(&trimmed):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:98 AK::parse_number<u8>(StringView, TrimWhitespace, int):
+## the u8 that is all of `string` (after trimming), or none.
+pub func parse_number_string_view_u8(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+
+    let result = parse_first_number_string_view_u8(trimmed, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != string_view_length(&trimmed):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:98 AK::parse_number<u16>(StringView, TrimWhitespace, int):
+## the u16 that is all of `string` (after trimming), or none.
+pub func parse_number_string_view_u16(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+
+    let result = parse_first_number_string_view_u16(trimmed, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != string_view_length(&trimmed):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:98 AK::parse_number<u32>(StringView, TrimWhitespace, int):
+## the u32 that is all of `string` (after trimming), or none.
+pub func parse_number_string_view_u32(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+
+    let result = parse_first_number_string_view_u32(trimmed, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != string_view_length(&trimmed):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:98 AK::parse_number<u64>(StringView, TrimWhitespace, int):
+## the u64 that is all of `string` (after trimming), or none.
+pub func parse_number_string_view_u64(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+
+    let result = parse_first_number_string_view_u64(trimmed, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != string_view_length(&trimmed):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:98 AK::parse_number<f32>(StringView, TrimWhitespace, int):
+## the f32 that is all of `string` (after trimming), or none.
+pub func parse_number_string_view_f32(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+
+    let result = parse_first_number_string_view_f32(trimmed, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != string_view_length(&trimmed):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:98 AK::parse_number<f64>(StringView, TrimWhitespace, int):
+## the f64 that is all of `string` (after trimming), or none.
+pub func parse_number_string_view_f64(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    let trimmed = string_conversions_trim_string_view(string, trim_whitespace)
+
+    let result = parse_first_number_string_view_f64(trimmed, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != string_view_length(&trimmed):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:114 AK::parse_number<i8>(Utf16View const&, TrimWhitespace, int).
+pub func parse_number_utf16_view_i8(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_number_string_view_i8(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+
+    let result = parse_first_number_utf16_view_i8(trimmed_string, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != utf16_view_length_in_code_units(&trimmed_string):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:114 AK::parse_number<i16>(Utf16View const&, TrimWhitespace, int).
+pub func parse_number_utf16_view_i16(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_number_string_view_i16(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+
+    let result = parse_first_number_utf16_view_i16(trimmed_string, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != utf16_view_length_in_code_units(&trimmed_string):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:114 AK::parse_number<i32>(Utf16View const&, TrimWhitespace, int).
+pub func parse_number_utf16_view_i32(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_number_string_view_i32(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+
+    let result = parse_first_number_utf16_view_i32(trimmed_string, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != utf16_view_length_in_code_units(&trimmed_string):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:114 AK::parse_number<i64>(Utf16View const&, TrimWhitespace, int).
+pub func parse_number_utf16_view_i64(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_number_string_view_i64(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+
+    let result = parse_first_number_utf16_view_i64(trimmed_string, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != utf16_view_length_in_code_units(&trimmed_string):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:114 AK::parse_number<u8>(Utf16View const&, TrimWhitespace, int).
+pub func parse_number_utf16_view_u8(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_number_string_view_u8(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+
+    let result = parse_first_number_utf16_view_u8(trimmed_string, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != utf16_view_length_in_code_units(&trimmed_string):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:114 AK::parse_number<u16>(Utf16View const&, TrimWhitespace, int).
+pub func parse_number_utf16_view_u16(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_number_string_view_u16(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+
+    let result = parse_first_number_utf16_view_u16(trimmed_string, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != utf16_view_length_in_code_units(&trimmed_string):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:114 AK::parse_number<u32>(Utf16View const&, TrimWhitespace, int).
+pub func parse_number_utf16_view_u32(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_number_string_view_u32(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+
+    let result = parse_first_number_utf16_view_u32(trimmed_string, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != utf16_view_length_in_code_units(&trimmed_string):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:114 AK::parse_number<u64>(Utf16View const&, TrimWhitespace, int).
+pub func parse_number_utf16_view_u64(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_number_string_view_u64(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+
+    let result = parse_first_number_utf16_view_u64(trimmed_string, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != utf16_view_length_in_code_units(&trimmed_string):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:114 AK::parse_number<f32>(Utf16View const&, TrimWhitespace, int).
+pub func parse_number_utf16_view_f32(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_number_string_view_f32(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+
+    let result = parse_first_number_utf16_view_f32(trimmed_string, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != utf16_view_length_in_code_units(&trimmed_string):
+        return none
+
+    return result.value
+
+## Ported from AK/StringConversions.cpp:114 AK::parse_number<f64>(Utf16View const&, TrimWhitespace, int).
+pub func parse_number_utf16_view_f64(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    if utf16_view_has_ascii_storage(&string):
+        return parse_number_string_view_f64(string_view_from_bytes(utf16_view_bytes(&string)), trim_whitespace, base_)
+
+    let trimmed_string = string_conversions_trim_utf16_view(string, trim_whitespace)
+
+    let result = parse_first_number_utf16_view_f64(trimmed_string, TrimWhitespace.no, base_) else return none
+
+    if result.characters_parsed != utf16_view_length_in_code_units(&trimmed_string):
+        return none
+
+    return result.value
+
+# mark: parse_hexadecimal_number ==============================================================
+
+## Ported from AK/StringConversions.cpp:143 AK::parse_hexadecimal_number<i8>(StringView, TrimWhitespace).
+pub func parse_hexadecimal_number_string_view_i8(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> i8?:
+    return parse_number_string_view_i8(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:143 AK::parse_hexadecimal_number<i16>(StringView, TrimWhitespace).
+pub func parse_hexadecimal_number_string_view_i16(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> i16?:
+    return parse_number_string_view_i16(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:143 AK::parse_hexadecimal_number<i32>(StringView, TrimWhitespace).
+pub func parse_hexadecimal_number_string_view_i32(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> i32?:
+    return parse_number_string_view_i32(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:143 AK::parse_hexadecimal_number<i64>(StringView, TrimWhitespace).
+pub func parse_hexadecimal_number_string_view_i64(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> i64?:
+    return parse_number_string_view_i64(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:143 AK::parse_hexadecimal_number<u8>(StringView, TrimWhitespace).
+pub func parse_hexadecimal_number_string_view_u8(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> u8?:
+    return parse_number_string_view_u8(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:143 AK::parse_hexadecimal_number<u16>(StringView, TrimWhitespace).
+pub func parse_hexadecimal_number_string_view_u16(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> u16?:
+    return parse_number_string_view_u16(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:143 AK::parse_hexadecimal_number<u32>(StringView, TrimWhitespace).
+pub func parse_hexadecimal_number_string_view_u32(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> u32?:
+    return parse_number_string_view_u32(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:143 AK::parse_hexadecimal_number<u64>(StringView, TrimWhitespace).
+pub func parse_hexadecimal_number_string_view_u64(string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> u64?:
+    return parse_number_string_view_u64(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:149 AK::parse_hexadecimal_number<i8>(Utf16View const&, TrimWhitespace).
+pub func parse_hexadecimal_number_utf16_view_i8(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> i8?:
+    return parse_number_utf16_view_i8(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:149 AK::parse_hexadecimal_number<i16>(Utf16View const&, TrimWhitespace).
+pub func parse_hexadecimal_number_utf16_view_i16(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> i16?:
+    return parse_number_utf16_view_i16(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:149 AK::parse_hexadecimal_number<i32>(Utf16View const&, TrimWhitespace).
+pub func parse_hexadecimal_number_utf16_view_i32(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> i32?:
+    return parse_number_utf16_view_i32(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:149 AK::parse_hexadecimal_number<i64>(Utf16View const&, TrimWhitespace).
+pub func parse_hexadecimal_number_utf16_view_i64(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> i64?:
+    return parse_number_utf16_view_i64(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:149 AK::parse_hexadecimal_number<u8>(Utf16View const&, TrimWhitespace).
+pub func parse_hexadecimal_number_utf16_view_u8(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> u8?:
+    return parse_number_utf16_view_u8(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:149 AK::parse_hexadecimal_number<u16>(Utf16View const&, TrimWhitespace).
+pub func parse_hexadecimal_number_utf16_view_u16(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> u16?:
+    return parse_number_utf16_view_u16(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:149 AK::parse_hexadecimal_number<u32>(Utf16View const&, TrimWhitespace).
+pub func parse_hexadecimal_number_utf16_view_u32(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> u32?:
+    return parse_number_utf16_view_u32(string, trim_whitespace, 16)
+
+## Ported from AK/StringConversions.cpp:149 AK::parse_hexadecimal_number<u64>(Utf16View const&, TrimWhitespace).
+pub func parse_hexadecimal_number_utf16_view_u64(string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> u64?:
+    return parse_number_utf16_view_u64(string, trim_whitespace, 16)
