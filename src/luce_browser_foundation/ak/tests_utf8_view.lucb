@@ -1,0 +1,271 @@
+#==============================================================================================
+#
+#   tests_utf8_view - Utf8View tests
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestUtf8View.cpp (lines 1-360). EXPECT_DEATH checks are not ported
+#       (a trap ends the test run).
+#
+#==============================================================================================
+
+## Whether two byte spans hold the same bytes.
+func tc_bytes_equal(a: const u8[], b: const u8[]) -> bool:
+    return a.length == b.length and compare_bytes(a, b) == 0
+
+## Whether a view's bytes equal `text`.
+func tc_view_is(view: StringView, text: str) -> bool:
+    return tc_bytes_equal(string_view_bytes(&view), text.bytes)
+
+## Decodes `raw` and checks each code point and its underlying bytes (decode_invalid_ut8's cases).
+func tc_check_decoding(raw: const u8[], expected_characters: const u32[], expected_underlying_bytes: const (const u8[])[]):
+    let view = Utf8View(m_string = string_view_from_bytes(raw))
+    var i: usize = 0
+    var it = utf8_view_begin(&view)
+    while not utf8_code_point_iterator_done(&it):
+        assert(i < expected_characters.length)
+        assert(utf8_code_point_iterator_deref(&it) == expected_characters[i])
+        assert(tc_bytes_equal(utf8_code_point_iterator_underlying_code_point_bytes(&it), expected_underlying_bytes[i]))
+        i += 1
+        discard(utf8_code_point_iterator_inc(&it))
+    assert(i == expected_characters.length)
+
+test "decode_ascii":
+    let utf8 = Utf8View(m_string = sv("Hello World!11"))
+    assert(utf8_view_validate_allow_lonely_surrogates(&utf8))
+
+    let expected: u32[14] = [72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33, 49, 49]
+
+    var i: usize = 0
+    var it = utf8_view_begin(&utf8)
+    while not utf8_code_point_iterator_done(&it):
+        assert(i < expected.length)
+        assert(utf8_code_point_iterator_deref(&it) == expected[i])
+        i += 1
+        discard(utf8_code_point_iterator_inc(&it))
+    assert(i == expected.length)
+
+test "decode_utf8":
+    let utf8 = Utf8View(m_string = sv("Привет, мир! 😀 γειά σου κόσμος こんにちは世界"))
+    var valid_bytes: usize = 0
+    assert(utf8_view_validate_usize(&utf8, &valid_bytes))
+    assert(valid_bytes == utf8_view_byte_length(&utf8))
+
+    let expected: u32[38] = [1055, 1088, 1080, 1074, 1077, 1090, 44, 32, 1084, 1080, 1088, 33, 32, 128512, 32, 947, 949, 953, 940, 32, 963, 959, 965, 32, 954, 972, 963, 956, 959, 962, 32, 12371, 12435, 12395, 12385, 12399, 19990, 30028]
+    let expected_underlying_bytes: str[38] = ["П", "р", "и", "в", "е", "т", ",", " ", "м", "и", "р", "!", " ", "😀", " ", "γ", "ε", "ι", "ά", " ", "σ", "ο", "υ", " ", "κ", "ό", "σ", "μ", "ο", "ς", " ", "こ", "ん", "に", "ち", "は", "世", "界"]
+
+    var i: usize = 0
+    var it = utf8_view_begin(&utf8)
+    while not utf8_code_point_iterator_done(&it):
+        assert(i < expected.length)
+        assert(utf8_code_point_iterator_deref(&it) == expected[i])
+        assert(tc_bytes_equal(utf8_code_point_iterator_underlying_code_point_bytes(&it), expected_underlying_bytes[i].bytes))
+        i += 1
+        discard(utf8_code_point_iterator_inc(&it))
+    assert(i == expected.length)
+
+test "null_view":
+    let view = Utf8View()
+    assert(utf8_view_validate_allow_lonely_surrogates(&view, AllowLonelySurrogates.no))
+    assert(utf8_view_validate_allow_lonely_surrogates(&view, AllowLonelySurrogates.yes))
+    assert(utf8_view_byte_length(&view) == 0)
+    assert(utf8_view_length(&view) == 0)
+
+    let it = utf8_view_begin(&view)
+    assert(utf8_code_point_iterator_done(&it))
+
+test "validate_invalid_ut8":
+    var valid_bytes: usize = 0
+    let utf8_1 = Utf8View(m_string = string_view_from_bytes(b"\x2a\x23\xb6\x09"))
+    assert(not utf8_view_validate_usize(&utf8_1, &valid_bytes))
+    assert(valid_bytes == 2)
+
+    let utf8_2 = Utf8View(m_string = string_view_from_bytes(b"\x2a\x23\xd0\xd0"))
+    assert(not utf8_view_validate_usize(&utf8_2, &valid_bytes))
+    assert(valid_bytes == 2)
+
+    let utf8_3 = Utf8View(m_string = string_view_from_bytes(b"\xd0"))
+    assert(not utf8_view_validate_usize(&utf8_3, &valid_bytes))
+    assert(valid_bytes == 0)
+
+    let utf8_4 = Utf8View(m_string = string_view_from_bytes(b"\xd0\x23"))
+    assert(not utf8_view_validate_usize(&utf8_4, &valid_bytes))
+    assert(valid_bytes == 0)
+
+    # U+110000
+    let utf8_5 = Utf8View(m_string = string_view_from_bytes(b"\xf4\x8f\xbf\xc0"))
+    assert(not utf8_view_validate_usize(&utf8_5, &valid_bytes))
+    assert(valid_bytes == 0)
+
+    # U+121c3d
+    let utf8_6 = Utf8View(m_string = string_view_from_bytes(b"\xf4\xa1\xb0\xbd"))
+    assert(not utf8_view_validate_usize(&utf8_6, &valid_bytes))
+    assert(valid_bytes == 0)
+
+    # U+d800
+    let utf8_7 = Utf8View(m_string = string_view_from_bytes(b"\xed\xa0\x80"))
+    assert(not utf8_view_validate_usize(&utf8_7, &valid_bytes, AllowLonelySurrogates.no))
+    assert(valid_bytes == 0)
+
+test "validate_overlong_utf8":
+    var valid_bytes: usize = 0
+
+    # Overlong 2-byte encoding of U+002F
+    let utf8_1 = Utf8View(m_string = string_view_from_bytes(b"\x2a\x23\xc0\xaf"))
+    assert(not utf8_view_validate_usize(&utf8_1, &valid_bytes))
+    assert(valid_bytes == 2)
+
+    # Overlong 3-byte encoding of U+002F
+    let utf8_2 = Utf8View(m_string = string_view_from_bytes(b"\x2a\x23\xe0\x80\xaf"))
+    assert(not utf8_view_validate_usize(&utf8_2, &valid_bytes))
+    assert(valid_bytes == 2)
+
+    # Overlong 4-byte encoding of U+002F
+    let utf8_3 = Utf8View(m_string = string_view_from_bytes(b"\x2a\x23\xf0\x80\x80\xaf"))
+    assert(not utf8_view_validate_usize(&utf8_3, &valid_bytes))
+    assert(valid_bytes == 2)
+
+    # Overlong 3-byte encoding of U+00FF
+    let utf8_4 = Utf8View(m_string = string_view_from_bytes(b"\x2a\x23\xe0\x83\xbf"))
+    assert(not utf8_view_validate_usize(&utf8_4, &valid_bytes))
+    assert(valid_bytes == 2)
+
+    # Overlong 4-byte encoding of U+00FF
+    let utf8_5 = Utf8View(m_string = string_view_from_bytes(b"\x2a\x23\xf0\x80\x83\xbf"))
+    assert(not utf8_view_validate_usize(&utf8_5, &valid_bytes))
+    assert(valid_bytes == 2)
+
+    # Overlong 4-byte encoding of U+0FFF
+    let utf8_6 = Utf8View(m_string = string_view_from_bytes(b"\x2a\x23\xf0\x8f\xbf\xbf"))
+    assert(not utf8_view_validate_usize(&utf8_6, &valid_bytes))
+    assert(valid_bytes == 2)
+
+test "iterate_utf8":
+    let view = Utf8View(m_string = sv("Some weird characters \u{a9}\u{266a}\u{a755}"))
+    var iterator = utf8_view_begin(&view)
+
+    assert(utf8_code_point_iterator_deref(&iterator) == (u32)'S')
+    assert(utf8_code_point_iterator_peek(&iterator) == (u32)'S')
+    assert(utf8_code_point_iterator_peek(&iterator, 0) == (u32)'S')
+    assert(utf8_code_point_iterator_peek(&iterator, 1) == (u32)'o')
+    assert(utf8_code_point_iterator_peek(&iterator, 22) == 0x00a9)
+    assert(utf8_code_point_iterator_peek(&iterator, 24) == 0xa755)
+    assert(utf8_code_point_iterator_peek(&iterator, 25) == none)
+
+    discard(utf8_code_point_iterator_inc(&iterator))
+
+    assert(utf8_code_point_iterator_deref(&iterator) == (u32)'o')
+    assert(utf8_code_point_iterator_peek(&iterator, 23) == 0xa755)
+
+    for _i in 0..<23:
+        discard(utf8_code_point_iterator_inc(&iterator))
+
+    assert(not utf8_code_point_iterator_done(&iterator))
+    assert(utf8_code_point_iterator_deref(&iterator) == 0xa755)
+    assert(utf8_code_point_iterator_peek(&iterator) == 0xa755)
+    assert(utf8_code_point_iterator_peek(&iterator, 1) == none)
+
+    discard(utf8_code_point_iterator_inc(&iterator))
+
+    assert(utf8_code_point_iterator_done(&iterator))
+    assert(utf8_code_point_iterator_peek(&iterator, 0) == none)
+
+test "decode_invalid_ut8":
+    # Test case 1 : Getting an extension byte as first byte of the code point
+    let expected_1: u32[4] = [(u32)'a', (u32)'b', 0xfffd, (u32)'d']
+    let underlying_1: (const u8[])[4] = [b"a", b"b", b"\xa0", b"d"]
+    tc_check_decoding(b"ab\xa0d", expected_1, underlying_1)
+
+    # Test case 2 : Getting a non-extension byte when an extension byte is expected
+    let expected_2: u32[5] = [(u32)'a', (u32)'b', 0xfffd, (u32)'d', (u32)'e']
+    let underlying_2: (const u8[])[5] = [b"a", b"b", b"\xc0", b"d", b"e"]
+    tc_check_decoding(b"ab\xc0de", expected_2, underlying_2)
+
+    # Test case 3 : Not enough bytes before the end of the string
+    let expected_3: u32[4] = [(u32)'a', (u32)'b', 0xfffd, (u32)'d']
+    let underlying_3: (const u8[])[4] = [b"a", b"b", b"\x90", b"d"]
+    tc_check_decoding(b"ab\x90d", expected_3, underlying_3)
+
+    # Test case 4 : Not enough bytes at the end of the string
+    let expected_4: u32[4] = [(u32)'a', (u32)'b', (u32)'c', 0xfffd]
+    let underlying_4: (const u8[])[4] = [b"a", b"b", b"c", b"\x90"]
+    tc_check_decoding(b"abc\x90", expected_4, underlying_4)
+
+    # Test case 5 : Oversized four-byte sequence (e.g. U+123456): one U+FFFD for all four bytes
+    let expected_5: u32[3] = [(u32)'a', 0xfffd, (u32)'b']
+    let underlying_5: (const u8[])[3] = [b"a", b"\xf4\xa3\x91\x96", b"b"]
+    tc_check_decoding(b"a\xf4\xa3\x91\x96b", expected_5, underlying_5)
+
+## The three trims of `text` by " ", compared with the expected results.
+func tc_check_trims(text: str, both: str, left: str, right: str):
+    let whitespace = Utf8View(m_string = sv(" "))
+    let view = Utf8View(m_string = sv(text))
+    let trimmed_both = utf8_view_trim(&view, whitespace, TrimMode.both)
+    assert(tc_view_is(utf8_view_as_string(&trimmed_both), both))
+    let trimmed_left = utf8_view_trim(&view, whitespace, TrimMode.left)
+    assert(tc_view_is(utf8_view_as_string(&trimmed_left), left))
+    let trimmed_right = utf8_view_trim(&view, whitespace, TrimMode.right)
+    assert(tc_view_is(utf8_view_as_string(&trimmed_right), right))
+
+test "trim":
+    tc_check_trims("word", "word", "word", "word")
+    tc_check_trims("   word", "word", "word", "   word")
+    tc_check_trims("word   ", "word", "word   ", "word")
+    tc_check_trims("   word   ", "word", "word   ", "   word")
+    tc_check_trims("\u{180e}", "\u{180e}", "\u{180e}", "\u{180e}")
+
+## `is_period` of the donor test.
+struct TcIsPeriod: CodePointPredicate:
+    var unused_: u8
+
+    func matches(code_point: u32) -> bool:
+        return code_point == (u32)'.'
+
+## The `gather` lambda of for_each_split_view: records each part.
+struct TcGatherParts: Utf8ViewCallback:
+    var parts: StringView[10]
+    var count: usize
+
+    mutating func call(part: Utf8View):
+        self.parts[self.count] = utf8_view_as_string(&part)
+        self.count += 1
+
+## Splits the donor's view with `split_behavior` and compares with `expected`.
+func tc_check_gather(split_behavior: SplitBehavior, expected: const str[]):
+    let view = Utf8View(m_string = sv("...Well..hello.friends!..."))
+    let is_period = TcIsPeriod(unused_ = 0)
+    var gather = TcGatherParts()
+    utf8_view_for_each_split_view(&view, &is_period, split_behavior, &gather)
+    assert(gather.count == expected.length)
+    for i in 0..<expected.length:
+        assert(tc_view_is(gather.parts[i], expected[i]))
+
+test "for_each_split_view":
+    let nothing: str[3] = ["Well", "hello", "friends!"]
+    tc_check_gather(SplitBehavior.nothing, nothing)
+    let keep_empty: str[10] = ["", "", "", "Well", "", "hello", "friends!", "", "", ""]
+    tc_check_gather(SplitBehavior.keep_empty, keep_empty)
+    let keep_separator: str[3] = ["Well.", "hello.", "friends!."]
+    tc_check_gather(SplitBehavior.keep_trailing_separator, keep_separator)
+    let both: str[10] = [".", ".", ".", "Well.", ".", "hello.", "friends!.", ".", ".", ""]
+    tc_check_gather(SplitBehavior.keep_empty | SplitBehavior.keep_trailing_separator, both)
+
+test "code_point_offset_of":
+    let view = Utf8View(m_string = sv("😭foo"))
+
+    assert(utf8_view_code_point_offset_of(&view, 0) == 0)
+    assert(utf8_view_code_point_offset_of(&view, 1) == 0)
+    assert(utf8_view_code_point_offset_of(&view, 2) == 0)
+    assert(utf8_view_code_point_offset_of(&view, 3) == 0)
+    assert(utf8_view_code_point_offset_of(&view, 4) == 1)
+    assert(utf8_view_code_point_offset_of(&view, 5) == 2)
+    assert(utf8_view_code_point_offset_of(&view, 6) == 3)
+    assert(utf8_view_code_point_offset_of(&view, 7) == 4)
+
+test "byte_offset_of":
+    let view = Utf8View(m_string = sv("😂foo"))
+
+    assert(utf8_view_byte_offset_of_usize(&view, 0) == 0)
+    assert(utf8_view_byte_offset_of_usize(&view, 1) == 4)
+    assert(utf8_view_byte_offset_of_usize(&view, 2) == 5)
+    assert(utf8_view_byte_offset_of_usize(&view, 3) == 6)
+    assert(utf8_view_byte_offset_of_usize(&view, 4) == 7)

@@ -123,4 +123,12 @@ stub_r02_ak_text.lucb
 stub_r03_ak_format.lucb
 stub_r07_web_unicode.lucb
 tests_support.lucb
-tests_smoke.lucb
+tests_character_types.lucb
+tests_string_view.lucb
+tests_string_utils.lucb
+tests_string_1.lucb
+tests_string_2.lucb
+tests_utf8_view.lucb
+tests_byte_string.lucb
+tests_fly_string.lucb
+tests_text_support.lucb

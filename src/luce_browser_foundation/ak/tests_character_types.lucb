@@ -1,0 +1,138 @@
+#==============================================================================================
+#
+#   tests_character_types - the CharacterTypes tests
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestCharacterTypes.cpp: compares each classifier with the C library's
+#       <ctype.h> function over the ASCII range, and over pseudo-random Unicode code points for
+#       the randomized cases. The EXPECT_DEATH checks (a VERIFY that traps) and the benchmarks
+#       are not ported: a trap ends the test run.
+#
+#==============================================================================================
+
+extern func c_isalnum as "isalnum"(c: i32) -> i32
+extern func c_isblank as "isblank"(c: i32) -> i32
+extern func c_iscntrl as "iscntrl"(c: i32) -> i32
+extern func c_isdigit as "isdigit"(c: i32) -> i32
+extern func c_isgraph as "isgraph"(c: i32) -> i32
+extern func c_isxdigit as "isxdigit"(c: i32) -> i32
+extern func c_islower as "islower"(c: i32) -> i32
+extern func c_isprint as "isprint"(c: i32) -> i32
+extern func c_ispunct as "ispunct"(c: i32) -> i32
+extern func c_isspace as "isspace"(c: i32) -> i32
+extern func c_isupper as "isupper"(c: i32) -> i32
+extern func c_tolower as "tolower"(c: i32) -> i32
+extern func c_toupper as "toupper"(c: i32) -> i32
+extern func c_isascii as "isascii"(c: i32) -> i32
+
+## The ASCII range of the donor's tests (`#define ASCII 0x80`).
+let ascii_range: u32 = 0x80
+
+## The Unicode range of the donor's randomized tests (`#define UNICODE 0x10FFFF + 100`).
+let unicode_range: u32 = 0x10ffff + 100
+
+## compare_bool_output_over: the C classifier and the AK one agree on [0, range).
+func compare_bool_output_over(range: u32, old_function: func(i32) -> i32, new_function: func(u32) -> bool):
+    for i: u32 in 0..<range:
+        assert((old_function((i32)i) > 0) == new_function(i))
+
+## compare_value_output_over: the C mapping and the AK one agree on [0, range).
+func compare_value_output_over(range: u32, old_function: func(i32) -> i32, new_function: func(u32) -> u32):
+    for i: u32 in 0..<range:
+        assert((i64)old_function((i32)i) == (i64)new_function(i))
+
+## The next value of the randomized cases' deterministic generator (an LCG), below `range`.
+func character_types_random_below(state: u64*, range: u32) -> u32:
+    *state = *state *% 6364136223846793005 +% 1442695040888963407
+    return (u32)((*state >> 33) % (u64)range)
+
+## randomized_compare_bool_output_over: 100 pseudo-random inputs below `range`.
+func randomized_compare_bool_output_over(range: u32, old_function: func(i32) -> i32, new_function: func(u32) -> bool):
+    var state: u64 = 0x5eed
+    for _n in 0..<100:
+        let i = character_types_random_below(&state, range)
+        assert((old_function((i32)i) > 0) == new_function(i))
+
+## randomized_compare_value_output_over: 100 pseudo-random inputs below `range`.
+func randomized_compare_value_output_over(range: u32, old_function: func(i32) -> i32, new_function: func(u32) -> u32):
+    var state: u64 = 0xc0de
+    for _n in 0..<100:
+        let i = character_types_random_below(&state, range)
+        assert((i64)old_function((i32)i) == (i64)new_function(i))
+
+test "is_ascii_alphanumeric":
+    compare_bool_output_over(ascii_range, c_isalnum, is_ascii_alphanumeric)
+
+test "is_ascii_base36_digit":
+    let valid_base36_digits: u32[6] = [(u32)'0', (u32)'9', (u32)'A', (u32)'Z', (u32)'a', (u32)'z']
+    for valid_base36_digit in valid_base36_digits:
+        assert(is_ascii_base36_digit(valid_base36_digit) == true)
+
+    let invalid_base36_digits: u32[6] = [(u32)'/', (u32)':', (u32)'@', (u32)'[', (u32)'`', (u32)'{']
+    for invalid_base36_digit in invalid_base36_digits:
+        assert(is_ascii_base36_digit(invalid_base36_digit) == false)
+
+test "is_ascii_blank":
+    compare_bool_output_over(ascii_range, c_isblank, is_ascii_blank)
+
+test "is_ascii_c0_control":
+    compare_bool_output_over(ascii_range - 1, c_iscntrl, is_ascii_c0_control)
+
+test "is_ascii_control":
+    compare_bool_output_over(ascii_range, c_iscntrl, is_ascii_control)
+
+test "is_ascii_digit":
+    compare_bool_output_over(ascii_range, c_isdigit, is_ascii_digit)
+
+test "is_ascii_graphical":
+    compare_bool_output_over(ascii_range, c_isgraph, is_ascii_graphical)
+
+test "is_ascii_hex_digit":
+    compare_bool_output_over(ascii_range, c_isxdigit, is_ascii_hex_digit)
+
+test "is_ascii_lower_alpha":
+    compare_bool_output_over(ascii_range, c_islower, is_ascii_lower_alpha)
+
+test "is_ascii_printable":
+    compare_bool_output_over(ascii_range, c_isprint, is_ascii_printable)
+
+test "is_ascii_punctuation":
+    compare_bool_output_over(ascii_range, c_ispunct, is_ascii_punctuation)
+
+test "is_ascii_space":
+    compare_bool_output_over(ascii_range, c_isspace, is_ascii_space)
+
+test "is_ascii_upper_alpha":
+    compare_bool_output_over(ascii_range, c_isupper, is_ascii_upper_alpha)
+
+test "to_ascii_lowercase":
+    compare_value_output_over(ascii_range, c_tolower, to_ascii_lowercase)
+
+test "to_ascii_uppercase":
+    compare_value_output_over(ascii_range, c_toupper, to_ascii_uppercase)
+
+test "parse_ascii_base36_digit":
+    assert(parse_ascii_base36_digit((u32)'0') == 0)
+    assert(parse_ascii_base36_digit((u32)'9') == 9)
+    assert(parse_ascii_base36_digit((u32)'A') == 10)
+    assert(parse_ascii_base36_digit((u32)'Z') == 35)
+    assert(parse_ascii_base36_digit((u32)'a') == 10)
+    assert(parse_ascii_base36_digit((u32)'z') == 35)
+
+test "parse_ascii_digit":
+    assert(parse_ascii_digit((u32)'0') == 0)
+    assert(parse_ascii_digit((u32)'9') == 9)
+
+test "parse_ascii_hex_digit":
+    assert(parse_ascii_hex_digit((u32)'0') == 0)
+    assert(parse_ascii_hex_digit((u32)'F') == 15)
+    assert(parse_ascii_hex_digit((u32)'f') == 15)
+
+test "is_ascii_unicode (randomized)":
+    randomized_compare_bool_output_over(unicode_range, c_isascii, is_ascii)
+
+test "to_ascii_lowercase_unicode (randomized)":
+    randomized_compare_value_output_over(unicode_range, c_tolower, to_ascii_lowercase)
+
+test "to_ascii_uppercase_unicode (randomized)":
+    randomized_compare_value_output_over(unicode_range, c_toupper, to_ascii_uppercase)

@@ -1,0 +1,455 @@
+#==============================================================================================
+#
+#   tests_string_2 - the String tests, part 2: searching, repeating, trimming, case, numerals
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestString.cpp (lines 863-1586). Not ported: equals_ignoring_case,
+#       find_byte_offset_ignoring_case and trim_whitespace (LibUnicode members, not AK), the
+#       EXPECT_DEATH checks, the benchmarks, and the join cases over integers or with a format
+#       string (the port's join takes views or strings with the default "{}" format).
+#       `is_one_of` has no port (variadic); its cases are the comparisons it folds.
+#
+#==============================================================================================
+
+## `EXPECT_EQ(string, "text"sv)`.
+func string_2_is(string: const String*, text: str) -> bool:
+    return string_eq_string_view(string, sv(text))
+
+test "is_one_of":
+    let foo = string_from_str("foo")
+    let bar = string_from_str("bar")
+
+    assert(string_equals(&foo, &foo))
+    assert(string_equals(&foo, &foo) or string_equals(&foo, &bar))
+    assert(string_equals(&foo, &bar) or string_equals(&foo, &foo))
+    assert(not string_equals(&foo, &bar))
+
+    assert(not string_2_is(&bar, "foo"))
+    assert(string_2_is(&bar, "foo") or string_2_is(&bar, "bar"))
+    assert(string_2_is(&bar, "bar") or string_2_is(&bar, "foo"))
+    assert(string_2_is(&bar, "bar"))
+
+test "split":
+    if not ak_core_is_ported:
+        return
+    let test1 = string_from_str("foo bar baz")
+    let parts1 = string_split(&test1, (u32)' ') else trap("MUST")
+    assert(test_vector_size(&parts1) == 3)
+    let part10 = test_vector_at(&parts1, 0)
+    let part11 = test_vector_at(&parts1, 1)
+    let part12 = test_vector_at(&parts1, 2)
+    assert(string_2_is(&part10, "foo"))
+    assert(string_2_is(&part11, "bar"))
+    assert(string_2_is(&part12, "baz"))
+
+    let test2 = string_from_str("ωΣ2ωΣω")
+    let parts2 = string_split(&test2, 0x03a3) else trap("MUST")
+    assert(test_vector_size(&parts2) == 3)
+    let part20 = test_vector_at(&parts2, 0)
+    let part21 = test_vector_at(&parts2, 1)
+    let part22 = test_vector_at(&parts2, 2)
+    assert(string_2_is(&part20, "ω"))
+    assert(string_2_is(&part21, "2ω"))
+    assert(string_2_is(&part22, "ω"))
+
+test "find_byte_offset":
+    let empty = string_new()
+    assert(string_find_byte_offset_u32(&empty, 0) == none)
+    assert(string_find_byte_offset_string_view(&empty, sv("")) == none)
+
+    let foo = string_from_str("foo")
+    assert(string_find_byte_offset_u32(&foo, (u32)'f') == 0)
+    let index2 = string_find_byte_offset_u32(&foo, (u32)'o') else trap("index2")
+    assert(index2 == 1)
+    assert(string_find_byte_offset_u32(&foo, (u32)'o', index2 + 1) == 2)
+    assert(string_find_byte_offset_u32(&foo, (u32)'b') == none)
+
+    assert(string_find_byte_offset_string_view(&foo, sv("fo")) == 0)
+    let index_oo = string_find_byte_offset_string_view(&foo, sv("oo")) else trap("index_oo")
+    assert(index_oo == 1)
+    assert(string_find_byte_offset_string_view(&foo, sv("o"), index_oo + 1) == 2)
+    assert(string_find_byte_offset_string_view(&foo, sv("fooo")) == none)
+
+    let omega = string_from_str("ωΣωΣω")
+    assert(string_find_byte_offset_u32(&omega, 0x03c9) == 0)
+    assert(string_find_byte_offset_u32(&omega, 0x03a3) == 2)
+    assert(string_find_byte_offset_u32(&omega, 0x03c9, 2) == 4)
+    assert(string_find_byte_offset_u32(&omega, 0x03a3, 4) == 6)
+    assert(string_find_byte_offset_u32(&omega, 0x03c9, 6) == 8)
+
+    assert(string_find_byte_offset_string_view(&omega, sv("ω")) == 0)
+    assert(string_find_byte_offset_string_view(&omega, sv("Σ")) == 2)
+    assert(string_find_byte_offset_string_view(&omega, sv("ω"), 2) == 4)
+    assert(string_find_byte_offset_string_view(&omega, sv("Σ"), 4) == 6)
+    assert(string_find_byte_offset_string_view(&omega, sv("ω"), 6) == 8)
+
+## `MUST(String::repeated(code_point, count))`.
+func string_repeated_must(code_point: u32, count: usize) -> String:
+    return string_repeated_u32(code_point, count) else trap("MUST")
+
+## The length of a string's bytes.
+func string_2_length(string: const String*) -> usize:
+    let view = string_bytes_as_string_view(string)
+    return string_view_length(&view)
+
+test "repeated":
+    let string01 = string_repeated_must((u32)'a', 0)
+    assert(string_base_is_short_string(&string01.string_base))
+    assert(string_is_empty(&string01))
+
+    let string02 = string_repeated_must(0x03c9, 0)
+    assert(string_base_is_short_string(&string02.string_base))
+    assert(string_is_empty(&string02))
+
+    let string03 = string_repeated_must(0x10300, 0)
+    assert(string_base_is_short_string(&string03.string_base))
+    assert(string_is_empty(&string03))
+
+    let string11 = string_repeated_must((u32)'a', 1)
+    assert(string_base_is_short_string(&string11.string_base))
+    assert(string_2_length(&string11) == 1)
+    assert(string_2_is(&string11, "a"))
+
+    let string12 = string_repeated_must(0x03c9, 1)
+    assert(string_base_is_short_string(&string12.string_base))
+    assert(string_2_length(&string12) == 2)
+    assert(string_2_is(&string12, "ω"))
+
+    let string13 = string_repeated_must(0x10300, 1)
+    assert(string_base_is_short_string(&string13.string_base))
+    assert(string_2_length(&string13) == 4)
+    assert(string_2_is(&string13, "𐌀"))
+
+    let string31 = string_repeated_must((u32)'a', 3)
+    assert(string_base_is_short_string(&string31.string_base))
+    assert(string_2_length(&string31) == 3)
+    assert(string_2_is(&string31, "aaa"))
+
+    let string32 = string_repeated_must(0x03c9, 3)
+    assert(string_base_is_short_string(&string32.string_base))
+    assert(string_2_length(&string32) == 6)
+    assert(string_2_is(&string32, "ωωω"))
+
+    let string33 = string_repeated_must(0x10300, 3)
+    assert(not string_base_is_short_string(&string33.string_base))
+    assert(string_2_length(&string33) == 12)
+    assert(string_2_is(&string33, "𐌀𐌀𐌀"))
+
+    let string101 = string_repeated_must((u32)'a', 10)
+    assert(not string_base_is_short_string(&string101.string_base))
+    assert(string_2_length(&string101) == 10)
+    assert(string_2_is(&string101, "aaaaaaaaaa"))
+
+    let string102 = string_repeated_must(0x03c9, 10)
+    assert(not string_base_is_short_string(&string102.string_base))
+    assert(string_2_length(&string102) == 20)
+    assert(string_2_is(&string102, "ωωωωωωωωωω"))
+
+    let string103 = string_repeated_must(0x10300, 10)
+    assert(not string_base_is_short_string(&string103.string_base))
+    assert(string_2_length(&string103) == 40)
+    assert(string_2_is(&string103, "𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀"))
+
+test "join":
+    if not ak_core_is_ported:
+        return
+    let empty_views: StringView[1] = [sv("")]
+    let string1 = string_join_string_view(sv(","), empty_views[..<0]) else trap("MUST")
+    assert(string_is_empty(&string1))
+
+    let separator = string_from_str("!!!")
+    let views: StringView[3] = [sv("foo"), sv("bar"), sv("baz")]
+    let string6 = string_join_string_view(string_bytes_as_string_view(&separator), views) else trap("MUST")
+    assert(string_2_is(&string6, "foo!!!bar!!!baz"))
+
+## `MUST(string.trim(characters, mode))` compared with `expected` (or emptiness for "").
+func string_trim_is(string: const String*, characters: str, mode: TrimMode, expected: str) -> bool:
+    let result = string_trim_string_view(string, sv(characters), mode) else trap("MUST")
+    if expected.length == 0:
+        return string_is_empty(&result)
+    return string_2_is(&result, expected)
+
+test "trim":
+    let empty = string_new()
+    assert(string_trim_is(&empty, " ", TrimMode.both, ""))
+    assert(string_trim_is(&empty, " ", TrimMode.left, ""))
+    assert(string_trim_is(&empty, " ", TrimMode.right, ""))
+
+    let word = string_from_str("word")
+    assert(string_trim_is(&word, " ", TrimMode.both, "word"))
+    assert(string_trim_is(&word, " ", TrimMode.left, "word"))
+    assert(string_trim_is(&word, " ", TrimMode.right, "word"))
+
+    let leading = string_from_str("    word")
+    assert(string_trim_is(&leading, " ", TrimMode.both, "word"))
+    assert(string_trim_is(&leading, " ", TrimMode.left, "word"))
+    assert(string_trim_is(&leading, " ", TrimMode.right, "    word"))
+
+    let trailing = string_from_str("word    ")
+    assert(string_trim_is(&trailing, " ", TrimMode.both, "word"))
+    assert(string_trim_is(&trailing, " ", TrimMode.left, "word    "))
+    assert(string_trim_is(&trailing, " ", TrimMode.right, "word"))
+
+    let both = string_from_str("    word    ")
+    assert(string_trim_is(&both, " ", TrimMode.both, "word"))
+    assert(string_trim_is(&both, " ", TrimMode.left, "word    "))
+    assert(string_trim_is(&both, " ", TrimMode.right, "    word"))
+
+    assert(string_trim_is(&both, "\t", TrimMode.both, "    word    "))
+    assert(string_trim_is(&both, "\t", TrimMode.left, "    word    "))
+    assert(string_trim_is(&both, "\t", TrimMode.right, "    word    "))
+
+    let omega = string_from_str("ωΣωΣω")
+    assert(string_trim_is(&omega, "ω", TrimMode.both, "ΣωΣ"))
+    assert(string_trim_is(&omega, "ω", TrimMode.left, "ΣωΣω"))
+    assert(string_trim_is(&omega, "ω", TrimMode.right, "ωΣωΣ"))
+
+    assert(string_trim_is(&omega, "ωΣ", TrimMode.both, ""))
+    assert(string_trim_is(&omega, "ωΣ", TrimMode.left, ""))
+    assert(string_trim_is(&omega, "ωΣ", TrimMode.right, ""))
+
+    assert(string_trim_is(&omega, "Σω", TrimMode.both, ""))
+    assert(string_trim_is(&omega, "Σω", TrimMode.left, ""))
+    assert(string_trim_is(&omega, "Σω", TrimMode.right, ""))
+
+## The `"text"_string.contains(needle)` of the contains tests.
+func string_2_contains(text: str, needle: StringView) -> bool:
+    let string = string_from_str(text)
+    return string_contains_string_view(&string, needle)
+
+## The `"text"_string.contains(code_point)` of the contains tests.
+func string_2_contains_code_point(text: str, code_point: u32) -> bool:
+    let string = string_from_str(text)
+    return string_contains_u32(&string, code_point)
+
+test "contains":
+    let empty = string_new()
+    # `contains({})` picks the u32 overload: the code point U+0000.
+    assert(not string_contains_u32(&empty, 0))
+    assert(not string_contains_string_view(&empty, sv(" ")))
+    assert(not string_contains_u32(&empty, 0))
+
+    assert(string_2_contains("a", sv("a")))
+    assert(not string_2_contains_code_point("a", 0))
+    assert(not string_2_contains("a", sv("b")))
+    assert(not string_2_contains("a", sv("ab")))
+
+    assert(string_2_contains_code_point("a", 0x0061))
+    assert(not string_2_contains_code_point("a", 0x0062))
+
+    assert(string_2_contains("abc", sv("a")))
+    assert(string_2_contains("abc", sv("b")))
+    assert(string_2_contains("abc", sv("c")))
+    assert(string_2_contains("abc", sv("ab")))
+    assert(string_2_contains("abc", sv("bc")))
+    assert(string_2_contains("abc", sv("abc")))
+    assert(not string_2_contains_code_point("abc", 0))
+    assert(not string_2_contains("abc", sv("ac")))
+    assert(not string_2_contains("abc", sv("abcd")))
+
+    assert(string_2_contains_code_point("abc", 0x0061))
+    assert(string_2_contains_code_point("abc", 0x0062))
+    assert(string_2_contains_code_point("abc", 0x0063))
+    assert(not string_2_contains_code_point("abc", 0x0064))
+
+    let emoji = string_from_str("😀")
+    assert(string_contains_string_view(&emoji, string_view_from_bytes(b"\xf0")))
+    assert(string_contains_string_view(&emoji, string_view_from_bytes(b"\x9f")))
+    assert(string_contains_string_view(&emoji, string_view_from_bytes(b"\x98")))
+    assert(string_contains_string_view(&emoji, string_view_from_bytes(b"\x80")))
+    assert(string_contains_string_view(&emoji, string_view_from_bytes(b"\xf0\x9f")))
+    assert(string_contains_string_view(&emoji, string_view_from_bytes(b"\xf0\x9f\x98")))
+    assert(string_contains_string_view(&emoji, string_view_from_bytes(b"\xf0\x9f\x98\x80")))
+    assert(string_contains_string_view(&emoji, string_view_from_bytes(b"\x9f\x98\x80")))
+    assert(string_contains_string_view(&emoji, string_view_from_bytes(b"\x98\x80")))
+    assert(not string_contains_string_view(&emoji, sv("a")))
+    assert(not string_contains_string_view(&emoji, sv("🙃")))
+
+    assert(string_contains_u32(&emoji, 0x1f600))
+    assert(not string_contains_u32(&emoji, 0x1f643))
+
+## The `"text"_string.starts_with_bytes(bytes)` of the starts_with tests.
+func string_2_starts_with_bytes(text: str, bytes: StringView) -> bool:
+    let string = string_from_str(text)
+    return string_starts_with_bytes(&string, bytes)
+
+## The `"text"_string.starts_with(code_point)` of the starts_with tests.
+func string_2_starts_with(text: str, code_point: u32) -> bool:
+    let string = string_from_str(text)
+    return string_starts_with(&string, code_point)
+
+test "starts_with":
+    let empty = string_new()
+    assert(string_starts_with_bytes(&empty, StringView()))
+    assert(not string_starts_with_bytes(&empty, sv(" ")))
+    assert(not string_starts_with(&empty, 0))
+
+    assert(string_2_starts_with_bytes("a", StringView()))
+    assert(string_2_starts_with_bytes("a", sv("a")))
+    assert(not string_2_starts_with_bytes("a", sv("b")))
+    assert(not string_2_starts_with_bytes("a", sv("ab")))
+
+    assert(string_2_starts_with("a", 0x0061))
+    assert(not string_2_starts_with("a", 0x0062))
+
+    assert(string_2_starts_with_bytes("abc", StringView()))
+    assert(string_2_starts_with_bytes("abc", sv("a")))
+    assert(string_2_starts_with_bytes("abc", sv("ab")))
+    assert(string_2_starts_with_bytes("abc", sv("abc")))
+    assert(not string_2_starts_with_bytes("abc", sv("b")))
+    assert(not string_2_starts_with_bytes("abc", sv("bc")))
+
+    assert(string_2_starts_with("abc", 0x0061))
+    assert(not string_2_starts_with("abc", 0x0062))
+    assert(not string_2_starts_with("abc", 0x0063))
+
+    let emoji = string_from_str("😀🙃")
+    assert(string_starts_with_bytes(&emoji, string_view_from_bytes(b"\xf0")))
+    assert(string_starts_with_bytes(&emoji, string_view_from_bytes(b"\xf0\x9f")))
+    assert(string_starts_with_bytes(&emoji, string_view_from_bytes(b"\xf0\x9f\x98")))
+    assert(string_starts_with_bytes(&emoji, string_view_from_bytes(b"\xf0\x9f\x98\x80")))
+    assert(string_starts_with_bytes(&emoji, string_view_from_bytes(b"\xf0\x9f\x98\x80\xf0")))
+    assert(string_starts_with_bytes(&emoji, string_view_from_bytes(b"\xf0\x9f\x98\x80\xf0\x9f")))
+    assert(string_starts_with_bytes(&emoji, string_view_from_bytes(b"\xf0\x9f\x98\x80\xf0\x9f\x99")))
+    assert(string_starts_with_bytes(&emoji, string_view_from_bytes(b"\xf0\x9f\x98\x80\xf0\x9f\x99\x83")))
+    assert(not string_starts_with_bytes(&emoji, sv("a")))
+    assert(not string_starts_with_bytes(&emoji, sv("🙃")))
+
+    assert(string_starts_with(&emoji, 0x1f600))
+    assert(not string_starts_with(&emoji, 0x1f643))
+
+## The `"text"_string.ends_with_bytes(bytes)` of the ends_with tests.
+func string_2_ends_with_bytes(text: str, bytes: StringView) -> bool:
+    let string = string_from_str(text)
+    return string_ends_with_bytes(&string, bytes)
+
+## The `"text"_string.ends_with(code_point)` of the ends_with tests.
+func string_2_ends_with(text: str, code_point: u32) -> bool:
+    let string = string_from_str(text)
+    return string_ends_with(&string, code_point)
+
+test "ends_with":
+    let empty = string_new()
+    assert(string_ends_with_bytes(&empty, StringView()))
+    assert(not string_ends_with_bytes(&empty, sv(" ")))
+    assert(not string_ends_with(&empty, 0))
+
+    assert(string_2_ends_with_bytes("a", StringView()))
+    assert(string_2_ends_with_bytes("a", sv("a")))
+    assert(not string_2_ends_with_bytes("a", sv("b")))
+    assert(not string_2_ends_with_bytes("a", sv("ba")))
+
+    assert(string_2_ends_with("a", 0x0061))
+    assert(not string_2_ends_with("a", 0x0062))
+
+    assert(string_2_ends_with_bytes("abc", StringView()))
+    assert(string_2_ends_with_bytes("abc", sv("c")))
+    assert(string_2_ends_with_bytes("abc", sv("bc")))
+    assert(string_2_ends_with_bytes("abc", sv("abc")))
+    assert(not string_2_ends_with_bytes("abc", sv("b")))
+    assert(not string_2_ends_with_bytes("abc", sv("ab")))
+
+    assert(string_2_ends_with("abc", 0x0063))
+    assert(not string_2_ends_with("abc", 0x0062))
+    assert(not string_2_ends_with("abc", 0x0061))
+
+    let emoji = string_from_str("😀🙃")
+    assert(string_ends_with_bytes(&emoji, string_view_from_bytes(b"\x83")))
+    assert(string_ends_with_bytes(&emoji, string_view_from_bytes(b"\x99\x83")))
+    assert(string_ends_with_bytes(&emoji, string_view_from_bytes(b"\x9f\x99\x83")))
+    assert(string_ends_with_bytes(&emoji, string_view_from_bytes(b"\xf0\x9f\x99\x83")))
+    assert(string_ends_with_bytes(&emoji, string_view_from_bytes(b"\x80\xf0\x9f\x99\x83")))
+    assert(string_ends_with_bytes(&emoji, string_view_from_bytes(b"\x98\x80\xf0\x9f\x99\x83")))
+    assert(string_ends_with_bytes(&emoji, string_view_from_bytes(b"\x9f\x98\x80\xf0\x9f\x99\x83")))
+    assert(string_ends_with_bytes(&emoji, string_view_from_bytes(b"\xf0\x9f\x98\x80\xf0\x9f\x99\x83")))
+    assert(not string_ends_with_bytes(&emoji, sv("a")))
+    assert(not string_ends_with_bytes(&emoji, sv("😀")))
+
+    assert(string_ends_with(&emoji, 0x1f643))
+    assert(not string_ends_with(&emoji, 0x1f600))
+
+## `"text"_string.to_ascii_lowercase() == "expected"_string`.
+func string_2_to_ascii_lowercase_is(text: str, expected: str) -> bool:
+    let string = string_from_str(text)
+    let result = string_to_ascii_lowercase(&string)
+    let expected_string = string_from_str(expected)
+    return string_equals(&result, &expected_string)
+
+## `"text"_string.to_ascii_uppercase() == "expected"_string`.
+func string_2_to_ascii_uppercase_is(text: str, expected: str) -> bool:
+    let string = string_from_str(text)
+    let result = string_to_ascii_uppercase(&string)
+    let expected_string = string_from_str(expected)
+    return string_equals(&result, &expected_string)
+
+test "to_ascii_lowercase":
+    assert(string_2_to_ascii_lowercase_is("foobar", "foobar"))
+    assert(string_2_to_ascii_lowercase_is("FooBar", "foobar"))
+    assert(string_2_to_ascii_lowercase_is("FOOBAR", "foobar"))
+
+    # NOTE: We expect to_ascii_lowercase() to return the same underlying string if no changes are needed.
+    let long_string = string_from_str("this is a long string that cannot use the short string optimization")
+    let lowercased = string_to_ascii_lowercase(&long_string)
+    assert(string_base_bytes(&long_string.string_base).data == string_base_bytes(&lowercased.string_base).data)
+
+test "to_ascii_uppercase":
+    assert(string_2_to_ascii_uppercase_is("foobar", "FOOBAR"))
+    assert(string_2_to_ascii_uppercase_is("FooBar", "FOOBAR"))
+    assert(string_2_to_ascii_uppercase_is("FOOBAR", "FOOBAR"))
+
+    # NOTE: We expect to_ascii_uppercase() to return the same underlying string if no changes are needed.
+    let long_string = string_from_str("THIS IS A LONG STRING THAT CANNOT USE THE SHORT STRING OPTIMIZATION")
+    let uppercased = string_to_ascii_uppercase(&long_string)
+    assert(string_base_bytes(&long_string.string_base).data == string_base_bytes(&uppercased.string_base).data)
+
+## `"text"_string.is_ascii()`.
+func string_2_is_ascii(text: str) -> bool:
+    let string = string_from_str(text)
+    return string_is_ascii(&string)
+
+test "is_ascii":
+    let empty = string_new()
+    assert(string_is_ascii(&empty))
+    assert(string_2_is_ascii(" "))
+    assert(string_2_is_ascii("abc"))
+    assert(string_2_is_ascii("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()"))
+
+    assert(not string_2_is_ascii("€"))
+    assert(not string_2_is_ascii("😀"))
+    assert(not string_2_is_ascii("abcdefghijklmnopqrstuvwxyz😀ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789😀!@#$%^&*()"))
+
+## `String::bijective_base_from(value, Case::Upper) == "expected"sv`.
+func string_2_bijective_base_is(value: usize, expected: str) -> bool:
+    let result = string_bijective_base_from(value, StringCase.upper)
+    return string_2_is(&result, expected)
+
+test "bijective_base":
+    assert(string_2_bijective_base_is(0, "A"))
+    assert(string_2_bijective_base_is(25, "Z"))
+    assert(string_2_bijective_base_is(26, "AA"))
+    assert(string_2_bijective_base_is(52, "BA"))
+    assert(string_2_bijective_base_is(701, "ZZ"))
+    assert(string_2_bijective_base_is(702, "AAA"))
+    assert(string_2_bijective_base_is(730, "ABC"))
+    assert(string_2_bijective_base_is(18277, "ZZZ"))
+
+test "roman_numerals":
+    let four_thousand = string_roman_number_from(4000, StringCase.upper)
+    assert(string_2_is(&four_thousand, "4000"))
+
+    if not ak_core_is_ported:
+        return
+    let zero = string_roman_number_from(0, StringCase.upper)
+    assert(string_2_is(&zero, ""))
+
+    let one = string_roman_number_from(1, StringCase.upper)
+    assert(string_2_is(&one, "I"))
+
+    let nine = string_roman_number_from(9, StringCase.upper)
+    assert(string_2_is(&nine, "IX"))
+
+    let fourty_eight = string_roman_number_from(48, StringCase.upper)
+    assert(string_2_is(&fourty_eight, "XLVIII"))
+
+    let one_thousand_nine_hundred_ninety_eight = string_roman_number_from(1998, StringCase.upper)
+    assert(string_2_is(&one_thousand_nine_hundred_ninety_eight, "MCMXCVIII"))
