@@ -7,20 +7,26 @@
 #       AK/BinaryHeap.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
 #       Regenerate rather than edit, except to fill a field the generator could not map.
 #
+#       Edited by region r01: the comparator and index setter are traits-like structs
+#       implementing BinaryHeapComparator[N] and BinaryHeapIndexSetter[N]
+#       (binary_heap.lucb); BinaryHeap's heap is an IntrusiveBinaryHeap over
+#       BinaryHeapNode[K, V] (the generated Node).
+#
 #==============================================================================================
 
 # mark: IntrusiveBinaryHeap =====================================================================
 
-## AK::IntrusiveBinaryHeap (AK/BinaryHeap.h:15): a generic struct.
+## AK::IntrusiveBinaryHeap (AK/BinaryHeap.h:14): a min-heap of TNode in a Vector.
 pub struct IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]:
     pub var m_nodes: Vector[TNode]
 
 # mark: BinaryHeap ==============================================================================
 
-## AK::BinaryHeap (AK/BinaryHeap.h:120): a generic struct.
-pub struct BinaryHeap[K, V]:
-    pub var m_heap: void*?  # unmapped: decltype([](const Node &a, const Node &b) { return a.key < b.key; }); decltype([](Node &, size_t) { })
+## AK::BinaryHeap (AK/BinaryHeap.h:122): a zero heap is empty.
+pub struct BinaryHeap[K: luce.Comparable, V]:
+    pub var m_heap: IntrusiveBinaryHeap[BinaryHeapNode[K, V], BinaryHeapKeyComparator[K, V], BinaryHeapNoIndexSetter[K, V]]
 
-## AK::BinaryHeap::Node (AK/BinaryHeap.h:164): opaque in this phase (not in the phase-1 closure).
-pub struct Node:
-    pub var opaque_: u8
+## AK::BinaryHeap::Node (AK/BinaryHeap.h:164).
+pub struct BinaryHeapNode[K, V]:
+    pub var key: K
+    pub var value: V

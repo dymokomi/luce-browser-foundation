@@ -1,0 +1,70 @@
+#==============================================================================================
+#
+#   tests_doubly_linked_list - DoublyLinkedList<T>
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestDoublyLinkedList.cpp. basic_node_cache does not apply (the node
+#       cache is dropped); a removal and iteration case is added.
+#
+#==============================================================================================
+
+func test_dll_make_list() -> DoublyLinkedList[i32]:
+    var list: DoublyLinkedList[i32]
+    for i: i32 in 0..<10:
+        doubly_linked_list_append(&list, i)
+    return list
+
+test "doubly_linked_list: should_find_mutable":
+    var sut = test_dll_make_list()
+    var it = doubly_linked_list_find(&sut, 4)
+    assert(*doubly_linked_list_iterator_deref(&it) == 4)
+    let missing = doubly_linked_list_find(&sut, 42)
+    assert(doubly_linked_list_iterator_eq(&missing, doubly_linked_list_end(&sut)))
+
+test "doubly_linked_list: should_find_const":
+    let sut = test_dll_make_list()
+    var it = doubly_linked_list_find_const(&sut, 4)
+    assert(*doubly_linked_list_iterator_deref(&it) == 4)
+    let missing = doubly_linked_list_find_const(&sut, 42)
+    assert(doubly_linked_list_iterator_eq(&missing, doubly_linked_list_end_const(&sut)))
+    assert(doubly_linked_list_contains_slow(&sut, 9))
+    assert(not doubly_linked_list_contains_slow(&sut, 10))
+
+test "doubly_linked_list: take_first":
+    var sut = test_dll_make_list()
+    assert(doubly_linked_list_take_first(&sut) == 0)
+    assert(*doubly_linked_list_first(&sut) == 1)
+    assert(*doubly_linked_list_last(&sut) == 9)
+    assert(doubly_linked_list_size(&sut) == 9)
+
+test "doubly_linked_list: take_last":
+    var sut = test_dll_make_list()
+    assert(doubly_linked_list_take_last(&sut) == 9)
+    assert(*doubly_linked_list_last(&sut) == 8)
+    assert(*doubly_linked_list_first(&sut) == 0)
+    assert(doubly_linked_list_size(&sut) == 9)
+
+test "doubly_linked_list: take_last_all":
+    var sut = test_dll_make_list()
+    for i: i32 in 0..<10:
+        assert(doubly_linked_list_take_last(&sut) == 9 - i)
+    assert(doubly_linked_list_size(&sut) == 0)
+    assert(doubly_linked_list_is_empty(&sut))
+
+test "doubly_linked_list: prepend, remove and iterate":
+    var sut = test_dll_make_list()
+    doubly_linked_list_prepend(&sut, -1)
+    assert(doubly_linked_list_first_const(&sut) == -1)
+    var it = doubly_linked_list_find(&sut, 5)
+    it = doubly_linked_list_remove(&sut, it)
+    assert(*doubly_linked_list_iterator_deref(&it) == 6)
+    var expected: i32 = -1
+    for value in doubly_linked_list_begin(&sut):
+        if expected == 5:
+            expected += 1
+        assert(*value == expected)
+        expected += 1
+    assert(expected == 10)
+    assert(doubly_linked_list_size(&sut) == 10)
+    doubly_linked_list_clear(&sut)
+    assert(doubly_linked_list_is_empty(&sut))

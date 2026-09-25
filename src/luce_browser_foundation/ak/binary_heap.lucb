@@ -1,0 +1,170 @@
+#==============================================================================================
+#
+#   binary_heap - IntrusiveBinaryHeap<Node, Comparator, IndexSetter> and BinaryHeap<K, V>
+#
+#   DESCRIPTION:
+#       Port of AK/BinaryHeap.h (lines 1-181): a min-heap in a Vector. The donor's Comparator
+#       and IndexSetter are stateless callable types; here they are one-byte structs
+#       implementing BinaryHeapComparator[N] and BinaryHeapIndexSetter[N], instantiated the
+#       way the donor's `Comparator {}(a, b)` is (DESIGN.md §2.6's traits structs). BinaryHeap
+#       compares keys with `<` (`K: Comparable`) and sets no indices. The inline capacity is
+#       dropped (DESIGN.md §2.6).
+#
+#==============================================================================================
+
+# mark: Comparator and index setter =============================================================
+
+## IntrusiveBinaryHeap's Comparator: `Comparator {}(a, b)`, true when `a` belongs above `b`.
+pub interface BinaryHeapComparator[N]:
+    func less(a: const N*, b: const N*) -> bool
+
+## IntrusiveBinaryHeap's IndexSetter: `IndexSetter {}(node, index)`, told of every node's new
+## index.
+pub interface BinaryHeapIndexSetter[N]:
+    func set_index(node: N*, index: usize)
+
+## BinaryHeap's comparator: `[](Node const& a, Node const& b) { return a.key < b.key; }`.
+pub struct BinaryHeapKeyComparator[K: luce.Comparable, V]: BinaryHeapComparator[BinaryHeapNode[K, V]]:
+    var empty_: u8
+
+    func less(a: const BinaryHeapNode[K, V]*, b: const BinaryHeapNode[K, V]*) -> bool: return a.key.compare(b.key) < 0
+
+## BinaryHeap's index setter: `[](Node&, size_t) {}`.
+pub struct BinaryHeapNoIndexSetter[K, V]: BinaryHeapIndexSetter[BinaryHeapNode[K, V]]:
+    var empty_: u8
+
+    func set_index(node: BinaryHeapNode[K, V]*, index: usize): binary_heap_no_index(node, index)
+
+func binary_heap_no_index[K, V](node: BinaryHeapNode[K, V]*, index: usize):
+    discard(node)
+    discard(index)
+
+# mark: IntrusiveBinaryHeap =====================================================================
+
+## Ported from AK/BinaryHeap.h:22 AK::IntrusiveBinaryHeap::IntrusiveBinaryHeap(Vector&&).
+pub func intrusive_binary_heap_construct[TNode, TComparator: BinaryHeapComparator[TNode], TIndexSetter: BinaryHeapIndexSetter[TNode]](this: IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*, nodes: Vector[TNode]):
+    this.m_nodes = nodes
+    var i = (isize)(vector_size(&this.m_nodes) // 2)
+    while i > 0:
+        i -= 1
+        intrusive_binary_heap_heapify_down(this, (usize)i)
+
+## Ported from AK/BinaryHeap.h:29 AK::IntrusiveBinaryHeap::size.
+pub func intrusive_binary_heap_size[TNode, TComparator, TIndexSetter](this: const IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*) -> usize:
+    return vector_size(&this.m_nodes)
+
+## Ported from AK/BinaryHeap.h:30 AK::IntrusiveBinaryHeap::is_empty.
+pub func intrusive_binary_heap_is_empty[TNode, TComparator, TIndexSetter](this: const IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*) -> bool:
+    return vector_is_empty(&this.m_nodes)
+
+## Ported from AK/BinaryHeap.h:32 AK::IntrusiveBinaryHeap::insert(Node const&).
+pub func intrusive_binary_heap_insert[TNode, TComparator: BinaryHeapComparator[TNode], TIndexSetter: BinaryHeapIndexSetter[TNode]](this: IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*, node: TNode):
+    vector_append_t(&this.m_nodes, node)
+    var setter: TIndexSetter = ---
+    setter.set_index(vector_last(&this.m_nodes), vector_size(&this.m_nodes) - 1)
+    intrusive_binary_heap_heapify_up(this, vector_size(&this.m_nodes) - 1)
+
+## Ported from AK/BinaryHeap.h:39 AK::IntrusiveBinaryHeap::insert(Node&&).
+pub func intrusive_binary_heap_insert_2[TNode, TComparator: BinaryHeapComparator[TNode], TIndexSetter: BinaryHeapIndexSetter[TNode]](this: IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*, node: TNode):
+    intrusive_binary_heap_insert(this, node)
+
+## Ported from AK/BinaryHeap.h:46 AK::IntrusiveBinaryHeap::pop.
+pub func intrusive_binary_heap_pop[TNode, TComparator: BinaryHeapComparator[TNode], TIndexSetter: BinaryHeapIndexSetter[TNode]](this: IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*, index: usize) -> TNode:
+    var i = index
+    while i != 0:
+        intrusive_binary_heap_swap_indices(this, i, (i - 1) // 2)
+        i = (i - 1) // 2
+    intrusive_binary_heap_swap_indices(this, 0, vector_size(&this.m_nodes) - 1)
+    let node = vector_take_last(&this.m_nodes)
+    intrusive_binary_heap_heapify_down(this, 0)
+    return node
+
+## Ported from AK/BinaryHeap.h:58 AK::IntrusiveBinaryHeap::pop_min.
+pub func intrusive_binary_heap_pop_min[TNode, TComparator: BinaryHeapComparator[TNode], TIndexSetter: BinaryHeapIndexSetter[TNode]](this: IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*) -> TNode:
+    return intrusive_binary_heap_pop(this, 0)
+
+## Ported from AK/BinaryHeap.h:63 AK::IntrusiveBinaryHeap::peek_min.
+pub func intrusive_binary_heap_peek_min[TNode, TComparator, TIndexSetter](this: const IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*) -> const TNode*:
+    return vector_at_const(&this.m_nodes, 0)
+
+## Ported from AK/BinaryHeap.h:68 AK::IntrusiveBinaryHeap::clear.
+pub func intrusive_binary_heap_clear[TNode, TComparator, TIndexSetter](this: IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*):
+    vector_clear(&this.m_nodes)
+
+## Ported from AK/BinaryHeap.h:73 AK::IntrusiveBinaryHeap::nodes_in_arbitrary_order.
+pub func intrusive_binary_heap_nodes_in_arbitrary_order[TNode, TComparator, TIndexSetter](this: const IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*) -> const TNode[]:
+    return vector_span_const(&this.m_nodes)
+
+## Ported from AK/BinaryHeap.h:79 AK::IntrusiveBinaryHeap::swap_indices.
+pub func intrusive_binary_heap_swap_indices[TNode, TComparator, TIndexSetter: BinaryHeapIndexSetter[TNode]](this: IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*, i: usize, j: usize):
+    swap_5(vector_at(&this.m_nodes, i), vector_at(&this.m_nodes, j))
+    var setter: TIndexSetter = ---
+    setter.set_index(vector_at(&this.m_nodes, i), i)
+    setter.set_index(vector_at(&this.m_nodes, j), j)
+
+## Ported from AK/BinaryHeap.h:86 AK::IntrusiveBinaryHeap::compare_indices.
+pub func intrusive_binary_heap_compare_indices[TNode, TComparator: BinaryHeapComparator[TNode], TIndexSetter](this: IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*, i: usize, j: usize) -> bool:
+    var comparator: TComparator = ---
+    return comparator.less(vector_at(&this.m_nodes, i), vector_at(&this.m_nodes, j))
+
+## Ported from AK/BinaryHeap.h:91 AK::IntrusiveBinaryHeap::heapify_up.
+pub func intrusive_binary_heap_heapify_up[TNode, TComparator: BinaryHeapComparator[TNode], TIndexSetter: BinaryHeapIndexSetter[TNode]](this: IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*, index: usize):
+    var i = index
+    while i != 0:
+        let parent = (i - 1) // 2
+        if intrusive_binary_heap_compare_indices(this, parent, i):
+            break
+        intrusive_binary_heap_swap_indices(this, i, parent)
+        i = parent
+
+## Ported from AK/BinaryHeap.h:102 AK::IntrusiveBinaryHeap::heapify_down.
+pub func intrusive_binary_heap_heapify_down[TNode, TComparator: BinaryHeapComparator[TNode], TIndexSetter: BinaryHeapIndexSetter[TNode]](this: IntrusiveBinaryHeap[TNode, TComparator, TIndexSetter]*, index: usize):
+    var i = index
+    while i * 2 + 1 < intrusive_binary_heap_size(this):
+        var min_child = i * 2 + 1
+        let other_child = i * 2 + 2
+        if other_child < intrusive_binary_heap_size(this) and intrusive_binary_heap_compare_indices(this, other_child, min_child):
+            min_child = other_child
+        if intrusive_binary_heap_compare_indices(this, i, min_child):
+            break
+        intrusive_binary_heap_swap_indices(this, i, min_child)
+        i = min_child
+
+# mark: BinaryHeap ==============================================================================
+
+## Ported from AK/BinaryHeap.h:126 AK::BinaryHeap::BinaryHeap(K keys[], V values[], size_t size).
+# This constructor allows for O(n) construction of the heap (instead of O(nlogn) for repeated insertions)
+pub func binary_heap_construct[K: luce.Comparable, V](this: BinaryHeap[K, V]*, keys: const K*, values: const V*, size: usize):
+    var nodes: Vector[BinaryHeapNode[K, V]]
+    vector_ensure_capacity(&nodes, size)
+    for i in 0..<size:
+        vector_unchecked_append_u(&nodes, BinaryHeapNode[K, V](key = keys[i], value = values[i]))
+    intrusive_binary_heap_construct(&this.m_heap, nodes)
+
+## Ported from AK/BinaryHeap.h:135 AK::BinaryHeap::size.
+pub func binary_heap_size[K: luce.Comparable, V](this: const BinaryHeap[K, V]*) -> usize:
+    return intrusive_binary_heap_size(&this.m_heap)
+
+## Ported from AK/BinaryHeap.h:136 AK::BinaryHeap::is_empty.
+pub func binary_heap_is_empty[K: luce.Comparable, V](this: const BinaryHeap[K, V]*) -> bool:
+    return intrusive_binary_heap_is_empty(&this.m_heap)
+
+## Ported from AK/BinaryHeap.h:138 AK::BinaryHeap::insert.
+pub func binary_heap_insert[K: luce.Comparable, V](this: BinaryHeap[K, V]*, key: K, value: V):
+    intrusive_binary_heap_insert(&this.m_heap, BinaryHeapNode[K, V](key = key, value = value))
+
+## Ported from AK/BinaryHeap.h:143 AK::BinaryHeap::pop_min.
+pub func binary_heap_pop_min[K: luce.Comparable, V](this: BinaryHeap[K, V]*) -> V:
+    return intrusive_binary_heap_pop_min(&this.m_heap).value
+
+## Ported from AK/BinaryHeap.h:148 AK::BinaryHeap::peek_min.
+pub func binary_heap_peek_min[K: luce.Comparable, V](this: const BinaryHeap[K, V]*) -> V:
+    return intrusive_binary_heap_peek_min(&this.m_heap).value
+
+## Ported from AK/BinaryHeap.h:153 AK::BinaryHeap::peek_min_key.
+pub func binary_heap_peek_min_key[K: luce.Comparable, V](this: const BinaryHeap[K, V]*) -> K:
+    return intrusive_binary_heap_peek_min(&this.m_heap).key
+
+## Ported from AK/BinaryHeap.h:158 AK::BinaryHeap::clear.
+pub func binary_heap_clear[K: luce.Comparable, V](this: BinaryHeap[K, V]*):
+    intrusive_binary_heap_clear(&this.m_heap)

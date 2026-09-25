@@ -7,18 +7,23 @@
 #       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
 #       than edit, except to fill a field the generator could not map.
 #
+#       Edited by region r01: Detail::Trie (Trie2) keeps the value, optional metadata and
+#       children map and is generic over the value type, metadata type and value traits (the
+#       CRTP base type and the map template are dropped: the map is HashMap); AK::Trie
+#       embeds it first.
+#
 #==============================================================================================
 
 # mark: Trie2 ===================================================================================
 
-## AK::Detail::Trie (AK/Trie.h:30): a generic struct.
-pub struct Trie2[TDeclaredBaseType, TDefaultBaseType, TValueType, TMetadataT, TValueTraits]:
+## AK::Detail::Trie (AK/Trie.h:31): a node's value, its optional metadata and its children.
+pub struct Trie2[TValueType, TMetadataT, TValueTraits: Traits[TValueType]]:
     pub var m_value: TValueType
-    pub var m_metadata: void*?  # unmapped: Optional<MetadataType>
-    pub var m_children: void*?  # unmapped: MapType<ValueType, NonnullOwnPtr<Trie<DeclaredBaseType, DefaultBaseType, ValueType, MetadataT, ValueTraits, MapType>>, V
+    pub var m_metadata: TMetadataT*?  # Optional<MetadataType>: none, or a cell holding it (so metadata_value() is an lvalue)
+    pub var m_children: HashMap[TValueType, Trie2[TValueType, TMetadataT, TValueTraits]*, TValueTraits]
 
 # mark: Trie ====================================================================================
 
-## AK::Trie (AK/Trie.h:288): a generic struct.
-pub struct Trie[TValueType, TMetadataT, TValueTraits, TBaseT]:
-    pub var empty_: u8
+## AK::Trie (AK/Trie.h:285): the Detail::Trie of a root.
+pub struct Trie[TValueType, TMetadataT, TValueTraits: Traits[TValueType]]:
+    pub var base: Trie2[TValueType, TMetadataT, TValueTraits]

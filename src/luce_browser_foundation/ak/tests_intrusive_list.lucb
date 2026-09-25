@@ -1,0 +1,106 @@
+#==============================================================================================
+#
+#   tests_intrusive_list - IntrusiveList<&T::member>
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestIntrusiveList.cpp. The RefPtr/NonnullRefPtr container cases
+#       count references the intrusive list takes on its values; containers are raw pointers
+#       here (DESIGN.md §2.6), so they reduce to insertion and removal, which are tested.
+#
+#==============================================================================================
+
+struct IntrusiveTestItem:
+    var value: i32
+    var m_list_node: IntrusiveListNode[IntrusiveTestItem, IntrusiveTestItem*?]
+
+type IntrusiveTestList = IntrusiveList[IntrusiveTestItem, IntrusiveTestItem*?]
+
+func test_item_member() -> usize:
+    return offsetof(IntrusiveTestItem, m_list_node)
+
+func test_new_item(value: i32) -> IntrusiveTestItem*:
+    let item = new IntrusiveTestItem else trap("out of memory")
+    item.value = value
+    return item
+
+test "intrusive_list: construct":
+    var empty: IntrusiveTestList
+    assert(intrusive_list_is_empty(&empty))
+
+test "intrusive_list: insert":
+    var list: IntrusiveTestList
+    intrusive_list_append(&list, test_new_item(0), test_item_member())
+    assert(not intrusive_list_is_empty(&list))
+    let last = intrusive_list_take_last(&list) else trap("empty")
+    free(last)
+    assert(intrusive_list_is_empty(&list))
+
+test "intrusive_list: insert_before":
+    var list: IntrusiveTestList
+    let two = test_new_item(2)
+    intrusive_list_append(&list, two, test_item_member())
+    let zero = test_new_item(0)
+    intrusive_list_append(&list, zero, test_item_member())
+    let one = test_new_item(1)
+    intrusive_list_insert_before(&list, zero, one, test_item_member())
+
+    assert(intrusive_list_first(&list) == (IntrusiveTestItem*?)two)
+    assert(intrusive_list_last(&list) == (IntrusiveTestItem*?)zero)
+    assert(intrusive_list_contains(&list, zero, test_item_member()))
+    assert(intrusive_list_contains(&list, one, test_item_member()))
+    assert(intrusive_list_contains(&list, two, test_item_member()))
+    assert(intrusive_list_node_is_in_list(&zero.m_list_node))
+    assert(intrusive_list_node_is_in_list(&one.m_list_node))
+    assert(intrusive_list_node_is_in_list(&two.m_list_node))
+    assert(intrusive_list_size_slow(&list) == 3)
+    let order: i32[3] = [2, 1, 0]
+    var index: usize = 0
+    for item in intrusive_list_begin(&list):
+        assert(item.value == order[index])
+        index += 1
+
+    while let elem = intrusive_list_take_first(&list):
+        free(elem)
+
+test "intrusive_list: enumeration":
+    let expected_size: usize = 10
+    var list: IntrusiveTestList
+    for i in 0..<expected_size:
+        intrusive_list_append(&list, test_new_item((i32)i), test_item_member())
+
+    var actual_size: usize = 0
+    for elem in intrusive_list_begin(&list):
+        discard(elem)
+        actual_size += 1
+    assert(expected_size == actual_size)
+    assert(expected_size == intrusive_list_size_slow(&list))
+
+    var reverse_actual_size: usize = 0
+    var it = intrusive_list_rbegin(&list)
+    while it.m_value != none:
+        reverse_actual_size += 1
+        discard(intrusive_list_reverse_iterator_inc(&it))
+    assert(expected_size == reverse_actual_size)
+
+    while let elem = intrusive_list_take_first(&list):
+        free(elem)
+
+test "intrusive_list: remove, prepend, erase and clear":
+    var list: IntrusiveTestList
+    var items: IntrusiveTestItem*[4] = [test_new_item(0), test_new_item(1), test_new_item(2), test_new_item(3)]
+    for item in items:
+        intrusive_list_prepend(&list, item, test_item_member())
+    assert((intrusive_list_first(&list) else trap("empty")).value == 3)
+    intrusive_list_remove(&list, items[2], test_item_member())
+    assert(not intrusive_list_contains(&list, items[2], test_item_member()))
+    assert(intrusive_list_size_slow(&list) == 3)
+    # Appending a value that is in the list moves it to the end.
+    intrusive_list_append(&list, items[3], test_item_member())
+    assert((intrusive_list_last(&list) else trap("empty")).value == 3)
+    var it = intrusive_list_begin(&list)
+    discard(intrusive_list_iterator_erase(&it))
+    assert(intrusive_list_iterator_deref(&it).value == 0)
+    assert(intrusive_list_size_slow(&list) == 2)
+    intrusive_list_clear(&list)
+    assert(intrusive_list_is_empty(&list))
+    assert(not intrusive_list_node_is_in_list(&items[3].m_list_node))

@@ -1,0 +1,125 @@
+#==============================================================================================
+#
+#   circular_queue - CircularQueue<T, Capacity>: a fixed-capacity ring that overwrites its
+#                    oldest value when full
+#
+#   DESCRIPTION:
+#       Port of AK/CircularQueue.h (lines 1-136). The Capacity template argument is the field
+#       m_capacity, given to circular_queue_construct, which allocates the storage the donor
+#       keeps inline. The iterator is a luce-base iterator:
+#       `for value in circular_queue_begin(&queue)` walks from the oldest value.
+#
+#==============================================================================================
+
+## AK::CircularQueue<T, Capacity>: an empty queue of `capacity` slots.
+pub func circular_queue_construct[T](this: CircularQueue[T]*, capacity: usize):
+    assert(capacity > 0)
+    this.m_capacity = capacity
+    this.m_size = 0
+    this.m_head = 0
+    let storage = alloc T[capacity] catch:
+        trap("out of memory")
+    this.m_storage = storage.data
+
+## Ported from AK/CircularQueue.h:25 AK::CircularQueue::clear.
+pub func circular_queue_clear[T](this: CircularQueue[T]*):
+    this.m_head = 0
+    this.m_size = 0
+
+## Ported from AK/CircularQueue.h:34 AK::CircularQueue::is_empty.
+pub func circular_queue_is_empty[T](this: const CircularQueue[T]*) -> bool:
+    return this.m_size == 0
+
+## Ported from AK/CircularQueue.h:35 AK::CircularQueue::size.
+pub func circular_queue_size[T](this: const CircularQueue[T]*) -> usize:
+    return this.m_size
+
+## Ported from AK/CircularQueue.h:37 AK::CircularQueue::capacity.
+pub func circular_queue_capacity[T](this: const CircularQueue[T]*) -> usize:
+    return this.m_capacity
+
+## Ported from AK/CircularQueue.h:40 AK::CircularQueue::enqueue.
+pub func circular_queue_enqueue[T](this: CircularQueue[T]*, value: T):
+    let slot = circular_queue_elements(this) + ((this.m_head + this.m_size) % this.m_capacity)
+    *slot = value
+    if this.m_size == this.m_capacity:
+        this.m_head = (this.m_head + 1) % this.m_capacity
+    else:
+        this.m_size += 1
+
+## Ported from AK/CircularQueue.h:53 AK::CircularQueue::dequeue.
+pub func circular_queue_dequeue[T](this: CircularQueue[T]*) -> T:
+    assert(not circular_queue_is_empty(this))
+    let slot = circular_queue_elements(this) + this.m_head
+    let value = *slot
+    this.m_head = (this.m_head + 1) % this.m_capacity
+    this.m_size -= 1
+    return value
+
+## Ported from AK/CircularQueue.h:64 AK::CircularQueue::at const.
+pub func circular_queue_at_const[T](this: const CircularQueue[T]*, index: usize) -> T:
+    return circular_queue_elements_const(this)[(this.m_head + index) % this.m_capacity]
+
+## Ported from AK/CircularQueue.h:65 AK::CircularQueue::at.
+pub func circular_queue_at[T](this: CircularQueue[T]*, index: usize) -> T*:
+    return circular_queue_elements(this) + ((this.m_head + index) % this.m_capacity)
+
+## Ported from AK/CircularQueue.h:67 AK::CircularQueue::first.
+pub func circular_queue_first[T](this: const CircularQueue[T]*) -> T:
+    return circular_queue_at_const(this, 0)
+
+## Ported from AK/CircularQueue.h:68 AK::CircularQueue::last.
+pub func circular_queue_last[T](this: const CircularQueue[T]*) -> T:
+    return circular_queue_at_const(this, circular_queue_size(this) - 1)
+
+## Ported from AK/CircularQueue.h:114 AK::CircularQueue::begin const.
+pub func circular_queue_begin_const[T](this: const CircularQueue[T]*) -> CircularQueueIterator[T]:
+    return CircularQueueIterator[T](m_queue = (CircularQueue[T]*)this, m_index = 0)
+
+## Ported from AK/CircularQueue.h:115 AK::CircularQueue::end const.
+pub func circular_queue_end_const[T](this: const CircularQueue[T]*) -> CircularQueueIterator[T]:
+    return CircularQueueIterator[T](m_queue = (CircularQueue[T]*)this, m_index = circular_queue_size(this))
+
+## Ported from AK/CircularQueue.h:117 AK::CircularQueue::begin.
+pub func circular_queue_begin[T](this: CircularQueue[T]*) -> CircularQueueIterator[T]:
+    return CircularQueueIterator[T](m_queue = this, m_index = 0)
+
+## Ported from AK/CircularQueue.h:118 AK::CircularQueue::end.
+pub func circular_queue_end[T](this: CircularQueue[T]*) -> CircularQueueIterator[T]:
+    return CircularQueueIterator[T](m_queue = this, m_index = circular_queue_size(this))
+
+## Ported from AK/CircularQueue.h:120 AK::CircularQueue::head_index.
+pub func circular_queue_head_index[T](this: const CircularQueue[T]*) -> usize:
+    return this.m_head
+
+## Ported from AK/CircularQueue.h:123 AK::CircularQueue::elements.
+pub func circular_queue_elements[T](this: CircularQueue[T]*) -> T*:
+    return this.m_storage else trap("VERIFY: CircularQueue used before circular_queue_construct")
+
+## Ported from AK/CircularQueue.h:124 AK::CircularQueue::elements const.
+pub func circular_queue_elements_const[T](this: const CircularQueue[T]*) -> const T*:
+    return this.m_storage else trap("VERIFY: CircularQueue used before circular_queue_construct")
+
+# mark: Iterator ================================================================================
+
+## AK/CircularQueue.h:73 AK::CircularQueue::Iterator::operator!=.
+pub func circular_queue_iterator_ne[T](this: const CircularQueueIterator[T]*, other: CircularQueueIterator[T]) -> bool:
+    return this.m_index != other.m_index
+
+## AK/CircularQueue.h:74 AK::CircularQueue::Iterator::operator++.
+pub func circular_queue_iterator_inc[T](this: CircularQueueIterator[T]*) -> CircularQueueIterator[T]*:
+    this.m_index += 1
+    return this
+
+## AK/CircularQueue.h:79 AK::CircularQueue::Iterator::operator*.
+pub func circular_queue_iterator_deref[T](this: const CircularQueueIterator[T]*) -> T*:
+    return circular_queue_at(this.m_queue, this.m_index)
+
+## The value the iterator is at, and the iterator moved past it; none at the end (the `for`
+## protocol).
+pub func circular_queue_iterator_next[T](this: CircularQueueIterator[T]*) -> T*?:
+    if this.m_index >= circular_queue_size(this.m_queue):
+        return none
+    let value = circular_queue_at(this.m_queue, this.m_index)
+    this.m_index += 1
+    return value

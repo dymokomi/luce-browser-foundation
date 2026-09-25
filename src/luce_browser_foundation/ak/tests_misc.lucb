@@ -178,3 +178,16 @@ test "default_delete, array and variant helpers":
     assert(empty_array_storage_to_t(&storage) == none)
     var constructors: VariantConstructors[i32, i64]
     assert((void*)variant_constructors_internal_cast(&constructors) == (void*)&constructors)
+
+test "id_allocator: unique ids at or above the minimum":
+    var allocator: IdAllocator
+    id_allocator_construct(&allocator, 100)
+    var ids: HashTable[i32, I32Traits]
+    for i in 0..<50:
+        discard(i)
+        let id = id_allocator_allocate(&allocator)
+        assert(id >= 100)
+        assert(hash_table_set(&ids, id) == HashSetResult.inserted_new_entry)
+    for id in hash_table_begin(&ids):
+        id_allocator_deallocate(&allocator, *id)
+    assert(hash_table_is_empty(&allocator.m_allocated_ids))

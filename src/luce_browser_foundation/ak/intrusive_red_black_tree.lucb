@@ -1,0 +1,184 @@
+#==============================================================================================
+#
+#   intrusive_red_black_tree - IntrusiveRedBlackTree<&V::member>: a red-black tree threaded
+#                              through nodes inside its values
+#
+#   DESCRIPTION:
+#       Port of AK/IntrusiveRedBlackTree.h (lines 1-248). As for IntrusiveList, the donor's
+#       pointer-to-member template argument is `member`, the node field's offset in V
+#       (`offsetof(V, m_tree_node)`): insert takes it and records it in the tree, and the
+#       members that turn nodes back into values use the recorded one (node_to_value is
+#       container_of). The tree and the node embed their base (BaseRedBlackTree[K],
+#       BaseRedBlackTreeNode[K]) as their first field. Container is a raw pointer, so the
+#       self reference is never set, and the lookups answer `V*?`.
+#
+#==============================================================================================
+
+# The intrusive node holding a base node (`static_cast<TreeNode*>`): the base is its first field.
+func irbt_node[K, V, TContainer](node: BaseRedBlackTreeNode[K]*?) -> IntrusiveRedBlackTreeNode[K, V, TContainer]*?:
+    let n = node else return none
+    return (IntrusiveRedBlackTreeNode[K, V, TContainer]*)n
+
+# The value holding a possibly-null node.
+func irbt_value[K, V, TContainer](node: BaseRedBlackTreeNode[K]*?, member: usize) -> V*?:
+    let n = irbt_node[K, V, TContainer](node) else return none
+    return intrusive_red_black_tree_node_to_value(n, member)
+
+# mark: IntrusiveRedBlackTree ===================================================================
+
+## Ported from AK/IntrusiveRedBlackTree.h:42 AK::Detail::IntrusiveRedBlackTree::find.
+pub func intrusive_red_black_tree_find[K: luce.Comparable, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*, key: K) -> V*?:
+    return irbt_value[K, V, TContainer](base_red_black_tree_find(this.base.m_root, key), this.m_member)
+
+## Ported from AK/IntrusiveRedBlackTree.h:50 AK::Detail::IntrusiveRedBlackTree::find_largest_not_above.
+pub func intrusive_red_black_tree_find_largest_not_above[K: luce.Comparable, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*, key: K) -> V*?:
+    return irbt_value[K, V, TContainer](base_red_black_tree_find_largest_not_above(this.base.m_root, key), this.m_member)
+
+## Ported from AK/IntrusiveRedBlackTree.h:58 AK::Detail::IntrusiveRedBlackTree::find_smallest_not_below.
+pub func intrusive_red_black_tree_find_smallest_not_below[K: luce.Comparable, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*, key: K) -> V*?:
+    return irbt_value[K, V, TContainer](base_red_black_tree_find_smallest_not_below(this.base.m_root, key), this.m_member)
+
+## Ported from AK/IntrusiveRedBlackTree.h:66 AK::Detail::IntrusiveRedBlackTree::insert: `member`
+## is the offset of the node field in V.
+pub func intrusive_red_black_tree_insert[K: luce.Comparable, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*, key: K, value: V*, member: usize):
+    this.m_member = member
+    let node = (IntrusiveRedBlackTreeNode[K, V, TContainer]*)((u8*)value + member)
+    assert(not node.m_in_tree)
+    node.base.key = key
+    base_red_black_tree_insert(&this.base, &node.base)
+    node.m_in_tree = true
+
+# mark: BaseIterator ============================================================================
+
+## Ported from AK/IntrusiveRedBlackTree.h:81 AK::Detail::IntrusiveRedBlackTree::BaseIterator::operator!=.
+pub func base_iterator_ne[K, V, TContainer](this: const BaseIterator[K, V, TContainer]*, other: BaseIterator[K, V, TContainer]) -> bool:
+    return this.m_node != other.m_node
+
+## Ported from AK/IntrusiveRedBlackTree.h:82 AK::Detail::IntrusiveRedBlackTree::BaseIterator::operator++.
+pub func base_iterator_inc[K, V, TContainer](this: BaseIterator[K, V, TContainer]*) -> BaseIterator[K, V, TContainer]*:
+    let node = this.m_node else return this
+    this.m_prev = node
+    # the complexity is O(logn) for each successor call, but the total complexity for all elements comes out to O(n), meaning the amortized cost for a single call is O(1)
+    this.m_node = irbt_node[K, V, TContainer](base_red_black_tree_successor(&node.base))
+    return this
+
+## Ported from AK/IntrusiveRedBlackTree.h:91 AK::Detail::IntrusiveRedBlackTree::BaseIterator::operator--.
+pub func base_iterator_dec[K, V, TContainer](this: BaseIterator[K, V, TContainer]*) -> BaseIterator[K, V, TContainer]*:
+    let prev = this.m_prev else return this
+    this.m_node = prev
+    this.m_prev = irbt_node[K, V, TContainer](base_red_black_tree_predecessor(&prev.base))
+    return this
+
+## Ported from AK/IntrusiveRedBlackTree.h:99 AK::Detail::IntrusiveRedBlackTree::BaseIterator::operator*.
+pub func base_iterator_deref[K, V, TContainer](this: BaseIterator[K, V, TContainer]*) -> V*:
+    let node = this.m_node else trap("VERIFY: dereferencing the end of an IntrusiveRedBlackTree")
+    return intrusive_red_black_tree_node_to_value(node, this.m_member)
+
+## Ported from AK/IntrusiveRedBlackTree.h:104 AK::Detail::IntrusiveRedBlackTree::BaseIterator::operator->.
+pub func base_iterator_arrow[K, V, TContainer](this: BaseIterator[K, V, TContainer]*) -> V*:
+    return base_iterator_deref(this)
+
+## Ported from AK/IntrusiveRedBlackTree.h:109 AK::Detail::IntrusiveRedBlackTree::BaseIterator::is_end.
+pub func base_iterator_is_end[K, V, TContainer](this: const BaseIterator[K, V, TContainer]*) -> bool:
+    return this.m_node == none
+
+## Ported from AK/IntrusiveRedBlackTree.h:110 AK::Detail::IntrusiveRedBlackTree::BaseIterator::is_begin.
+pub func base_iterator_is_begin[K, V, TContainer](this: const BaseIterator[K, V, TContainer]*) -> bool:
+    return this.m_prev == none
+
+## Ported from AK/IntrusiveRedBlackTree.h:111 AK::Detail::IntrusiveRedBlackTree::BaseIterator::key.
+pub func base_iterator_key[K, V, TContainer](this: const BaseIterator[K, V, TContainer]*) -> K:
+    let node = this.m_node else trap("VERIFY: key() of the end of an IntrusiveRedBlackTree")
+    return node.base.key
+
+## Ported from AK/IntrusiveRedBlackTree.h:115 AK::Detail::IntrusiveRedBlackTree::BaseIterator::BaseIterator.
+pub func base_iterator_construct[K, V, TContainer](this: BaseIterator[K, V, TContainer]*, node: IntrusiveRedBlackTreeNode[K, V, TContainer]*?, prev: IntrusiveRedBlackTreeNode[K, V, TContainer]*?, member: usize):
+    this.m_node = node
+    this.m_prev = prev
+    this.m_member = member
+
+## The value the iterator is at, and the iterator moved past it; none at the end (the `for`
+## protocol over `*it` and `++it`).
+pub func base_iterator_next[K, V, TContainer](this: BaseIterator[K, V, TContainer]*) -> V*?:
+    let node = this.m_node else return none
+    discard(base_iterator_inc(this))
+    return intrusive_red_black_tree_node_to_value(node, this.m_member)
+
+# mark: Iteration and removal ===================================================================
+
+## Ported from AK/IntrusiveRedBlackTree.h:125 AK::Detail::IntrusiveRedBlackTree::begin.
+pub func intrusive_red_black_tree_begin[K, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*) -> BaseIterator[K, V, TContainer]:
+    return BaseIterator[K, V, TContainer](m_node = irbt_node[K, V, TContainer](this.base.m_minimum), m_prev = none, m_member = this.m_member)
+
+## Ported from AK/IntrusiveRedBlackTree.h:126 AK::Detail::IntrusiveRedBlackTree::end.
+pub func intrusive_red_black_tree_end[K, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*) -> BaseIterator[K, V, TContainer]:
+    return BaseIterator[K, V, TContainer](m_node = none, m_prev = none, m_member = this.m_member)
+
+## Ported from AK/IntrusiveRedBlackTree.h:127 AK::Detail::IntrusiveRedBlackTree::begin_from(K).
+pub func intrusive_red_black_tree_begin_from_k[K: luce.Comparable, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*, key: K) -> BaseIterator[K, V, TContainer]:
+    return BaseIterator[K, V, TContainer](m_node = irbt_node[K, V, TContainer](base_red_black_tree_find(this.base.m_root, key)), m_prev = none, m_member = this.m_member)
+
+## Ported from AK/IntrusiveRedBlackTree.h:128 AK::Detail::IntrusiveRedBlackTree::begin_from(V&).
+pub func intrusive_red_black_tree_begin_from_v[K, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*, value: V*) -> BaseIterator[K, V, TContainer]:
+    let node = (IntrusiveRedBlackTreeNode[K, V, TContainer]*)((u8*)value + this.m_member)
+    return BaseIterator[K, V, TContainer](m_node = node, m_prev = none, m_member = this.m_member)
+
+## Ported from AK/IntrusiveRedBlackTree.h:131 AK::Detail::IntrusiveRedBlackTree::begin const.
+pub func intrusive_red_black_tree_begin_const[K, V, TContainer](this: const IntrusiveRedBlackTree[K, V, TContainer]*) -> BaseIterator[K, V, TContainer]:
+    return intrusive_red_black_tree_begin((IntrusiveRedBlackTree[K, V, TContainer]*)this)
+
+## Ported from AK/IntrusiveRedBlackTree.h:132 AK::Detail::IntrusiveRedBlackTree::end const.
+pub func intrusive_red_black_tree_end_const[K, V, TContainer](this: const IntrusiveRedBlackTree[K, V, TContainer]*) -> BaseIterator[K, V, TContainer]:
+    return intrusive_red_black_tree_end((IntrusiveRedBlackTree[K, V, TContainer]*)this)
+
+## Ported from AK/IntrusiveRedBlackTree.h:133 AK::Detail::IntrusiveRedBlackTree::begin_from(K) const.
+# (The donor's body reads `this->m_rootF`, a typo in a template that is never instantiated.)
+pub func intrusive_red_black_tree_begin_from_k_const[K: luce.Comparable, V, TContainer](this: const IntrusiveRedBlackTree[K, V, TContainer]*, key: K) -> BaseIterator[K, V, TContainer]:
+    return intrusive_red_black_tree_begin_from_k((IntrusiveRedBlackTree[K, V, TContainer]*)this, key)
+
+## Ported from AK/IntrusiveRedBlackTree.h:134 AK::Detail::IntrusiveRedBlackTree::begin_from(V const&) const.
+pub func intrusive_red_black_tree_begin_from_v_const[K, V, TContainer](this: const IntrusiveRedBlackTree[K, V, TContainer]*, value: const V*) -> BaseIterator[K, V, TContainer]:
+    return intrusive_red_black_tree_begin_from_v((IntrusiveRedBlackTree[K, V, TContainer]*)this, (V*)value)
+
+## Ported from AK/IntrusiveRedBlackTree.h:136 AK::Detail::IntrusiveRedBlackTree::remove.
+pub func intrusive_red_black_tree_remove[K: luce.Comparable, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*, key: K) -> bool:
+    let node = irbt_node[K, V, TContainer](base_red_black_tree_find(this.base.m_root, key)) else return false
+
+    base_red_black_tree_remove(&this.base, &node.base)
+
+    node.base.right_child = none
+    node.base.left_child = none
+    node.m_in_tree = false
+
+    return true
+
+## Ported from AK/IntrusiveRedBlackTree.h:153 AK::Detail::IntrusiveRedBlackTree::clear.
+pub func intrusive_red_black_tree_clear[K, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*):
+    intrusive_red_black_tree_clear_nodes[K, V, TContainer](irbt_node[K, V, TContainer](this.base.m_root))
+    this.base.m_root = none
+    this.base.m_minimum = none
+    this.base.m_size = 0
+
+## Ported from AK/IntrusiveRedBlackTree.h:162 AK::Detail::IntrusiveRedBlackTree::clear_nodes.
+pub func intrusive_red_black_tree_clear_nodes[K, V, TContainer](node: IntrusiveRedBlackTreeNode[K, V, TContainer]*?):
+    let n = node else return
+    intrusive_red_black_tree_clear_nodes[K, V, TContainer](irbt_node[K, V, TContainer](n.base.right_child))
+    n.base.right_child = none
+    intrusive_red_black_tree_clear_nodes[K, V, TContainer](irbt_node[K, V, TContainer](n.base.left_child))
+    n.base.left_child = none
+    n.m_in_tree = false
+
+## Ported from AK/IntrusiveRedBlackTree.h:175 AK::Detail::IntrusiveRedBlackTree::node_to_value:
+## the V holding `node` at offset `member` (container_of).
+pub func intrusive_red_black_tree_node_to_value[K, V, TContainer](node: IntrusiveRedBlackTreeNode[K, V, TContainer]*, member: usize) -> V*:
+    return (V*)((u8*)node - member)
+
+# mark: IntrusiveRedBlackTreeNode ===============================================================
+
+## Ported from AK/IntrusiveRedBlackTree.h:196 AK::Detail::IntrusiveRedBlackTreeNode::is_in_tree.
+pub func intrusive_red_black_tree_node_is_in_tree[K, V, TContainer](this: const IntrusiveRedBlackTreeNode[K, V, TContainer]*) -> bool:
+    return this.m_in_tree
+
+## Ported from AK/IntrusiveRedBlackTree.h:201 AK::Detail::IntrusiveRedBlackTreeNode::key.
+pub func intrusive_red_black_tree_node_key[K, V, TContainer](this: const IntrusiveRedBlackTreeNode[K, V, TContainer]*) -> K:
+    return this.base.key

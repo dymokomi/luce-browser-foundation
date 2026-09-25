@@ -1,0 +1,221 @@
+#==============================================================================================
+#
+#   tests_binary_heap - BinaryHeap<K, V>, Queue<T>, Stack<T>, CircularQueue<T>, IDAllocator
+#
+#   DESCRIPTION:
+#       Ports of Tests/AK/TestBinaryHeap.cpp, TestQueue.cpp, TestStack.cpp and
+#       TestCircularQueue.cpp (ByteString values are `str`; the randomized heap cases run over
+#       a fixed pseudo-random sequence), and focused IDAllocator cases.
+#
+#==============================================================================================
+
+# mark: TestBinaryHeap ==========================================================================
+
+test "binary_heap: construct":
+    var empty: BinaryHeap[i32, i32]
+    assert(binary_heap_is_empty(&empty))
+    assert(binary_heap_size(&empty) == 0)
+
+test "binary_heap: construct_from_existing":
+    let keys: i32[3] = [3, 2, 1]
+    let values: u8[3] = ['c', 'b', 'a']
+    var from_existing: BinaryHeap[i32, u8]
+    binary_heap_construct(&from_existing, &keys[0], &values[0], 3)
+    assert(binary_heap_size(&from_existing) == 3)
+    assert(binary_heap_pop_min(&from_existing) == 'a')
+    assert(binary_heap_pop_min(&from_existing) == 'b')
+    assert(binary_heap_pop_min(&from_existing) == 'c')
+
+test "binary_heap: populate_int":
+    var ints: BinaryHeap[i32, i32]
+    binary_heap_insert(&ints, 1, 10)
+    binary_heap_insert(&ints, 3, 20)
+    binary_heap_insert(&ints, 2, 30)
+    assert(binary_heap_size(&ints) == 3)
+    assert(binary_heap_pop_min(&ints) == 10)
+    assert(binary_heap_size(&ints) == 2)
+    assert(binary_heap_pop_min(&ints) == 30)
+    assert(binary_heap_size(&ints) == 1)
+    assert(binary_heap_pop_min(&ints) == 20)
+    assert(binary_heap_size(&ints) == 0)
+
+test "binary_heap: populate_string":
+    var strings: BinaryHeap[i32, str]
+    binary_heap_insert(&strings, 1, "ABC")
+    binary_heap_insert(&strings, 2, "DEF")
+    assert(binary_heap_size(&strings) == 2)
+    assert(binary_heap_pop_min(&strings) == "ABC")
+    assert(binary_heap_pop_min(&strings) == "DEF")
+    assert(binary_heap_is_empty(&strings))
+
+test "binary_heap: large_populate_reverse":
+    var ints: BinaryHeap[i32, i32]
+    var i: i32 = 1023
+    while i >= 0:
+        binary_heap_insert(&ints, i, i)
+        i -= 1
+    assert(binary_heap_size(&ints) == 1024)
+    for j: i32 in 0..<1024:
+        assert(binary_heap_peek_min(&ints) == j)
+        assert(binary_heap_peek_min_key(&ints) == j)
+        assert(binary_heap_pop_min(&ints) == j)
+
+test "binary_heap: pop_min_is_min over pseudo-random keys":
+    var state: u64 = 12345
+    for round in 0..<50:
+        discard(round)
+        var heap: BinaryHeap[u64, u64]
+        var values: Vector[u64]
+        state = state *% 6364136223846793005 +% 1442695040888963407
+        let count = 1 + (state >> 60) % 10
+        for k in 0..<count:
+            discard(k)
+            state = state *% 6364136223846793005 +% 1442695040888963407
+            binary_heap_insert(&heap, state, state)
+            vector_append_t(&values, state)
+        var previous: u64 = 0
+        while not binary_heap_is_empty(&heap):
+            let peeked = binary_heap_peek_min(&heap)
+            let popped = binary_heap_pop_min(&heap)
+            assert(peeked == popped)
+            assert(popped >= previous)
+            previous = popped
+        binary_heap_clear(&heap)
+
+# mark: TestQueue ===============================================================================
+
+test "queue: construct and populate_int":
+    var ints: Queue[i32]
+    assert(queue_is_empty(&ints))
+    assert(queue_size(&ints) == 0)
+    queue_enqueue(&ints, 1)
+    queue_enqueue(&ints, 2)
+    queue_enqueue(&ints, 3)
+    assert(queue_size(&ints) == 3)
+    assert(*queue_head(&ints) == 1)
+    assert(*queue_tail(&ints) == 3)
+    assert(queue_dequeue(&ints) == 1)
+    assert(queue_size(&ints) == 2)
+    assert(queue_dequeue(&ints) == 2)
+    assert(queue_dequeue(&ints) == 3)
+    assert(queue_size(&ints) == 0)
+    queue_try_dequeue(&ints) catch failure:
+        assert(failure.code == ak_errno_error)
+        assert(ak_pending_error.m_code == enoent)
+        recover 0
+
+test "queue: populate_string":
+    var strings: Queue[str]
+    queue_enqueue(&strings, "ABC")
+    queue_enqueue(&strings, "DEF")
+    assert(queue_size(&strings) == 2)
+    assert(queue_dequeue(&strings) == "ABC")
+    assert(queue_dequeue(&strings) == "DEF")
+    assert(queue_is_empty(&strings))
+
+struct TestQueueSum:
+    var sum: i64
+
+func test_queue_add(context: void*?, value: const i64*):
+    let captures = (TestQueueSum*)(context else trap("no captures"))
+    captures.sum += *value
+
+test "queue: order across segments":
+    with memory.heap:
+        var numbers: Queue[i64]
+        for i: i64 in 0..<10000:
+            queue_enqueue(&numbers, i)
+            assert(queue_size(&numbers) == (usize)(i + 1))
+        for i: i64 in 0..<1500:
+            assert(queue_dequeue(&numbers) == i)
+        var captures = TestQueueSum(sum = 0)
+        queue_for_each(&numbers, Function1[const i64*, unit](call = test_queue_add, context = &captures))
+        assert(captures.sum == 49995000 - 1124250)
+        for i: i64 in 1500..<10000:
+            assert(queue_dequeue(&numbers) == i)
+        assert(queue_is_empty(&numbers))
+        queue_enqueue(&numbers, 7)
+        queue_clear(&numbers)
+        assert(queue_is_empty(&numbers))
+
+# mark: TestStack ===============================================================================
+
+test "stack: basic":
+    var stack: Stack[i32]
+    stack_construct(&stack, 3)
+    assert(stack_is_empty(&stack))
+    assert(stack_push(&stack, 2))
+    assert(stack_push(&stack, 4))
+    assert(stack_push(&stack, 17))
+    assert(not stack_push(&stack, 18))
+    assert(stack_size(&stack) == 3)
+    assert(*stack_top(&stack) == 17)
+    assert(stack_contains_slow[i32, I32Traits](&stack, 4))
+    assert(stack_pop(&stack))
+    assert(stack_pop(&stack))
+    assert(stack_pop(&stack))
+    assert(not stack_pop(&stack))
+    assert(stack_is_empty(&stack))
+
+test "stack: complex_type":
+    var stack: Stack[str]
+    stack_construct(&stack, 4)
+    assert(stack_is_empty(&stack))
+    assert(stack_push(&stack, "Well"))
+    assert(stack_push(&stack, "Hello"))
+    assert(stack_push(&stack, "Friends"))
+    assert(stack_push_2(&stack, ":^)"))
+    assert(stack_top_const(&stack) == ":^)")
+    assert(stack_pop(&stack))
+    assert(stack_top_const(&stack) == "Friends")
+    assert(stack_pop(&stack))
+    assert(stack_top_const(&stack) == "Hello")
+    assert(stack_pop(&stack))
+    assert(stack_top_const(&stack) == "Well")
+    assert(stack_pop(&stack))
+    assert(stack_is_empty(&stack))
+
+# mark: TestCircularQueue =======================================================================
+
+test "circular_queue: basic":
+    var ints: CircularQueue[i32]
+    circular_queue_construct(&ints, 3)
+    assert(circular_queue_is_empty(&ints))
+    circular_queue_enqueue(&ints, 1)
+    circular_queue_enqueue(&ints, 2)
+    circular_queue_enqueue(&ints, 3)
+    assert(circular_queue_size(&ints) == 3)
+    circular_queue_enqueue(&ints, 4)
+    assert(circular_queue_size(&ints) == 3)
+    assert(circular_queue_first(&ints) == 2)
+    assert(circular_queue_last(&ints) == 4)
+    assert(circular_queue_head_index(&ints) == 1)
+    var expected: i32 = 2
+    for value in circular_queue_begin(&ints):
+        assert(*value == expected)
+        expected += 1
+    assert(expected == 5)
+    assert(circular_queue_dequeue(&ints) == 2)
+    assert(circular_queue_dequeue(&ints) == 3)
+    assert(circular_queue_dequeue(&ints) == 4)
+    assert(circular_queue_size(&ints) == 0)
+
+test "circular_queue: complex_type and clear":
+    var strings: CircularQueue[str]
+    circular_queue_construct(&strings, 2)
+    circular_queue_enqueue(&strings, "ABC")
+    circular_queue_enqueue(&strings, "DEF")
+    assert(circular_queue_size(&strings) == 2)
+    circular_queue_enqueue(&strings, "abc")
+    circular_queue_enqueue(&strings, "def")
+    assert(circular_queue_dequeue(&strings) == "abc")
+    assert(circular_queue_dequeue(&strings) == "def")
+    var more: CircularQueue[str]
+    circular_queue_construct(&more, 5)
+    for i in 0..<5:
+        discard(i)
+        circular_queue_enqueue(&more, "xxx")
+    assert(circular_queue_size(&more) == 5)
+    assert(circular_queue_capacity(&more) == 5)
+    circular_queue_clear(&more)
+    assert(circular_queue_size(&more) == 0)

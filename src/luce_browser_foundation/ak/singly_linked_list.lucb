@@ -1,0 +1,351 @@
+#==============================================================================================
+#
+#   singly_linked_list - SinglyLinkedList<T, SizePolicy>: a forward list of heap nodes
+#
+#   DESCRIPTION:
+#       Port of AK/SinglyLinkedList.h (lines 1-305) and AK/SinglyLinkedListSizePolicy.h. The
+#       size policy is a struct implementing SizeCalculationPolicy[T]: the donor's
+#       DefaultSizeCalculationPolicy (walk the nodes) and CountingSizeCalculationPolicy (keep a
+#       count). Nodes are managed memory (DESIGN.md §3.3), freed where the donor deletes them.
+#       The iterator is a luce-base iterator. Traits<T>::equals in find() is `==`.
+#
+#==============================================================================================
+
+# mark: Size policies ===========================================================================
+
+## The size policy of a SinglyLinkedList (SinglyLinkedListSizePolicy.h): told of every
+## insertion, removal and clear, and asked for the size given the head node.
+pub interface SizeCalculationPolicy[T]:
+    mutating func increase_size(value: const T*)
+
+    mutating func decrease_size(value: const T*)
+
+    mutating func reset()
+
+    func size(head: const SinglyLinkedListNode[T]*?) -> usize
+
+## AK::DefaultSizeCalculationPolicy (SinglyLinkedListSizePolicy.h:13): the size is counted by
+## walking the list.
+pub struct DefaultSizeCalculationPolicy[T]: SizeCalculationPolicy[T]:
+    var empty_: u8
+
+    mutating func increase_size(value: const T*): discard(value)
+
+    mutating func decrease_size(value: const T*): discard(value)
+
+    mutating func reset(): return
+
+    func size(head: const SinglyLinkedListNode[T]*?) -> usize: return default_size_calculation_policy_size(head)
+
+# DefaultSizeCalculationPolicy::size.
+func default_size_calculation_policy_size[T](head: const SinglyLinkedListNode[T]*?) -> usize:
+    var size: usize = 0
+    var node = head
+    while let current = node:
+        size += 1
+        node = current.next
+    return size
+
+## AK::CountingSizeCalculationPolicy (SinglyLinkedListSizePolicy.h:29): the size is kept as a
+## count.
+pub struct CountingSizeCalculationPolicy[T]: SizeCalculationPolicy[T]:
+    var m_size: usize
+
+    mutating func increase_size(value: const T*): self.m_size = counting_size_calculation_policy_step(self.m_size, value, 1)
+
+    mutating func decrease_size(value: const T*): self.m_size = counting_size_calculation_policy_step(self.m_size, value, -1)
+
+    mutating func reset(): self.m_size = 0
+
+    func size(head: const SinglyLinkedListNode[T]*?) -> usize: return counting_size_calculation_policy_size(self.m_size, head)
+
+func counting_size_calculation_policy_step[T](size: usize, value: const T*, delta: isize) -> usize:
+    discard(value)
+    return (usize)((isize)size + delta)
+
+func counting_size_calculation_policy_size[T](size: usize, head: const SinglyLinkedListNode[T]*?) -> usize:
+    discard(head)
+    return size
+
+# mark: SinglyLinkedListIterator ================================================================
+
+## Ported from AK/SinglyLinkedList.h:22 AK::SinglyLinkedListIterator::operator==.
+pub func singly_linked_list_iterator_eq[T](this: const SinglyLinkedListIterator[T]*, other: SinglyLinkedListIterator[T]) -> bool:
+    return this.m_node == other.m_node
+
+## Ported from AK/SinglyLinkedList.h:23 AK::SinglyLinkedListIterator::operator!=.
+pub func singly_linked_list_iterator_ne[T](this: const SinglyLinkedListIterator[T]*, other: SinglyLinkedListIterator[T]) -> bool:
+    return this.m_node != other.m_node
+
+## Ported from AK/SinglyLinkedList.h:24 AK::SinglyLinkedListIterator::operator++.
+pub func singly_linked_list_iterator_inc[T](this: SinglyLinkedListIterator[T]*) -> SinglyLinkedListIterator[T]*:
+    this.m_prev = this.m_node
+    this.m_node = this.m_next
+    if let next = this.m_next:
+        this.m_next = next.next
+    return this
+
+## Ported from AK/SinglyLinkedList.h:32 AK::SinglyLinkedListIterator::operator*.
+pub func singly_linked_list_iterator_deref[T](this: SinglyLinkedListIterator[T]*) -> T*:
+    let node = this.m_node else trap("VERIFY: dereferencing the end of a SinglyLinkedList")
+    return &node.value
+
+## Ported from AK/SinglyLinkedList.h:36 AK::SinglyLinkedListIterator::operator->.
+pub func singly_linked_list_iterator_arrow[T](this: SinglyLinkedListIterator[T]*) -> T*:
+    return singly_linked_list_iterator_deref(this)
+
+## Ported from AK/SinglyLinkedList.h:40 AK::SinglyLinkedListIterator::is_end.
+pub func singly_linked_list_iterator_is_end[T](this: const SinglyLinkedListIterator[T]*) -> bool:
+    return this.m_node == none
+
+## Ported from AK/SinglyLinkedList.h:41 AK::SinglyLinkedListIterator::is_begin.
+pub func singly_linked_list_iterator_is_begin[T](this: const SinglyLinkedListIterator[T]*) -> bool:
+    return this.m_prev == none
+
+## Ported from AK/SinglyLinkedList.h:45 AK::SinglyLinkedListIterator::SinglyLinkedListIterator.
+pub func singly_linked_list_iterator_construct[T](this: SinglyLinkedListIterator[T]*, node: SinglyLinkedListNode[T]*?, prev: SinglyLinkedListNode[T]*? = none):
+    this.m_node = node
+    this.m_prev = prev
+    this.m_next = none
+    if let current = node:
+        this.m_next = current.next
+
+## The value the iterator is at, and the iterator moved past it; none at the end (the `for`
+## protocol over `*it` and `++it`).
+pub func singly_linked_list_iterator_next[T](this: SinglyLinkedListIterator[T]*) -> T*?:
+    let node = this.m_node else return none
+    discard(singly_linked_list_iterator_inc(this))
+    return &node.value
+
+# The iterator at `node`, `prev` before it (the private constructor).
+func singly_linked_list_make_iterator[T](node: SinglyLinkedListNode[T]*?, prev: SinglyLinkedListNode[T]*? = none) -> SinglyLinkedListIterator[T]:
+    var it: SinglyLinkedListIterator[T]
+    singly_linked_list_iterator_construct(&it, node, prev)
+    return it
+
+# mark: Node ====================================================================================
+
+## Ported from AK/SinglyLinkedList.h:60 AK::SinglyLinkedList::Node::Node(T&&).
+pub func singly_linked_list_node_construct[T](this: SinglyLinkedListNode[T]*, v: T):
+    this.value = v
+    this.next = none
+
+## Ported from AK/SinglyLinkedList.h:64 AK::SinglyLinkedList::Node::Node(T const&).
+pub func singly_linked_list_node_construct_2[T](this: SinglyLinkedListNode[T]*, v: T):
+    singly_linked_list_node_construct(this, v)
+
+# `new (nothrow) Node(value)`.
+func singly_linked_list_new_node[T](value: T) -> SinglyLinkedListNode[T]*?:
+    return new SinglyLinkedListNode[T](value = value, next = none) catch:
+        recover none
+
+# mark: SinglyLinkedList ========================================================================
+
+## Ported from AK/SinglyLinkedList.h:87 AK::SinglyLinkedList::is_empty.
+pub func singly_linked_list_is_empty[T, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*) -> bool:
+    return singly_linked_list_head_const(this) == none
+
+## Ported from AK/SinglyLinkedList.h:89 AK::SinglyLinkedList::size.
+pub func singly_linked_list_size[T, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*) -> usize:
+    return this.m_size_policy.size(this.m_head)
+
+## Ported from AK/SinglyLinkedList.h:94 AK::SinglyLinkedList::clear.
+pub func singly_linked_list_clear[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*):
+    var node = this.m_head
+    while let current = node:
+        let next = current.next
+        free(current)
+        node = next
+    this.m_head = none
+    this.m_tail = none
+    this.m_size_policy.reset()
+
+## Ported from AK/SinglyLinkedList.h:106 AK::SinglyLinkedList::first.
+pub func singly_linked_list_first[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*) -> T*:
+    let head = singly_linked_list_head(this) else trap("VERIFY: first() of an empty SinglyLinkedList")
+    return &head.value
+
+## Ported from AK/SinglyLinkedList.h:111 AK::SinglyLinkedList::first const.
+pub func singly_linked_list_first_const[T, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*) -> T:
+    let head = singly_linked_list_head_const(this) else trap("VERIFY: first() of an empty SinglyLinkedList")
+    return head.value
+
+## Ported from AK/SinglyLinkedList.h:116 AK::SinglyLinkedList::last.
+pub func singly_linked_list_last[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*) -> T*:
+    assert(singly_linked_list_head(this) != none)
+    let tail = singly_linked_list_tail(this) else trap("VERIFY: last() of an empty SinglyLinkedList")
+    return &tail.value
+
+## Ported from AK/SinglyLinkedList.h:121 AK::SinglyLinkedList::last const.
+pub func singly_linked_list_last_const[T, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*) -> T:
+    assert(singly_linked_list_head_const(this) != none)
+    let tail = singly_linked_list_tail_const(this) else trap("VERIFY: last() of an empty SinglyLinkedList")
+    return tail.value
+
+## Ported from AK/SinglyLinkedList.h:127 AK::SinglyLinkedList::take_first.
+pub func singly_linked_list_take_first[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*) -> T:
+    let prev_head = this.m_head else trap("VERIFY: take_first() of an empty SinglyLinkedList")
+    let value = *singly_linked_list_first(this)
+    if this.m_tail == this.m_head:
+        this.m_tail = none
+    this.m_head = prev_head.next
+    this.m_size_policy.decrease_size(&value)
+    free(prev_head)
+    return value
+
+## Ported from AK/SinglyLinkedList.h:141 AK::SinglyLinkedList::try_append.
+pub func singly_linked_list_try_append[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, value: T) -> !:
+    let node = singly_linked_list_new_node(value) else return try ak_error_throw(ak_error_from_errno(enomem))
+    this.m_size_policy.increase_size(&value)
+    if this.m_head == none:
+        this.m_head = node
+        this.m_tail = node
+        return
+    let tail = this.m_tail else trap("VERIFY: SinglyLinkedList without a tail")
+    tail.next = node
+    this.m_tail = node
+
+## Ported from AK/SinglyLinkedList.h:158 AK::SinglyLinkedList::try_prepend.
+pub func singly_linked_list_try_prepend[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, value: T) -> !:
+    let node = singly_linked_list_new_node(value) else return try ak_error_throw(ak_error_from_errno(enomem))
+    this.m_size_policy.increase_size(&value)
+    if this.m_head == none:
+        this.m_head = node
+        this.m_tail = node
+        return
+    node.next = this.m_head
+    this.m_head = node
+
+## Ported from AK/SinglyLinkedList.h:175 AK::SinglyLinkedList::append.
+pub func singly_linked_list_append[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, value: T):
+    singly_linked_list_try_append(this, value) else trap("MUST: SinglyLinkedList::append")
+
+## Ported from AK/SinglyLinkedList.h:181 AK::SinglyLinkedList::prepend.
+pub func singly_linked_list_prepend[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, value: T):
+    singly_linked_list_try_prepend(this, value) else trap("MUST: SinglyLinkedList::prepend")
+
+## Ported from AK/SinglyLinkedList.h:186 AK::SinglyLinkedList::contains_slow.
+pub func singly_linked_list_contains_slow[T: luce.Equatable, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*, value: T) -> bool:
+    let it = singly_linked_list_find_const(this, value)
+    return singly_linked_list_iterator_ne(&it, singly_linked_list_end_const(this))
+
+## Ported from AK/SinglyLinkedList.h:193 AK::SinglyLinkedList::begin.
+pub func singly_linked_list_begin[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*) -> SinglyLinkedListIterator[T]:
+    return singly_linked_list_make_iterator(this.m_head)
+
+## Ported from AK/SinglyLinkedList.h:194 AK::SinglyLinkedList::end.
+pub func singly_linked_list_end[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*) -> SinglyLinkedListIterator[T]:
+    discard(this)
+    var end: SinglyLinkedListIterator[T]
+    return end
+
+## Ported from AK/SinglyLinkedList.h:198 AK::SinglyLinkedList::begin const.
+pub func singly_linked_list_begin_const[T, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*) -> SinglyLinkedListIterator[T]:
+    return singly_linked_list_make_iterator(this.m_head)
+
+## Ported from AK/SinglyLinkedList.h:199 AK::SinglyLinkedList::end const.
+pub func singly_linked_list_end_const[T, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*) -> SinglyLinkedListIterator[T]:
+    discard(this)
+    var end: SinglyLinkedListIterator[T]
+    return end
+
+## Ported from AK/SinglyLinkedList.h:202 AK::SinglyLinkedList::find_if const (AK::find_if over
+## begin()..end()).
+pub func singly_linked_list_find_if_const[T, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*, pred: Function1[const T*, bool]) -> SinglyLinkedListIterator[T]:
+    var it = singly_linked_list_begin_const(this)
+    let end = singly_linked_list_end_const(this)
+    while singly_linked_list_iterator_ne(&it, end):
+        if function1_call(&pred, singly_linked_list_iterator_deref(&it)):
+            return it
+        discard(singly_linked_list_iterator_inc(&it))
+    return end
+
+## Ported from AK/SinglyLinkedList.h:208 AK::SinglyLinkedList::find_if.
+pub func singly_linked_list_find_if[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, pred: Function1[const T*, bool]) -> SinglyLinkedListIterator[T]:
+    return singly_linked_list_find_if_const(this, pred)
+
+# The predicate of find(): `Traits<T>::equals(entry, value)`.
+# workaround: compiler-issues/generic_function_value (the callback is a static method)
+struct SinglyLinkedListEqualsValue[T: luce.Equatable]:
+    var value: T
+
+    static func call(context: void*?, entry: const T*) -> bool:
+        let captures = (const SinglyLinkedListEqualsValue[T]*)(context else trap("SinglyLinkedList: no captures"))
+        return *entry == captures.value
+
+## Ported from AK/SinglyLinkedList.h:213 AK::SinglyLinkedList::find const.
+pub func singly_linked_list_find_const[T: luce.Equatable, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*, value: T) -> SinglyLinkedListIterator[T]:
+    var captures = SinglyLinkedListEqualsValue[T](value = value)
+    let equals: func(void*?, const T*) -> bool = SinglyLinkedListEqualsValue[T].call
+    return singly_linked_list_find_if_const(this, Function1[const T*, bool](call = equals, context = &captures))
+
+## Ported from AK/SinglyLinkedList.h:218 AK::SinglyLinkedList::find.
+pub func singly_linked_list_find[T: luce.Equatable, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, value: T) -> SinglyLinkedListIterator[T]:
+    return singly_linked_list_find_const(this, value)
+
+## Ported from AK/SinglyLinkedList.h:224 AK::SinglyLinkedList::try_insert_before.
+pub func singly_linked_list_try_insert_before[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, iterator: SinglyLinkedListIterator[T], value: T) -> !:
+    let node = singly_linked_list_new_node(value) else return try ak_error_throw(ak_error_from_errno(enomem))
+    this.m_size_policy.increase_size(&value)
+    node.next = iterator.m_node
+    if this.m_head == iterator.m_node:
+        this.m_head = node
+    if let prev = iterator.m_prev:
+        prev.next = node
+
+## Ported from AK/SinglyLinkedList.h:239 AK::SinglyLinkedList::try_insert_after.
+pub func singly_linked_list_try_insert_after[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, iterator: SinglyLinkedListIterator[T], value: T) -> !:
+    let current = iterator.m_node else return try singly_linked_list_try_append(this, value)
+
+    let node = singly_linked_list_new_node(value) else return try ak_error_throw(ak_error_from_errno(enomem))
+    this.m_size_policy.increase_size(&value)
+    node.next = current.next
+
+    current.next = node
+
+    if this.m_tail == (SinglyLinkedListNode[T]*?)current:
+        this.m_tail = node
+
+## Ported from AK/SinglyLinkedList.h:258 AK::SinglyLinkedList::insert_before.
+pub func singly_linked_list_insert_before[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, iterator: SinglyLinkedListIterator[T], value: T):
+    singly_linked_list_try_insert_before(this, iterator, value) else trap("MUST: SinglyLinkedList::insert_before")
+
+## Ported from AK/SinglyLinkedList.h:264 AK::SinglyLinkedList::insert_after.
+pub func singly_linked_list_insert_after[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, iterator: SinglyLinkedListIterator[T], value: T):
+    singly_linked_list_try_insert_after(this, iterator, value) else trap("MUST: SinglyLinkedList::insert_after")
+
+## Ported from AK/SinglyLinkedList.h:269 AK::SinglyLinkedList::remove.
+pub func singly_linked_list_remove[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, iterator: SinglyLinkedListIterator[T]) -> SinglyLinkedListIterator[T]:
+    assert(not singly_linked_list_iterator_is_end(&iterator))
+    let node = iterator.m_node else trap("unreachable")
+    if this.m_head == iterator.m_node:
+        this.m_head = node.next
+    if this.m_tail == iterator.m_node:
+        this.m_tail = iterator.m_prev
+    if let prev = iterator.m_prev:
+        prev.next = node.next
+    this.m_size_policy.decrease_size(&node.value)
+    var new_iterator: SinglyLinkedListIterator[T]
+    let next = node.next
+    new_iterator.m_node = next
+    if let following = next:
+        new_iterator.m_next = following.next
+    new_iterator.m_prev = iterator.m_prev
+    free(node)
+    return new_iterator
+
+## Ported from AK/SinglyLinkedList.h:290 AK::SinglyLinkedList::head.
+pub func singly_linked_list_head[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*) -> SinglyLinkedListNode[T]*?:
+    return this.m_head
+
+## Ported from AK/SinglyLinkedList.h:291 AK::SinglyLinkedList::head const.
+pub func singly_linked_list_head_const[T, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*) -> const SinglyLinkedListNode[T]*?:
+    return this.m_head
+
+## Ported from AK/SinglyLinkedList.h:293 AK::SinglyLinkedList::tail.
+pub func singly_linked_list_tail[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*) -> SinglyLinkedListNode[T]*?:
+    return this.m_tail
+
+## Ported from AK/SinglyLinkedList.h:294 AK::SinglyLinkedList::tail const.
+pub func singly_linked_list_tail_const[T, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*) -> const SinglyLinkedListNode[T]*?:
+    return this.m_tail

@@ -8,30 +8,35 @@
 #       §4.4). Regenerate rather than edit, except to fill a field the generator could not
 #       map.
 #
+#       Edited by region r01: the tree embeds its BaseRedBlackTree[K] first and records the
+#       member offset (the donor's pointer-to-member template argument) given to insert; the
+#       node embeds its base node first; the iterator is generic and a luce-base iterator.
+#
 #==============================================================================================
-
-# mark: ExtractIntrusiveRedBlackTreeTypes =======================================================
-
-## AK::Detail::ExtractIntrusiveRedBlackTreeTypes (AK/IntrusiveRedBlackTree.h:17).
-pub struct ExtractIntrusiveRedBlackTreeTypes:
-    pub var empty_: u8
 
 # mark: IntrusiveRedBlackTree ===================================================================
 
-## AK::Detail::IntrusiveRedBlackTree (AK/IntrusiveRedBlackTree.h:30): a generic struct.
+## AK::Detail::IntrusiveRedBlackTree (AK/IntrusiveRedBlackTree.h:30): a zero tree is empty.
+## `m_member` is offsetof(V, node field), recorded by insert.
 pub struct IntrusiveRedBlackTree[K, V, TContainer]:
-    pub var empty_: u8
+    pub var base: BaseRedBlackTree[K]
+    pub var m_member: usize
 
-# mark: BaseIterator ============================================================================
+## AK::Detail::IntrusiveRedBlackTree::BaseIterator (AK/IntrusiveRedBlackTree.h:78): the node an
+## iteration is at, the one before it and the member offset; also a luce-base iterator.
+pub struct BaseIterator[K, V, TContainer]: luce.Iterable[V*, BaseIterator[K, V, TContainer]], luce.Iterator[V*]:
+    pub var m_node: IntrusiveRedBlackTreeNode[K, V, TContainer]*?  # C++ default: { nullptr }
+    pub var m_prev: IntrusiveRedBlackTreeNode[K, V, TContainer]*?  # C++ default: { nullptr }
+    pub var m_member: usize
 
-## AK::Detail::IntrusiveRedBlackTree::BaseIterator (AK/IntrusiveRedBlackTree.h:78): a generic struct.
-pub struct BaseIterator[TElementType]:
-    pub var m_node: void*?  # unmapped: SubstitutedIntrusiveRedBlackTreeNode<K, V, Container>
-    pub var m_prev: void*?  # unmapped: SubstitutedIntrusiveRedBlackTreeNode<K, V, Container>
+    func iterator() -> BaseIterator[K, V, TContainer]: return self
+
+    mutating func next() -> V*?: return base_iterator_next(&self)
 
 # mark: IntrusiveRedBlackTreeNode ===============================================================
 
-## AK::Detail::IntrusiveRedBlackTreeNode (AK/IntrusiveRedBlackTree.h:189): a generic struct.
+## AK::Detail::IntrusiveRedBlackTreeNode (AK/IntrusiveRedBlackTree.h:182): a node embedded in a V.
 pub struct IntrusiveRedBlackTreeNode[K, V, TContainer]:
+    pub var base: BaseRedBlackTreeNode[K]
     pub var m_in_tree: bool  # C++ default: { false }
     pub var m_self: SelfReferenceIfNeeded[TContainer]

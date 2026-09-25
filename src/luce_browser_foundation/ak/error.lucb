@@ -136,3 +136,6 @@ pub let enomem: i32 = 12
 
 ## errno EINVAL (the same value on every supported target).
 pub let einval: i32 = 22
+
+## errno ENOENT (the same value on every supported target).
+pub let enoent: i32 = 2

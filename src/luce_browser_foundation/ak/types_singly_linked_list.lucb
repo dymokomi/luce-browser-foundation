@@ -8,24 +8,35 @@
 #       §4.4). Regenerate rather than edit, except to fill a field the generator could not
 #       map.
 #
+#       Edited by region r01: the node and iterator are generic over the element type; the
+#       iterator is a luce-base iterator; the size policy is a SizeCalculationPolicy[T]
+#       (singly_linked_list.lucb).
+#
 #==============================================================================================
 
 # mark: SinglyLinkedListIterator ================================================================
 
-## AK::SinglyLinkedListIterator (AK/SinglyLinkedList.h:19): a generic struct.
-pub struct SinglyLinkedListIterator[TListType, TElementType]:
-    pub var m_node: void*?  # unmapped: typename ListType::Node
-    pub var m_prev: void*?  # unmapped: typename ListType::Node
-    pub var m_next: void*?  # unmapped: typename ListType::Node
+## AK::SinglyLinkedListIterator (AK/SinglyLinkedList.h:19): the node an iteration is at, the one
+## before it and the one after it; also a luce-base iterator yielding a pointer to each value.
+pub struct SinglyLinkedListIterator[T]: luce.Iterable[T*, SinglyLinkedListIterator[T]], luce.Iterator[T*]:
+    pub var m_node: SinglyLinkedListNode[T]*?  # C++ default: { nullptr }
+    pub var m_prev: SinglyLinkedListNode[T]*?  # C++ default: { nullptr }
+    pub var m_next: SinglyLinkedListNode[T]*?  # C++ default: { nullptr }
+
+    func iterator() -> SinglyLinkedListIterator[T]: return self
+
+    mutating func next() -> T*?: return singly_linked_list_iterator_next(&self)
 
 # mark: SinglyLinkedList ========================================================================
 
-## AK::SinglyLinkedList (AK/SinglyLinkedList.h:57): a generic struct.
+## AK::SinglyLinkedList (AK/SinglyLinkedList.h:56): a zero SinglyLinkedList is empty.
+## TTSizeCalculationPolicy is DefaultSizeCalculationPolicy[T] or CountingSizeCalculationPolicy[T].
 pub struct SinglyLinkedList[T, TTSizeCalculationPolicy]:
-    pub var m_head: SinglyLinkedListNode*?  # C++ default: { nullptr }
-    pub var m_tail: SinglyLinkedListNode*?  # C++ default: { nullptr }
+    pub var m_head: SinglyLinkedListNode[T]*?  # C++ default: { nullptr }
+    pub var m_tail: SinglyLinkedListNode[T]*?  # C++ default: { nullptr }
     pub var m_size_policy: TTSizeCalculationPolicy  # C++ default: { }
 
-## AK::SinglyLinkedList::Node (AK/SinglyLinkedList.h:59): opaque in this phase (not in the phase-1 closure).
-pub struct SinglyLinkedListNode:
-    pub var opaque_: u8
+## AK::SinglyLinkedList::Node (AK/SinglyLinkedList.h:59).
+pub struct SinglyLinkedListNode[T]:
+    pub var value: T
+    pub var next: SinglyLinkedListNode[T]*?  # C++ default: { nullptr }

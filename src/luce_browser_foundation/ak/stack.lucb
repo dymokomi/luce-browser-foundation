@@ -1,0 +1,56 @@
+#==============================================================================================
+#
+#   stack - Stack<T, stack_size>: a bounded stack over a Vector
+#
+#   DESCRIPTION:
+#       Port of AK/Stack.h (lines 1-79). The stack_size template argument is the field
+#       m_stack_size, given to stack_construct, which reserves the capacity the donor's
+#       Vector<T, stack_size> has inline (so push's unchecked_append is valid).
+#       contains_slow compares with Traits (`TT`).
+#
+#==============================================================================================
+
+## AK::Stack<T, stack_size>: a stack of at most `capacity` values (the stack_size argument).
+pub func stack_construct[T](this: Stack[T]*, capacity: usize):
+    this.m_stack_size = capacity
+    vector_ensure_capacity(&this.m_stack, capacity)
+
+## Ported from AK/Stack.h:19 AK::Stack::push(T const&).
+pub func stack_push[T](this: Stack[T]*, item: T) -> bool:
+    if vector_size(&this.m_stack) >= this.m_stack_size:
+        return false
+
+    vector_unchecked_append_u(&this.m_stack, item)
+    return true
+
+## Ported from AK/Stack.h:28 AK::Stack::push(T&&).
+pub func stack_push_2[T](this: Stack[T]*, item: T) -> bool:
+    return stack_push(this, item)
+
+## Ported from AK/Stack.h:37 AK::Stack::is_empty.
+pub func stack_is_empty[T](this: const Stack[T]*) -> bool:
+    return vector_is_empty(&this.m_stack)
+
+## Ported from AK/Stack.h:42 AK::Stack::size.
+pub func stack_size[T](this: const Stack[T]*) -> usize:
+    return vector_size(&this.m_stack)
+
+## Ported from AK/Stack.h:47 AK::Stack::pop.
+pub func stack_pop[T](this: Stack[T]*) -> bool:
+    if stack_is_empty(this):
+        return false
+
+    vector_resize_and_keep_capacity(&this.m_stack, vector_size(&this.m_stack) - 1)
+    return true
+
+## Ported from AK/Stack.h:56 AK::Stack::top.
+pub func stack_top[T](this: Stack[T]*) -> T*:
+    return vector_last(&this.m_stack)
+
+## Ported from AK/Stack.h:61 AK::Stack::top const.
+pub func stack_top_const[T](this: const Stack[T]*) -> T:
+    return *vector_last_const(&this.m_stack)
+
+## Ported from AK/Stack.h:66 AK::Stack::contains_slow.
+pub func stack_contains_slow[T, TT: Traits[T]](this: const Stack[T]*, value: T) -> bool:
+    return vector_contains_slow[T, TT](&this.m_stack, value)

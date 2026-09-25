@@ -1,0 +1,213 @@
+#==============================================================================================
+#
+#   tests_red_black_tree - RedBlackTree<K, V> and IntrusiveRedBlackTree<&V::member>
+#
+#   DESCRIPTION:
+#       Ports of Tests/AK/TestRedBlackTree.cpp and TestIntrusiveRedBlackTree.cpp. The random
+#       key order comes from a fixed linear congruential generator instead of get_random, so
+#       the runs repeat. The RefPtr container cases do not apply (containers are raw
+#       pointers, DESIGN.md §2.6).
+#
+#==============================================================================================
+
+# A permutation of 0..<amount in a fixed pseudo-random order.
+func test_rbt_shuffled_keys(amount: usize) -> Vector[i32]:
+    var keys: Vector[i32]
+    for i in 0..<amount:
+        vector_append_t(&keys, (i32)i)
+    var state: u64 = 0x2545f4914f6cdd1d
+    for i in 0..<amount:
+        state = state *% 6364136223846793005 +% 1442695040888963407
+        swap_5(vector_at(&keys, i), vector_at(&keys, (usize)((state >> 33) % (u64)amount)))
+    return keys
+
+test "red_black_tree: construct":
+    var empty: RedBlackTree[i32, i32]
+    assert(base_red_black_tree_is_empty(&empty.base))
+    assert(base_red_black_tree_size(&empty.base) == 0)
+
+test "red_black_tree: ints":
+    var ints: RedBlackTree[i32, i32]
+    red_black_tree_insert(&ints, 1, 10)
+    red_black_tree_insert(&ints, 3, 20)
+    red_black_tree_insert(&ints, 2, 30)
+    assert(base_red_black_tree_size(&ints.base) == 3)
+    assert(*(red_black_tree_find(&ints, 3) else trap("missing")) == 20)
+    assert(*(red_black_tree_find(&ints, 2) else trap("missing")) == 30)
+    assert(*(red_black_tree_find(&ints, 1) else trap("missing")) == 10)
+    assert(not red_black_tree_remove(&ints, 4))
+    assert(red_black_tree_remove(&ints, 2))
+    assert(red_black_tree_remove(&ints, 1))
+    assert(red_black_tree_remove(&ints, 3))
+    assert(base_red_black_tree_size(&ints.base) == 0)
+
+test "red_black_tree: largest_smaller_than":
+    var ints: RedBlackTree[i32, i32]
+    red_black_tree_insert(&ints, 1, 10)
+    red_black_tree_insert(&ints, 11, 20)
+    red_black_tree_insert(&ints, 21, 30)
+    assert(base_red_black_tree_size(&ints.base) == 3)
+    assert(*(red_black_tree_find_largest_not_above(&ints, 3) else trap("missing")) == 10)
+    assert(*(red_black_tree_find_largest_not_above(&ints, 17) else trap("missing")) == 20)
+    assert(*(red_black_tree_find_largest_not_above(&ints, 22) else trap("missing")) == 30)
+    assert(red_black_tree_find_largest_not_above(&ints, -5) == none)
+    assert(*(red_black_tree_find_smallest_not_below(&ints, 12) else trap("missing")) == 30)
+
+test "red_black_tree: key_ordered_iteration":
+    with memory.heap:
+        let amount: usize = 10000
+        var tree: RedBlackTree[i32, usize]
+        let keys = test_rbt_shuffled_keys(amount)
+        # insert random keys
+        for key in vector_span_const(&keys):
+            red_black_tree_insert(&tree, key, (usize)key)
+        # check key-ordered iteration
+        var index: usize = 0
+        for value in red_black_tree_begin(&tree):
+            assert(*value == index)
+            index += 1
+        assert(index == amount)
+        # ensure we can remove all of them (aka, tree structure is not destroyed somehow)
+        for i in 0..<amount:
+            assert(red_black_tree_remove(&tree, (i32)i))
+        assert(base_red_black_tree_is_empty(&tree.base))
+
+test "red_black_tree: clear":
+    with memory.heap:
+        var tree: RedBlackTree[usize, usize]
+        for i in 0..<1000usize:
+            red_black_tree_insert(&tree, i, i)
+        red_black_tree_clear(&tree)
+        assert(base_red_black_tree_size(&tree.base) == 0)
+
+test "red_black_tree: find_smallest_not_below_iterator":
+    var tree: RedBlackTree[usize, usize]
+    for i in 0..<8usize:
+        let above_all = red_black_tree_find_smallest_not_below_iterator(&tree, i)
+        assert(red_black_tree_iterator_is_end(&above_all))
+        red_black_tree_insert(&tree, i, i)
+        let only_just_added_i_is_not_below = red_black_tree_find_smallest_not_below_iterator(&tree, i)
+        assert(not red_black_tree_iterator_is_end(&only_just_added_i_is_not_below))
+        assert(red_black_tree_iterator_key(&only_just_added_i_is_not_below) == i)
+    let smallest_not_below_two = red_black_tree_find_smallest_not_below_iterator(&tree, 2)
+    assert(red_black_tree_iterator_key(&smallest_not_below_two) == 2)
+    discard(red_black_tree_remove(&tree, 2))
+    let without_two = red_black_tree_find_smallest_not_below_iterator(&tree, 2)
+    assert(not red_black_tree_iterator_is_end(&without_two))
+    assert(red_black_tree_iterator_key(&without_two) == 3)
+    let one = red_black_tree_find_smallest_not_below_iterator(&tree, 1)
+    assert(red_black_tree_iterator_key(&one) == 1)
+    let three = red_black_tree_find_smallest_not_below_iterator(&tree, 3)
+    assert(red_black_tree_iterator_key(&three) == 3)
+    assert(not red_black_tree_iterator_is_begin(&three))
+
+test "red_black_tree: iterators_on_emptied_tree":
+    var tree: RedBlackTree[usize, usize]
+    red_black_tree_insert(&tree, 1, 1)
+    discard(red_black_tree_remove(&tree, 1))
+    assert(base_red_black_tree_size(&tree.base) == 0)
+    let begin_iterator = red_black_tree_begin(&tree)
+    let end_iterator = red_black_tree_end(&tree)
+    assert(red_black_tree_iterator_is_end(&begin_iterator))
+    assert(not red_black_tree_iterator_ne(&begin_iterator, end_iterator))
+
+test "red_black_tree: unsafe_remove and reverse steps":
+    var tree: RedBlackTree[i32, i32]
+    for i: i32 in 0..<20:
+        red_black_tree_insert(&tree, i, i * 2)
+    assert(red_black_tree_unsafe_remove(&tree, 7) == 14)
+    var it = red_black_tree_find_largest_not_above_iterator(&tree, 7)
+    assert(red_black_tree_iterator_key(&it) == 6)
+    discard(red_black_tree_iterator_inc(&it))
+    assert(*red_black_tree_iterator_deref(&it) == 16)
+    discard(red_black_tree_iterator_dec(&it))
+    assert(*red_black_tree_iterator_deref(&it) == 12)
+
+# mark: IntrusiveRedBlackTree ===================================================================
+
+struct IntrusiveTest:
+    var m_tree_node: IntrusiveRedBlackTreeNode[i32, IntrusiveTest, IntrusiveTest*?]
+    var m_some_value: i32
+
+type IntrusiveRBTree = IntrusiveRedBlackTree[i32, IntrusiveTest, IntrusiveTest*?]
+
+func test_irbt_member() -> usize:
+    return offsetof(IntrusiveTest, m_tree_node)
+
+func test_irbt_new(value: i32) -> IntrusiveTest*:
+    let entry = new IntrusiveTest else trap("out of memory")
+    entry.m_some_value = value
+    return entry
+
+test "intrusive_red_black_tree: construct":
+    var empty: IntrusiveRBTree
+    assert(base_red_black_tree_is_empty(&empty.base))
+    assert(base_red_black_tree_size(&empty.base) == 0)
+
+test "intrusive_red_black_tree: ints":
+    var tree: IntrusiveRBTree
+    let first = test_irbt_new(10)
+    intrusive_red_black_tree_insert(&tree, 1, first, test_irbt_member())
+    let second = test_irbt_new(20)
+    intrusive_red_black_tree_insert(&tree, 3, second, test_irbt_member())
+    let third = test_irbt_new(30)
+    intrusive_red_black_tree_insert(&tree, 2, third, test_irbt_member())
+    assert(base_red_black_tree_size(&tree.base) == 3)
+    assert((intrusive_red_black_tree_find(&tree, 3) else trap("missing")).m_some_value == 20)
+    assert((intrusive_red_black_tree_find(&tree, 2) else trap("missing")).m_some_value == 30)
+    assert((intrusive_red_black_tree_find(&tree, 1) else trap("missing")).m_some_value == 10)
+    assert(intrusive_red_black_tree_node_is_in_tree(&first.m_tree_node))
+    assert(intrusive_red_black_tree_node_key(&third.m_tree_node) == 2)
+    assert(not intrusive_red_black_tree_remove(&tree, 4))
+    assert(intrusive_red_black_tree_remove(&tree, 2))
+    assert(intrusive_red_black_tree_remove(&tree, 1))
+    assert(intrusive_red_black_tree_remove(&tree, 3))
+    assert(base_red_black_tree_size(&tree.base) == 0)
+    assert(not intrusive_red_black_tree_node_is_in_tree(&first.m_tree_node))
+
+test "intrusive_red_black_tree: largest_smaller_than":
+    var tree: IntrusiveRBTree
+    intrusive_red_black_tree_insert(&tree, 1, test_irbt_new(10), test_irbt_member())
+    intrusive_red_black_tree_insert(&tree, 11, test_irbt_new(20), test_irbt_member())
+    intrusive_red_black_tree_insert(&tree, 21, test_irbt_new(30), test_irbt_member())
+    assert(base_red_black_tree_size(&tree.base) == 3)
+    assert((intrusive_red_black_tree_find_largest_not_above(&tree, 3) else trap("missing")).m_some_value == 10)
+    assert((intrusive_red_black_tree_find_largest_not_above(&tree, 17) else trap("missing")).m_some_value == 20)
+    assert((intrusive_red_black_tree_find_largest_not_above(&tree, 22) else trap("missing")).m_some_value == 30)
+    assert(intrusive_red_black_tree_find_largest_not_above(&tree, -5) == none)
+    assert(intrusive_red_black_tree_remove(&tree, 1))
+    assert(intrusive_red_black_tree_remove(&tree, 11))
+    assert(intrusive_red_black_tree_remove(&tree, 21))
+
+test "intrusive_red_black_tree: key_ordered_iteration":
+    with memory.heap:
+        let amount: usize = 10000
+        var tree: IntrusiveRBTree
+        let keys = test_rbt_shuffled_keys(amount)
+        for key in vector_span_const(&keys):
+            intrusive_red_black_tree_insert(&tree, key, test_irbt_new(key), test_irbt_member())
+        var index: i32 = 0
+        for value in intrusive_red_black_tree_begin(&tree):
+            assert(value.m_some_value == index)
+            index += 1
+        assert(index == (i32)amount)
+        for i in 0..<amount:
+            assert(intrusive_red_black_tree_remove(&tree, (i32)i))
+
+test "intrusive_red_black_tree: clear and begin_from":
+    with memory.heap:
+        var tree: IntrusiveRBTree
+        var entries: Vector[IntrusiveTest*]
+        for i: i32 in 0..<1000:
+            let entry = test_irbt_new(i)
+            intrusive_red_black_tree_insert(&tree, i, entry, test_irbt_member())
+            vector_append_t(&entries, entry)
+        var it = intrusive_red_black_tree_begin_from_k(&tree, 500)
+        assert(base_iterator_deref(&it).m_some_value == 500)
+        discard(base_iterator_inc(&it))
+        assert(base_iterator_key(&it) == 501)
+        var from_value = intrusive_red_black_tree_begin_from_v(&tree, *vector_at(&entries, 10))
+        assert(base_iterator_deref(&from_value).m_some_value == 10)
+        intrusive_red_black_tree_clear(&tree)
+        assert(base_red_black_tree_size(&tree.base) == 0)
+        assert(not intrusive_red_black_tree_node_is_in_tree(&(*vector_at(&entries, 500)).m_tree_node))

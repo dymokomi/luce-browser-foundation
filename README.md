@@ -28,7 +28,8 @@ of this repository.
 
 ## Testing
 
-`./test.sh` type-checks every module.
+`./test.sh` type-checks every module (failing on any `-W` warning) and runs the unit tests of the
+modules that have them (`ak`: region r01, ported from `Tests/AK`).
 
 ## License
 

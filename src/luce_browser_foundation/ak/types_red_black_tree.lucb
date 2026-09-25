@@ -7,29 +7,54 @@
 #       AK/RedBlackTree.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
 #       Regenerate rather than edit, except to fill a field the generator could not map.
 #
+#       Edited by region r01: the node is generic over the key (BaseRedBlackTreeNode[K],
+#       with the Color enum as RedBlackTreeColor); RedBlackTree[K, V] embeds its
+#       BaseRedBlackTree[K] first and RedBlackTreeNode[K, V] its base node first, so the
+#       base functions take them by cast; the iterator is generic over K and V and is a
+#       luce-base iterator.
+#
 #==============================================================================================
+
+## AK::BaseRedBlackTree::Color (AK/RedBlackTree.h:22).
+pub enum RedBlackTreeColor as u8:
+    red = 0
+    black = 1
 
 # mark: BaseRedBlackTree ========================================================================
 
-## AK::BaseRedBlackTree (AK/RedBlackTree.h:17): a generic struct.
+## AK::BaseRedBlackTree (AK/RedBlackTree.h:16): a zero tree is empty.
 pub struct BaseRedBlackTree[K]:
-    pub var m_root: BaseRedBlackTreeNode*?  # C++ default: { nullptr }
+    pub var m_root: BaseRedBlackTreeNode[K]*?  # C++ default: { nullptr }
     pub var m_size: usize  # C++ default: { 0 }
-    pub var m_minimum: BaseRedBlackTreeNode*?  # C++ default: { nullptr }
+    pub var m_minimum: BaseRedBlackTreeNode[K]*?  # C++ default: { nullptr } (maintained for O(1) begin())
 
-## AK::BaseRedBlackTree::Node (AK/RedBlackTree.h:29): opaque in this phase (not in the phase-1 closure).
-pub struct BaseRedBlackTreeNode:
-    pub var opaque_: u8
+## AK::BaseRedBlackTree::Node (AK/RedBlackTree.h:26).
+pub struct BaseRedBlackTreeNode[K]:
+    pub var left_child: BaseRedBlackTreeNode[K]*?  # C++ default: { nullptr }
+    pub var right_child: BaseRedBlackTreeNode[K]*?  # C++ default: { nullptr }
+    pub var parent: BaseRedBlackTreeNode[K]*?  # C++ default: { nullptr }
+    pub var color: RedBlackTreeColor  # C++ default: { Color::Red }
+    pub var key: K
 
 # mark: RedBlackTreeIterator ====================================================================
 
-## AK::RedBlackTreeIterator (AK/RedBlackTree.h:404): a generic struct.
-pub struct RedBlackTreeIterator[TTreeType, TElementType]:
-    pub var m_node: void*?  # unmapped: typename TreeType::Node
-    pub var m_prev: void*?  # unmapped: typename TreeType::Node
+## AK::RedBlackTreeIterator (AK/RedBlackTree.h:437): the node an iteration is at and the one
+## before it; also a luce-base iterator yielding a pointer to each value in key order.
+pub struct RedBlackTreeIterator[K, V]: luce.Iterable[V*, RedBlackTreeIterator[K, V]], luce.Iterator[V*]:
+    pub var m_node: RedBlackTreeNode[K, V]*?  # C++ default: { nullptr }
+    pub var m_prev: RedBlackTreeNode[K, V]*?  # C++ default: { nullptr }
+
+    func iterator() -> RedBlackTreeIterator[K, V]: return self
+
+    mutating func next() -> V*?: return red_black_tree_iterator_next(&self)
 
 # mark: RedBlackTree ============================================================================
 
-## AK::RedBlackTree (AK/RedBlackTree.h:444): a generic struct.
+## AK::RedBlackTree (AK/RedBlackTree.h:477): a zero tree is empty.
 pub struct RedBlackTree[K, V]:
-    pub var empty_: u8
+    pub var base: BaseRedBlackTree[K]
+
+## AK::RedBlackTree::Node (AK/RedBlackTree.h:595): the base node first, then the value.
+pub struct RedBlackTreeNode[K, V]:
+    pub var base: BaseRedBlackTreeNode[K]
+    pub var value: V
