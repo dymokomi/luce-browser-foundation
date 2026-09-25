@@ -1,0 +1,138 @@
+#==============================================================================================
+#
+#   error - AK::Error, and how ErrorOr<T> maps onto luce-base failures
+#
+#   DESCRIPTION:
+#       Port of AK/Error.h (lines 1-191), AK/Error.cpp (the Windows constructors are not
+#       built on the supported targets) and AK/Try.h.
+#
+#       DESIGN.md §2.10: `ErrorOr<T>` is `T!`, `TRY(x)` is `try x` and `MUST(x)` is
+#       `x else trap("MUST: ...")`. A failure made from a string literal is
+#       `error(ak_error, "literal")`; one made from an errno or a syscall is
+#       `ak_error_throw(ak_error_from_errno(code))`, which keeps the code and syscall
+#       name in a per-thread slot and fails with ak_errno_error. `release_error()` on a
+#       caught failure is `ak_error_from_failure(failure)`.
+#
+#==============================================================================================
+
+## The AK::Error of the most recent errno or syscall failure of this thread (DESIGN.md §2.10):
+## what ak_error_throw stored before failing with ak_errno_error.
+pub local var ak_pending_error: AkError
+
+# The text of a StringView known to hold a message (string literals are UTF-8).
+func ak_error_message(view: StringView) -> str:
+    let characters = view.m_characters else return ""
+    return (str)(const u8[])u8[]((u8*)characters, view.m_length)
+
+## Fails with `e` (the `return error;` of a function returning ErrorOr<T>): a string-literal
+## error fails with ak_error and the literal as the message; an errno, syscall or Windows error
+## is stored in ak_pending_error and fails with ak_errno_error.
+pub func ak_error_throw(e: AkError) -> never!:
+    if e.m_kind == AkErrorKind.string_literal:
+        error(ak_error, ak_error_message(e.m_string_literal))
+    ak_pending_error = e
+    if e.m_kind == AkErrorKind.syscall:
+        error(ak_errno_error, ak_error_message(e.m_string_literal))
+    error(ak_errno_error, "errno")
+
+## The AK::Error a caught failure stands for (`result.release_error()`): the pending errno error
+## for ak_errno_error, otherwise a string-literal error holding the failure's message.
+pub func ak_error_from_failure(failure: Error) -> AkError:
+    if failure.code == ak_errno_error:
+        return ak_pending_error
+    return ak_error_from_string_view_string_view(StringView(m_characters = failure.message.bytes.data, m_length = failure.message.length))
+
+## Ported from AK/Error.h:25 AK::Error::from_errno.
+pub func ak_error_from_errno(code: i32) -> AkError:
+    var e: AkError
+    ak_error_construct_i32(&e, code, AkErrorKind.errno)
+    return e
+
+## Ported from AK/Error.h:30 AK::Error::from_syscall.
+pub func ak_error_from_syscall(syscall_name: StringView, code: i32) -> AkError:
+    var e: AkError
+    ak_error_construct_string_view_i32(&e, syscall_name, code)
+    return e
+
+## Ported from AK/Error.h:47 AK::Error::from_string_view.
+# Prefer `from_string_literal` when directly typing out an error message:
+#
+#     return Error::from_string_literal("Class: Some failure");
+#
+# If you need to return a static string based on a dynamic condition (like picking an error from an array), then
+# prefer `from_string_view` instead.
+pub func ak_error_from_string_view_string_view(string_literal: StringView) -> AkError:
+    var e: AkError
+    ak_error_construct_string_view(&e, string_literal)
+    return e
+
+## Ported from AK/Error.h:53 AK::Error::from_string_view (ByteString, String, FlyString).
+# `Error::from_string_view(ByteString::formatted(...))` is a somewhat common mistake, which leads to a UAF
+# situation. The donor rejects it at compile time (static_assert); here it traps.
+pub func ak_error_from_string_view_t[T](arg0: T) -> AkError:
+    discard(arg0)
+    trap("VERIFY_NOT_REACHED: Error::from_string_view(String) is almost always a use-after-free")
+
+## Ported from AK/Error.h:67 AK::Error::copy.
+pub func ak_error_copy(error_: AkError) -> AkError:
+    return error_
+
+## Ported from AK/Error.h:75 AK::Error::operator==.
+pub func ak_error_eq(this: const AkError*, other: AkError) -> bool:
+    return this.m_code == other.m_code and string_view_bytes_equal(this.m_string_literal, other.m_string_literal) and this.m_kind == other.m_kind
+
+# StringView::operator== on the two literals: the same bytes.
+func string_view_bytes_equal(a: StringView, b: StringView) -> bool:
+    if a.m_length != b.m_length:
+        return false
+    if a.m_length == 0:
+        return true
+    let pa = a.m_characters else return false
+    let pb = b.m_characters else return false
+    for i in 0..<a.m_length:
+        if pa[i] != pb[i]:
+            return false
+    return true
+
+## Ported from AK/Error.h:80 AK::Error::is_errno.
+pub func ak_error_is_errno(this: const AkError*) -> bool:
+    return this.m_kind == AkErrorKind.errno or this.m_kind == AkErrorKind.syscall
+
+## Ported from AK/Error.h:81 AK::Error::is_windows_error.
+pub func ak_error_is_windows_error(this: const AkError*) -> bool:
+    return this.m_kind == AkErrorKind.windows
+
+## Ported from AK/Error.h:83 AK::Error::string_literal.
+pub func ak_error_string_literal(this: const AkError*) -> StringView:
+    return this.m_string_literal
+
+## Ported from AK/Error.h:84 AK::Error::code.
+pub func ak_error_code(this: const AkError*) -> i32:
+    return this.m_code
+
+## Ported from AK/Error.h:85 AK::Error::kind.
+pub func ak_error_kind(this: const AkError*) -> AkErrorKind:
+    return this.m_kind
+
+## Ported from AK/Error.h:88 AK::Error::Error.
+pub func ak_error_construct_i32(this: AkError*, code: i32, kind: AkErrorKind):
+    this.m_code = code
+    this.m_kind = kind
+    assert(code != 0)
+
+## Ported from AK/Error.h:95 AK::Error::Error.
+pub func ak_error_construct_string_view(this: AkError*, string_literal: StringView):
+    this.m_string_literal = string_literal
+    this.m_kind = AkErrorKind.string_literal
+
+## Ported from AK/Error.h:101 AK::Error::Error.
+pub func ak_error_construct_string_view_i32(this: AkError*, syscall_name: StringView, code: i32):
+    this.m_string_literal = syscall_name
+    this.m_code = code
+    this.m_kind = AkErrorKind.syscall
+
+## errno ENOMEM (the same value on every supported target).
+pub let enomem: i32 = 12
+
+## errno EINVAL (the same value on every supported target).
+pub let einval: i32 = 22

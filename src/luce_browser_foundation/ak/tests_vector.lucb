@@ -1,0 +1,373 @@
+#==============================================================================================
+#
+#   tests_vector - Vector<T>, SimpleIterator, SimpleReverseIterator, find, all_of, any_of
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestVector.cpp. The ByteString cases use `str` elements (ByteString
+#       is region r02); the inline-capacity cases do not apply (inline capacity is dropped);
+#       Vector<int&> is Vector[i32*]. Also the cases of TestAllOf.cpp, TestAnyOf.cpp and
+#       TestFind.cpp that run over a Vector.
+#
+#==============================================================================================
+
+# Predicates used below: a capture struct and a function taking its address (DESIGN.md §2.7).
+struct TestVectorLimit:
+    var limit: i32
+
+func test_vector_greater_than(context: void*?, value: const i32*) -> bool:
+    let captures = (const TestVectorLimit*)(context else trap("no captures"))
+    return *value > captures.limit
+
+func test_vector_equals(context: void*?, value: const i32*) -> bool:
+    let captures = (const TestVectorLimit*)(context else trap("no captures"))
+    return *value == captures.limit
+
+func test_vector_always(context: void*?, value: const i32*) -> bool:
+    discard(value)
+    return context != none
+
+func test_vector_make(values: const i32[]) -> Vector[i32]:
+    var v: Vector[i32]
+    vector_construct_opaque(&v, values)
+    return v
+
+func test_vector_is_even(context: void*?, value: const i32*) -> bool:
+    discard(context)
+    return *value % 2 == 0
+
+test "vector: construct":
+    var v: Vector[i32]
+    vector_construct(&v)
+    assert(vector_is_empty(&v))
+    assert(vector_size(&v) == 0)
+
+test "vector: ints":
+    var ints: Vector[i32]
+    vector_append_t(&ints, 1)
+    vector_append_t(&ints, 2)
+    vector_append_t(&ints, 3)
+    assert(vector_size(&ints) == 3)
+    assert(vector_take_last(&ints) == 3)
+    assert(vector_size(&ints) == 2)
+    assert(vector_take_last(&ints) == 2)
+    assert(vector_size(&ints) == 1)
+    assert(vector_take_last(&ints) == 1)
+    assert(vector_size(&ints) == 0)
+    vector_clear(&ints)
+    assert(vector_size(&ints) == 0)
+
+test "vector: strings":
+    var strings: Vector[str]
+    vector_append_t(&strings, "ABC")
+    vector_append_t(&strings, "DEF")
+    var loop_counter = 0
+    for string in vector_span(&strings):
+        assert(string.length != 0)
+        loop_counter += 1
+    assert(loop_counter == 2)
+
+test "vector: strings_insert_ordered":
+    var strings: Vector[str]
+    vector_append_t(&strings, "abc")
+    vector_append_t(&strings, "def")
+    vector_append_t(&strings, "ghi")
+    var index: usize = 99
+    vector_insert_before_matching(&strings, "f-g", Function1[const str*, bool](call = test_vector_after_f_g, context = none), 0, &index)
+    assert(index == 2)
+    assert(*vector_at(&strings, 0) == "abc")
+    assert(*vector_at(&strings, 1) == "def")
+    assert(*vector_at(&strings, 2) == "f-g")
+    assert(*vector_at(&strings, 3) == "ghi")
+
+func test_vector_after_f_g(context: void*?, entry: const str*) -> bool:
+    discard(context)
+    return "f-g".compare(*entry) < 0
+
+test "vector: prepend_vector":
+    var ints = test_vector_make([1, 2, 3])
+    var more_ints = test_vector_make([4, 5, 6])
+    vector_prepend_vector(&ints, &more_ints)
+    assert(vector_size(&ints) == 6)
+    assert(vector_size(&more_ints) == 0)
+    let expected: i32[6] = [4, 5, 6, 1, 2, 3]
+    for i in 0..<6usize:
+        assert(*vector_at(&ints, i) == expected[i])
+    vector_prepend_vector(&ints, &more_ints)
+    assert(vector_size(&ints) == 6)
+    assert(vector_size(&more_ints) == 0)
+    vector_prepend_vector(&more_ints, &ints)
+    assert(vector_size(&more_ints) == 6)
+    assert(vector_size(&ints) == 0)
+
+struct TestVectorSubObject:
+    var value: i32
+
+struct TestVectorObject:
+    var subobject: TestVectorSubObject*?
+
+test "vector: prepend_vector_object":
+    var objects: Vector[TestVectorObject]
+    var more_objects: Vector[TestVectorObject]
+    for i: i32 in 1..=3:
+        let sub = new TestVectorSubObject(value = i) else trap("out of memory")
+        vector_append_t(&objects, TestVectorObject(subobject = sub))
+    for i: i32 in 4..=6:
+        let sub = new TestVectorSubObject(value = i) else trap("out of memory")
+        vector_append_t(&more_objects, TestVectorObject(subobject = sub))
+    assert(vector_size(&objects) == 3)
+    vector_prepend_vector(&objects, &more_objects)
+    assert(vector_size(&more_objects) == 0)
+    assert(vector_size(&objects) == 6)
+    let expected: i32[6] = [4, 5, 6, 1, 2, 3]
+    for i in 0..<6usize:
+        let sub = vector_at(&objects, i).subobject else trap("null")
+        assert(sub.value == expected[i])
+
+test "vector: vector_compare":
+    with memory.heap:
+        var ints: Vector[i32]
+        var same_ints: Vector[i32]
+        for i: i32 in 0..<1000:
+            vector_append_t(&ints, i)
+            vector_append_t(&same_ints, i)
+        assert(vector_size(&ints) == 1000)
+        assert(vector_eq(&ints, &same_ints))
+        var strings: Vector[str]
+        var same_strings: Vector[str]
+        for i in 0..<1000:
+            let text = "odd" if i % 2 == 1 else "even"
+            vector_append_t(&strings, text)
+            vector_append_t(&same_strings, text)
+        assert(vector_eq(&strings, &same_strings))
+
+test "vector: grow_and_clear":
+    var strings: Vector[str]
+    for i in 0..<32:
+        vector_append_t(&strings, "x" if i < 31 else "31")
+    assert(vector_size(&strings) == 32)
+    assert(*vector_at(&strings, 31) == "31")
+    vector_clear(&strings)
+    assert(vector_size(&strings) == 0)
+    assert(vector_capacity(&strings) == 0)
+    for i in 0..<32:
+        discard(i)
+        vector_append_t(&strings, "y")
+    vector_clear_with_capacity(&strings)
+    assert(vector_size(&strings) == 0)
+    assert(vector_capacity(&strings) >= 32)
+
+test "vector: append_and_remove_trivial":
+    with memory.heap:
+        var ints: Vector[i32]
+        for i: i32 in 0..<10000:
+            vector_append_t(&ints, i)
+        var tmp: Vector[i32]
+        vector_extend_2(&tmp, &ints)
+        assert(vector_size(&tmp) == 10000)
+        assert(vector_remove_all_matching(&ints, Function1[const i32*, bool](call = test_vector_is_even, context = none)))
+        assert(vector_size(&ints) == 5000)
+        while not vector_is_empty(&tmp):
+            vector_remove(&tmp, 0)
+        assert(vector_size(&tmp) == 0)
+
+test "vector: vector_remove":
+    var ints = test_vector_make([1, 2, 3, 4, 5])
+    vector_remove(&ints, 1)
+    assert(vector_size(&ints) == 4)
+    assert(*vector_at(&ints, 0) == 1)
+    assert(*vector_at(&ints, 1) == 3)
+    assert(*vector_at(&ints, 2) == 4)
+    assert(*vector_at(&ints, 3) == 5)
+    vector_remove(&ints, 0)
+    assert(vector_size(&ints) == 3)
+    assert(*vector_at(&ints, 0) == 3)
+    discard(vector_take_last(&ints))
+    assert(vector_size(&ints) == 2)
+    assert(*vector_at(&ints, 1) == 4)
+    discard(vector_take_first(&ints))
+    assert(vector_size(&ints) == 1)
+    assert(*vector_at(&ints, 0) == 4)
+    var more = test_vector_make([1, 2, 3, 4, 5, 6])
+    vector_remove_usize(&more, 1, 3)
+    assert(vector_size(&more) == 3)
+    assert(*vector_at(&more, 1) == 5)
+    assert(vector_take(&more, 1) == 5)
+    assert(vector_unstable_take(&more, 0) == 1)
+    assert(*vector_at(&more, 0) == 6)
+
+test "vector: remove_all_matching":
+    var ints = test_vector_make([1, 2, 3, 4])
+    assert(vector_size(&ints) == 4)
+    var two = TestVectorLimit(limit = 2)
+    assert(vector_remove_all_matching(&ints, Function1[const i32*, bool](call = test_vector_greater_than, context = &two)))
+    assert(not vector_remove_all_matching(&ints, Function1[const i32*, bool](call = test_vector_always, context = none)))
+    assert(vector_size(&ints) == 2)
+    assert(vector_remove_all_matching(&ints, Function1[const i32*, bool](call = test_vector_always, context = &two)))
+    assert(vector_is_empty(&ints))
+    assert(not vector_remove_all_matching(&ints, Function1[const i32*, bool](call = test_vector_always, context = &two)))
+    var more = test_vector_make([1, 5, 2, 6])
+    assert(vector_remove_first_matching(&more, Function1[const i32*, bool](call = test_vector_greater_than, context = &two)))
+    assert(vector_size(&more) == 3)
+    assert(*vector_at(&more, 1) == 2)
+
+test "vector: insert_trivial":
+    var ints = test_vector_make([0, 10, 20, 30, 40])
+    vector_insert(&ints, 2, 15)
+    let expected: i32[6] = [0, 10, 15, 20, 30, 40]
+    assert(vector_size(&ints) == 6)
+    for i in 0..<6usize:
+        assert(*vector_at(&ints, i) == expected[i])
+    vector_prepend_u(&ints, -1)
+    assert(*vector_first(&ints) == -1)
+    assert(*vector_last(&ints) == 40)
+    vector_try_insert(&ints, 99, 1) catch failure:
+        assert(failure.code == ak_errno_error)
+        assert(ak_pending_error.m_code == einval)
+        recover ()
+
+test "vector: resize_initializes":
+    var ints: Vector[TestVectorLimit]
+    vector_resize(&ints, 32)
+    for idx in 0..<32usize:
+        assert(vector_at(&ints, idx).limit == 0)
+    vector_resize_with_default_value(&ints, 40, TestVectorLimit(limit = 7))
+    assert(vector_at(&ints, 39).limit == 7)
+    vector_shrink(&ints, 10)
+    assert(vector_size(&ints) == 10)
+    vector_shrink_to_fit(&ints)
+    assert(vector_capacity(&ints) == 10)
+
+test "vector: should_compare_vectors":
+    var a: Vector[i32]
+    var b: Vector[i32]
+    assert(vector_eq(&a, &b))
+    vector_append_t(&a, 1)
+    assert(not vector_eq(&a, &b))
+    vector_append_t(&b, 1)
+    assert(vector_eq(&a, &b))
+    vector_append_t(&a, 42)
+    vector_append_t(&b, 17)
+    assert(not vector_eq(&a, &b))
+    discard(vector_take_last(&a))
+    assert(not vector_eq(&a, &b))
+
+test "vector: should_find":
+    var v = test_vector_make([1, 2, 3, 4, 0, 6, 7, 8, 0, 0])
+    let begin = vector_begin(&v)
+    let expected = simple_iterator_add(&begin, 4)
+    assert(simple_iterator_eq(&expected, vector_find(&v, 0)))
+    var zero = TestVectorLimit(limit = 0)
+    assert(simple_iterator_eq(&expected, vector_find_if(&v, Function1[const i32*, bool](call = test_vector_equals, context = &zero))))
+    assert((vector_find_first_index(&v, 0) else 99) == 4)
+    assert(vector_find_first_index(&v, 42) == none)
+    assert((vector_find_first_index_if(&v, Function1[const i32*, bool](call = test_vector_equals, context = &zero)) else 99) == 4)
+    var other = TestVectorLimit(limit = 123)
+    assert(vector_find_first_index_if(&v, Function1[const i32*, bool](call = test_vector_equals, context = &other)) == none)
+    assert(vector_contains(&v, Function1[const i32*, bool](call = test_vector_equals, context = &zero)))
+    assert(not vector_contains(&v, Function1[const i32*, bool](call = test_vector_equals, context = &other)))
+
+test "vector: contains_in_range and contains_slow":
+    var v = test_vector_make([1, 2, 3, 4, 5])
+    assert(vector_contains_in_range[i32, I32Traits](&v, 1, 0, 4))
+    assert(vector_contains_in_range[i32, I32Traits](&v, 5, 0, 4))
+    assert(vector_contains_in_range[i32, I32Traits](&v, 3, 0, 4))
+    assert(not vector_contains_in_range[i32, I32Traits](&v, 6, 0, 4))
+    assert(not vector_contains_in_range[i32, I32Traits](&v, 2, 2, 4))
+    assert(vector_contains_slow[i32, I32Traits](&v, 4))
+    assert(not vector_contains_slow[i32, I32Traits](&v, 9))
+
+test "vector: can_store_references":
+    var my_integer: i32 = 42
+    var references: Vector[i32*]
+    vector_append_t(&references, &my_integer)
+    vector_prepend_u(&references, &my_integer)
+    assert(*vector_first(&references) == *vector_last(&references))
+    var other_references: Vector[i32*]
+    vector_extend_2(&other_references, &references)
+    assert(*vector_first(&other_references) == &my_integer)
+    let copy = vector_clone(&references)
+    assert(*vector_first_const(&copy) == &my_integer)
+    let it = vector_find(&references, &my_integer)
+    assert(not simple_iterator_is_end(&it))
+    assert(*simple_iterator_deref(&it) == 42)
+    vector_remove(&references, 0)
+    vector_ensure_capacity(&references, 10)
+    assert(vector_take_first(&references) == &my_integer)
+
+test "vector: rbegin, rend and reverse loops":
+    var v = test_vector_make([1, 2, 3, 4, 5, 6, 7, 8, 0])
+    let begin = vector_begin(&v)
+    let expected = simple_iterator_add(&begin, 4)
+    let rbegin = vector_rbegin(&v)
+    let expected_in_reverse = simple_reverse_iterator_add(&rbegin, 4)
+    assert(simple_iterator_deref(&expected) == simple_reverse_iterator_deref_const(&expected_in_reverse))
+    let end = vector_end(&v)
+    let before_end = simple_iterator_sub_isize(&end, 5)
+    let rend = vector_rend(&v)
+    let before_rend = simple_reverse_iterator_sub(&rend, 5)
+    assert(simple_iterator_deref(&before_end) == simple_reverse_iterator_deref_const(&before_rend))
+    var w = test_vector_make([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    var index: i32 = 9
+    var rev = vector_rbegin(&w)
+    while simple_reverse_iterator_ne(&rev, vector_rend(&w)):
+        assert(simple_reverse_iterator_deref_const(&rev) == index)
+        index -= 1
+        discard(simple_reverse_iterator_inc(&rev))
+    assert(index == -1)
+    let wrapper = vector_in_reverse(&w)
+    var item = reverse_wrapper_begin[i32, Vector[i32]](wrapper)
+    index = 9
+    while simple_reverse_iterator_ne(&item, reverse_wrapper_end[Vector[i32], i32](wrapper)):
+        assert(*simple_reverse_iterator_deref(&item) == index)
+        index -= 1
+        discard(simple_reverse_iterator_inc(&item))
+    assert(index == -1)
+
+test "vector: remove_all":
+    var v0 = test_vector_make([1, 2, 3, 2, 4, 2, 5])
+    let indices: usize[3] = [1, 4, 6]
+    vector_remove_all_t_it(&v0, indices)
+    assert(vector_size(&v0) == 4)
+    assert(*vector_at(&v0, 0) == 1)
+    assert(*vector_at(&v0, 1) == 3)
+    assert(*vector_at(&v0, 2) == 2)
+    assert(*vector_at(&v0, 3) == 2)
+    var v1 = test_vector_make([1, 2, 3, 4, 5])
+    let all: usize[5] = [0, 1, 2, 3, 4]
+    vector_remove_all_t_it(&v1, all)
+    assert(vector_size(&v1) == 0)
+    var v2 = test_vector_make([1, 2, 3, 4, 5])
+    var none_: Vector[usize]
+    vector_remove_all_t_is(&v2, &none_)
+    assert(vector_size(&v2) == 5)
+    assert(*vector_at(&v2, 4) == 5)
+
+test "vector: unsafe_last":
+    var v: Vector[i32]
+    vector_append_t(&v, 1)
+    vector_append_t(&v, 2)
+    assert(*vector_unsafe_last(&v) == 2)
+    assert(vector_unsafe_take_last(&v) == 2)
+    assert(*vector_unsafe_last(&v) == 1)
+
+test "vector: atomic storage":
+    var bytes = vector_create_atomic[u8]()
+    for i: u8 in 0..<200:
+        vector_append_t(&bytes, i)
+    assert(vector_size(&bytes) == 200)
+    assert(*vector_at(&bytes, 199) == 199)
+
+test "all_of and any_of over a vector":
+    var v = test_vector_make([2, 4, 6])
+    assert(all_of_t_container(&v, Function1[const i32*, bool](call = test_vector_is_even, context = none)))
+    vector_append_t(&v, 7)
+    assert(not all_of_t_container(&v, Function1[const i32*, bool](call = test_vector_is_even, context = none)))
+    var seven = TestVectorLimit(limit = 7)
+    assert(any_of_t_container(&v, Function1[const i32*, bool](call = test_vector_equals, context = &seven)))
+    var eight = TestVectorLimit(limit = 8)
+    assert(not any_of_t_container(&v, Function1[const i32*, bool](call = test_vector_equals, context = &eight)))
+    let found = find_value(&v, Function1[const i32*, bool](call = test_vector_equals, context = &seven)) else trap("not found")
+    assert(*found == 7)
+    var empty: Vector[i32]
+    assert(all_of_t_container(&empty, Function1[const i32*, bool](call = test_vector_is_even, context = none)))
+    assert(not any_of_t_container(&empty, Function1[const i32*, bool](call = test_vector_is_even, context = none)))

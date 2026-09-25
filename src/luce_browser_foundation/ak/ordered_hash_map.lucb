@@ -1,0 +1,231 @@
+#==============================================================================================
+#
+#   ordered_hash_map - OrderedHashMap<K, V>: the IsOrdered = true instantiation of HashMap
+#
+#   DESCRIPTION:
+#       AK/HashMap.h with IsOrdered = true. OrderedHashMap[K, V, KT] has the layout of
+#       HashMap[K, V, KT] around an ordered table: each member sets the table's `m_ordered`
+#       flag (mutating members only; a zero OrderedHashMap is an empty ordered map) and runs
+#       the HashMap member of the same name, so iteration follows insertion order.
+#
+#==============================================================================================
+
+## AK::OrderedHashMap::HashMap(std::initializer_list<Entry>) (IsOrdered = true).
+pub func ordered_hash_map_construct[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, list: const HashMapEntry[K, V][]):
+    this.m_table.m_table.m_ordered = true
+    hash_map_construct[K, V, KT]((HashMap[K, V, KT]*)this, list)
+
+## AK::OrderedHashMap::clone: an ordered map with its own table holding the same entries in
+## the same order (IsOrdered = true).
+pub func ordered_hash_map_clone[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> OrderedHashMap[K, V, KT]!:
+    var clone_: OrderedHashMap[K, V, KT]
+    clone_.m_table.m_table.m_ordered = true
+    try ordered_hash_map_try_ensure_capacity(&clone_, ordered_hash_map_size(this))
+    for entry in ordered_hash_map_begin_const(this):
+        discard(ordered_hash_map_set(&clone_, entry.key, entry.value))
+    return clone_
+
+## AK::OrderedHashMap::is_empty (IsOrdered = true).
+pub func ordered_hash_map_is_empty[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> bool:
+    return hash_map_is_empty[K, V, KT]((const HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::size (IsOrdered = true).
+pub func ordered_hash_map_size[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> usize:
+    return hash_map_size[K, V, KT]((const HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::capacity (IsOrdered = true).
+pub func ordered_hash_map_capacity[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> usize:
+    return hash_map_capacity[K, V, KT]((const HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::clear (IsOrdered = true).
+pub func ordered_hash_map_clear[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*):
+    this.m_table.m_table.m_ordered = true
+    hash_map_clear[K, V, KT]((HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::clear_with_capacity (IsOrdered = true).
+pub func ordered_hash_map_clear_with_capacity[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*):
+    this.m_table.m_table.m_ordered = true
+    hash_map_clear_with_capacity[K, V, KT]((HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::set(K const&, V const&) (IsOrdered = true).
+pub func ordered_hash_map_set[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_set[K, V, KT]((HashMap[K, V, KT]*)this, key, value, existing_entry_behavior)
+
+## AK::OrderedHashMap::set(K const&, V&&) (IsOrdered = true).
+pub func ordered_hash_map_set_2[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_set_2[K, V, KT]((HashMap[K, V, KT]*)this, key, value, existing_entry_behavior)
+
+## AK::OrderedHashMap::set(K&&, V&&) (IsOrdered = true).
+pub func ordered_hash_map_set_3[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_set_3[K, V, KT]((HashMap[K, V, KT]*)this, key, value, existing_entry_behavior)
+
+## AK::OrderedHashMap::try_set(K const&, V const&) (IsOrdered = true).
+pub func ordered_hash_map_try_set[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
+    this.m_table.m_table.m_ordered = true
+    return try hash_map_try_set[K, V, KT]((HashMap[K, V, KT]*)this, key, value, existing_entry_behavior)
+
+## AK::OrderedHashMap::try_set(K const&, V&&) (IsOrdered = true).
+pub func ordered_hash_map_try_set_2[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
+    this.m_table.m_table.m_ordered = true
+    return try hash_map_try_set_2[K, V, KT]((HashMap[K, V, KT]*)this, key, value, existing_entry_behavior)
+
+## AK::OrderedHashMap::try_set(K&&, V&&) (IsOrdered = true).
+pub func ordered_hash_map_try_set_3[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
+    this.m_table.m_table.m_ordered = true
+    return try hash_map_try_set_3[K, V, KT]((HashMap[K, V, KT]*)this, key, value, existing_entry_behavior)
+
+## AK::OrderedHashMap::update (IsOrdered = true).
+pub func ordered_hash_map_update[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, other: const HashMap[K, V, KT]*):
+    this.m_table.m_table.m_ordered = true
+    hash_map_update[K, V, KT]((HashMap[K, V, KT]*)this, other)
+
+## AK::OrderedHashMap::remove (IsOrdered = true).
+pub func ordered_hash_map_remove_k[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K) -> bool:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_remove_k[K, V, KT]((HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::remove(Key const&) for a hash-compatible key (IsOrdered = true).
+pub func ordered_hash_map_remove_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: OrderedHashMap[K, V, KT]*, key: Key) -> bool:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_remove_t_key[K, V, KT, Key, KeyT]((HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::remove_all_matching (IsOrdered = true).
+pub func ordered_hash_map_remove_all_matching[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, predicate: Function2[const K*, const V*, bool]) -> bool:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_remove_all_matching[K, V, KT]((HashMap[K, V, KT]*)this, predicate)
+
+## AK::OrderedHashMap::take_all_matching (IsOrdered = true).
+pub func ordered_hash_map_take_all_matching[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, predicate: Function2[const K*, const V*, bool]) -> Vector[HashMapEntry[K, V]]:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_take_all_matching[K, V, KT]((HashMap[K, V, KT]*)this, predicate)
+
+## AK::OrderedHashMap::begin (IsOrdered = true).
+pub func ordered_hash_map_begin[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*) -> HashTableIterator[HashMapEntry[K, V]]:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_begin[K, V, KT]((HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::end (IsOrdered = true).
+pub func ordered_hash_map_end[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*) -> HashTableIterator[HashMapEntry[K, V]]:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_end[K, V, KT]((HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::find (IsOrdered = true).
+pub func ordered_hash_map_find_k[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K) -> HashTableIterator[HashMapEntry[K, V]]:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_find_k[K, V, KT]((HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::find(hash, predicate) (IsOrdered = true).
+pub func ordered_hash_map_find_u32_tt_unary_predicate[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, hash_: u32, predicate: Function1[const HashMapEntry[K, V]*, bool]) -> HashTableIterator[HashMapEntry[K, V]]:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_find_u32_tt_unary_predicate[K, V, KT]((HashMap[K, V, KT]*)this, hash_, predicate)
+
+## AK::OrderedHashMap::begin const (IsOrdered = true).
+pub func ordered_hash_map_begin_const[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_map_begin_const[K, V, KT]((const HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::end const (IsOrdered = true).
+pub func ordered_hash_map_end_const[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_map_end_const[K, V, KT]((const HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::find const (IsOrdered = true).
+pub func ordered_hash_map_find_k_const[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*, key: K) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_map_find_k_const[K, V, KT]((const HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::find(hash, predicate) const (IsOrdered = true).
+pub func ordered_hash_map_find_u32_tt_unary_predicate_const[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*, hash_: u32, predicate: Function1[const HashMapEntry[K, V]*, bool]) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_map_find_u32_tt_unary_predicate_const[K, V, KT]((const HashMap[K, V, KT]*)this, hash_, predicate)
+
+## AK::OrderedHashMap::find(Key const&) for a hash-compatible key (IsOrdered = true).
+pub func ordered_hash_map_find_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: OrderedHashMap[K, V, KT]*, key: Key) -> HashTableIterator[HashMapEntry[K, V]]:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_find_t_key[K, V, KT, Key, KeyT]((HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::find(Key const&) const for a hash-compatible key (IsOrdered = true).
+pub func ordered_hash_map_find_t_key_const[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: const OrderedHashMap[K, V, KT]*, key: Key) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_map_find_t_key_const[K, V, KT, Key, KeyT]((const HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::try_ensure_capacity (IsOrdered = true).
+pub func ordered_hash_map_try_ensure_capacity[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, capacity: usize) -> !:
+    this.m_table.m_table.m_ordered = true
+    return try hash_map_try_ensure_capacity[K, V, KT]((HashMap[K, V, KT]*)this, capacity)
+
+## AK::OrderedHashMap::ensure_capacity (IsOrdered = true).
+pub func ordered_hash_map_ensure_capacity[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, capacity: usize):
+    this.m_table.m_table.m_ordered = true
+    hash_map_ensure_capacity[K, V, KT]((HashMap[K, V, KT]*)this, capacity)
+
+## AK::OrderedHashMap::get const: the value for `key`, if any (IsOrdered = true).
+pub func ordered_hash_map_get_k_const[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*, key: K) -> const V*?:
+    return hash_map_get_k_const[K, V, KT]((const HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::get: the value for `key`, if any (IsOrdered = true).
+pub func ordered_hash_map_get_k[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K) -> V*?:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_get_k[K, V, KT]((HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::get(Key const&) const for a hash-compatible key (IsOrdered = true).
+pub func ordered_hash_map_get_t_key_const[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: const OrderedHashMap[K, V, KT]*, key: Key) -> const V*?:
+    return hash_map_get_t_key_const[K, V, KT, Key, KeyT]((const HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::get(Key const&) for a hash-compatible key (IsOrdered = true).
+pub func ordered_hash_map_get_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: OrderedHashMap[K, V, KT]*, key: Key) -> V*?:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_get_t_key[K, V, KT, Key, KeyT]((HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::contains (IsOrdered = true).
+pub func ordered_hash_map_contains_k[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*, key: K) -> bool:
+    return hash_map_contains_k[K, V, KT]((const HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::contains(Key const&) for a hash-compatible key (IsOrdered = true).
+pub func ordered_hash_map_contains_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: const OrderedHashMap[K, V, KT]*, value: Key) -> bool:
+    return hash_map_contains_t_key[K, V, KT, Key, KeyT]((const HashMap[K, V, KT]*)this, value)
+
+## AK::OrderedHashMap::remove(IteratorType) (IsOrdered = true).
+pub func ordered_hash_map_remove_opaque[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, it: HashTableIterator[HashMapEntry[K, V]]):
+    this.m_table.m_table.m_ordered = true
+    hash_map_remove_opaque[K, V, KT]((HashMap[K, V, KT]*)this, it)
+
+## AK::OrderedHashMap::take (IsOrdered = true).
+pub func ordered_hash_map_take_k[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K) -> V?:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_take_k[K, V, KT]((HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::take(Key const&) for a hash-compatible key (IsOrdered = true).
+pub func ordered_hash_map_take_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: OrderedHashMap[K, V, KT]*, key: Key) -> V?:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_take_t_key[K, V, KT, Key, KeyT]((HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::take_first (ordered maps only) (IsOrdered = true).
+pub func ordered_hash_map_take_first[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*) -> V:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_take_first[K, V, KT]((HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::ensure(key, initialization_callback) (IsOrdered = true).
+pub func ordered_hash_map_ensure_t_callback[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K, initialization_callback: Function0[V], existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.keep) -> V*:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_ensure_t_callback[K, V, KT]((HashMap[K, V, KT]*)this, key, initialization_callback, existing_entry_behavior)
+
+## AK::OrderedHashMap::ensure(key): inserts V() (the zero value) when the (IsOrdered = true).
+pub func ordered_hash_map_ensure[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K) -> V*:
+    this.m_table.m_table.m_ordered = true
+    return hash_map_ensure[K, V, KT]((HashMap[K, V, KT]*)this, key)
+
+## AK::OrderedHashMap::try_ensure. A fallible callback (FallibleFunction) (IsOrdered = true).
+pub func ordered_hash_map_try_ensure[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K, initialization_callback: Function0[V]) -> V!:
+    this.m_table.m_table.m_ordered = true
+    return try hash_map_try_ensure[K, V, KT]((HashMap[K, V, KT]*)this, key, initialization_callback)
+
+## AK::OrderedHashMap::keys (IsOrdered = true).
+pub func ordered_hash_map_keys[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> Vector[K]:
+    return hash_map_keys[K, V, KT]((const HashMap[K, V, KT]*)this)
+
+## AK::OrderedHashMap::operator== (IsOrdered = true).
+pub func ordered_hash_map_eq[K, V: luce.Equatable, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*, other: const HashMap[K, V, KT]*) -> bool:
+    return hash_map_eq[K, V, KT]((const HashMap[K, V, KT]*)this, other)
+
+## AK::OrderedHashMap::operator!= (IsOrdered = true).
+pub func ordered_hash_map_ne[K, V: luce.Equatable, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*, other: const HashMap[K, V, KT]*) -> bool:
+    return hash_map_ne[K, V, KT]((const HashMap[K, V, KT]*)this, other)

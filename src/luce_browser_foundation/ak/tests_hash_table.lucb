@@ -1,0 +1,616 @@
+#==============================================================================================
+#
+#   tests_hash_table - HashTable, OrderedHashTable, HashMap, OrderedHashMap
+#
+#   DESCRIPTION:
+#       Ports of Tests/AK/TestHashTable.cpp and TestHashMap.cpp. ByteString and String keys
+#       (region r02) are `str` keys with TestStrTraits (AK's string_hash of the bytes); the
+#       NonnullOwnPtr and non-trivial-type cases use plain pointers and structs (values are
+#       plain data here). Iteration orders are pinned against the donor's HashTable and
+#       HashMap (a C++ program over the reference build's AK, run while porting).
+#
+#==============================================================================================
+
+# Traits<ByteString> for the `str` keys of these tests: string_hash of the bytes.
+struct TestStrTraits: Traits[str]:
+    var empty_: u8
+
+    func hash_of(key: const str*) -> u32: return test_str_hash(*key)
+
+    func equals(a: const str*, b: const str*) -> bool: return *a == *b
+
+func test_str_hash(key: str) -> u32:
+    return string_hash(key.bytes.data, key.length)
+
+# CaseInsensitiveASCIIStringTraits for `str` keys.
+struct TestCaseInsensitiveStrTraits: Traits[str]:
+    var empty_: u8
+
+    func hash_of(key: const str*) -> u32: return test_case_insensitive_str_hash(*key)
+
+    func equals(a: const str*, b: const str*) -> bool: return test_str_equals_ignoring_case(*a, *b)
+
+func test_case_insensitive_str_hash(key: str) -> u32:
+    return case_insensitive_string_hash(key.bytes.data, key.length)
+
+func test_str_equals_ignoring_case(a: str, b: str) -> bool:
+    if a.length != b.length:
+        return false
+    for i in 0..<a.length:
+        var x = a.bytes[i]
+        var y = b.bytes[i]
+        if x >= 'A' and x <= 'Z':
+            x += 0x20
+        if y >= 'A' and y <= 'Z':
+            y += 0x20
+        if x != y:
+            return false
+    return true
+
+# StringCollisionTraits: every string hashes to 0.
+struct TestCollisionStrTraits: Traits[str]:
+    var empty_: u8
+
+    func hash_of(key: const str*) -> u32: return test_zero_hash(*key)
+
+    func equals(a: const str*, b: const str*) -> bool: return *a == *b
+
+func test_zero_hash(key: str) -> u32:
+    discard(key)
+    return 0
+
+# ByteString::number(i) for the tests' keys: the decimal text of `i` in a table of spellings.
+let test_number_texts: str[16] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]
+
+func test_int_greater_than_two(context: void*?, value: const i32*) -> bool:
+    discard(context)
+    return *value > 2
+
+func test_int_bool(context: void*?, value: const i32*) -> bool:
+    discard(value)
+    return context != none
+
+type IntTable = HashTable[i32, I32Traits]
+type OrderedIntTable = OrderedHashTable[i32, I32Traits]
+
+# mark: TestHashTable ===========================================================================
+
+test "hash_table: construct":
+    var table: IntTable
+    assert(hash_table_is_empty(&table))
+    assert(hash_table_size(&table) == 0)
+
+test "hash_table: basic_move and move_is_not_swap":
+    var foo: IntTable
+    discard(hash_table_set(&foo, 1))
+    assert(hash_table_size(&foo) == 1)
+    var bar = foo
+    foo = IntTable()
+    assert(hash_table_size(&bar) == 1)
+    assert(hash_table_size(&foo) == 0)
+    var baz: IntTable
+    discard(hash_table_set(&baz, 2))
+    foo = baz
+    baz = IntTable()
+    assert(hash_table_contains_t(&foo, 2))
+    assert(not hash_table_contains_t(&baz, 1))
+    assert(hash_table_size(&baz) == 0)
+
+test "hash_table: populate, range_loop and table_remove":
+    var strings: HashTable[str, TestStrTraits]
+    assert(hash_table_set(&strings, "One") == HashSetResult.inserted_new_entry)
+    assert(hash_table_set(&strings, "Two") == HashSetResult.inserted_new_entry)
+    assert(hash_table_set(&strings, "Three") == HashSetResult.inserted_new_entry)
+    assert(not hash_table_is_empty(&strings))
+    assert(hash_table_size(&strings) == 3)
+    var loop_counter = 0
+    for it in hash_table_begin(&strings):
+        assert(it.length != 0)
+        loop_counter += 1
+    assert(loop_counter == 3)
+    assert(hash_table_remove_t(&strings, "One"))
+    assert(hash_table_size(&strings) == 2)
+    let one = hash_table_find_t(&strings, "One")
+    assert(hash_table_iterator_eq(&one, hash_table_end(&strings)))
+    assert(hash_table_remove_t(&strings, "Three"))
+    assert(hash_table_size(&strings) == 1)
+    assert(hash_table_find_t(&strings, "Three").m_bucket == none)
+    assert(hash_table_find_t(&strings, "Two").m_bucket != none)
+
+test "hash_table: range_loop_reverse":
+    let strings: str[3] = ["One", "Two", "Three"]
+    var table: OrderedHashTable[str, TestStrTraits]
+    for s in strings:
+        assert(ordered_hash_table_set(&table, s) == HashSetResult.inserted_new_entry)
+    var loop_counter = 0
+    var index = 2
+    for it in ordered_hash_table_in_reverse(&table):
+        assert(*it == strings[index])
+        loop_counter += 1
+        index -= 1
+    assert(loop_counter == 3)
+
+test "hash_table: remove_all_matching and take_all_matching":
+    var ints: IntTable
+    for i: i32 in 1..=4:
+        discard(hash_table_set(&ints, i))
+    assert(hash_table_size(&ints) == 4)
+    assert(hash_table_remove_all_matching(&ints, Function1[const i32*, bool](call = test_int_greater_than_two, context = none)))
+    assert(not hash_table_remove_all_matching(&ints, Function1[const i32*, bool](call = test_int_bool, context = none)))
+    assert(hash_table_size(&ints) == 2)
+    assert(hash_table_contains_t(&ints, 1))
+    assert(hash_table_contains_t(&ints, 2))
+    var yes: u8 = 1
+    assert(hash_table_remove_all_matching(&ints, Function1[const i32*, bool](call = test_int_bool, context = &yes)))
+    assert(hash_table_is_empty(&ints))
+    assert(not hash_table_remove_all_matching(&ints, Function1[const i32*, bool](call = test_int_bool, context = &yes)))
+
+    for i: i32 in 1..=4:
+        discard(hash_table_set(&ints, i))
+    let first_values = hash_table_take_all_matching(&ints, Function1[const i32*, bool](call = test_int_greater_than_two, context = none))
+    assert(vector_size(&first_values) == 2)
+    assert(vector_contains_slow[i32, I32Traits](&first_values, 3))
+    assert(vector_contains_slow[i32, I32Traits](&first_values, 4))
+    let none_taken = hash_table_take_all_matching(&ints, Function1[const i32*, bool](call = test_int_bool, context = none))
+    assert(vector_is_empty(&none_taken))
+    assert(hash_table_size(&ints) == 2)
+    let second_values = hash_table_take_all_matching(&ints, Function1[const i32*, bool](call = test_int_bool, context = &yes))
+    assert(vector_size(&second_values) == 2)
+    assert(vector_contains_slow[i32, I32Traits](&second_values, 1))
+    assert(hash_table_is_empty(&ints))
+
+test "hash_table: case_insensitive":
+    var casetable: HashTable[str, TestCaseInsensitiveStrTraits]
+    assert(hash_table_set(&casetable, "nickserv") == HashSetResult.inserted_new_entry)
+    assert(hash_table_set(&casetable, "NickServ") == HashSetResult.replaced_existing_entry)
+    assert(hash_table_size(&casetable) == 1)
+
+test "hash_table: many_ints":
+    with memory.heap:
+        var ints: IntTable
+        for i: i32 in 0..<999:
+            assert(hash_table_set(&ints, i) == HashSetResult.inserted_new_entry)
+        assert(hash_table_size(&ints) == 999)
+        for i: i32 in 0..<999:
+            assert(hash_table_remove_t(&ints, i))
+        assert(hash_table_is_empty(&ints))
+
+test "hash_table: many_collisions and space_reuse":
+    with memory.heap:
+        var strings: HashTable[str, TestCollisionStrTraits]
+        for text in test_number_texts:
+            assert(hash_table_set(&strings, text) == HashSetResult.inserted_new_entry)
+        assert(hash_table_set(&strings, "foo") == HashSetResult.inserted_new_entry)
+        assert(hash_table_size(&strings) == 17)
+        for text in test_number_texts:
+            assert(hash_table_remove_t(&strings, text))
+        assert(hash_table_find_t(&strings, "foo").m_bucket != none)
+
+        var reuse: HashTable[str, TestCollisionStrTraits]
+        assert(hash_table_set(&reuse, "0") == HashSetResult.inserted_new_entry)
+        for i in 1..<5usize:
+            assert(hash_table_set(&reuse, test_number_texts[i]) == HashSetResult.inserted_new_entry)
+            assert(hash_table_remove_t(&reuse, test_number_texts[i - 1]))
+        let capacity = hash_table_capacity(&reuse)
+        for i in 5..<16usize:
+            assert(hash_table_set(&reuse, test_number_texts[i]) == HashSetResult.inserted_new_entry)
+            assert(hash_table_remove_t(&reuse, test_number_texts[i - 1]))
+        assert(hash_table_capacity(&reuse) == capacity)
+
+test "hash_table: basic_remove and basic_contains":
+    var table: IntTable
+    discard(hash_table_set(&table, 1))
+    discard(hash_table_set(&table, 2))
+    discard(hash_table_set(&table, 3))
+    assert(hash_table_contains_t(&table, 1))
+    assert(hash_table_contains_t(&table, 3))
+    assert(not hash_table_contains_t(&table, 4))
+    assert(hash_table_remove_t(&table, 3))
+    assert(not hash_table_remove_t(&table, 3))
+    assert(not hash_table_contains_t(&table, 3))
+    assert(hash_table_size(&table) == 2)
+    assert(hash_table_remove_t(&table, 1))
+    assert(not hash_table_remove_t(&table, 1))
+    assert(hash_table_size(&table) == 1)
+    assert(hash_table_remove_t(&table, 2))
+    assert(not hash_table_remove_t(&table, 2))
+    assert(hash_table_size(&table) == 0)
+
+test "hash_table: capacity_leak":
+    with memory.heap:
+        var table: IntTable
+        for i: i32 in 0..<10000:
+            discard(hash_table_set(&table, i))
+            discard(hash_table_remove_t(&table, i))
+        assert(hash_table_capacity(&table) < 100)
+
+test "hash_table: floats and doubles":
+    var floats: HashTable[f32, F32Traits]
+    discard(hash_table_set(&floats, 0.0))
+    discard(hash_table_set(&floats, 1.0))
+    discard(hash_table_set(&floats, 2.0))
+    assert(hash_table_size(&floats) == 3)
+    assert(hash_table_contains_t(&floats, 0.0))
+    assert(hash_table_contains_t(&floats, 2.0))
+    var doubles: HashTable[f64, F64Traits]
+    discard(hash_table_set(&doubles, 0.0))
+    discard(hash_table_set(&doubles, 1.0))
+    discard(hash_table_set(&doubles, 2.0))
+    assert(hash_table_size(&doubles) == 3)
+    assert(hash_table_contains_t(&doubles, 1.0))
+
+test "hash_table: reinsertion and clear_with_capacity":
+    var map: OrderedHashTable[str, TestStrTraits]
+    discard(ordered_hash_table_set(&map, "ytidb::LAST_RESULT_ENTRY_KEY"))
+    discard(ordered_hash_table_set(&map, "__sak"))
+    discard(ordered_hash_table_remove_t(&map, "__sak"))
+    discard(ordered_hash_table_set(&map, "__sak"))
+    assert(ordered_hash_table_size(&map) == 2)
+    var ints: IntTable
+    hash_table_clear_with_capacity(&ints)
+    discard(hash_table_set(&ints, 0))
+    discard(hash_table_set(&ints, 1))
+    assert(hash_table_size(&ints) == 2)
+    hash_table_clear_with_capacity(&ints)
+    assert(hash_table_size(&ints) == 0)
+    assert(not hash_table_contains_t(&ints, 1))
+
+test "hash_table: iterator_removal":
+    var map: IntTable
+    discard(hash_table_set(&map, 0))
+    discard(hash_table_set(&map, 1))
+    var it = hash_table_begin(&map)
+    hash_table_remove_opaque(&map, &it)
+    assert(hash_table_iterator_eq(&it, hash_table_end(&map)))
+    assert(hash_table_size(&map) == 1)
+
+func test_expect_ordered(table: OrderedIntTable*, values: const i32[]):
+    var index: usize = 0
+    var it = ordered_hash_table_begin(table)
+    while hash_table_iterator_ne(&it, ordered_hash_table_end(table)):
+        assert(*hash_table_iterator_deref(&it) == values[index])
+        assert(ordered_hash_table_contains_t(table, values[index]))
+        hash_table_iterator_inc(&it)
+        index += 1
+    assert(index == values.length)
+    index = ordered_hash_table_size(table)
+    var rit = ordered_hash_table_rbegin(table)
+    while reverse_ordered_hash_table_iterator_ne(&rit, ordered_hash_table_rend(table)):
+        index -= 1
+        assert(*reverse_ordered_hash_table_iterator_deref(&rit) == values[index])
+        reverse_ordered_hash_table_iterator_inc(&rit)
+    assert(index == 0)
+
+test "hash_table: ordered_insertion_and_deletion":
+    var table: OrderedIntTable
+    for i: i32 in 0..<4:
+        assert(ordered_hash_table_set(&table, i) == HashSetResult.inserted_new_entry)
+    assert(ordered_hash_table_size(&table) == 4)
+    let all: i32[4] = [0, 1, 2, 3]
+    test_expect_ordered(&table, all)
+    assert(ordered_hash_table_remove_t(&table, 0))
+    assert(ordered_hash_table_remove_t(&table, 2))
+    assert(not ordered_hash_table_remove_t(&table, 4))
+    assert(ordered_hash_table_size(&table) == 2)
+    let rest: i32[2] = [1, 3]
+    test_expect_ordered(&table, rest)
+
+test "hash_table: ordered_deletion_and_reinsertion":
+    var table: OrderedIntTable
+    discard(ordered_hash_table_set(&table, 1))
+    discard(ordered_hash_table_set(&table, 3))
+    discard(ordered_hash_table_remove_t(&table, 1))
+    assert(ordered_hash_table_size(&table) == 1)
+    # By adding 1 again but this time in a different position, we
+    # test whether the bucket's neighbors are reset properly.
+    discard(ordered_hash_table_set(&table, 1))
+    assert(ordered_hash_table_size(&table) == 2)
+    let expected: i32[2] = [3, 1]
+    test_expect_ordered(&table, expected)
+
+test "hash_table: ordered take_last, iterator_removal, remove_from_head":
+    var table: OrderedIntTable
+    discard(ordered_hash_table_set(&table, 1))
+    discard(ordered_hash_table_set(&table, 2))
+    discard(ordered_hash_table_set(&table, 3))
+    assert(ordered_hash_table_take_last(&table) == 3)
+    assert(ordered_hash_table_take_last(&table) == 2)
+    assert(ordered_hash_table_take_first(&table) == 1)
+    assert(ordered_hash_table_is_empty(&table))
+    discard(ordered_hash_table_set(&table, 0))
+    discard(ordered_hash_table_set(&table, 1))
+    var it = ordered_hash_table_begin(&table)
+    ordered_hash_table_remove_opaque(&table, &it)
+    assert(hash_table_iterator_eq(&it, ordered_hash_table_end(&table)))
+    assert(ordered_hash_table_size(&table) == 1)
+    var map: OrderedIntTable
+    for i: i32 in 1..=6:
+        discard(ordered_hash_table_set(&map, i))
+    assert(ordered_hash_table_size(&map) == 6)
+    for i in 0..<6:
+        discard(i)
+        var head = ordered_hash_table_begin(&map)
+        ordered_hash_table_remove_opaque(&map, &head)
+    assert(ordered_hash_table_size(&map) == 0)
+
+test "hash_table: ordered_infinite_loop_clang_regression":
+    var map: OrderedHashTable[str, TestStrTraits]
+    let keys: str[7] = ["", "1", "_cb", "2", "3", "_cb_svref", "_cb_svref_expires"]
+    for key in keys:
+        discard(ordered_hash_table_set(&map, key))
+    discard(ordered_hash_table_remove_t(&map, "_cb_svref"))
+    discard(ordered_hash_table_remove_t(&map, "_cb_svref_expires"))
+    discard(ordered_hash_table_set(&map, "_cb_svref"))
+    var iterations: usize = 0
+    let size = ordered_hash_table_size(&map)
+    for it in ordered_hash_table_begin(&map):
+        discard(it)
+        iterations += 1
+        assert(iterations <= size)
+    assert(iterations == 6)
+
+test "hash_table: values":
+    var table: OrderedIntTable
+    discard(ordered_hash_table_set(&table, 10))
+    discard(ordered_hash_table_set(&table, 30))
+    discard(ordered_hash_table_set(&table, 20))
+    let values = ordered_hash_table_values(&table)
+    assert(vector_size(&values) == ordered_hash_table_size(&table))
+    assert(*vector_at_const(&values, 0) == 10)
+    assert(*vector_at_const(&values, 1) == 30)
+    assert(*vector_at_const(&values, 2) == 20)
+
+test "hash_table: iteration order matches the donor":
+    with memory.heap:
+        var t: IntTable
+        for i: i32 in 0..<40:
+            discard(hash_table_set(&t, i * 7 - 50))
+        var i: i32 = 0
+        while i < 40:
+            discard(hash_table_remove_t(&t, i * 7 - 50))
+            i += 3
+        let expected: i32[26] = [-43, 6, -15, 153, 195, 132, 167, 41, 48, 216, 146, 104, 188, 111, -22, 20, 209, 69, 83, 90, 27, -36, 174, 62, 125, -1]
+        var index: usize = 0
+        for value in hash_table_begin(&t):
+            assert(*value == expected[index])
+            index += 1
+        assert(index == 26)
+        assert(hash_table_capacity(&t) == 64)
+        var big: HashTable[u64, U64Traits]
+        for k: u64 in 0..<30:
+            discard(hash_table_set(&big, k << 32))
+        let expected_big: u64[30] = [0, 5, 11, 2, 22, 20, 23, 6, 25, 12, 24, 26, 21, 13, 7, 8, 1, 4, 15, 28, 16, 17, 9, 27, 14, 19, 29, 10, 3, 18]
+        index = 0
+        for value in hash_table_begin(&big):
+            assert(*value >> 32 == expected_big[index])
+            index += 1
+        assert(index == 30)
+
+test "hash_table: clone":
+    var table: IntTable
+    discard(hash_table_set(&table, 5))
+    discard(hash_table_set(&table, 6))
+    var copy = hash_table_clone(&table)
+    discard(hash_table_set(&copy, 7))
+    assert(hash_table_size(&table) == 2)
+    assert(hash_table_size(&copy) == 3)
+    assert(not hash_table_contains_t(&table, 7))
+
+# mark: TestHashMap =============================================================================
+
+type IntIntMap = HashMap[i32, i32, I32Traits]
+
+func test_map_key_one_or_value_two(context: void*?, key: const i32*, value: const str*) -> bool:
+    discard(context)
+    return *key == 1 or *value == "Two"
+
+func test_map_bool(context: void*?, key: const i32*, value: const str*) -> bool:
+    discard(key)
+    discard(value)
+    return context != none
+
+test "hash_map: construct, populate and range_loop":
+    var empty: IntIntMap
+    assert(hash_map_is_empty(&empty))
+    assert(hash_map_size(&empty) == 0)
+    var number_to_string: HashMap[i32, str, I32Traits]
+    let list: HashMapEntry[i32, str][3] = [HashMapEntry[i32, str](key = 1, value = "One"), HashMapEntry[i32, str](key = 2, value = "Two"), HashMapEntry[i32, str](key = 3, value = "Three")]
+    hash_map_construct(&number_to_string, list)
+    assert(not hash_map_is_empty(&number_to_string))
+    assert(hash_map_size(&number_to_string) == 3)
+    var loop_counter = 0
+    for it in hash_map_begin(&number_to_string):
+        assert(it.value.length != 0)
+        loop_counter += 1
+    assert(loop_counter == 3)
+
+test "hash_map: map_remove":
+    var number_to_string: HashMap[i32, str, I32Traits]
+    assert(hash_map_set(&number_to_string, 1, "One") == HashSetResult.inserted_new_entry)
+    assert(hash_map_set(&number_to_string, 2, "Two") == HashSetResult.inserted_new_entry)
+    assert(hash_map_set(&number_to_string, 3, "Three") == HashSetResult.inserted_new_entry)
+    assert(hash_map_remove_k(&number_to_string, 1))
+    assert(hash_map_size(&number_to_string) == 2)
+    assert(hash_map_find_k(&number_to_string, 1).m_bucket == none)
+    assert(hash_map_remove_k(&number_to_string, 3))
+    assert(hash_map_size(&number_to_string) == 1)
+    assert(hash_map_find_k(&number_to_string, 2).m_bucket != none)
+
+test "hash_map: remove_all_matching and take_all_matching":
+    var map: HashMap[i32, str, I32Traits]
+    discard(hash_map_set(&map, 1, "One"))
+    discard(hash_map_set(&map, 2, "Two"))
+    discard(hash_map_set(&map, 3, "Three"))
+    discard(hash_map_set(&map, 4, "Four"))
+    assert(hash_map_remove_all_matching(&map, Function2[const i32*, const str*, bool](call = test_map_key_one_or_value_two, context = none)))
+    assert(hash_map_size(&map) == 2)
+    assert(not hash_map_remove_all_matching(&map, Function2[const i32*, const str*, bool](call = test_map_bool, context = none)))
+    assert(hash_map_contains_k(&map, 3))
+    assert(hash_map_contains_k(&map, 4))
+    var yes: u8 = 1
+    assert(hash_map_remove_all_matching(&map, Function2[const i32*, const str*, bool](call = test_map_bool, context = &yes)))
+    assert(hash_map_is_empty(&map))
+
+    discard(hash_map_set(&map, 1, "One"))
+    discard(hash_map_set(&map, 2, "Two"))
+    discard(hash_map_set(&map, 3, "Three"))
+    discard(hash_map_set(&map, 4, "Four"))
+    let first_entries = hash_map_take_all_matching(&map, Function2[const i32*, const str*, bool](call = test_map_key_one_or_value_two, context = none))
+    assert(vector_size(&first_entries) == 2)
+    let low = 1usize if vector_at_const(&first_entries, 0).key > vector_at_const(&first_entries, 1).key else 0
+    assert(vector_at_const(&first_entries, low).key == 1)
+    assert(vector_at_const(&first_entries, low).value == "One")
+    assert(vector_at_const(&first_entries, 1 - low).key == 2)
+    assert(vector_at_const(&first_entries, 1 - low).value == "Two")
+    assert(hash_map_size(&map) == 2)
+    let second_entries = hash_map_take_all_matching(&map, Function2[const i32*, const str*, bool](call = test_map_bool, context = &yes))
+    assert(vector_size(&second_entries) == 2)
+    assert(hash_map_is_empty(&map))
+
+test "hash_map: case_insensitive":
+    var casemap: HashMap[str, i32, TestCaseInsensitiveStrTraits]
+    assert(hash_map_set(&casemap, "nickserv", 3) == HashSetResult.inserted_new_entry)
+    assert(hash_map_set(&casemap, "NickServ", 3) == HashSetResult.replaced_existing_entry)
+    assert(hash_map_size(&casemap) == 1)
+
+struct TestMapObject:
+    var string: str
+
+test "hash_map: hashmap_of_pointers_get":
+    var objects: HashMap[i32, TestMapObject*, I32Traits]
+    let one = new TestMapObject(string = "One") else trap("out of memory")
+    let two = new TestMapObject(string = "Two") else trap("out of memory")
+    let three = new TestMapObject(string = "Three") else trap("out of memory")
+    discard(hash_map_set(&objects, 1, one))
+    discard(hash_map_set(&objects, 2, two))
+    discard(hash_map_set(&objects, 3, three))
+    let x = hash_map_get_k(&objects, 2) else trap("missing")
+    assert((*x).string == "Two")
+    # Do it again to make sure that peeking into the map above didn't
+    # remove the value from the map.
+    let y = hash_map_get_k(&objects, 2) else trap("missing")
+    assert((*y).string == "Two")
+    assert(hash_map_size(&objects) == 3)
+
+test "hash_map: basic_remove and basic_contains":
+    var map: IntIntMap
+    discard(hash_map_set(&map, 1, 10))
+    discard(hash_map_set(&map, 2, 20))
+    discard(hash_map_set(&map, 3, 30))
+    assert(hash_map_contains_k(&map, 1))
+    assert(not hash_map_contains_k(&map, 4))
+    assert(hash_map_remove_k(&map, 3))
+    assert(not hash_map_remove_k(&map, 3))
+    assert(not hash_map_contains_k(&map, 3))
+    assert(hash_map_size(&map) == 2)
+    assert(hash_map_remove_k(&map, 1))
+    assert(hash_map_remove_k(&map, 2))
+    assert(not hash_map_remove_k(&map, 2))
+    assert(hash_map_size(&map) == 0)
+
+test "hash_map: in_place_rehashing_ordered_loop_bug":
+    var map: OrderedHashMap[str, str, TestStrTraits]
+    discard(ordered_hash_map_set(&map, "yt.innertube::nextId", ""))
+    discard(ordered_hash_map_set(&map, "yt.innertube::requests", ""))
+    discard(ordered_hash_map_remove_k(&map, "yt.innertube::nextId"))
+    discard(ordered_hash_map_set(&map, "yt.innertube::nextId", ""))
+    let keys = ordered_hash_map_keys(&map)
+    assert(vector_size(&keys) == 2)
+    assert(*vector_at_const(&keys, 0) == "yt.innertube::requests")
+    assert(ordered_hash_map_take_first(&map) == "")
+    assert(ordered_hash_map_size(&map) == 1)
+
+test "hash_map: take":
+    var map: HashMap[str, i32, TestStrTraits]
+    assert(hash_map_take_k(&map, "foo") == none)
+    discard(hash_map_set(&map, "foo", 1))
+    discard(hash_map_set(&map, "bar", 2))
+    discard(hash_map_set(&map, "baz", 3))
+    assert(hash_map_take_k(&map, "foo") == 1)
+    assert(hash_map_take_k(&map, "foo") == none)
+    assert(hash_map_take_k(&map, "bar") == 2)
+    assert(hash_map_take_k(&map, "bar") == none)
+    assert(hash_map_take_k(&map, "baz") == 3)
+    assert(hash_map_take_k(&map, "baz") == none)
+
+test "hash_map: clone, move and update":
+    var orig: IntIntMap
+    discard(hash_map_set(&orig, 1, 10))
+    discard(hash_map_set(&orig, 2, 20))
+    discard(hash_map_set(&orig, 3, 30))
+    let second = hash_map_clone(&orig) else trap("clone failed")
+    assert(hash_map_size(&orig) == 3)
+    assert(*(hash_map_get_k_const(&orig, 2) else trap("missing")) == 20)
+    assert(hash_map_size(&second) == 3)
+    assert(*(hash_map_get_k_const(&second, 2) else trap("missing")) == 20)
+
+    var first: IntIntMap
+    var other: IntIntMap
+    discard(hash_map_set(&first, 1, 10))
+    discard(hash_map_set(&first, 2, 20))
+    discard(hash_map_set(&other, 1, 9))
+    discard(hash_map_set(&other, 3, 30))
+    discard(hash_map_set(&other, 4, 40))
+    hash_map_update(&first, &other)
+    assert(hash_map_size(&first) == 4)
+    assert(hash_map_size(&other) == 3)
+    assert(*(hash_map_get_k(&first, 1) else trap("missing")) == 9)
+    assert(*(hash_map_get_k(&first, 2) else trap("missing")) == 20)
+    assert(*(hash_map_get_k(&first, 3) else trap("missing")) == 30)
+    assert(*(hash_map_get_k(&first, 4) else trap("missing")) == 40)
+    hash_map_update(&other, &first)
+    assert(hash_map_size(&other) == 4)
+
+test "hash_map: compare":
+    var first: IntIntMap
+    var second: IntIntMap
+    assert(hash_map_eq(&first, &second))
+    discard(hash_map_set(&first, 1, 10))
+    discard(hash_map_set(&second, 1, 10))
+    assert(hash_map_eq(&first, &second))
+    discard(hash_map_set(&first, 2, 20))
+    assert(hash_map_ne(&second, &first))
+
+struct TestSentinel:
+    var magic: u64
+
+let test_sentinel_magic: u64 = 0xC0FFEECAFEBABE
+
+struct TestEnsureCaptures:
+    var map: HashMap[i32, TestSentinel, I32Traits]*
+    var visited: usize
+
+func test_ensure_callback(context: void*?) -> TestSentinel:
+    let captures = (TestEnsureCaptures*)(context else trap("no captures"))
+    for it in hash_map_begin(captures.map):
+        assert(it.value.magic == test_sentinel_magic)
+        captures.visited += 1
+    return TestSentinel(magic = test_sentinel_magic)
+
+test "hash_map: ensure_callback_sees_consistent_table":
+    # HashMap::ensure() must run the initialization callback while the tentative
+    # target bucket is invisible to iterators.
+    var map: HashMap[i32, TestSentinel, I32Traits]
+    for i: i32 in 0..<100:
+        discard(hash_map_set(&map, i, TestSentinel(magic = test_sentinel_magic)))
+    var captures = TestEnsureCaptures(map = &map, visited = 0)
+    let value = hash_map_ensure_t_callback(&map, 9999, Function0[TestSentinel](call = test_ensure_callback, context = &captures))
+    assert(value.magic == test_sentinel_magic)
+    assert(captures.visited == 100)
+    assert(hash_map_size(&map) == 101)
+    let zero = hash_map_ensure(&map, 12345)
+    assert(zero.magic == 0)
+    assert(hash_map_size(&map) == 102)
+
+test "hash_map: iteration order matches the donor":
+    var m: HashMap[u32, u32, U32Traits]
+    for i: u32 in 0..<25:
+        discard(hash_map_set(&m, i * 1000003, i))
+    discard(hash_map_remove_k(&m, 5 * 1000003))
+    discard(hash_map_remove_k(&m, 17 * 1000003))
+    let expected: u32[23] = [0, 9, 11, 16, 12, 7, 19, 23, 4, 13, 24, 22, 1, 21, 18, 8, 20, 6, 10, 15, 2, 14, 3]
+    var index: usize = 0
+    for entry in hash_map_begin(&m):
+        assert(entry.value == expected[index])
+        index += 1
+    assert(index == 23)

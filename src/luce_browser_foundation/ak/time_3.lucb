@@ -1,0 +1,476 @@
+#==============================================================================================
+#
+#   time_3 - UnixDateTime::to_string_impl and UnixDateTime::parse
+#
+#   DESCRIPTION:
+#       Port of AK/Time.cpp (lines 489-927). `appendff("{:02}", n)` and friends are
+#       time_append_number (AK's integer formatting for a width and a fill of '0' or ' ').
+#       parse walks the input with the GenericLexer operations it uses (peek, consume,
+#       consume_specific, consume_decimal_integer<int>, consume_while(is_ascii_space),
+#       consume_until), written here over the StringView's bytes: the generated
+#       GenericLexer signatures (region r02) are not usable yet. tzname[tm_isdst != 0] is
+#       read as tm.tm_zone, which localtime_r/gmtime_r set to the same name.
+#
+#==============================================================================================
+
+# mark: to_string_impl ==========================================================================
+
+# One byte of a StringView.
+func time_view_at(view: StringView, index: usize) -> u8:
+    assert(index < view.m_length)
+    let characters = view.m_characters else trap("StringView without characters")
+    return characters[index]
+
+# A StringView of a string literal.
+func time_view_of(text: str) -> StringView:
+    return StringView(m_characters = text.bytes.data, m_length = text.length)
+
+# builder.try_appendff("{:0<width>}", value) with fill '0', or "{:<width>}" with fill ' '.
+func time_append_number(builder: StringBuilder*, value: i64, width: usize, fill: u8) -> !:
+    var digits: u8[20]
+    var count: usize = 0
+    let negative = value < 0
+    var magnitude: u64 = (0 -% (u64)value) if negative else (u64)value
+    while true:
+        digits[count] = '0' + (u8)(magnitude % 10)
+        count += 1
+        magnitude = magnitude // 10
+        if magnitude == 0:
+            break
+    let length = count + (1 if negative else 0)
+    if negative and fill == '0':
+        try string_builder_try_append_u8(builder, '-')
+    var padding = length
+    while padding < width:
+        try string_builder_try_append_u8(builder, fill)
+        padding += 1
+    if negative and fill != '0':
+        try string_builder_try_append_u8(builder, '-')
+    while count > 0:
+        count -= 1
+        try string_builder_try_append_u8(builder, digits[count])
+
+# The 12-hour clock hour of `tm_hour`.
+func time_display_hour(tm_hour: i32) -> i32:
+    var display_hour = tm_hour % 12
+    if display_hour == 0:
+        display_hour = 12
+    return display_hour
+
+## Ported from AK/Time.cpp:489 AK::UnixDateTime::to_string_impl.
+pub func unix_date_time_to_string_impl(this: const UnixDateTime*, builder: StringBuilder*, format_: StringView, local_time: UnixDateTimeLocalTime) -> !:
+    var tm = zeroed_tm()
+
+    let timestamp = duration_to_timespec(&this.unaware_time.m_offset).tv_sec
+    if local_time == UnixDateTimeLocalTime.yes:
+        discard(localtime_r(&timestamp, &tm))
+    else:
+        discard(gmtime_r(&timestamp, &tm))
+
+    let format_len = format_.m_length
+    var i: usize = 0
+    while i < format_len:
+        if time_view_at(format_, i) != '%':
+            try string_builder_try_append_u8(builder, time_view_at(format_, i))
+        else:
+            i += 1
+            if i == format_len:
+                string_builder_clear(builder)
+                return
+
+            match time_view_at(format_, i):
+                'a':
+                    try string_builder_try_append_string_view(builder, time_view_of(short_day_names[tm.tm_wday]))
+                'A':
+                    try string_builder_try_append_string_view(builder, time_view_of(long_day_names[tm.tm_wday]))
+                'b':
+                    try string_builder_try_append_string_view(builder, time_view_of(short_month_names[tm.tm_mon]))
+                'B':
+                    try string_builder_try_append_string_view(builder, time_view_of(long_month_names[tm.tm_mon]))
+                'C':
+                    try time_append_number(builder, (i64)((tm.tm_year + 1900) // 100), 2, '0')
+                'd':
+                    try time_append_number(builder, (i64)tm.tm_mday, 2, '0')
+                'D':
+                    try time_append_number(builder, (i64)(tm.tm_mon + 1), 2, '0')
+                    try string_builder_try_append_u8(builder, '/')
+                    try time_append_number(builder, (i64)tm.tm_mday, 2, '0')
+                    try string_builder_try_append_u8(builder, '/')
+                    try time_append_number(builder, (i64)((tm.tm_year + 1900) % 100), 2, '0')
+                'e':
+                    try time_append_number(builder, (i64)tm.tm_mday, 2, ' ')
+                'h':
+                    try string_builder_try_append_string_view(builder, time_view_of(short_month_names[tm.tm_mon]))
+                'H':
+                    try time_append_number(builder, (i64)tm.tm_hour, 2, '0')
+                'I':
+                    try time_append_number(builder, (i64)time_display_hour(tm.tm_hour), 2, '0')
+                'j':
+                    try time_append_number(builder, (i64)(tm.tm_yday + 1), 3, '0')
+                'l':
+                    try time_append_number(builder, (i64)time_display_hour(tm.tm_hour), 2, ' ')
+                'm':
+                    try time_append_number(builder, (i64)(tm.tm_mon + 1), 2, '0')
+                'M':
+                    try time_append_number(builder, (i64)tm.tm_min, 2, '0')
+                'n':
+                    try string_builder_try_append_u8(builder, '\n')
+                'p':
+                    try string_builder_try_append_string_view(builder, time_view_of("AM" if tm.tm_hour < 12 else "PM"))
+                'r':
+                    try time_append_number(builder, (i64)time_display_hour(tm.tm_hour), 2, '0')
+                    try string_builder_try_append_u8(builder, ':')
+                    try time_append_number(builder, (i64)tm.tm_min, 2, '0')
+                    try string_builder_try_append_u8(builder, ':')
+                    try time_append_number(builder, (i64)tm.tm_sec, 2, '0')
+                    try string_builder_try_append_u8(builder, ' ')
+                    try string_builder_try_append_string_view(builder, time_view_of("AM" if tm.tm_hour < 12 else "PM"))
+                'R':
+                    try time_append_number(builder, (i64)tm.tm_hour, 2, '0')
+                    try string_builder_try_append_u8(builder, ':')
+                    try time_append_number(builder, (i64)tm.tm_min, 2, '0')
+                'S':
+                    try time_append_number(builder, (i64)tm.tm_sec, 2, '0')
+                't':
+                    try string_builder_try_append_u8(builder, '\t')
+                'T':
+                    try time_append_number(builder, (i64)tm.tm_hour, 2, '0')
+                    try string_builder_try_append_u8(builder, ':')
+                    try time_append_number(builder, (i64)tm.tm_min, 2, '0')
+                    try string_builder_try_append_u8(builder, ':')
+                    try time_append_number(builder, (i64)tm.tm_sec, 2, '0')
+                'u':
+                    try time_append_number(builder, (i64)(tm.tm_wday if tm.tm_wday != 0 else 7), 0, ' ')
+                'U':
+                    let wday_of_year_beginning = (tm.tm_wday + 6 * tm.tm_yday) % 7
+                    let week_number = (tm.tm_yday + wday_of_year_beginning) // 7
+                    try time_append_number(builder, (i64)week_number, 2, '0')
+                'V':
+                    let wday_of_year_beginning = (tm.tm_wday + 6 + 6 * tm.tm_yday) % 7
+                    var week_number = ((tm.tm_yday + wday_of_year_beginning) // 7) + 1
+                    if wday_of_year_beginning > 3:
+                        if tm.tm_yday >= 7 - wday_of_year_beginning:
+                            week_number -= 1
+                        else:
+                            let days_of_last_year = (i32)days_in_year(tm.tm_year + 1900 - 1)
+                            let wday_of_last_year_beginning = (wday_of_year_beginning + 6 * days_of_last_year) % 7
+                            week_number = (days_of_last_year + wday_of_last_year_beginning) // 7 + 1
+                            if wday_of_last_year_beginning > 3:
+                                week_number -= 1
+                    try time_append_number(builder, (i64)week_number, 2, '0')
+                'w':
+                    try time_append_number(builder, (i64)tm.tm_wday, 0, ' ')
+                'W':
+                    let wday_of_year_beginning = (tm.tm_wday + 6 + 6 * tm.tm_yday) % 7
+                    let week_number = (tm.tm_yday + wday_of_year_beginning) // 7
+                    try time_append_number(builder, (i64)week_number, 2, '0')
+                'y':
+                    try time_append_number(builder, (i64)((tm.tm_year + 1900) % 100), 2, '0')
+                'Y':
+                    try time_append_number(builder, (i64)(tm.tm_year + 1900), 0, ' ')
+                'Z':
+                    let timezone_name = tm.tm_zone else trap("struct tm without a time zone name")
+                    var timezone_length: usize = 0
+                    while timezone_name[timezone_length] != 0:
+                        timezone_length += 1
+                    try string_builder_try_append_string_view(builder, StringView(m_characters = timezone_name, m_length = timezone_length))
+                '%':
+                    try string_builder_try_append_u8(builder, '%')
+                _:
+                    try string_builder_try_append_u8(builder, '%')
+                    try string_builder_try_append_u8(builder, time_view_at(format_, i))
+        i += 1
+
+# mark: parse ===================================================================================
+
+# The GenericLexer over the parsed string (m_input and m_index).
+struct TimeLexer:
+    var input: StringView
+    var index: usize
+
+func time_lexer_is_eof(lexer: const TimeLexer*) -> bool:
+    return lexer.index >= lexer.input.m_length
+
+func time_lexer_peek(lexer: const TimeLexer*) -> u8:
+    if lexer.index < lexer.input.m_length:
+        return time_view_at(lexer.input, lexer.index)
+    return 0
+
+# GenericLexer::consume_specific(char).
+func time_lexer_consume_specific(lexer: TimeLexer*, next: u8) -> bool:
+    if time_lexer_is_eof(lexer) or time_lexer_peek(lexer) != next:
+        return false
+    lexer.index += 1
+    return true
+
+# GenericLexer::consume(count): the next `count` bytes, fewer at the end.
+func time_lexer_consume_count(lexer: TimeLexer*, count: usize) -> StringView:
+    let start = lexer.index
+    let available = lexer.input.m_length - start
+    let length = count if count < available else available
+    lexer.index += length
+    let characters = lexer.input.m_characters else trap("StringView without characters")
+    return StringView(m_characters = characters + start, m_length = length)
+
+# GenericLexer::consume_decimal_integer<int>(): an optional sign and ASCII digits; on failure
+# the position is rolled back and none is answered.
+func time_lexer_consume_decimal_integer(lexer: TimeLexer*) -> i32?:
+    let rollback_position = lexer.index
+    var has_minus_sign = false
+    if time_lexer_peek(lexer) == '+' or time_lexer_peek(lexer) == '-':
+        if not time_lexer_is_eof(lexer):
+            if time_view_at(lexer.input, lexer.index) == '-':
+                has_minus_sign = true
+            lexer.index += 1
+    var number: u64 = 0
+    var digits: usize = 0
+    var too_large = false
+    while not time_lexer_is_eof(lexer) and time_lexer_peek(lexer) >= '0' and time_lexer_peek(lexer) <= '9':
+        let digit = (u64)(time_lexer_peek(lexer) - '0')
+        if number > (u64)u32_max:
+            too_large = true
+        else:
+            number = number * 10 + digit
+        digits += 1
+        lexer.index += 1
+    if digits == 0 or too_large:
+        lexer.index = rollback_position
+        return none
+    if not has_minus_sign:
+        if number > (u64)i32_max:
+            lexer.index = rollback_position
+            return none
+        return (i32)number
+    if number > (u64)i32_max + 1:
+        lexer.index = rollback_position
+        return none
+    return (i32)(0 -% (i64)number)
+
+# Whether `a` equals `b` ignoring ASCII case.
+func time_equals_ignoring_ascii_case(a: StringView, b: StringView) -> bool:
+    if a.m_length != b.m_length:
+        return false
+    for i in 0..<a.m_length:
+        var ca = time_view_at(a, i)
+        var cb = time_view_at(b, i)
+        if ca >= 'A' and ca <= 'Z':
+            ca += 0x20
+        if cb >= 'A' and cb <= 'Z':
+            cb += 0x20
+        if ca != cb:
+            return false
+    return true
+
+# The state of UnixDateTime::parse its lambdas capture.
+struct TimeParseState:
+    var lexer: TimeLexer
+    var parsing_failed: bool
+
+# parse's parse_number lambda.
+func time_parse_number(state: TimeParseState*) -> i32:
+    if let result = time_lexer_consume_decimal_integer(&state.lexer):
+        return result
+    state.parsing_failed = true
+    return 0
+
+# parse's consume lambda.
+func time_parse_consume(state: TimeParseState*, c: u8):
+    if not time_lexer_consume_specific(&state.lexer, c):
+        state.parsing_failed = true
+
+# parse's consume_specific_ascii_case_insensitive lambda.
+func time_parse_consume_name(state: TimeParseState*, name: str) -> bool:
+    let lexer = &state.lexer
+    # peek_string(length): none when fewer bytes remain.
+    if lexer.input.m_length - lexer.index < name.length:
+        return false
+    let characters = lexer.input.m_characters else trap("StringView without characters")
+    let next_string = StringView(m_characters = characters + lexer.index, m_length = name.length)
+    if time_equals_ignoring_ascii_case(next_string, time_view_of(name)):
+        lexer.index += name.length
+        return true
+    return false
+
+## Ported from AK/Time.cpp:670 AK::UnixDateTime::parse.
+# Parses a string in the given format. Does not support time zone-related format specifiers.
+# If 'from_gmt' is true, the string is parsed as a GMT time, otherwise it is parsed as a local time.
+pub func unix_date_time_parse(format_: StringView, string: StringView, from_gmt: bool = false) -> UnixDateTime?:
+    var format_pos: usize = 0
+
+    var tm = zeroed_tm()
+    tm.tm_isdst = -1
+
+    var state = TimeParseState(lexer = TimeLexer(input = string, index = 0), parsing_failed = false)
+
+    while format_pos < format_.m_length and not time_lexer_is_eof(&state.lexer):
+        if time_view_at(format_, format_pos) != '%':
+            time_parse_consume(&state, time_view_at(format_, format_pos))
+            format_pos += 1
+            continue
+
+        format_pos += 1
+        if format_pos == format_.m_length:
+            return none
+
+        match time_view_at(format_, format_pos):
+            'a':
+                var wday: i32 = 0
+                for name in short_day_names:
+                    if time_parse_consume_name(&state, name):
+                        tm.tm_wday = wday
+                        break
+                    wday += 1
+                if wday == 7:
+                    return none
+            'A':
+                var wday: i32 = 0
+                for name in long_day_names:
+                    if time_parse_consume_name(&state, name):
+                        tm.tm_wday = wday
+                        break
+                    wday += 1
+                if wday == 7:
+                    return none
+            'h', 'b':
+                var mon: i32 = 0
+                for name in short_month_names:
+                    if time_parse_consume_name(&state, name):
+                        tm.tm_mon = mon
+                        break
+                    mon += 1
+                if mon == 12:
+                    return none
+            'B':
+                var mon: i32 = 0
+                for name in long_month_names:
+                    if time_parse_consume_name(&state, name):
+                        tm.tm_mon = mon
+                        break
+                    mon += 1
+                if mon == 12:
+                    return none
+            'C':
+                let num = time_parse_number(&state)
+                tm.tm_year = (num - 19) * 100 + (tm.tm_year % 100)
+            'd':
+                tm.tm_mday = time_parse_number(&state)
+            'D':
+                let mon = time_parse_number(&state)
+                time_parse_consume(&state, '/')
+                let day = time_parse_number(&state)
+                time_parse_consume(&state, '/')
+                let year = time_parse_number(&state)
+                tm.tm_mon = mon - 1
+                tm.tm_mday = day
+                tm.tm_year = (year - 1900) if year > 1900 else (year if year <= 99 and year > 69 else 100 + year)
+            'e':
+                tm.tm_mday = time_parse_number(&state)
+            'H':
+                tm.tm_hour = time_parse_number(&state)
+            'I':
+                let num = time_parse_number(&state)
+                tm.tm_hour = num % 12
+            'j':
+                # a little trickery here... we can get mktime() to figure out mon and mday using out of range values.
+                # yday is not used so setting it is pointless.
+                tm.tm_mday = time_parse_number(&state)
+                tm.tm_mon = 0
+                discard(mktime(&tm))
+            'm':
+                let num = time_parse_number(&state)
+                tm.tm_mon = num - 1
+            'M':
+                tm.tm_min = time_parse_number(&state)
+            'n', 't':
+                # string_lexer.consume_while(is_ascii_space)
+                while not time_lexer_is_eof(&state.lexer):
+                    let ch = time_lexer_peek(&state.lexer)
+                    if not (ch == ' ' or ch == '\t' or ch == '\n' or ch == 0x0b or ch == 0x0c or ch == '\r'):
+                        break
+                    state.lexer.index += 1
+            'r', 'p':
+                let ampm = time_lexer_consume_count(&state.lexer, 2)
+                if string_view_bytes_equal(ampm, time_view_of("PM")):
+                    if tm.tm_hour < 12:
+                        tm.tm_hour += 12
+                elif not string_view_bytes_equal(ampm, time_view_of("AM")):
+                    return none
+            'R':
+                tm.tm_hour = time_parse_number(&state)
+                time_parse_consume(&state, ':')
+                tm.tm_min = time_parse_number(&state)
+            'S':
+                tm.tm_sec = time_parse_number(&state)
+            'T':
+                tm.tm_hour = time_parse_number(&state)
+                time_parse_consume(&state, ':')
+                tm.tm_min = time_parse_number(&state)
+                time_parse_consume(&state, ':')
+                tm.tm_sec = time_parse_number(&state)
+            'w':
+                tm.tm_wday = time_parse_number(&state)
+            'y':
+                let year = time_parse_number(&state)
+                tm.tm_year = (1900 + year) if year <= 99 and year > 69 else 2000 + year
+            'Y':
+                let year = time_parse_number(&state)
+                tm.tm_year = year - 1900
+            'x':
+                var hours = time_parse_number(&state)
+                var minutes: i32
+                if time_lexer_consume_specific(&state.lexer, ':'):
+                    minutes = time_parse_number(&state)
+                else:
+                    minutes = hours % 100
+                    hours = hours // 100
+
+                tm.tm_hour -= hours
+                tm.tm_min -= minutes
+            'X':
+                if not time_lexer_consume_specific(&state.lexer, '.'):
+                    return none
+                # NOTE: the tm structure does not support sub second precision, so drop this value.
+                discard(time_parse_number(&state))
+            '+':
+                var next_format_character: u8? = none
+
+                if format_pos + 1 < format_.m_length:
+                    let next = time_view_at(format_, format_pos + 1)
+                    next_format_character = next
+
+                    # Disallow another formatter directly after %+. This is to avoid ambiguity when parsing a string like
+                    # "ignoreJan" with "%+%b", as it would be non-trivial to know that where the %b field begins.
+                    if next == '%':
+                        return none
+
+                # string_lexer.consume_until([&](auto ch) { return ch == next_format_character; })
+                let start = state.lexer.index
+                while not time_lexer_is_eof(&state.lexer):
+                    if let stop = next_format_character:
+                        if time_lexer_peek(&state.lexer) == stop:
+                            break
+                    state.lexer.index += 1
+                if state.lexer.index == start:
+                    return none
+            '%':
+                time_parse_consume(&state, '%')
+            _:
+                state.parsing_failed = true
+
+        if state.parsing_failed:
+            return none
+
+        format_pos += 1
+
+    if not time_lexer_is_eof(&state.lexer) or format_pos != format_.m_length:
+        return none
+
+    if from_gmt:
+        # When from_gmt is true, the parsed time is in GMT and needs to be converted to Unix time
+        tm.tm_isdst = 0  # GMT doesn't have daylight saving time
+        let gmt_time = timegm(&tm)
+        if gmt_time == -1:
+            return none
+        return unix_date_time_from_seconds_since_epoch(gmt_time)
+
+    return unix_date_time_from_unix_time_parts(tm.tm_year + 1900, (u8)(tm.tm_mon + 1), (u8)tm.tm_mday, (u8)tm.tm_hour, (u8)tm.tm_min, (u8)tm.tm_sec, 0)

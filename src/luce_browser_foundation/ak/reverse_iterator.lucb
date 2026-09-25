@@ -1,0 +1,113 @@
+#==============================================================================================
+#
+#   reverse_iterator - SimpleReverseIterator and ReverseWrapper::in_reverse
+#
+#   DESCRIPTION:
+#       Port of AK/ReverseIterator.h (lines 1-108), over the IndexedContainer interface of
+#       iterator.lucb. `for (auto& x : v.in_reverse())` is a descending index loop in plain
+#       code; these are the iterator objects for code that keeps them.
+#
+#==============================================================================================
+
+## Ported from AK/ReverseIterator.h:19 AK::SimpleReverseIterator::is_end.
+pub func simple_reverse_iterator_is_end[TContainer, TValueType](this: const SimpleReverseIterator[TContainer, TValueType]*) -> bool:
+    return this.m_index == simple_reverse_iterator_rend[TContainer, TValueType](this.m_container).m_index
+
+## Ported from AK/ReverseIterator.h:20 AK::SimpleReverseIterator::index.
+pub func simple_reverse_iterator_index[TContainer, TValueType](this: const SimpleReverseIterator[TContainer, TValueType]*) -> i32:
+    return this.m_index
+
+## Ported from AK/ReverseIterator.h:22 AK::SimpleReverseIterator::operator==.
+pub func simple_reverse_iterator_eq[TContainer, TValueType](this: const SimpleReverseIterator[TContainer, TValueType]*, other: SimpleReverseIterator[TContainer, TValueType]) -> bool:
+    return this.m_index == other.m_index
+
+## Ported from AK/ReverseIterator.h:23 AK::SimpleReverseIterator::operator!=.
+pub func simple_reverse_iterator_ne[TContainer, TValueType](this: const SimpleReverseIterator[TContainer, TValueType]*, other: SimpleReverseIterator[TContainer, TValueType]) -> bool:
+    return this.m_index != other.m_index
+
+## Ported from AK/ReverseIterator.h:24 AK::SimpleReverseIterator::operator<.
+pub func simple_reverse_iterator_lt[TContainer, TValueType](this: const SimpleReverseIterator[TContainer, TValueType]*, other: SimpleReverseIterator[TContainer, TValueType]) -> bool:
+    return this.m_index < other.m_index
+
+## Ported from AK/ReverseIterator.h:25 AK::SimpleReverseIterator::operator>.
+pub func simple_reverse_iterator_gt[TContainer, TValueType](this: const SimpleReverseIterator[TContainer, TValueType]*, other: SimpleReverseIterator[TContainer, TValueType]) -> bool:
+    return this.m_index > other.m_index
+
+## Ported from AK/ReverseIterator.h:26 AK::SimpleReverseIterator::operator<=.
+pub func simple_reverse_iterator_le[TContainer, TValueType](this: const SimpleReverseIterator[TContainer, TValueType]*, other: SimpleReverseIterator[TContainer, TValueType]) -> bool:
+    return this.m_index <= other.m_index
+
+## Ported from AK/ReverseIterator.h:27 AK::SimpleReverseIterator::operator>=.
+pub func simple_reverse_iterator_ge[TContainer, TValueType](this: const SimpleReverseIterator[TContainer, TValueType]*, other: SimpleReverseIterator[TContainer, TValueType]) -> bool:
+    return this.m_index >= other.m_index
+
+## Ported from AK/ReverseIterator.h:29 AK::SimpleReverseIterator::operator+.
+pub func simple_reverse_iterator_add[TContainer, TValueType](this: const SimpleReverseIterator[TContainer, TValueType]*, delta: i32) -> SimpleReverseIterator[TContainer, TValueType]:
+    return SimpleReverseIterator[TContainer, TValueType](m_container = this.m_container, m_index = this.m_index - delta)
+
+## Ported from AK/ReverseIterator.h:30 AK::SimpleReverseIterator::operator-.
+pub func simple_reverse_iterator_sub[TContainer, TValueType](this: const SimpleReverseIterator[TContainer, TValueType]*, delta: i32) -> SimpleReverseIterator[TContainer, TValueType]:
+    return SimpleReverseIterator[TContainer, TValueType](m_container = this.m_container, m_index = this.m_index + delta)
+
+## Ported from AK/ReverseIterator.h:32 AK::SimpleReverseIterator::operator++ (prefix).
+pub func simple_reverse_iterator_inc[TContainer, TValueType](this: SimpleReverseIterator[TContainer, TValueType]*) -> SimpleReverseIterator[TContainer, TValueType]:
+    this.m_index -= 1
+    return *this
+
+## Ported from AK/ReverseIterator.h:37 AK::SimpleReverseIterator::operator++ (postfix).
+pub func simple_reverse_iterator_inc_i32[TContainer, TValueType](this: SimpleReverseIterator[TContainer, TValueType]*, arg0: i32) -> SimpleReverseIterator[TContainer, TValueType]:
+    discard(arg0)
+    this.m_index -= 1
+    return SimpleReverseIterator[TContainer, TValueType](m_container = this.m_container, m_index = this.m_index + 1)
+
+## Ported from AK/ReverseIterator.h:43 AK::SimpleReverseIterator::operator-- (prefix).
+pub func simple_reverse_iterator_dec[TContainer, TValueType](this: SimpleReverseIterator[TContainer, TValueType]*) -> SimpleReverseIterator[TContainer, TValueType]:
+    this.m_index += 1
+    return *this
+
+## Ported from AK/ReverseIterator.h:48 AK::SimpleReverseIterator::operator-- (postfix).
+pub func simple_reverse_iterator_dec_i32[TContainer, TValueType](this: SimpleReverseIterator[TContainer, TValueType]*, arg0: i32) -> SimpleReverseIterator[TContainer, TValueType]:
+    discard(arg0)
+    this.m_index += 1
+    return SimpleReverseIterator[TContainer, TValueType](m_container = this.m_container, m_index = this.m_index - 1)
+
+## Ported from AK/ReverseIterator.h:54 AK::SimpleReverseIterator::operator* const.
+pub func simple_reverse_iterator_deref_const[TValueType, TContainer: IndexedContainer[TValueType]](this: const SimpleReverseIterator[TContainer, TValueType]*) -> TValueType:
+    return *this.m_container.at((usize)this.m_index)
+
+## Ported from AK/ReverseIterator.h:55 AK::SimpleReverseIterator::operator*.
+pub func simple_reverse_iterator_deref[TValueType, TContainer: IndexedContainer[TValueType]](this: SimpleReverseIterator[TContainer, TValueType]*) -> TValueType*:
+    return this.m_container.at((usize)this.m_index)
+
+## Ported from AK/ReverseIterator.h:57 AK::SimpleReverseIterator::operator-> const.
+pub func simple_reverse_iterator_arrow_const[TValueType, TContainer: IndexedContainer[TValueType]](this: const SimpleReverseIterator[TContainer, TValueType]*) -> const TValueType*:
+    return this.m_container.at((usize)this.m_index)
+
+## Ported from AK/ReverseIterator.h:58 AK::SimpleReverseIterator::operator->.
+pub func simple_reverse_iterator_arrow[TValueType, TContainer: IndexedContainer[TValueType]](this: SimpleReverseIterator[TContainer, TValueType]*) -> TValueType*:
+    return this.m_container.at((usize)this.m_index)
+
+## Ported from AK/ReverseIterator.h:69 AK::SimpleReverseIterator::rbegin.
+pub func simple_reverse_iterator_rbegin[TValueType, TContainer: IndexedContainer[TValueType]](container: TContainer*) -> SimpleReverseIterator[TContainer, TValueType]:
+    return SimpleReverseIterator[TContainer, TValueType](m_container = container, m_index = (i32)container.size() - 1)
+
+## Ported from AK/ReverseIterator.h:78 AK::SimpleReverseIterator::rend.
+pub func simple_reverse_iterator_rend[TContainer, TValueType](container: TContainer*) -> SimpleReverseIterator[TContainer, TValueType]:
+    return SimpleReverseIterator[TContainer, TValueType](m_container = container, m_index = -1)
+
+## Ported from AK/ReverseIterator.h:83 AK::SimpleReverseIterator::SimpleReverseIterator.
+pub func simple_reverse_iterator_construct[TContainer, TValueType](this: SimpleReverseIterator[TContainer, TValueType]*, container: TContainer*, index: i32):
+    this.m_container = container
+    this.m_index = index
+
+## Ported from AK/ReverseIterator.h:101 AK::ReverseWrapper::begin.
+pub func reverse_wrapper_begin[TValueType, TContainer: IndexedContainer[TValueType]](wrapper: ReverseWrapper[TContainer]) -> SimpleReverseIterator[TContainer, TValueType]:
+    return simple_reverse_iterator_rbegin[TValueType, TContainer](wrapper.container)
+
+## Ported from AK/ReverseIterator.h:104 AK::ReverseWrapper::end.
+pub func reverse_wrapper_end[TContainer, TValueType](wrapper: ReverseWrapper[TContainer]) -> SimpleReverseIterator[TContainer, TValueType]:
+    return simple_reverse_iterator_rend[TContainer, TValueType](wrapper.container)
+
+## Ported from AK/ReverseIterator.h:107 AK::ReverseWrapper::in_reverse.
+pub func reverse_wrapper_in_reverse[TContainer](container: TContainer*) -> ReverseWrapper[TContainer]:
+    return ReverseWrapper[TContainer](container = container)

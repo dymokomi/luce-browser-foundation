@@ -1,0 +1,161 @@
+#==============================================================================================
+#
+#   ordered_hash_table - OrderedHashTable<T>: the IsOrdered = true instantiation of HashTable
+#
+#   DESCRIPTION:
+#       AK/HashTable.h with IsOrdered = true. OrderedHashTable[T, TT] wraps a HashTable whose
+#       `m_ordered` flag each mutating member sets before delegating (a zero OrderedHashTable
+#       is an empty ordered table), so every function here is the HashTable member of the
+#       same name; iteration follows insertion order.
+#
+#==============================================================================================
+
+## AK::OrderedHashTable copy constructor: the clone of `other` (DESIGN.md §3.3 rule 2).
+pub func ordered_hash_table_clone[T, TT: Traits[T]](other: const OrderedHashTable[T, TT]*) -> OrderedHashTable[T, TT]:
+    var table = OrderedHashTable[T, TT](m_table = hash_table_clone(&other.m_table))
+    table.m_table.m_ordered = true
+    return table
+
+## AK::OrderedHashTable::HashTable(size_t capacity) (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_construct[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, capacity: usize):
+    this.m_table.m_ordered = true
+    hash_table_construct(&this.m_table, capacity)
+
+## AK::OrderedHashTable::is_empty (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_is_empty[T, TT: Traits[T]](this: const OrderedHashTable[T, TT]*) -> bool:
+    return hash_table_is_empty(&this.m_table)
+
+## AK::OrderedHashTable::size (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_size[T, TT: Traits[T]](this: const OrderedHashTable[T, TT]*) -> usize:
+    return hash_table_size(&this.m_table)
+
+## AK::OrderedHashTable::capacity (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_capacity[T, TT: Traits[T]](this: const OrderedHashTable[T, TT]*) -> usize:
+    return hash_table_capacity(&this.m_table)
+
+## AK::OrderedHashTable::try_ensure_capacity (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_try_ensure_capacity[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, capacity: usize) -> !:
+    this.m_table.m_ordered = true
+    return try hash_table_try_ensure_capacity(&this.m_table, capacity)
+
+## AK::OrderedHashTable::ensure_capacity (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_ensure_capacity[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, capacity: usize):
+    this.m_table.m_ordered = true
+    hash_table_ensure_capacity(&this.m_table, capacity)
+
+## AK::OrderedHashTable::contains (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_contains_t[T, TT: Traits[T]](this: const OrderedHashTable[T, TT]*, value: T) -> bool:
+    return hash_table_contains_t(&this.m_table, value)
+
+## AK::OrderedHashTable::contains(K const&) (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_contains_k[T, TT: Traits[T], K, KT: HashCompatibleTraits[T, K]](this: const OrderedHashTable[T, TT]*, value: K) -> bool:
+    return hash_table_contains_k[T, TT, K, KT](&this.m_table, value)
+
+## AK::OrderedHashTable::begin (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_begin[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*) -> HashTableIterator[T]:
+    this.m_table.m_ordered = true
+    return hash_table_begin(&this.m_table)
+
+## AK::OrderedHashTable::end (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_end[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*) -> HashTableIterator[T]:
+    this.m_table.m_ordered = true
+    return hash_table_end(&this.m_table)
+
+## AK::OrderedHashTable::rbegin (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_rbegin[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*) -> ReverseOrderedHashTableIterator[T]:
+    this.m_table.m_ordered = true
+    return hash_table_rbegin(&this.m_table)
+
+## AK::OrderedHashTable::rend (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_rend[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*) -> ReverseOrderedHashTableIterator[T]:
+    this.m_table.m_ordered = true
+    return hash_table_rend(&this.m_table)
+
+## AK::OrderedHashTable::in_reverse (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_in_reverse[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*) -> ReverseOrderedHashTableIterator[T]:
+    this.m_table.m_ordered = true
+    return hash_table_in_reverse(&this.m_table)
+
+## AK::OrderedHashTable::clear (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_clear[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*):
+    this.m_table.m_ordered = true
+    hash_table_clear(&this.m_table)
+
+## AK::OrderedHashTable::clear_with_capacity (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_clear_with_capacity[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*):
+    this.m_table.m_ordered = true
+    hash_table_clear_with_capacity(&this.m_table)
+
+## AK::OrderedHashTable::try_set (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_try_set[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, value: T, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
+    this.m_table.m_ordered = true
+    return try hash_table_try_set(&this.m_table, value, existing_entry_behavior)
+
+## AK::OrderedHashTable::set (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_set[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, value: T, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
+    this.m_table.m_ordered = true
+    return hash_table_set(&this.m_table, value, existing_entry_behavior)
+
+## AK::OrderedHashTable::ensure(U&&) (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_ensure_u[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, value: T, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> T*:
+    this.m_table.m_ordered = true
+    return hash_table_ensure_u(&this.m_table, value, existing_entry_behavior)
+
+## AK::OrderedHashTable::ensure(hash, predicate, initialization_callback) (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_ensure_u32[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, hash_: u32, predicate: Function1[const T*, bool], initialization_callback: Function0[T], existing_entry_behavior: HashSetExistingEntryBehavior) -> T*:
+    this.m_table.m_ordered = true
+    return hash_table_ensure_u32(&this.m_table, hash_, predicate, initialization_callback, existing_entry_behavior)
+
+## AK::OrderedHashTable::find(hash, predicate) (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_find_u32_tt_unary_predicate[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, hash_: u32, predicate: Function1[const T*, bool]) -> HashTableIterator[T]:
+    this.m_table.m_ordered = true
+    return hash_table_find_u32_tt_unary_predicate(&this.m_table, hash_, predicate)
+
+## AK::OrderedHashTable::find (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_find_t[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, value: T) -> HashTableIterator[T]:
+    this.m_table.m_ordered = true
+    return hash_table_find_t(&this.m_table, value)
+
+## AK::OrderedHashTable::find(K const&) (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_find_k[T, TT: Traits[T], K, KT: HashCompatibleTraits[T, K]](this: OrderedHashTable[T, TT]*, value: K) -> HashTableIterator[T]:
+    this.m_table.m_ordered = true
+    return hash_table_find_k[T, TT, K, KT](&this.m_table, value)
+
+## AK::OrderedHashTable::remove (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_remove_t[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, value: T) -> bool:
+    this.m_table.m_ordered = true
+    return hash_table_remove_t(&this.m_table, value)
+
+## AK::OrderedHashTable::remove(K const&) (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_remove_k[T, TT: Traits[T], K, KT: HashCompatibleTraits[T, K]](this: OrderedHashTable[T, TT]*, value: K) -> bool:
+    this.m_table.m_ordered = true
+    return hash_table_remove_k[T, TT, K, KT](&this.m_table, value)
+
+## AK::OrderedHashTable::remove(Iterator&) (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_remove_opaque[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, iterator: HashTableIterator[T]*):
+    this.m_table.m_ordered = true
+    hash_table_remove_opaque(&this.m_table, iterator)
+
+## AK::OrderedHashTable::remove_all_matching (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_remove_all_matching[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, predicate: Function1[const T*, bool]) -> bool:
+    this.m_table.m_ordered = true
+    return hash_table_remove_all_matching(&this.m_table, predicate)
+
+## AK::OrderedHashTable::take_all_matching (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_take_all_matching[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*, predicate: Function1[const T*, bool]) -> Vector[T]:
+    this.m_table.m_ordered = true
+    return hash_table_take_all_matching(&this.m_table, predicate)
+
+## AK::OrderedHashTable::take_last (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_take_last[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*) -> T:
+    this.m_table.m_ordered = true
+    return hash_table_take_last(&this.m_table)
+
+## AK::OrderedHashTable::take_first (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_take_first[T, TT: Traits[T]](this: OrderedHashTable[T, TT]*) -> T:
+    this.m_table.m_ordered = true
+    return hash_table_take_first(&this.m_table)
+
+## AK::OrderedHashTable::values (AK/HashTable.h, IsOrdered = true).
+pub func ordered_hash_table_values[T, TT: Traits[T]](this: const OrderedHashTable[T, TT]*) -> Vector[T]:
+    return hash_table_values(&this.m_table)

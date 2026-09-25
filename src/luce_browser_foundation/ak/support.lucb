@@ -37,7 +37,7 @@ pub interface Traits[K]:
 pub struct PtrTraits[T]: Traits[T*]:
     var empty_: u8
 
-    func hash_of(key: const (T*)*) -> u32: trap("unported: AK::Traits<T*>::hash")
+    func hash_of(key: const (T*)*) -> u32: return ptr_hash_void(*key)
 
     func equals(a: const (T*)*, b: const (T*)*) -> bool: return *a == *b
 
@@ -50,31 +50,45 @@ pub struct DefaultTraits[T]: Traits[T]:
     func equals(a: const T*, b: const T*) -> bool: trap("unported: AK::Traits<T>::equals")
 
 ## AK::Vector<T, N> (AK/Vector.h): size, capacity and the outline buffer; inline capacity dropped.
-pub struct Vector[T]:
+## A zero Vector is empty. `m_atomic` (set by vector_create_atomic) keeps the buffer in atomic
+## storage, never scanned for pointers (DESIGN.md §3.3 rule 5).
+pub struct Vector[T]: IndexedContainer[T]:
     pub var m_size: usize
     pub var m_capacity: usize
     pub var m_outline_buffer: T*?
+    pub var m_atomic: bool
 
-## AK::HashTableBucket<T> (AK/HashTable.h).
+    func size() -> usize: return self.m_size
+
+    func at(index: usize) -> T*: return vector_at((Vector[T]*)&self, index)
+
+## AK::HashTable<T>::Bucket and OrderedBucket (AK/HashTable.h): the ordered-iteration links, the
+## state (BucketState, or the probe length + 1), the stored hash and the value. Every bucket has
+## the links; an unordered table leaves them none. The hash is always stored and checked first,
+## which the donor does for types whose equality may be slow; for the others the check is
+## redundant (equal values have equal hashes), so lookups behave identically.
 pub struct HashTableBucket[T]:
+    pub var previous: HashTableBucket[T]*?
+    pub var next: HashTableBucket[T]*?
     pub var state: u8
+    pub var hash: u32
     pub var storage: T
 
-## AK::HashTable<T, TT> (AK/HashTable.h).
+## AK::HashTable<T, TT> (AK/HashTable.h): closed hashing with Robin Hood probing over
+## `m_mask + 1` buckets. `m_head`/`m_tail` are the OrderedCollectionData of an ordered table
+## (`m_ordered`, set by the OrderedHashTable functions). A zero HashTable is empty.
 pub struct HashTable[T, TT: Traits[T]]:
     pub var m_buckets: HashTableBucket[T]*?
+    pub var m_head: HashTableBucket[T]*?
+    pub var m_tail: HashTableBucket[T]*?
     pub var m_size: usize
-    pub var m_capacity: usize
-    pub var m_deleted_count: usize
+    pub var m_mask: usize
+    pub var m_ordered: bool
 
-## AK::OrderedHashTable<T, TT> (AK/HashTable.h, IsOrdered = true).
+## AK::OrderedHashTable<T, TT> (AK/HashTable.h, IsOrdered = true): a HashTable that iterates in
+## insertion order.
 pub struct OrderedHashTable[T, TT: Traits[T]]:
-    pub var m_buckets: HashTableBucket[T]*?
-    pub var m_size: usize
-    pub var m_capacity: usize
-    pub var m_deleted_count: usize
-    pub var m_collection_head: HashTableBucket[T]*?
-    pub var m_collection_tail: HashTableBucket[T]*?
+    pub var m_table: HashTable[T, TT]
 
 ## AK::HashMap<K, V>::Entry (AK/HashMap.h).
 pub struct HashMapEntry[K, V]:
@@ -85,9 +99,9 @@ pub struct HashMapEntry[K, V]:
 pub struct HashMapEntryTraits[K, V, KT: Traits[K]]: Traits[HashMapEntry[K, V]]:
     var empty_: u8
 
-    func hash_of(key: const HashMapEntry[K, V]*) -> u32: trap("unported: AK::HashMap::EntryTraits::hash")
+    func hash_of(key: const HashMapEntry[K, V]*) -> u32: return hash_map_entry_traits_hash[K, V, KT](key)
 
-    func equals(a: const HashMapEntry[K, V]*, b: const HashMapEntry[K, V]*) -> bool: trap("unported: AK::HashMap::EntryTraits::equals")
+    func equals(a: const HashMapEntry[K, V]*, b: const HashMapEntry[K, V]*) -> bool: return hash_map_entry_traits_equals[K, V, KT](a, b)
 
 ## AK::HashMap<K, V, KT> (AK/HashMap.h).
 pub struct HashMap[K, V, KT: Traits[K]]:

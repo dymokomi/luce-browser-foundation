@@ -1,0 +1,501 @@
+#==============================================================================================
+#
+#   time_1 - Calendar arithmetic and Duration
+#
+#   DESCRIPTION:
+#       Port of AK/Time.h (lines 1-378: the calendar helpers and class Duration) with the
+#       out-of-line definitions of AK/Time.cpp they declare (lines 27-266), in the header's
+#       order. Detail::floor_div_by<divisor> and mod_zeros_in_range<positive_mod> take their
+#       template argument as a parameter. Duration's operators are named functions
+#       (duration_add, duration_sub, duration_cmp; == is structural). Checked<i64> is the
+#       `_i64` instantiation of checked_*.
+#
+#==============================================================================================
+
+# mark: Calendar ================================================================================
+
+## Ported from AK/Time.h:45 AK::is_leap_year.
+pub func is_leap_year(year: i32) -> bool:
+    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+
+## Ported from AK/Time.cpp:37 AK::day_of_week.
+# Month and day start at 1. Month must be >= 1 and <= 12.
+# The return value is 0-indexed, that is 0 is Sunday, 1 is Monday, etc.
+# Day may be negative or larger than the number of days
+# in the given month.
+pub func day_of_week(year: i32, month: u32, day: i32) -> u32:
+    assert(month >= 1 and month <= 12)
+    let seek_table: i32[12] = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
+    var y = year
+    if month < 3:
+        y -= 1
+
+    return (u32)((y + y // 4 - y // 100 + y // 400 + seek_table[month - 1] + day) % 7)
+
+## Ported from AK/Time.h:61 AK::day_of_year.
+# Month and day start at 1. Month must be >= 1 and <= 12.
+# The return value is 0-indexed, that is Jan 1 is day 0.
+# Day may be negative or larger than the number of days
+# in the given month. If day is negative enough, the result
+# can be negative.
+pub func day_of_year(year: i32, month: u32, day: i32) -> i32:
+    if not (month >= 1 and month <= 12):
+        return 0
+
+    let seek_table: i32[12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
+    var result = seek_table[month - 1] + day - 1
+
+    if is_leap_year(year) and month >= 3:
+        result += 1
+
+    return result
+
+## Ported from AK/Time.cpp:27 AK::days_in_month.
+# Month starts at 1. Month must be >= 1 and <= 12.
+pub func days_in_month(year: i32, month: u32) -> i32:
+    assert(month >= 1 and month <= 12)
+    if month == 2:
+        return 29 if is_leap_year(year) else 28
+
+    let is_long_month = (month == 1 or month == 3 or month == 5 or month == 7 or month == 8 or month == 10 or month == 12)
+    return 31 if is_long_month else 30
+
+## Ported from AK/Time.h:82 AK::days_in_year.
+pub func days_in_year(year: i32) -> u32:
+    return 365 + (1 if is_leap_year(year) else 0)
+
+## Ported from AK/Time.h:87 AK::iso8061_weeks_in_year.
+pub func iso8061_weeks_in_year(year: i32) -> u32:
+    return 53 if day_of_week(year, 12, 31) == 4 or day_of_week(year - 1, 12, 31) == 3 else 52
+
+## Ported from AK/Time.h:96 AK::Detail::floor_div_by<divisor>: integer division rounding towards
+## negative infinity.
+# TODO: This feels like there should be an easier way to do this.
+pub func floor_div_by(divisor: i64, dividend: i64) -> i64:
+    assert(divisor > 1)
+    let is_negative: i64 = 1 if dividend < 0 else 0
+    return (dividend + is_negative) // divisor - is_negative
+
+## Ported from AK/Time.h:106 AK::Detail::mod_zeros_in_range<positive_mod>: counts how many integers
+## n are in the interval [begin, end) with n % positive_mod == 0.
+# NOTE: "end" is not considered to be part of the range, hence "[begin, end)".
+pub func mod_zeros_in_range(positive_mod: i64, begin: i64, end: i64) -> i64:
+    return floor_div_by(positive_mod, end - 1) - floor_div_by(positive_mod, begin - 1)
+
+## Ported from AK/Time.h:114 AK::years_to_days_since_epoch.
+pub func years_to_days_since_epoch(year: i32) -> i64:
+    var begin_year: i32
+    var end_year: i32
+    var leap_sign: i64
+    if year < 1970:
+        begin_year = year
+        end_year = 1970
+        leap_sign = -1
+    else:
+        begin_year = 1970
+        end_year = year
+        leap_sign = 1
+    let year_i64: i64 = year
+    # This duplicates the logic of 'is_leap_year', with the advantage of not needing any loops.
+    # Given that the definition of leap years is not expected to change, this should be a good trade-off.
+    let days: i64 = 365 * (year_i64 - 1970)
+    var extra_leap_days: i64 = 0
+    extra_leap_days += mod_zeros_in_range(4, begin_year, end_year)
+    extra_leap_days -= mod_zeros_in_range(100, begin_year, end_year)
+    extra_leap_days += mod_zeros_in_range(400, begin_year, end_year)
+    return days + extra_leap_days * leap_sign
+
+## Ported from AK/Time.h:137 AK::days_since_epoch.
+pub func days_since_epoch(year: i32, month: i32, day: i32) -> i64:
+    return years_to_days_since_epoch(year) + day_of_year(year, (u32)month, day)
+
+## Ported from AK/Time.h:142 AK::seconds_since_epoch_to_year.
+pub func seconds_since_epoch_to_year(seconds: i64) -> i64:
+    let years_since_epoch = f64(seconds) / seconds_per_year
+    return 1970 + seconds_since_epoch_round_down(years_since_epoch)
+
+# The round_down lambda of seconds_since_epoch_to_year.
+# NOTE: We are not using floor() from <math.h> to avoid LibC / DynamicLoader dependency issues.
+func seconds_since_epoch_round_down(value: f64) -> i64:
+    let as_i64 = (i64)value
+
+    if value == f64(as_i64) or as_i64 >= 0:
+        return as_i64
+    return as_i64 - 1
+
+# mark: Duration ================================================================================
+
+# Represents a duration in a "safe" way.
+# Minimum: -(2**63) seconds, 0 nanoseconds
+# Maximum: 2**63-1 seconds, 999'999'999 nanoseconds
+# If any operation (e.g. 'from_timeval' or operator-) would over- or underflow, the closest legal value is returned instead.
+# Inputs (e.g. to 'from_timespec') are allowed to be in non-normal form (e.g. "1 second, 2'012'345'678 nanoseconds" or "1 second, -2 microseconds").
+# Outputs (e.g. from 'to_timeval') are always in normal form.
+#
+# NOTE: This class is naive. It may represent either absolute offsets or relative durations. It does not have a reference point in itself,
+#       and therefore comparing multiple instances of this class is only sensible if you are sure that their reference point is identical.
+#       You should not be using this class directly to represent absolute time.
+
+# The private constructor Duration(seconds, nanoseconds), as a value.
+func make_duration(seconds: i64, nanoseconds: u32) -> Duration:
+    var d: Duration
+    duration_construct(&d, seconds, nanoseconds)
+    return d
+
+## Ported from AK/Time.h:190 AK::Duration::sane_mod.
+# This must be part of the header in order to make the various 'from_*' functions constexpr.
+# However, sane_mod can only deal with a limited range of values for 'denominator', so this can't be made public.
+pub func duration_sane_mod_i64(numerator: i64*, denominator: i64) -> i64:
+    assert(2 <= denominator and denominator <= 1000000000)
+    # '%' in C/C++ does not work in the obvious way:
+    # For example, -9 % 7 is -2, not +5.
+    # However, we want a representation like "(-2)*7 + (+5)".
+    var dividend = *numerator // denominator
+    *numerator = *numerator % denominator
+    if *numerator < 0:
+        # Does not overflow: different signs.
+        *numerator = *numerator + denominator
+        # Does not underflow: denominator >= 2.
+        dividend -= 1
+    return dividend
+
+## Ported from AK/Time.h:206 AK::Duration::sane_mod.
+pub func duration_sane_mod_i32(numerator: i32*, denominator: i32) -> i32:
+    var numerator_64: i64 = *numerator
+    let dividend = duration_sane_mod_i64(&numerator_64, denominator)
+    # Does not underflow: numerator can only become smaller.
+    *numerator = (i32)numerator_64
+    # Does not overflow: Will be smaller than original value of 'numerator'.
+    return (i32)dividend
+
+## Ported from AK/Time.h:217 AK::Duration::from_seconds.
+pub func duration_from_seconds(seconds: i64) -> Duration:
+    return make_duration(seconds, 0)
+
+## Ported from AK/Time.h:218 AK::Duration::from_seconds_f64.
+pub func duration_from_seconds_f64(seconds: f64) -> Duration:
+    assert(seconds == seconds, "Converting float NaN seconds")
+    if seconds >= (f64)i64_max:
+        return duration_from_seconds(i64_max)
+    if seconds <= (f64)i64_min:
+        return duration_from_seconds(i64_min)
+    var integer_seconds = (i64)seconds
+    if (f64)integer_seconds > seconds:
+        integer_seconds -= 1
+    let integer_nanoseconds = (u32)((seconds - (f64)integer_seconds) * 1000000000.0)
+    return make_duration(integer_seconds, integer_nanoseconds)
+
+## Ported from AK/Time.h:231 AK::Duration::from_nanoseconds.
+pub func duration_from_nanoseconds(nanoseconds: i64) -> Duration:
+    var remainder = nanoseconds
+    let seconds = duration_sane_mod_i64(&remainder, 1000000000)
+    return make_duration(seconds, (u32)remainder)
+
+## Ported from AK/Time.h:236 AK::Duration::from_microseconds.
+pub func duration_from_microseconds(microseconds: i64) -> Duration:
+    var remainder = microseconds
+    let seconds = duration_sane_mod_i64(&remainder, 1000000)
+    return make_duration(seconds, (u32)(remainder * 1000))
+
+## Ported from AK/Time.h:241 AK::Duration::from_milliseconds.
+pub func duration_from_milliseconds(milliseconds: i64) -> Duration:
+    var remainder = milliseconds
+    let seconds = duration_sane_mod_i64(&remainder, 1000)
+    return make_duration(seconds, (u32)(remainder * 1000000))
+
+## Ported from AK/Time.cpp:47 AK::Duration::from_ticks.
+# clock_t and time_t are the donor's `long` on Linux; the arithmetic is done in i64.
+pub func duration_from_ticks(ticks: u64, ticks_per_second: i64) -> Duration:
+    let signed_ticks = (i64)ticks
+    let secs = signed_ticks % ticks_per_second
+
+    var nsecs = (i32)(1000000000 * (signed_ticks - (ticks_per_second * secs)) // ticks_per_second)
+    let extra_secs = duration_sane_mod_i32(&nsecs, 1000000000)
+    return duration_from_half_sanitized(secs, extra_secs, (u32)nsecs)
+
+## Ported from AK/Time.cpp:56 AK::Duration::from_timespec.
+pub func duration_from_timespec(ts: Timespec) -> Duration:
+    var nsecs = (i32)ts.tv_nsec
+    let extra_secs = duration_sane_mod_i32(&nsecs, 1000000000)
+    return duration_from_half_sanitized(ts.tv_sec, extra_secs, (u32)nsecs)
+
+## Ported from AK/Time.cpp:63 AK::Duration::from_timeval.
+pub func duration_from_timeval(tv: Timeval) -> Duration:
+    var usecs = (i32)tv.tv_usec
+    let extra_secs = duration_sane_mod_i32(&usecs, 1000000)
+    assert(0 <= usecs and usecs < 1000000)
+    return duration_from_half_sanitized(tv.tv_sec, extra_secs, (u32)(usecs * 1000))
+
+## Ported from AK/Time.cpp:71 AK::Duration::from_time_units.
+pub func duration_from_time_units(time_units: i64, numerator: u32, denominator: u32) -> Duration:
+    assert(numerator != 0)
+    assert(denominator != 0)
+
+    if checked_multiplication_would_overflow_i64(time_units, (i64)numerator):
+        return make_duration(i64_max if time_units >= 0 else i64_min, 0)
+    let time_units_product = time_units * (i64)numerator
+    var seconds = time_units_product // (i64)denominator
+    var time_units_remainder = time_units_product % (i64)denominator
+    if time_units_remainder < 0:
+        if seconds == i64_min:
+            return make_duration(i64_min, 0)
+        seconds -= 1
+        time_units_remainder += (i64)denominator
+
+    var nanoseconds = ((time_units_remainder * 1000000000) + (i64)(denominator // 2)) // (i64)denominator
+    if nanoseconds == 1000000000:
+        seconds += 1
+        nanoseconds = 0
+    assert(nanoseconds >= 0)
+    assert(nanoseconds < 1000000000)
+    return make_duration(seconds, (u32)nanoseconds)
+
+## Ported from AK/Time.h:251 AK::Duration::min.
+pub func duration_min() -> Duration:
+    return make_duration(i64_min, 0)
+
+## Ported from AK/Time.h:252 AK::Duration::zero.
+pub func duration_zero() -> Duration:
+    return make_duration(0, 0)
+
+## Ported from AK/Time.h:253 AK::Duration::max.
+pub func duration_max() -> Duration:
+    return make_duration(i64_max, 999999999)
+
+## Ported from AK/Time.cpp:98 AK::Duration::to_truncated_seconds.
+# Truncates towards zero (2.8s to 2s, -2.8s to -2s).
+pub func duration_to_truncated_seconds(this: const Duration*) -> i64:
+    assert(this.m_nanoseconds < 1000000000)
+    if this.m_seconds < 0 and this.m_nanoseconds != 0:
+        # Since m_seconds is negative, adding 1 can't possibly overflow
+        return this.m_seconds + 1
+    return this.m_seconds
+
+## Ported from AK/Time.cpp:108 AK::Duration::to_truncated_milliseconds.
+pub func duration_to_truncated_milliseconds(this: const Duration*) -> i64:
+    assert(this.m_nanoseconds < 1000000000)
+    var milliseconds = make_checked[i64]((this.m_seconds + 1) if this.m_seconds < 0 else this.m_seconds)
+    discard(checked_mul_assign_t_i64(&milliseconds, 1000))
+    discard(checked_add_assign_t_i64(&milliseconds, (i64)(this.m_nanoseconds // 1000000)))
+    if this.m_seconds < 0:
+        if this.m_nanoseconds % 1000000 != 0:
+            # Does not overflow: milliseconds <= 1'999.
+            discard(checked_inc_i32_i64(&milliseconds, 0))
+        # We dropped one second previously, put it back in now that we have handled the rounding.
+        discard(checked_sub_assign_t_i64(&milliseconds, 1000))
+    if not checked_has_overflow(&milliseconds):
+        return checked_value(&milliseconds)
+    return i64_min if this.m_seconds < 0 else i64_max
+
+## Ported from AK/Time.cpp:127 AK::Duration::to_truncated_microseconds.
+pub func duration_to_truncated_microseconds(this: const Duration*) -> i64:
+    assert(this.m_nanoseconds < 1000000000)
+    var microseconds = make_checked[i64]((this.m_seconds + 1) if this.m_seconds < 0 else this.m_seconds)
+    discard(checked_mul_assign_t_i64(&microseconds, 1000000))
+    discard(checked_add_assign_t_i64(&microseconds, (i64)(this.m_nanoseconds // 1000)))
+    if this.m_seconds < 0:
+        if this.m_nanoseconds % 1000 != 0:
+            # Does not overflow: microseconds <= 1'999'999.
+            discard(checked_inc_i32_i64(&microseconds, 0))
+        # We dropped one second previously, put it back in now that we have handled the rounding.
+        discard(checked_sub_assign_t_i64(&microseconds, 1000000))
+    if not checked_has_overflow(&microseconds):
+        return checked_value(&microseconds)
+    return i64_min if this.m_seconds < 0 else i64_max
+
+## Ported from AK/Time.cpp:146 AK::Duration::to_seconds.
+# Rounds away from zero (2.3s to 3s, -2.3s to -3s).
+pub func duration_to_seconds(this: const Duration*) -> i64:
+    assert(this.m_nanoseconds < 1000000000)
+    if this.m_seconds >= 0 and this.m_nanoseconds != 0:
+        var seconds = make_checked[i64](this.m_seconds)
+        discard(checked_inc_i32_i64(&seconds, 0))
+        return i64_max if checked_has_overflow(&seconds) else checked_value(&seconds)
+    return this.m_seconds
+
+## Ported from AK/Time.cpp:157 AK::Duration::to_seconds_f64.
+pub func duration_to_seconds_f64(this: const Duration*) -> f64:
+    assert(this.m_nanoseconds < 1000000000)
+    return (f64)this.m_seconds + ((f64)this.m_nanoseconds / 1000000000.0)
+
+## Ported from AK/Time.cpp:163 AK::Duration::to_milliseconds.
+pub func duration_to_milliseconds(this: const Duration*) -> i64:
+    assert(this.m_nanoseconds < 1000000000)
+    var milliseconds = make_checked[i64]((this.m_seconds + 1) if this.m_seconds < 0 else this.m_seconds)
+    discard(checked_mul_assign_t_i64(&milliseconds, 1000))
+    discard(checked_add_assign_t_i64(&milliseconds, (i64)(this.m_nanoseconds // 1000000)))
+    if this.m_seconds >= 0 and this.m_nanoseconds % 1000000 != 0:
+        discard(checked_inc_i32_i64(&milliseconds, 0))
+    if this.m_seconds < 0:
+        # We dropped one second previously, put it back in now that we have handled the rounding.
+        discard(checked_sub_assign_t_i64(&milliseconds, 1000))
+    if not checked_has_overflow(&milliseconds):
+        return checked_value(&milliseconds)
+    return i64_min if this.m_seconds < 0 else i64_max
+
+## Ported from AK/Time.cpp:180 AK::Duration::to_microseconds.
+pub func duration_to_microseconds(this: const Duration*) -> i64:
+    assert(this.m_nanoseconds < 1000000000)
+    var microseconds = make_checked[i64]((this.m_seconds + 1) if this.m_seconds < 0 else this.m_seconds)
+    discard(checked_mul_assign_t_i64(&microseconds, 1000000))
+    discard(checked_add_assign_t_i64(&microseconds, (i64)(this.m_nanoseconds // 1000)))
+    if this.m_seconds >= 0 and this.m_nanoseconds % 1000 != 0:
+        discard(checked_inc_i32_i64(&microseconds, 0))
+    if this.m_seconds < 0:
+        # We dropped one second previously, put it back in now that we have handled the rounding.
+        discard(checked_sub_assign_t_i64(&microseconds, 1000000))
+    if not checked_has_overflow(&microseconds):
+        return checked_value(&microseconds)
+    return i64_min if this.m_seconds < 0 else i64_max
+
+## Ported from AK/Time.cpp:197 AK::Duration::to_nanoseconds.
+pub func duration_to_nanoseconds(this: const Duration*) -> i64:
+    assert(this.m_nanoseconds < 1000000000)
+    var nanoseconds = make_checked[i64]((this.m_seconds + 1) if this.m_seconds < 0 else this.m_seconds)
+    discard(checked_mul_assign_t_i64(&nanoseconds, 1000000000))
+    discard(checked_add_assign_t_i64(&nanoseconds, (i64)this.m_nanoseconds))
+    if this.m_seconds < 0:
+        # We dropped one second previously, put it back in now that we have handled the rounding.
+        discard(checked_sub_assign_t_i64(&nanoseconds, 1000000000))
+    if not checked_has_overflow(&nanoseconds):
+        return checked_value(&nanoseconds)
+    return i64_min if this.m_seconds < 0 else i64_max
+
+## Ported from AK/Time.cpp:212 AK::Duration::to_timespec.
+pub func duration_to_timespec(this: const Duration*) -> Timespec:
+    assert(this.m_nanoseconds < 1000000000)
+    return Timespec(tv_sec = this.m_seconds, tv_nsec = (i64)this.m_nanoseconds)
+
+## Ported from AK/Time.cpp:218 AK::Duration::to_timeval.
+# Rounds towards -inf (it was the easiest to implement).
+pub func duration_to_timeval(this: const Duration*) -> Timeval:
+    assert(this.m_nanoseconds < 1000000000)
+    return Timeval(tv_sec = this.m_seconds, tv_usec = (i64)this.m_nanoseconds // 1000)
+
+## Ported from AK/Time.cpp:227 AK::Duration::to_time_units.
+pub func duration_to_time_units(this: const Duration*, numerator: u32, denominator: u32) -> i64:
+    assert(numerator != 0)
+    assert(denominator != 0)
+
+    let seconds_product = saturating_mul_i64(this.m_seconds, (i64)denominator)
+    var time_units = seconds_product // (i64)numerator
+    let seconds_remainder_dividend = seconds_product % (i64)numerator
+
+    let seconds_remainder_nanosecond_dividend = seconds_remainder_dividend * 1000000000
+    let rounding_half_nanosecond_dividend = (i64)numerator * 500000000
+    let sub_seconds_nanosecond_dividend = ((i64)this.m_nanoseconds * (i64)denominator) + seconds_remainder_nanosecond_dividend
+
+    let sub_seconds_nanosecond_units = sub_seconds_nanosecond_dividend // (i64)numerator
+    let sub_seconds_units_remainder_nanosecond_dividend = sub_seconds_nanosecond_dividend % (i64)numerator
+    let rounding_adjustment_nanosecond_units = (rounding_half_nanosecond_dividend + sub_seconds_units_remainder_nanosecond_dividend) // (i64)numerator
+
+    time_units = saturating_add_i64(time_units, (sub_seconds_nanosecond_units + rounding_adjustment_nanosecond_units) // 1000000000)
+
+    return time_units
+
+## Ported from AK/Time.h:270 AK::Duration::is_zero.
+pub func duration_is_zero(this: const Duration*) -> bool:
+    return this.m_seconds == 0 and this.m_nanoseconds == 0
+
+## Ported from AK/Time.h:271 AK::Duration::is_negative.
+pub func duration_is_negative(this: const Duration*) -> bool:
+    return this.m_seconds < 0
+
+## Ported from AK/Time.h:273 AK::Duration::operator+.
+pub func duration_add(this: const Duration*, other: Duration) -> Duration:
+    assert(this.m_nanoseconds < 1000000000)
+    assert(other.m_nanoseconds < 1000000000)
+
+    var new_nsecs: u32 = this.m_nanoseconds + other.m_nanoseconds
+    let extra_secs: u32 = new_nsecs // 1000000000
+    new_nsecs = new_nsecs % 1000000000
+
+    var this_secs = this.m_seconds
+    var other_secs = other.m_seconds
+    # We would like to just add "this_secs + other_secs + extra_secs".
+    # However, computing this naively may overflow even though the result is in-bounds.
+    # Example in 8-bit: (-127) + (-2) + (+1) = (-128), which fits in an i8.
+    # Example in 8-bit, the other way around: (-2) + (127) + (+1) = 126.
+    # So we do something more sophisticated:
+    if extra_secs != 0:
+        assert(extra_secs == 1)
+        if this_secs != 0x7fffffffffffffff:
+            this_secs += 1
+        elif other_secs != 0x7fffffffffffffff:
+            other_secs += 1
+        else:
+            # If *both* are INT64_MAX, then adding them will overflow in any case.
+            return duration_max()
+
+    var new_secs = make_checked[i64](this_secs)
+    discard(checked_add_assign_t_i64(&new_secs, other_secs))
+    if checked_has_overflow(&new_secs):
+        if other_secs > 0:
+            return duration_max()
+        else:
+            return duration_min()
+
+    return make_duration(checked_value(&new_secs), new_nsecs)
+
+## Ported from AK/Time.h:313 AK::Duration::operator+=.
+pub func duration_add_assign(this: Duration*, other: Duration) -> Duration*:
+    *this = duration_add(this, other)
+    return this
+
+## Ported from AK/Time.h:319 AK::Duration::operator-.
+pub func duration_sub(this: const Duration*, other: Duration) -> Duration:
+    assert(this.m_nanoseconds < 1000000000)
+    assert(other.m_nanoseconds < 1000000000)
+
+    if other.m_nanoseconds != 0:
+        return duration_add(this, make_duration((i64)~(u64)other.m_seconds, 1000000000 - other.m_nanoseconds))
+
+    if other.m_seconds != i64_min:
+        return duration_add(this, make_duration(-other.m_seconds, 0))
+
+    # Only remaining case: We want to subtract -0x8000'0000'0000'0000 seconds,
+    # i.e. add a very large number.
+
+    if this.m_seconds >= 0:
+        return duration_max()
+    return make_duration((this.m_seconds + 0x4000000000000000) + 0x4000000000000000, this.m_nanoseconds)
+
+## Ported from AK/Time.h:338 AK::Duration::operator-=.
+pub func duration_sub_assign(this: Duration*, other: Duration) -> Duration*:
+    *this = duration_sub(this, other)
+    return this
+
+## Ported from AK/Time.h:345 AK::Duration::operator<=>.
+pub func duration_cmp(this: const Duration*, other: Duration) -> i32:
+    let seconds_cmp: i32 = 1 if this.m_seconds > other.m_seconds else (-1 if this.m_seconds < other.m_seconds else 0)
+    if seconds_cmp != 0:
+        return seconds_cmp
+    let nanoseconds_cmp: i32 = 1 if this.m_nanoseconds > other.m_nanoseconds else (-1 if this.m_nanoseconds < other.m_nanoseconds else 0)
+    if nanoseconds_cmp != 0:
+        return nanoseconds_cmp
+    return 0
+
+## Ported from AK/Time.h:361 AK::Duration::Duration.
+pub func duration_construct(this: Duration*, seconds: i64, nanoseconds: u32):
+    this.m_seconds = seconds
+    this.m_nanoseconds = nanoseconds
+
+## Ported from AK/Time.cpp:249 AK::Duration::from_half_sanitized.
+pub func duration_from_half_sanitized(seconds: i64, extra_seconds: i32, nanoseconds: u32) -> Duration:
+    assert(nanoseconds < 1000000000)
+
+    var secs = seconds
+    var extra: i64 = extra_seconds
+    if (secs <= 0 and extra > 0) or (secs >= 0 and extra < 0):
+        # Opposite signs mean that we can definitely add them together without fear of overflowing i64:
+        secs += extra
+        extra = 0
+
+    # Now the only possible way to become invalid is overflowing i64 towards positive infinity:
+    if checked_addition_would_overflow_i64(secs, extra):
+        if secs < 0:
+            return duration_min()
+        else:
+            return duration_max()
+
+    return make_duration(secs + extra, nanoseconds)

@@ -1,0 +1,50 @@
+#==============================================================================================
+#
+#   find - find_if, find, find_index and find_value over an iterator range
+#
+#   DESCRIPTION:
+#       Port of AK/Find.h (lines 1-57). The donor's algorithms take any iterator pair; here
+#       the pair is a SimpleIterator over an IndexedContainer (iterator.lucb), the iterator
+#       every AK container this region ports hands out. Predicates are
+#       Function1[const T*, bool]; find() compares with `==` (DefaultTraits<T>::equals).
+#
+#==============================================================================================
+
+## Ported from AK/Find.h:17 AK::find_if.
+pub func find_if[T, TContainer: IndexedContainer[T]](first: SimpleIterator[TContainer, T], last: SimpleIterator[TContainer, T], pred: Function1[const T*, bool]) -> SimpleIterator[TContainer, T]:
+    var it = first
+    while not simple_iterator_eq(&it, last):
+        if function1_call(&pred, simple_iterator_arrow(&it)):
+            return it
+        discard(simple_iterator_inc(&it))
+    return last
+
+# The predicate of find() and find_index(): `Traits<T>::equals(entry, value)`.
+# workaround: compiler-issues/generic_function_value (the callback is a static method)
+struct FindEqualsValue[T: luce.Equatable]:
+    var value: T
+
+    static func call(context: void*?, entry: const T*) -> bool:
+        let captures = (const FindEqualsValue[T]*)(context else trap("find: no captures"))
+        return *entry == captures.value
+
+## Ported from AK/Find.h:29 AK::find.
+pub func find[T: luce.Equatable, TContainer: IndexedContainer[T]](first: SimpleIterator[TContainer, T], last: SimpleIterator[TContainer, T], value: T) -> SimpleIterator[TContainer, T]:
+    var captures = FindEqualsValue[T](value = value)
+    let equals: func(void*?, const T*) -> bool = FindEqualsValue[T].call
+    return find_if(first, last, Function1[const T*, bool](call = equals, context = &captures))
+
+## Ported from AK/Find.h:35 AK::find_index.
+pub func find_index[T: luce.Equatable, TContainer: IndexedContainer[T]](first: SimpleIterator[TContainer, T], last: SimpleIterator[TContainer, T], value: T) -> usize:
+    var captures = FindEqualsValue[T](value = value)
+    let equals: func(void*?, const T*) -> bool = FindEqualsValue[T].call
+    let found = find_if(first, last, Function1[const T*, bool](call = equals, context = &captures))
+    return simple_iterator_index(&found)
+
+## Ported from AK/Find.h:43 AK::find_value: the first element matching `pred`, if any.
+pub func find_value[T, TContainer: IndexedContainer[T]](container: TContainer*, pred: Function1[const T*, bool]) -> T*?:
+    let end = simple_iterator_end[T, TContainer](container)
+    let it = find_if(simple_iterator_begin[TContainer, T](container), end, pred)
+    if not simple_iterator_eq(&it, end):
+        return simple_iterator_arrow(&it)
+    return none

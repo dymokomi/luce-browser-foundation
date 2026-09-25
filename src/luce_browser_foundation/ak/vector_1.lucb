@@ -1,0 +1,373 @@
+#==============================================================================================
+#
+#   vector_1 - Vector<T>: construction, access, searching, appending and removal
+#
+#   DESCRIPTION:
+#       Port of AK/Vector.h (lines 1-614). The struct is support.lucb's Vector[T]: size,
+#       capacity and outline buffer, with the inline capacity dropped (DESIGN.md §2.6), so
+#       `inline_capacity` is 0 and there is no fast-last-access metadata. Vector<T&> is
+#       Vector[T*]. Moves are copies (§3.3 rule 1): a moved-from vector is emptied where the
+#       donor empties it, which is why the moving members take the other vector by pointer.
+#       A C++ copy of a vector is vector_clone (§3.3 rule 2).
+#
+#       Predicates are Function1[const T*, bool] (DESIGN.md §2.7): a capture struct on the
+#       stack and a function taking its address. Traits<T>::equals is a traits parameter
+#       (`vector_contains_slow[T, TT]`); operator== of the elements needs `T: Equatable`.
+#
+#==============================================================================================
+
+# mark: Construction ============================================================================
+
+## Ported from AK/Vector.h:71 AK::Vector::Vector<T, inline_capacity>.
+pub func vector_construct[T](this: Vector[T]*):
+    this.m_size = 0
+    this.m_capacity = 0
+    this.m_outline_buffer = none
+
+## A Vector whose buffer is atomic storage, never scanned for pointers: for vectors of plain
+## scalars (DESIGN.md §3.3 rule 5, `Vector[T].create_atomic()`).
+pub func vector_create_atomic[T]() -> Vector[T]:
+    var vector: Vector[T]
+    vector.m_atomic = true
+    return vector
+
+## Ported from AK/Vector.h:77 AK::Vector::Vector(std::initializer_list<T>).
+pub func vector_construct_opaque[T](this: Vector[T]*, list: const T[]):
+    vector_ensure_capacity(this, list.length)
+    for item in list:
+        vector_unchecked_append_u(this, item)
+
+## Ported from AK/Vector.h:94 AK::Vector::Vector(Vector const&): the copy of `other` with its
+## own buffer (DESIGN.md §3.3 rule 2: a C++ copy of a mutable container is a clone).
+pub func vector_clone[T](other: const Vector[T]*) -> Vector[T]:
+    var vector: Vector[T]
+    vector.m_atomic = other.m_atomic
+    vector_ensure_capacity(&vector, vector_size(other))
+    if let source = other.m_outline_buffer:
+        discard(typed_transfer_copy(vector_slot(&vector, 0), source, vector_size(other)))
+    vector.m_size = vector_size(other)
+    return vector
+
+## Ported from AK/Vector.h:113 AK::Vector::Vector(ReadonlySpan<T>).
+pub func vector_construct_opaque_2[T](this: Vector[T]*, other: const T[]):
+    vector_ensure_capacity(this, other.length)
+    if other.length > 0:
+        discard(typed_transfer_copy(vector_slot(this, 0), other.data, other.length))
+    this.m_size = other.length
+
+## Ported from AK/Vector.h:138 AK::Vector::span.
+pub func vector_span[T](this: Vector[T]*) -> T[]:
+    let data = this.m_outline_buffer else return empty_span[T]()
+    return T[](data, this.m_size)
+
+## Ported from AK/Vector.h:139 AK::Vector::span const.
+pub func vector_span_const[T](this: const Vector[T]*) -> const T[]:
+    let data = this.m_outline_buffer else return empty_span[T]()
+    return T[](data, this.m_size)
+
+## Ported from AK/Vector.h:141 AK::Vector::operator Span<T>.
+pub func vector_to_span_conditional_contains_reference_raw_ptr_remove_reference_t_type_type_t_type[T](this: Vector[T]*) -> T[]:
+    return vector_span(this)
+
+## Ported from AK/Vector.h:142 AK::Vector::operator ReadonlySpan<T>.
+pub func vector_to_span_const_conditional_contains_reference_raw_ptr_remove_reference_t_type_type_t_type[T](this: const Vector[T]*) -> const T[]:
+    return vector_span_const(this)
+
+# mark: Access ==================================================================================
+
+## Ported from AK/Vector.h:144 AK::Vector::is_empty.
+pub func vector_is_empty[T](this: const Vector[T]*) -> bool:
+    return vector_size(this) == 0
+
+## Ported from AK/Vector.h:145 AK::Vector::size.
+pub func vector_size[T](this: const Vector[T]*) -> usize:
+    return this.m_size
+
+## Ported from AK/Vector.h:146 AK::Vector::capacity.
+pub func vector_capacity[T](this: const Vector[T]*) -> usize:
+    return this.m_capacity
+
+## Ported from AK/Vector.h:148 AK::Vector::data.
+pub func vector_data[T](this: Vector[T]*) -> T*?:
+    return this.m_outline_buffer
+
+## Ported from AK/Vector.h:155 AK::Vector::data const.
+pub func vector_data_const[T](this: const Vector[T]*) -> const T*?:
+    return this.m_outline_buffer
+
+## Ported from AK/Vector.h:162 AK::Vector::at const.
+pub func vector_at_const[T](this: const Vector[T]*, i: usize) -> const T*:
+    assert(i < this.m_size)
+    let data = this.m_outline_buffer else trap("VERIFY: Vector without storage")
+    return data + i
+
+## Ported from AK/Vector.h:171 AK::Vector::at.
+pub func vector_at[T](this: Vector[T]*, i: usize) -> T*:
+    assert(i < this.m_size)
+    let data = this.m_outline_buffer else trap("VERIFY: Vector without storage")
+    return data + i
+
+## Ported from AK/Vector.h:180 AK::Vector::operator[] const.
+pub func vector_at_const_2[T](this: const Vector[T]*, i: usize) -> const T*:
+    return vector_at_const(this, i)
+
+## Ported from AK/Vector.h:181 AK::Vector::operator[].
+pub func vector_at_2[T](this: Vector[T]*, i: usize) -> T*:
+    return vector_at(this, i)
+
+## Ported from AK/Vector.h:183 AK::Vector::get.
+pub func vector_get[T](this: Vector[T]*, i: usize) -> T*?:
+    if i >= vector_size(this):
+        return none
+    return vector_at(this, i)
+
+## Ported from AK/Vector.h:190 AK::Vector::get const.
+pub func vector_get_const[T](this: const Vector[T]*, i: usize) -> const T*?:
+    if i >= vector_size(this):
+        return none
+    return vector_at_const(this, i)
+
+## Ported from AK/Vector.h:197 AK::Vector::first const.
+pub func vector_first_const[T](this: const Vector[T]*) -> const T*:
+    return vector_at_const(this, 0)
+
+## Ported from AK/Vector.h:198 AK::Vector::first.
+pub func vector_first[T](this: Vector[T]*) -> T*:
+    return vector_at(this, 0)
+
+## Ported from AK/Vector.h:200 AK::Vector::last const.
+pub func vector_last_const[T](this: const Vector[T]*) -> const T*:
+    return vector_at_const(this, this.m_size - 1)
+
+## Ported from AK/Vector.h:212 AK::Vector::last.
+pub func vector_last[T](this: Vector[T]*) -> T*:
+    return vector_at(this, this.m_size - 1)
+
+## Ported from AK/Vector.h:225 AK::Vector::unsafe_last const (fast-last-access vectors: the
+## last element without a bounds check).
+pub func vector_unsafe_last_const[T](this: const Vector[T]*) -> const T*:
+    let data = this.m_outline_buffer else trap("VERIFY: Vector without storage")
+    return data + (this.m_size - 1)
+
+## Ported from AK/Vector.h:230 AK::Vector::unsafe_last.
+pub func vector_unsafe_last[T](this: Vector[T]*) -> T*:
+    let data = this.m_outline_buffer else trap("VERIFY: Vector without storage")
+    return data + (this.m_size - 1)
+
+## Ported from AK/Vector.h:237 AK::Vector::first_matching.
+pub func vector_first_matching[T](this: Vector[T]*, predicate: Function1[const T*, bool]) -> T*?:
+    for i in 0..<vector_size(this):
+        if function1_call(&predicate, vector_at(this, i)):
+            return vector_at(this, i)
+    return none
+
+## Ported from AK/Vector.h:249 AK::Vector::first_matching const.
+pub func vector_first_matching_const[T](this: const Vector[T]*, predicate: Function1[const T*, bool]) -> const T*?:
+    for i in 0..<vector_size(this):
+        if function1_call(&predicate, vector_at_const(this, i)):
+            return vector_at_const(this, i)
+    return none
+
+## Ported from AK/Vector.h:261 AK::Vector::last_matching.
+pub func vector_last_matching[T](this: const Vector[T]*, predicate: Function1[const T*, bool]) -> const T*?:
+    var i = (isize)vector_size(this) - 1
+    while i >= 0:
+        if function1_call(&predicate, vector_at_const(this, (usize)i)):
+            return vector_at_const(this, (usize)i)
+        i -= 1
+    return none
+
+## Ported from AK/Vector.h:273 AK::Vector::operator==.
+pub func vector_eq[T: luce.Equatable](this: const Vector[T]*, other: const Vector[T]*) -> bool:
+    if this.m_size != vector_size(other):
+        return false
+    let a = this.m_outline_buffer else return true
+    let b = other.m_outline_buffer else return true
+    return typed_transfer_compare(a, b, vector_size(this))
+
+## Ported from AK/Vector.h:281 AK::Vector::contains_slow.
+pub func vector_contains_slow[T, TT: Traits[T]](this: const Vector[T]*, value: T) -> bool:
+    var traits: TT = ---
+    for i in 0..<vector_size(this):
+        if traits.equals(vector_at_const(this, i), &value):
+            return true
+    return false
+
+## Ported from AK/Vector.h:291 AK::Vector::contains (predicate).
+pub func vector_contains[T](this: const Vector[T]*, predicate: Function1[const T*, bool]) -> bool:
+    let it = vector_find_if_const(this, predicate)
+    return not simple_iterator_is_end(&it)
+
+## Ported from AK/Vector.h:297 AK::Vector::contains_in_range.
+pub func vector_contains_in_range[T, TT: Traits[T]](this: const Vector[T]*, value: T, start: usize, end: usize) -> bool:
+    assert(start <= end)
+    assert(end < vector_size(this))
+    var traits: TT = ---
+    for i in start..=end:
+        if traits.equals(vector_at_const(this, i), &value):
+            return true
+    return false
+
+# mark: Insertion and appending =================================================================
+
+## Ported from AK/Vector.h:309 AK::Vector::insert.
+pub func vector_insert[T](this: Vector[T]*, index: usize, value: T):
+    vector_try_insert(this, index, value) else trap("MUST: Vector::insert")
+
+## Ported from AK/Vector.h:316 AK::Vector::insert_before_matching.
+pub func vector_insert_before_matching[T](this: Vector[T]*, value: T, predicate: Function1[const T*, bool], first_index: usize = 0, inserted_index: usize*? = none):
+    vector_try_insert_before_matching(this, value, predicate, first_index, inserted_index) else trap("MUST: Vector::insert_before_matching")
+
+## Ported from AK/Vector.h:322 AK::Vector::extend(Vector&&): `other` is emptied.
+pub func vector_extend[T](this: Vector[T]*, other: Vector[T]*):
+    vector_try_extend(this, other) else trap("MUST: Vector::extend")
+
+## Ported from AK/Vector.h:327 AK::Vector::extend(Vector const&).
+pub func vector_extend_2[T](this: Vector[T]*, other: const Vector[T]*):
+    vector_try_extend_2(this, other) else trap("MUST: Vector::extend")
+
+## Ported from AK/Vector.h:332 AK::Vector::append(T&&).
+pub func vector_append_t[T](this: Vector[T]*, value: T):
+    vector_try_append_t(this, value) else trap("MUST: Vector::append")
+
+## Ported from AK/Vector.h:340 AK::Vector::append(T const&).
+pub func vector_append_t_2[T](this: Vector[T]*, value: T):
+    vector_try_append_t_2(this, value) else trap("MUST: Vector::append")
+
+## Ported from AK/Vector.h:346 AK::Vector::append(StorageType const*, size_t).
+pub func vector_append_opaque[T](this: Vector[T]*, values: const T*?, count: usize):
+    vector_try_append_opaque(this, values, count) else trap("MUST: Vector::append")
+
+## Ported from AK/Vector.h:352 AK::Vector::unchecked_append.
+pub func vector_unchecked_append_u[T](this: Vector[T]*, value: T):
+    assert(this.m_size < vector_capacity(this))
+    this.m_size += 1
+
+    let last_slot = vector_slot(this, this.m_size - 1)
+    *last_slot = value
+
+## Ported from AK/Vector.h:376 AK::Vector::unchecked_append(StorageType const*, size_t).
+pub func vector_unchecked_append_opaque[T](this: Vector[T]*, values: const T*?, count: usize):
+    if count == 0:
+        return
+    assert((vector_size(this) + count) <= vector_capacity(this))
+    let source = values else trap("VERIFY: unchecked_append from null")
+    discard(typed_transfer_copy(vector_slot(this, this.m_size), source, count))
+    this.m_size += count
+    vector_update_metadata(this)  # We have *some* space, since we're appending.
+
+## Ported from AK/Vector.h:415 AK::Vector::prepend.
+pub func vector_prepend_u[T](this: Vector[T]*, value: T):
+    vector_try_insert(this, 0, value) else trap("MUST: Vector::prepend")
+
+## Ported from AK/Vector.h:421 AK::Vector::prepend(Vector&&): `other` is emptied.
+pub func vector_prepend_vector[T](this: Vector[T]*, other: Vector[T]*):
+    vector_try_prepend_vector(this, other) else trap("MUST: Vector::prepend")
+
+## Ported from AK/Vector.h:426 AK::Vector::prepend(StorageType const*, size_t).
+pub func vector_prepend_opaque[T](this: Vector[T]*, values: const T*?, count: usize):
+    vector_try_prepend_opaque(this, values, count) else trap("MUST: Vector::prepend")
+
+## Ported from AK/Vector.h:432 AK::Vector::operator=(Vector&&): `this` takes `other`'s
+## buffer and `other` is emptied.
+pub func vector_move_assign[T](this: Vector[T]*, other: Vector[T]*):
+    if this != other:
+        vector_clear(this)
+        this.m_size = other.m_size
+        this.m_capacity = other.m_capacity
+        this.m_outline_buffer = other.m_outline_buffer
+        this.m_atomic = other.m_atomic
+        other.m_outline_buffer = none
+        other.m_size = 0
+        vector_reset_capacity(other)
+
+# mark: Clearing and removal ====================================================================
+
+## Ported from AK/Vector.h:480 AK::Vector::clear.
+pub func vector_clear[T](this: Vector[T]*):
+    vector_clear_with_capacity(this)
+    if let buffer = this.m_outline_buffer:
+        kfree(buffer)
+        this.m_outline_buffer = none
+    vector_reset_capacity(this)
+
+## Ported from AK/Vector.h:490 AK::Vector::clear_with_capacity.
+pub func vector_clear_with_capacity[T](this: Vector[T]*):
+    this.m_size = 0
+    if this.m_capacity != 0:
+        vector_update_metadata(this)
+
+## Ported from AK/Vector.h:501 AK::Vector::remove.
+pub func vector_remove[T](this: Vector[T]*, index: usize):
+    assert(index < this.m_size)
+
+    discard(typed_transfer_copy(vector_slot(this, index), vector_slot(this, index + 1), this.m_size - index - 1))
+
+    this.m_size -= 1
+    vector_update_metadata(this)  # We have *some* space, we just removed something that was there.
+
+## Ported from AK/Vector.h:519 AK::Vector::remove(size_t, size_t).
+pub func vector_remove_usize[T](this: Vector[T]*, index: usize, count: usize):
+    if count == 0:
+        return
+    assert(index + count > index)
+    assert(index + count <= this.m_size)
+
+    discard(typed_transfer_copy(vector_slot(this, index), vector_slot(this, index + count), this.m_size - index - count))
+
+    this.m_size -= count
+    vector_update_metadata(this)  # We have *some* space, we just removed something that was there.
+
+## Ported from AK/Vector.h:543 AK::Vector::remove_all(It, EndIt, ToIndex): removes the indices
+## an iterator pair yields, *in ascending order*. The pair is a span of indices here (the
+## donor's `to_index` maps an iterator to its index; with indices it is the identity).
+pub func vector_remove_all_t_it[T](this: Vector[T]*, indices: const usize[]):
+    var it: usize = 0
+    let end = indices.length
+    if not (it != end):
+        return
+    var write_index = indices[it]
+    assert(write_index < this.m_size)
+    it += 1
+    var next_remove_index = indices[it] if it != end else this.m_size
+    for read_index in (write_index + 1)..<this.m_size:
+        if read_index == next_remove_index:
+            it += 1
+            next_remove_index = indices[it] if it != end else this.m_size
+        else:
+            *vector_slot(this, write_index) = *vector_slot(this, read_index)
+            write_index += 1
+
+    assert(not (it != end))
+    this.m_size = write_index
+    vector_update_metadata(this)  # We have *some* space, we just removed something that was there.
+
+## Ported from AK/Vector.h:574 AK::Vector::remove_all(Is, ToIndex): the indices held by a
+## container (a Vector of indices, ascending).
+pub func vector_remove_all_t_is[T](this: Vector[T]*, indices: const Vector[usize]*):
+    vector_remove_all_t_it(this, vector_span_const(indices))
+
+## Ported from AK/Vector.h:580 AK::Vector::remove_first_matching.
+pub func vector_remove_first_matching[T](this: Vector[T]*, predicate: Function1[const T*, bool]) -> bool:
+    for i in 0..<vector_size(this):
+        if function1_call(&predicate, vector_at(this, i)):
+            vector_remove(this, i)
+            return true
+    return false
+
+## Ported from AK/Vector.h:592 AK::Vector::remove_all_matching.
+pub func vector_remove_all_matching[T](this: Vector[T]*, predicate: Function1[const T*, bool]) -> bool:
+    var write_index: usize = 0
+    for read_index in 0..<this.m_size:
+        if function1_call(&predicate, vector_at(this, read_index)):
+            continue
+        if read_index != write_index:
+            typed_transfer_move(vector_slot(this, write_index), vector_slot(this, read_index), 1)
+        write_index += 1
+
+    if write_index == this.m_size:
+        return false
+
+    this.m_size = write_index
+    vector_update_metadata(this)
+    return true

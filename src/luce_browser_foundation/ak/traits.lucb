@@ -1,0 +1,135 @@
+#==============================================================================================
+#
+#   traits - AK::Traits<T> for the scalar types: AK's hash and equality
+#
+#   DESCRIPTION:
+#       Port of AK/Traits.h (lines 1-103). Traits<T> is the Traits[K] interface of
+#       support.lucb, implemented by a one-byte traits struct per key type (DESIGN.md §2.6).
+#       The integer traits of i32, i64, u32 and u64 are in types_traits and Traits<T*> is
+#       support.lucb's PtrTraits; the other integer widths, bool, the floats and
+#       IdentityHashTraits are here. As in the donor, an integer narrower than 64 bits hashes
+#       with u32_hash of its value, a 64-bit one with u64_hash, a float with the hash of its
+#       bits. Enums hash as their underlying integer: use the traits of the backing type on
+#       `(u8)kind`, or a traits struct of the enum's own.
+#
+#==============================================================================================
+
+## AK::Traits<i8>.
+pub struct I8Traits: Traits[i8]:
+    var empty_: u8
+
+    func hash_of(key: const i8*) -> u32: return u32_hash((u32)*key)
+
+    func equals(a: const i8*, b: const i8*) -> bool: return *a == *b
+
+## AK::Traits<i16>.
+pub struct I16Traits: Traits[i16]:
+    var empty_: u8
+
+    func hash_of(key: const i16*) -> u32: return u32_hash((u32)*key)
+
+    func equals(a: const i16*, b: const i16*) -> bool: return *a == *b
+
+## AK::Traits<u8>.
+pub struct U8Traits: Traits[u8]:
+    var empty_: u8
+
+    func hash_of(key: const u8*) -> u32: return u32_hash(*key)
+
+    func equals(a: const u8*, b: const u8*) -> bool: return *a == *b
+
+## AK::Traits<u16>.
+pub struct U16Traits: Traits[u16]:
+    var empty_: u8
+
+    func hash_of(key: const u16*) -> u32: return u32_hash(*key)
+
+    func equals(a: const u16*, b: const u16*) -> bool: return *a == *b
+
+## AK::Traits<size_t>.
+pub struct UsizeTraits: Traits[usize]:
+    var empty_: u8
+
+    func hash_of(key: const usize*) -> u32: return u64_hash((u64)*key)
+
+    func equals(a: const usize*, b: const usize*) -> bool: return *a == *b
+
+## AK::Traits<ssize_t>.
+pub struct IsizeTraits: Traits[isize]:
+    var empty_: u8
+
+    func hash_of(key: const isize*) -> u32: return u64_hash((u64)*key)
+
+    func equals(a: const isize*, b: const isize*) -> bool: return *a == *b
+
+## AK::Traits<bool> (bool is an Integral type in the donor).
+pub struct BoolTraits: Traits[bool]:
+    var empty_: u8
+
+    func hash_of(key: const bool*) -> u32: return u32_hash((u32)*key)
+
+    func equals(a: const bool*, b: const bool*) -> bool: return *a == *b
+
+## AK::Traits<char32_t> for code points.
+pub struct CharTraits: Traits[char]:
+    var empty_: u8
+
+    func hash_of(key: const char*) -> u32: return u32_hash((u32)*key)
+
+    func equals(a: const char*, b: const char*) -> bool: return *a == *b
+
+## AK::Traits<float>: u32_hash of the bits.
+pub struct F32Traits: Traits[f32]:
+    var empty_: u8
+
+    func hash_of(key: const f32*) -> u32: return f32_traits_hash(*key)
+
+    func equals(a: const f32*, b: const f32*) -> bool: return *a == *b
+
+## AK::Traits<double>: u64_hash of the bits.
+pub struct F64Traits: Traits[f64]:
+    var empty_: u8
+
+    func hash_of(key: const f64*) -> u32: return f64_traits_hash(*key)
+
+    func equals(a: const f64*, b: const f64*) -> bool: return *a == *b
+
+# Traits<float>::hash and Traits<double>::hash, taking the value (not a pointer to it).
+# workaround: compiler-issues/float_bits_through_pointer
+func f32_traits_hash(value: f32) -> u32:
+    return u32_hash(value.bits())
+
+func f64_traits_hash(value: f64) -> u32:
+    return u64_hash(value.bits())
+
+## AK::IdentityHashTraits<u32>: the value is its own hash.
+pub struct U32IdentityHashTraits: Traits[u32]:
+    var empty_: u8
+
+    func hash_of(key: const u32*) -> u32: return *key
+
+    func equals(a: const u32*, b: const u32*) -> bool: return *a == *b
+
+## AK::IdentityHashTraits<u64>: `value ^ (value >> 32)`.
+pub struct U64IdentityHashTraits: Traits[u64]:
+    var empty_: u8
+
+    func hash_of(key: const u64*) -> u32: return (u32)(*key ^ (*key >> 32))
+
+    func equals(a: const u64*, b: const u64*) -> bool: return *a == *b
+
+## AK::IdentityHashTraits<i32>.
+pub struct I32IdentityHashTraits: Traits[i32]:
+    var empty_: u8
+
+    func hash_of(key: const i32*) -> u32: return (u32)*key
+
+    func equals(a: const i32*, b: const i32*) -> bool: return *a == *b
+
+## Concepts::HashCompatible<T, K>: looking up a table of T by a key of another type K (a
+## HashTable<String> by a StringView): the key's hash, which must equal the hash of the value
+## it matches, and the equality of a stored value and the key (Traits<T>::equals(entry, key)).
+pub interface HashCompatibleTraits[T, K]:
+    func hash_of(key: const K*) -> u32
+
+    func equals(entry: const T*, key: const K*) -> bool

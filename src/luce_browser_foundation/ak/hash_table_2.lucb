@@ -1,0 +1,192 @@
+#==============================================================================================
+#
+#   hash_table_2 - HashTable<T>: removal, rehashing and the Robin Hood bucket machinery
+#
+#   DESCRIPTION:
+#       Port of AK/HashTable.h (lines 512-940); see hash_table_1.
+#
+#==============================================================================================
+
+# mark: Removal and bulk access =================================================================
+
+## Ported from AK/HashTable.h:512 AK::HashTable::remove(Iterator&). This invalidates the
+## iterator.
+pub func hash_table_remove_opaque[T, TT: Traits[T]](this: HashTable[T, TT]*, iterator: HashTableIterator[T]*):
+    let bucket = iterator.m_bucket else trap("VERIFY: removing the end of a HashTable")
+    hash_table_delete_bucket(this, bucket)
+    iterator.m_bucket = none
+
+## Ported from AK/HashTable.h:518 AK::HashTable::remove_all_matching.
+pub func hash_table_remove_all_matching[T, TT: Traits[T]](this: HashTable[T, TT]*, predicate: Function1[const T*, bool]) -> bool:
+    var has_removed_anything = false
+    var i: usize = 0
+    while i < hash_table_capacity(this):
+        let bucket = hash_table_bucket_at(this, i)
+        if bucket.state == (u8)BucketState.free_ or not function1_call(&predicate, &bucket.storage):
+            i += 1
+            continue
+
+        hash_table_delete_bucket(this, bucket)
+        has_removed_anything = true
+
+        # If a bucket was shifted up, reevaluate this bucket index
+        if bucket.state == (u8)BucketState.free_:
+            i += 1
+    return has_removed_anything
+
+## Ported from AK/HashTable.h:537 AK::HashTable::take_all_matching.
+pub func hash_table_take_all_matching[T, TT: Traits[T]](this: HashTable[T, TT]*, predicate: Function1[const T*, bool]) -> Vector[T]:
+    var values: Vector[T]
+    var i: usize = 0
+    while i < hash_table_capacity(this):
+        let bucket = hash_table_bucket_at(this, i)
+        if bucket.state == (u8)BucketState.free_ or not function1_call(&predicate, &bucket.storage):
+            i += 1
+            continue
+
+        vector_append_t(&values, bucket.storage)
+        hash_table_delete_bucket(this, bucket)
+
+        # If a bucket was shifted up, reevaluate this bucket index
+        if bucket.state == (u8)BucketState.free_:
+            i += 1
+    return values
+
+## Ported from AK/HashTable.h:555 AK::HashTable::take_last (ordered tables only).
+pub func hash_table_take_last[T, TT: Traits[T]](this: HashTable[T, TT]*) -> T:
+    assert(this.m_ordered)
+    assert(not hash_table_is_empty(this))
+    let tail = this.m_tail else trap("VERIFY: empty OrderedHashTable")
+    let element = tail.storage
+    hash_table_delete_bucket(this, tail)
+    return element
+
+## Ported from AK/HashTable.h:564 AK::HashTable::take_first (ordered tables only).
+pub func hash_table_take_first[T, TT: Traits[T]](this: HashTable[T, TT]*) -> T:
+    assert(this.m_ordered)
+    assert(not hash_table_is_empty(this))
+    let head = this.m_head else trap("VERIFY: empty OrderedHashTable")
+    let element = head.storage
+    hash_table_delete_bucket(this, head)
+    return element
+
+## Ported from AK/HashTable.h:573 AK::HashTable::values.
+pub func hash_table_values[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> Vector[T]:
+    var list: Vector[T]
+    vector_ensure_capacity(&list, hash_table_size(this))
+    for value in hash_table_begin_const(this):
+        vector_unchecked_append_u(&list, *value)
+    return list
+
+# mark: Buckets =================================================================================
+
+## Ported from AK/HashTable.h:583 AK::HashTable::should_grow.
+pub func hash_table_should_grow[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> bool:
+    return ((this.m_size + 1) * 100) >= (hash_table_capacity(this) * hash_table_grow_at_load_factor_percent)
+
+## Ported from AK/HashTable.h:584 AK::HashTable::size_in_bytes.
+pub func hash_table_size_in_bytes[T, TT: Traits[T]](capacity: usize) -> usize:
+    return sizeof(HashTableBucket[T]) * capacity
+
+# The bucket at `index` of the bucket array.
+func hash_table_bucket_at[T, TT: Traits[T]](this: const HashTable[T, TT]*, index: usize) -> HashTableBucket[T]*:
+    let buckets = this.m_buckets else trap("VERIFY: HashTable without buckets")
+    return buckets + index
+
+## Ported from AK/HashTable.h:586 AK::HashTable::relocate_bucket. An unordered table's links are
+## always none, so exchanging them is the donor's `if constexpr (IsOrdered)` branch or nothing.
+pub func hash_table_relocate_bucket[T, TT: Traits[T]](dst: HashTableBucket[T]*, src: HashTableBucket[T]*):
+    dst.state = src.state
+    dst.hash = src.hash
+    dst.previous = exchange(&src.previous, none)
+    dst.next = exchange(&src.next, none)
+    dst.storage = src.storage
+
+## Ported from AK/HashTable.h:597 AK::HashTable::swap_buckets.
+pub func hash_table_swap_buckets[T, TT: Traits[T]](a: HashTableBucket[T]*, b: HashTableBucket[T]*):
+    swap_5(&a.state, &b.state)
+    swap_5(&a.hash, &b.hash)
+    swap_5(&a.previous, &b.previous)
+    swap_5(&a.next, &b.next)
+    swap_5(&a.storage, &b.storage)
+
+## Ported from AK/HashTable.h:609 AK::HashTable::end_bucket.
+pub func hash_table_end_bucket[T, TT: Traits[T]](this: HashTable[T, TT]*) -> HashTableBucket[T]*?:
+    if this.m_ordered:
+        return this.m_tail
+    let buckets = this.m_buckets else return none
+    return buckets + hash_table_capacity(this)
+
+## Ported from AK/HashTable.h:615 AK::HashTable::end_bucket const.
+pub func hash_table_end_bucket_const[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> HashTableBucket[T]*?:
+    return hash_table_end_bucket((HashTable[T, TT]*)this)
+
+## Ported from AK/HashTable.h:623 AK::HashTable::try_rehash.
+pub func hash_table_try_rehash[T, TT: Traits[T]](this: HashTable[T, TT]*, new_capacity: usize) -> !:
+    let at_least = hash_table_capacity(this) + 1
+    let capacity = exp2_usize(ceil_log2_usize(new_capacity if new_capacity > at_least else at_least))
+    assert(capacity >= hash_table_size(this))
+
+    let old_buckets = this.m_buckets
+    var old_iter = hash_table_begin(this)
+
+    let new_buckets = kcalloc(1, hash_table_size_in_bytes[T, TT](capacity)) else return try ak_error_throw(ak_error_from_errno(enomem))
+
+    this.m_buckets = (HashTableBucket[T]*)new_buckets
+    this.m_mask = capacity - 1
+
+    if this.m_ordered:
+        this.m_head = none
+        this.m_tail = none
+
+    let buckets = old_buckets else return
+
+    this.m_size = 0
+    while let value = hash_table_iterator_next(&old_iter):
+        discard(hash_table_write_value(this, *value, HashSetExistingEntryBehavior.keep))
+
+    kfree(buckets)
+
+## Ported from AK/HashTable.h:653 AK::HashTable::rehash.
+pub func hash_table_rehash[T, TT: Traits[T]](this: HashTable[T, TT]*, new_capacity: usize):
+    hash_table_try_rehash(this, new_capacity) else trap("MUST: HashTable::rehash")
+
+## Ported from AK/HashTable.h:659 AK::HashTable::lookup_with_hash.
+pub func hash_table_lookup_with_hash[T, TT: Traits[T]](this: const HashTable[T, TT]*, hash_: u32, predicate: Function1[const T*, bool]) -> HashTableBucket[T]*?:
+    if hash_table_is_empty(this):
+        return none
+
+    var bucket_index = (usize)hash_ & this.m_mask
+    while true:
+        let bucket = hash_table_bucket_at(this, bucket_index)
+        if bucket.state == (u8)BucketState.free_:
+            return none
+        if bucket.hash == hash_ and function1_call(&predicate, &bucket.storage):
+            return bucket
+        bucket_index = (bucket_index + 1) & this.m_mask
+
+## Ported from AK/HashTable.h:675 AK::HashTable::used_bucket_probe_length.
+pub func hash_table_used_bucket_probe_length[T, TT: Traits[T]](this: const HashTable[T, TT]*, bucket: const HashTableBucket[T]*) -> usize:
+    assert(bucket.state != (u8)BucketState.free_)
+
+    if bucket.state == (u8)BucketState.calculate_length:
+        var traits: TT = ---
+        let ideal_bucket_index = (usize)traits.hash_of(&bucket.storage) & this.m_mask
+
+        let buckets = this.m_buckets else trap("VERIFY: HashTable without buckets")
+        assert(bucket >= buckets)
+        let actual_bucket_index = (usize)(bucket - buckets)
+
+        if actual_bucket_index < ideal_bucket_index:
+            return hash_table_capacity(this) + actual_bucket_index - ideal_bucket_index
+        return actual_bucket_index - ideal_bucket_index
+
+    return (usize)bucket.state - 1
+
+## Ported from AK/HashTable.h:693 AK::HashTable::bucket_state_for_probe_length: the state byte of
+## a used bucket (a probe length + 1, or CalculateLength).
+pub func hash_table_bucket_state_for_probe_length[T, TT: Traits[T]](this: HashTable[T, TT]*, probe_length: usize) -> BucketState:
+    discard(this)
+    if probe_length > 253:
+        return BucketState.calculate_length
+    return (BucketState)(u8)(probe_length + 1)

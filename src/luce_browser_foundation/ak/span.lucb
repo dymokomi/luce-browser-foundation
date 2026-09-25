@@ -1,0 +1,43 @@
+#==============================================================================================
+#
+#   span - Span<T>: the few members that are not luce-base's own spans
+#
+#   DESCRIPTION:
+#       Port of AK/Span.h (lines 1-423). DESIGN.md §2.6: Span<T>, ReadonlySpan<T>, Bytes and
+#       ReadonlyBytes are luce-base spans (`T[]`, `const T[]`, `u8[]`, `const u8[]`), whose
+#       indexing, slicing, length and iteration are the language's. What remains is the
+#       generated Span[T] struct (for declarations that kept it), its conversion to and from a
+#       luce-base span, and the byte reinterpretations.
+#
+#==============================================================================================
+
+## Ported from AK/Span.h:24 AK::Span::Span<T>.
+pub func span_construct[T](this: Span[T]*, values: T*?, size: usize):
+    this.m_values = values
+    this.m_size = size
+
+## An empty span of T (its data is the language's dangling non-null pointer).
+pub func empty_span[T]() -> T[]:
+    var empty: T[]
+    return empty
+
+## The luce-base span a Span[T] describes (empty when it has no values).
+pub func span_to_slice[T](span: Span[T]) -> T[]:
+    let values = span.m_values else return empty_span[T]()
+    return T[](values, span.m_size)
+
+## The Span[T] over a luce-base span.
+pub func span_from_slice[T](values: T[]) -> Span[T]:
+    if values.length == 0:
+        return Span[T](m_values = none, m_size = 0)
+    return Span[T](m_values = values.data, m_size = values.length)
+
+## Ported from AK/Span.h:402 AK::to_readonly_bytes.
+pub func to_readonly_bytes[T](span: Span[T]) -> const u8[]:
+    let values = span.m_values else return empty_span[u8]()
+    return u8[]((u8*)values, span.m_size * sizeof(T))
+
+## Ported from AK/Span.h:409 AK::to_bytes.
+pub func to_bytes[T](span: Span[T]) -> u8[]:
+    let values = span.m_values else return empty_span[u8]()
+    return u8[]((u8*)values, span.m_size * sizeof(T))

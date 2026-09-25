@@ -1,0 +1,209 @@
+#==============================================================================================
+#
+#   function - AK::Function<Out(In...)> as a function pointer beside its captures
+#
+#   DESCRIPTION:
+#       Port of AK/Function.h (lines 1-390). DESIGN.md §2.7: a Function is support.lucb's
+#       FunctionN[A1, ..., R], `{ call: func(void*?, A1, ...) -> R, context: void*? }`; the
+#       lambda's captures are a struct in managed memory the context points at. The donor's
+#       type erasure (CallableWrapperBase and its inline/outline storage) is what luce-base
+#       spells as that pair, so its members are ported over the generated CallableWrapper
+#       declarations for completeness, and operator(), operator bool and clear() are the
+#       `functionN_call`, `functionN_is_set` and `functionN_clear` helpers below.
+#
+#==============================================================================================
+
+# mark: Objective-C blocks ======================================================================
+
+# The Blocks runtime (libclosure on macOS, libBlocksRuntime elsewhere). luce-base code never
+# makes a block; these exist for a Function built around one by foreign code.
+extern func c_block_copy as "_Block_copy"(block: const void*?) -> void*?
+extern func c_block_release as "_Block_release"(block: const void*?)
+
+## Ported from AK/Function.h:42 _Block_copy.
+pub func block_copy(arg0: const void*?) -> void*?:
+    return c_block_copy(arg0)
+
+## Ported from AK/Function.h:43 _Block_release.
+pub func block_release(arg0: const void*?):
+    c_block_release(arg0)
+
+## Ported from AK/Function.h:44 Block_size.
+# Block_size reads the block descriptor: a block's layout starts with its isa, flags and
+# reserved words, then the invoke pointer and the descriptor, whose second word is the size.
+pub func block_size(arg0: const void*?) -> usize:
+    let block = (const u8*)(arg0 else return 0)
+    let descriptor = *(const (const usize*)*)(block + 24)
+    return descriptor[1]
+
+# mark: CallableWrapper =========================================================================
+
+## Ported from AK/Function.h:206 AK::Function::CallableWrapperBase::call (virtual).
+pub func callable_wrapper_base_call_impl(this: CallableWrapperBase*, arg0: void*?) -> void*?:
+    discard(this)
+    discard(arg0)
+    trap("pure virtual: AK::Function::CallableWrapperBase::call")
+
+## Ported from AK/Function.h:207 AK::Function::CallableWrapperBase::init_and_swap (virtual).
+pub func callable_wrapper_base_init_and_swap_impl(this: CallableWrapperBase*, arg0: u8*?, arg1: usize):
+    discard(this)
+    discard(arg0)
+    discard(arg1)
+    trap("pure virtual: AK::Function::CallableWrapperBase::init_and_swap")
+
+## Ported from AK/Function.h:208 AK::Function::CallableWrapperBase::raw_callable (virtual).
+pub func callable_wrapper_base_raw_callable_impl(this: CallableWrapperBase*) -> const void*?:
+    discard(this)
+    trap("pure virtual: AK::Function::CallableWrapperBase::raw_callable")
+
+## Ported from AK/Function.h:217 AK::Function::CallableWrapper::CallableWrapper<CallableType>.
+pub func callable_wrapper_construct[TCallableType](this: CallableWrapper[TCallableType]*, callable: TCallableType):
+    this.m_callable = callable
+
+## Ported from AK/Function.h:238 AK::Function::CallableWrapper::init_and_swap.
+# NOLINTNEXTLINE(readability-non-const-parameter) False positive; destination is used in a placement new expression
+pub func callable_wrapper_init_and_swap[TCallableType](this: CallableWrapper[TCallableType]*, destination: u8*?, size: usize):
+    assert(size >= sizeof(CallableWrapper[TCallableType]))
+    let target = (CallableWrapper[TCallableType]*)(destination else trap("init_and_swap: null destination"))
+    *target = *this
+
+## Ported from AK/Function.h:244 AK::Function::CallableWrapper::raw_callable.
+pub func callable_wrapper_raw_callable[TCallableType](this: const CallableWrapper[TCallableType]*) -> const void*?:
+    return &this.m_callable
+
+# mark: Function ================================================================================
+
+## AK::Function<R()>::operator(): calls the function with its captures. The
+## function must not be empty (VERIFY(wrapper)).
+pub func function0_call[R](this: const Function0[R]*) -> R:
+    let function = this.call else trap("VERIFY: calling an empty AK::Function")
+    return function(this.context)
+
+## AK::Function<R()>::operator bool: whether the function holds a callable.
+pub func function0_is_set[R](this: const Function0[R]*) -> bool:
+    return this.call != none
+
+## AK::Function<R()>::operator=(nullptr_t) / clear(): empties the function.
+pub func function0_clear[R](this: Function0[R]*):
+    this.call = none
+    this.context = none
+
+## AK::Function<R(A1)>::operator(): calls the function with its captures. The
+## function must not be empty (VERIFY(wrapper)).
+pub func function1_call[A1, R](this: const Function1[A1, R]*, a1: A1) -> R:
+    let function = this.call else trap("VERIFY: calling an empty AK::Function")
+    return function(this.context, a1)
+
+## AK::Function<R(A1)>::operator bool: whether the function holds a callable.
+pub func function1_is_set[A1, R](this: const Function1[A1, R]*) -> bool:
+    return this.call != none
+
+## AK::Function<R(A1)>::operator=(nullptr_t) / clear(): empties the function.
+pub func function1_clear[A1, R](this: Function1[A1, R]*):
+    this.call = none
+    this.context = none
+
+## AK::Function<R(A1, A2)>::operator(): calls the function with its captures. The
+## function must not be empty (VERIFY(wrapper)).
+pub func function2_call[A1, A2, R](this: const Function2[A1, A2, R]*, a1: A1, a2: A2) -> R:
+    let function = this.call else trap("VERIFY: calling an empty AK::Function")
+    return function(this.context, a1, a2)
+
+## AK::Function<R(A1, A2)>::operator bool: whether the function holds a callable.
+pub func function2_is_set[A1, A2, R](this: const Function2[A1, A2, R]*) -> bool:
+    return this.call != none
+
+## AK::Function<R(A1, A2)>::operator=(nullptr_t) / clear(): empties the function.
+pub func function2_clear[A1, A2, R](this: Function2[A1, A2, R]*):
+    this.call = none
+    this.context = none
+
+## AK::Function<R(A1, A2, A3)>::operator(): calls the function with its captures. The
+## function must not be empty (VERIFY(wrapper)).
+pub func function3_call[A1, A2, A3, R](this: const Function3[A1, A2, A3, R]*, a1: A1, a2: A2, a3: A3) -> R:
+    let function = this.call else trap("VERIFY: calling an empty AK::Function")
+    return function(this.context, a1, a2, a3)
+
+## AK::Function<R(A1, A2, A3)>::operator bool: whether the function holds a callable.
+pub func function3_is_set[A1, A2, A3, R](this: const Function3[A1, A2, A3, R]*) -> bool:
+    return this.call != none
+
+## AK::Function<R(A1, A2, A3)>::operator=(nullptr_t) / clear(): empties the function.
+pub func function3_clear[A1, A2, A3, R](this: Function3[A1, A2, A3, R]*):
+    this.call = none
+    this.context = none
+
+## AK::Function<R(A1, A2, A3, A4)>::operator(): calls the function with its captures. The
+## function must not be empty (VERIFY(wrapper)).
+pub func function4_call[A1, A2, A3, A4, R](this: const Function4[A1, A2, A3, A4, R]*, a1: A1, a2: A2, a3: A3, a4: A4) -> R:
+    let function = this.call else trap("VERIFY: calling an empty AK::Function")
+    return function(this.context, a1, a2, a3, a4)
+
+## AK::Function<R(A1, A2, A3, A4)>::operator bool: whether the function holds a callable.
+pub func function4_is_set[A1, A2, A3, A4, R](this: const Function4[A1, A2, A3, A4, R]*) -> bool:
+    return this.call != none
+
+## AK::Function<R(A1, A2, A3, A4)>::operator=(nullptr_t) / clear(): empties the function.
+pub func function4_clear[A1, A2, A3, A4, R](this: Function4[A1, A2, A3, A4, R]*):
+    this.call = none
+    this.context = none
+
+## AK::Function<R(A1, A2, A3, A4, A5)>::operator(): calls the function with its captures. The
+## function must not be empty (VERIFY(wrapper)).
+pub func function5_call[A1, A2, A3, A4, A5, R](this: const Function5[A1, A2, A3, A4, A5, R]*, a1: A1, a2: A2, a3: A3, a4: A4, a5: A5) -> R:
+    let function = this.call else trap("VERIFY: calling an empty AK::Function")
+    return function(this.context, a1, a2, a3, a4, a5)
+
+## AK::Function<R(A1, A2, A3, A4, A5)>::operator bool: whether the function holds a callable.
+pub func function5_is_set[A1, A2, A3, A4, A5, R](this: const Function5[A1, A2, A3, A4, A5, R]*) -> bool:
+    return this.call != none
+
+## AK::Function<R(A1, A2, A3, A4, A5)>::operator=(nullptr_t) / clear(): empties the function.
+pub func function5_clear[A1, A2, A3, A4, A5, R](this: Function5[A1, A2, A3, A4, A5, R]*):
+    this.call = none
+    this.context = none
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6)>::operator(): calls the function with its captures. The
+## function must not be empty (VERIFY(wrapper)).
+pub func function6_call[A1, A2, A3, A4, A5, A6, R](this: const Function6[A1, A2, A3, A4, A5, A6, R]*, a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6) -> R:
+    let function = this.call else trap("VERIFY: calling an empty AK::Function")
+    return function(this.context, a1, a2, a3, a4, a5, a6)
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6)>::operator bool: whether the function holds a callable.
+pub func function6_is_set[A1, A2, A3, A4, A5, A6, R](this: const Function6[A1, A2, A3, A4, A5, A6, R]*) -> bool:
+    return this.call != none
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6)>::operator=(nullptr_t) / clear(): empties the function.
+pub func function6_clear[A1, A2, A3, A4, A5, A6, R](this: Function6[A1, A2, A3, A4, A5, A6, R]*):
+    this.call = none
+    this.context = none
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6, A7)>::operator(): calls the function with its captures. The
+## function must not be empty (VERIFY(wrapper)).
+pub func function7_call[A1, A2, A3, A4, A5, A6, A7, R](this: const Function7[A1, A2, A3, A4, A5, A6, A7, R]*, a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6, a7: A7) -> R:
+    let function = this.call else trap("VERIFY: calling an empty AK::Function")
+    return function(this.context, a1, a2, a3, a4, a5, a6, a7)
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6, A7)>::operator bool: whether the function holds a callable.
+pub func function7_is_set[A1, A2, A3, A4, A5, A6, A7, R](this: const Function7[A1, A2, A3, A4, A5, A6, A7, R]*) -> bool:
+    return this.call != none
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6, A7)>::operator=(nullptr_t) / clear(): empties the function.
+pub func function7_clear[A1, A2, A3, A4, A5, A6, A7, R](this: Function7[A1, A2, A3, A4, A5, A6, A7, R]*):
+    this.call = none
+    this.context = none
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6, A7, A8)>::operator(): calls the function with its captures. The
+## function must not be empty (VERIFY(wrapper)).
+pub func function8_call[A1, A2, A3, A4, A5, A6, A7, A8, R](this: const Function8[A1, A2, A3, A4, A5, A6, A7, A8, R]*, a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6, a7: A7, a8: A8) -> R:
+    let function = this.call else trap("VERIFY: calling an empty AK::Function")
+    return function(this.context, a1, a2, a3, a4, a5, a6, a7, a8)
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6, A7, A8)>::operator bool: whether the function holds a callable.
+pub func function8_is_set[A1, A2, A3, A4, A5, A6, A7, A8, R](this: const Function8[A1, A2, A3, A4, A5, A6, A7, A8, R]*) -> bool:
+    return this.call != none
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6, A7, A8)>::operator=(nullptr_t) / clear(): empties the function.
+pub func function8_clear[A1, A2, A3, A4, A5, A6, A7, A8, R](this: Function8[A1, A2, A3, A4, A5, A6, A7, A8, R]*):
+    this.call = none
+    this.context = none

@@ -1,0 +1,355 @@
+#==============================================================================================
+#
+#   hash_map - HashMap<K, V>: a map over HashTable<Entry, EntryTraits>
+#
+#   DESCRIPTION:
+#       Port of AK/HashMap.h (lines 1-344). The struct is support.lucb's HashMap[K, V, KT],
+#       KT the key's traits (DESIGN.md §2.6); its table holds HashMapEntry[K, V] values
+#       hashed and compared by the key. ValueTraits are the default ones: PeekType is `V&`,
+#       so get() answers `V*?`, and operator== compares values with `==` (`V: Equatable`).
+#       Iterating a map is iterating its table: `for entry in hash_map_begin(&map):` yields
+#       HashMapEntry[K, V]* in the donor's order. A C++ copy of a map is hash_map_clone.
+#       OrderedHashMap is ordered_hash_map.
+#
+#       Predicates over entries are Function2[const K*, const V*, bool]; lookups by another
+#       key type take a HashCompatibleTraits[K, Key] (traits.lucb).
+#
+#==============================================================================================
+
+# mark: EntryTraits =============================================================================
+
+## Ported from AK/HashMap.h:30 AK::HashMap::EntryTraits::hash: the key's hash.
+pub func hash_map_entry_traits_hash[K, V, KT: Traits[K]](entry: const HashMapEntry[K, V]*) -> u32:
+    var traits: KT = ---
+    return traits.hash_of(&entry.key)
+
+## Ported from AK/HashMap.h:31 AK::HashMap::EntryTraits::equals: the keys' equality.
+pub func hash_map_entry_traits_equals[K, V, KT: Traits[K]](a: const HashMapEntry[K, V]*, b: const HashMapEntry[K, V]*) -> bool:
+    var traits: KT = ---
+    return traits.equals(&a.key, &b.key)
+
+# The predicate of find(key): `KeyTraits::equals(entry.key, key)`.
+# workaround: compiler-issues/generic_function_value (the callback is a static method)
+struct HashMapKeyEquals[K, V, KT: Traits[K]]:
+    var key: K
+
+    static func call(context: void*?, entry: const HashMapEntry[K, V]*) -> bool:
+        let captures = (const HashMapKeyEquals[K, V, KT]*)(context else trap("HashMap: no captures"))
+        var traits: KT = ---
+        return traits.equals(&entry.key, &captures.key)
+
+# The predicate of find(Key const&) for a hash-compatible key: `Traits<K>::equals(entry.key, key)`.
+struct HashMapCompatibleKeyEquals[K, V, Key, KeyT: HashCompatibleTraits[K, Key]]:
+    var key: Key
+
+    static func call(context: void*?, entry: const HashMapEntry[K, V]*) -> bool:
+        let captures = (const HashMapCompatibleKeyEquals[K, V, Key, KeyT]*)(context else trap("HashMap: no captures"))
+        var traits: KeyT = ---
+        return traits.equals(&entry.key, &captures.key)
+
+# The predicate of remove_all_matching and take_all_matching: `predicate(entry.key, entry.value)`.
+struct HashMapEntryPredicate[K, V]:
+    var predicate: Function2[const K*, const V*, bool]
+
+    static func call(context: void*?, entry: const HashMapEntry[K, V]*) -> bool:
+        let captures = (const HashMapEntryPredicate[K, V]*)(context else trap("HashMap: no captures"))
+        return function2_call(&captures.predicate, &entry.key, &entry.value)
+
+# ensure()'s initialization callback: `[&] -> Entry { return { key, initialization_callback() }; }`.
+struct HashMapEnsureEntry[K, V]:
+    var key: K
+    var initialization_callback: Function0[V]
+
+    static func call(context: void*?) -> HashMapEntry[K, V]:
+        let captures = (const HashMapEnsureEntry[K, V]*)(context else trap("HashMap: no captures"))
+        return HashMapEntry[K, V](key = captures.key, value = function0_call(&captures.initialization_callback))
+
+# ensure(key)'s default callback: `[] { return V(); }`, the zero value.
+struct HashMapDefaultValue[V]:
+    var unused: u8
+
+    static func call(context: void*?) -> V:
+        discard(context)
+        var value: V = ---
+        memory.set(u8[]((u8*)&value, sizeof(V)), 0)
+        return value
+
+# mark: Construction and size ===================================================================
+
+## Ported from AK/HashMap.h:43 AK::HashMap::HashMap(std::initializer_list<Entry>).
+pub func hash_map_construct[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, list: const HashMapEntry[K, V][]):
+    hash_map_try_ensure_capacity(this, list.length) else trap("MUST: HashMap::try_ensure_capacity")
+    for entry in list:
+        discard(hash_map_set(this, entry.key, entry.value))
+
+## Ported from AK/HashMap.h:309 AK::HashMap::clone: a map with its own table holding the same
+## entries (also what a C++ copy of a map is, DESIGN.md §3.3 rule 2).
+pub func hash_map_clone[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*) -> HashMap[K, V, KT]!:
+    var hash_map_clone_: HashMap[K, V, KT]
+    hash_map_clone_.m_table.m_ordered = this.m_table.m_ordered
+    try hash_map_try_ensure_capacity(&hash_map_clone_, hash_map_size(this))
+    for entry in hash_map_begin_const(this):
+        discard(hash_map_set(&hash_map_clone_, entry.key, entry.value))
+    return hash_map_clone_
+
+## Ported from AK/HashMap.h:52 AK::HashMap::is_empty.
+pub func hash_map_is_empty[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*) -> bool:
+    return hash_table_is_empty(&this.m_table)
+
+## Ported from AK/HashMap.h:56 AK::HashMap::size.
+pub func hash_map_size[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*) -> usize:
+    return hash_table_size(&this.m_table)
+
+## Ported from AK/HashMap.h:57 AK::HashMap::capacity.
+pub func hash_map_capacity[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*) -> usize:
+    return hash_table_capacity(&this.m_table)
+
+## Ported from AK/HashMap.h:58 AK::HashMap::clear.
+pub func hash_map_clear[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*):
+    hash_table_clear(&this.m_table)
+
+## Ported from AK/HashMap.h:59 AK::HashMap::clear_with_capacity.
+pub func hash_map_clear_with_capacity[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*):
+    hash_table_clear_with_capacity(&this.m_table)
+
+# mark: Setting =================================================================================
+
+## Ported from AK/HashMap.h:61 AK::HashMap::set(K const&, V const&).
+pub func hash_map_set[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
+    return hash_table_set(&this.m_table, HashMapEntry[K, V](key = key, value = value), existing_entry_behavior)
+
+## Ported from AK/HashMap.h:62 AK::HashMap::set(K const&, V&&).
+pub func hash_map_set_2[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
+    return hash_map_set(this, key, value, existing_entry_behavior)
+
+## Ported from AK/HashMap.h:63 AK::HashMap::set(K&&, V&&).
+pub func hash_map_set_3[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
+    return hash_map_set(this, key, value, existing_entry_behavior)
+
+## Ported from AK/HashMap.h:64 AK::HashMap::try_set(K const&, V const&).
+pub func hash_map_try_set[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
+    return try hash_table_try_set(&this.m_table, HashMapEntry[K, V](key = key, value = value), existing_entry_behavior)
+
+## Ported from AK/HashMap.h:65 AK::HashMap::try_set(K const&, V&&).
+pub func hash_map_try_set_2[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
+    return try hash_map_try_set(this, key, value, existing_entry_behavior)
+
+## Ported from AK/HashMap.h:66 AK::HashMap::try_set(K&&, V&&).
+pub func hash_map_try_set_3[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
+    return try hash_map_try_set(this, key, value, existing_entry_behavior)
+
+## Ported from AK/HashMap.h:68 AK::HashMap::update.
+pub func hash_map_update[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, other: const HashMap[K, V, KT]*):
+    for entry in hash_map_begin_const(other):
+        discard(hash_map_set(this, entry.key, entry.value))
+
+# mark: Removal =================================================================================
+
+## Ported from AK/HashMap.h:74 AK::HashMap::remove.
+pub func hash_map_remove_k[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K) -> bool:
+    var it = hash_map_find_k(this, key)
+    if it.m_bucket != none:
+        hash_table_remove_opaque(&this.m_table, &it)
+        return true
+    return false
+
+## Ported from AK/HashMap.h:85 AK::HashMap::remove(Key const&) for a hash-compatible key.
+pub func hash_map_remove_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: HashMap[K, V, KT]*, key: Key) -> bool:
+    var it = hash_map_find_t_key[K, V, KT, Key, KeyT](this, key)
+    if it.m_bucket != none:
+        hash_table_remove_opaque(&this.m_table, &it)
+        return true
+    return false
+
+## Ported from AK/HashMap.h:96 AK::HashMap::remove_all_matching.
+pub func hash_map_remove_all_matching[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, predicate: Function2[const K*, const V*, bool]) -> bool:
+    var captures = HashMapEntryPredicate[K, V](predicate = predicate)
+    let call: func(void*?, const HashMapEntry[K, V]*) -> bool = HashMapEntryPredicate[K, V].call
+    return hash_table_remove_all_matching(&this.m_table, Function1[const HashMapEntry[K, V]*, bool](call = call, context = &captures))
+
+## Ported from AK/HashMap.h:104 AK::HashMap::take_all_matching.
+pub func hash_map_take_all_matching[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, predicate: Function2[const K*, const V*, bool]) -> Vector[HashMapEntry[K, V]]:
+    var captures = HashMapEntryPredicate[K, V](predicate = predicate)
+    let call: func(void*?, const HashMapEntry[K, V]*) -> bool = HashMapEntryPredicate[K, V].call
+    return hash_table_take_all_matching(&this.m_table, Function1[const HashMapEntry[K, V]*, bool](call = call, context = &captures))
+
+# mark: Iteration and lookup ====================================================================
+
+## Ported from AK/HashMap.h:116 AK::HashMap::begin.
+pub func hash_map_begin[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_table_begin(&this.m_table)
+
+## Ported from AK/HashMap.h:117 AK::HashMap::end.
+pub func hash_map_end[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_table_end(&this.m_table)
+
+## Ported from AK/HashMap.h:118 AK::HashMap::find.
+pub func hash_map_find_k[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K) -> HashTableIterator[HashMapEntry[K, V]]:
+    if hash_table_is_empty(&this.m_table):
+        return hash_table_end(&this.m_table)
+    var traits: KT = ---
+    var captures = HashMapKeyEquals[K, V, KT](key = key)
+    let call: func(void*?, const HashMapEntry[K, V]*) -> bool = HashMapKeyEquals[K, V, KT].call
+    return hash_table_find_u32_tt_unary_predicate(&this.m_table, traits.hash_of(&key), Function1[const HashMapEntry[K, V]*, bool](call = call, context = &captures))
+
+## Ported from AK/HashMap.h:125 AK::HashMap::find(hash, predicate).
+pub func hash_map_find_u32_tt_unary_predicate[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, hash_: u32, predicate: Function1[const HashMapEntry[K, V]*, bool]) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_table_find_u32_tt_unary_predicate(&this.m_table, hash_, predicate)
+
+## Ported from AK/HashMap.h:130 AK::HashMap::begin const.
+pub func hash_map_begin_const[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_table_begin_const(&this.m_table)
+
+## Ported from AK/HashMap.h:131 AK::HashMap::end const.
+pub func hash_map_end_const[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_table_end_const(&this.m_table)
+
+## Ported from AK/HashMap.h:132 AK::HashMap::find const.
+pub func hash_map_find_k_const[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*, key: K) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_map_find_k((HashMap[K, V, KT]*)this, key)
+
+## Ported from AK/HashMap.h:139 AK::HashMap::find(hash, predicate) const.
+pub func hash_map_find_u32_tt_unary_predicate_const[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*, hash_: u32, predicate: Function1[const HashMapEntry[K, V]*, bool]) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_table_find_u32_tt_unary_predicate_const(&this.m_table, hash_, predicate)
+
+## Ported from AK/HashMap.h:145 AK::HashMap::find(Key const&) for a hash-compatible key.
+pub func hash_map_find_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: HashMap[K, V, KT]*, key: Key) -> HashTableIterator[HashMapEntry[K, V]]:
+    if hash_table_is_empty(&this.m_table):
+        return hash_table_end(&this.m_table)
+    var traits: KeyT = ---
+    var captures = HashMapCompatibleKeyEquals[K, V, Key, KeyT](key = key)
+    let call: func(void*?, const HashMapEntry[K, V]*) -> bool = HashMapCompatibleKeyEquals[K, V, Key, KeyT].call
+    return hash_table_find_u32_tt_unary_predicate(&this.m_table, traits.hash_of(&key), Function1[const HashMapEntry[K, V]*, bool](call = call, context = &captures))
+
+## Ported from AK/HashMap.h:153 AK::HashMap::find(Key const&) const for a hash-compatible key.
+pub func hash_map_find_t_key_const[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: const HashMap[K, V, KT]*, key: Key) -> HashTableIterator[HashMapEntry[K, V]]:
+    return hash_map_find_t_key[K, V, KT, Key, KeyT]((HashMap[K, V, KT]*)this, key)
+
+## Ported from AK/HashMap.h:159 AK::HashMap::try_ensure_capacity.
+pub func hash_map_try_ensure_capacity[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, capacity: usize) -> !:
+    return try hash_table_try_ensure_capacity(&this.m_table, capacity)
+
+## Ported from AK/HashMap.h:161 AK::HashMap::ensure_capacity.
+pub func hash_map_ensure_capacity[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, capacity: usize):
+    hash_table_ensure_capacity(&this.m_table, capacity)
+
+## Ported from AK/HashMap.h:163 AK::HashMap::get const: the value for `key`, if any.
+pub func hash_map_get_k_const[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*, key: K) -> const V*?:
+    var it = hash_map_find_k_const(this, key)
+    let bucket = it.m_bucket else return none
+    return &bucket.storage.value
+
+## Ported from AK/HashMap.h:181 AK::HashMap::get: the value for `key`, if any.
+pub func hash_map_get_k[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K) -> V*?:
+    var it = hash_map_find_k(this, key)
+    let bucket = it.m_bucket else return none
+    return &bucket.storage.value
+
+## Ported from AK/HashMap.h:190 AK::HashMap::get(Key const&) const for a hash-compatible key.
+pub func hash_map_get_t_key_const[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: const HashMap[K, V, KT]*, key: Key) -> const V*?:
+    var it = hash_map_find_t_key_const[K, V, KT, Key, KeyT](this, key)
+    let bucket = it.m_bucket else return none
+    return &bucket.storage.value
+
+## Ported from AK/HashMap.h:210 AK::HashMap::get(Key const&) for a hash-compatible key.
+pub func hash_map_get_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: HashMap[K, V, KT]*, key: Key) -> V*?:
+    var it = hash_map_find_t_key[K, V, KT, Key, KeyT](this, key)
+    let bucket = it.m_bucket else return none
+    return &bucket.storage.value
+
+## Ported from AK/HashMap.h:220 AK::HashMap::contains.
+pub func hash_map_contains_k[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*, key: K) -> bool:
+    let it = hash_map_find_k_const(this, key)
+    return it.m_bucket != none
+
+## Ported from AK/HashMap.h:226 AK::HashMap::contains(Key const&) for a hash-compatible key.
+pub func hash_map_contains_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: const HashMap[K, V, KT]*, value: Key) -> bool:
+    let it = hash_map_find_t_key_const[K, V, KT, Key, KeyT](this, value)
+    return it.m_bucket != none
+
+## Ported from AK/HashMap.h:231 AK::HashMap::remove(IteratorType).
+pub func hash_map_remove_opaque[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, it: HashTableIterator[HashMapEntry[K, V]]):
+    var iterator = it
+    hash_table_remove_opaque(&this.m_table, &iterator)
+
+# mark: Taking and ensuring =====================================================================
+
+## Ported from AK/HashMap.h:236 AK::HashMap::take.
+pub func hash_map_take_k[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K) -> V?:
+    var it = hash_map_find_k(this, key)
+    if let bucket = it.m_bucket:
+        let value = bucket.storage.value
+        hash_table_remove_opaque(&this.m_table, &it)
+        return value
+    return none
+
+## Ported from AK/HashMap.h:247 AK::HashMap::take(Key const&) for a hash-compatible key.
+pub func hash_map_take_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTraits[K, Key]](this: HashMap[K, V, KT]*, key: Key) -> V?:
+    var it = hash_map_find_t_key[K, V, KT, Key, KeyT](this, key)
+    if let bucket = it.m_bucket:
+        let value = bucket.storage.value
+        hash_table_remove_opaque(&this.m_table, &it)
+        return value
+    return none
+
+## Ported from AK/HashMap.h:261 AK::HashMap::take_first (ordered maps only).
+pub func hash_map_take_first[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*) -> V:
+    assert(this.m_table.m_ordered)
+    assert(not hash_map_is_empty(this))
+    let first = this.m_table.m_head else trap("VERIFY: empty OrderedHashMap")
+    return hash_map_take_k(this, first.storage.key) else trap("VERIFY: OrderedHashMap::take_first")
+
+## Ported from AK/HashMap.h:269 AK::HashMap::ensure(key, initialization_callback).
+pub func hash_map_ensure_t_callback[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, initialization_callback: Function0[V], existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.keep) -> V*:
+    var traits: KT = ---
+    var equals_captures = HashMapKeyEquals[K, V, KT](key = key)
+    let equals: func(void*?, const HashMapEntry[K, V]*) -> bool = HashMapKeyEquals[K, V, KT].call
+    var entry_captures = HashMapEnsureEntry[K, V](key = key, initialization_callback = initialization_callback)
+    let make_entry: func(void*?) -> HashMapEntry[K, V] = HashMapEnsureEntry[K, V].call
+    let entry = hash_table_ensure_u32(&this.m_table, traits.hash_of(&key), Function1[const HashMapEntry[K, V]*, bool](call = equals, context = &equals_captures), Function0[HashMapEntry[K, V]](call = make_entry, context = &entry_captures), existing_entry_behavior)
+    return &entry.value
+
+## Ported from AK/HashMap.h:274 AK::HashMap::ensure(key): inserts V() (the zero value) when the
+## key is absent.
+pub func hash_map_ensure[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K) -> V*:
+    let make_value: func(void*?) -> V = HashMapDefaultValue[V].call
+    return hash_map_ensure_t_callback(this, key, Function0[V](call = make_value, context = none))
+
+## Ported from AK/HashMap.h:280 AK::HashMap::try_ensure. A fallible callback (FallibleFunction)
+## is a Function0 whose function fails: call it with `try` before passing its value here.
+pub func hash_map_try_ensure[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, initialization_callback: Function0[V]) -> V!:
+    let it = hash_map_find_k(this, key)
+    if let bucket = it.m_bucket:
+        return bucket.storage.value
+    let result = try hash_map_try_set(this, key, function0_call(&initialization_callback))
+    assert(result == HashSetResult.inserted_new_entry)
+    let found = hash_map_find_k(this, key)
+    let bucket = found.m_bucket else trap("VERIFY: HashMap::try_ensure")
+    return bucket.storage.value
+
+## Ported from AK/HashMap.h:295 AK::HashMap::keys.
+pub func hash_map_keys[K, V, KT: Traits[K]](this: const HashMap[K, V, KT]*) -> Vector[K]:
+    var list: Vector[K]
+    vector_ensure_capacity(&list, hash_map_size(this))
+    for entry in hash_map_begin_const(this):
+        vector_unchecked_append_u(&list, entry.key)
+    return list
+
+# mark: Comparison ==============================================================================
+
+## Ported from AK/HashMap.h:318 AK::HashMap::operator==.
+pub func hash_map_eq[K, V: luce.Equatable, KT: Traits[K]](this: const HashMap[K, V, KT]*, other: const HashMap[K, V, KT]*) -> bool:
+    if hash_map_size(this) != hash_map_size(other):
+        return false
+    if hash_map_is_empty(this):
+        return true
+    for entry in hash_map_begin_const(this):
+        let it = hash_map_find_k_const(other, entry.key)
+        let bucket = it.m_bucket else return false
+        if not (entry.value == bucket.storage.value):
+            return false
+    return true
+
+## Ported from AK/HashMap.h:336 AK::HashMap::operator!=.
+pub func hash_map_ne[K, V: luce.Equatable, KT: Traits[K]](this: const HashMap[K, V, KT]*, other: const HashMap[K, V, KT]*) -> bool:
+    return not hash_map_eq(this, other)
