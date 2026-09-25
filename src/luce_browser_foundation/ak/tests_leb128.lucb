@@ -1,0 +1,112 @@
+#==============================================================================================
+#
+#   tests_leb128 - LEB128 decoding from a stream
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestLEB128.cpp. `stream.read_value<LEB128<T>>()` is
+#       `leb128_read_from_stream_<t>(stream)`.
+#
+#==============================================================================================
+
+func test_leb_u32(stream: FixedMemoryStream*) -> u32?:
+    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    let value = leb128_read_from_stream_u32(stream.stream()) catch:
+        return none
+    return leb128_to_t(&value)
+
+func test_leb_i32(stream: FixedMemoryStream*) -> i32?:
+    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    let value = leb128_read_from_stream_i32(stream.stream()) catch:
+        return none
+    return leb128_to_t(&value)
+
+func test_leb_u64(stream: FixedMemoryStream*) -> u64?:
+    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    let value = leb128_read_from_stream_u64(stream.stream()) catch:
+        return none
+    return leb128_to_t(&value)
+
+func test_leb_i64(stream: FixedMemoryStream*) -> i64?:
+    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    let value = leb128_read_from_stream_i64(stream.stream()) catch:
+        return none
+    return leb128_to_t(&value)
+
+func test_leb_stream(buf: const u8[]) -> FixedMemoryStream:
+    var stream: FixedMemoryStream = ---
+    fixed_memory_stream_construct(&stream, buf)
+    return stream
+
+test "leb128: single_byte":
+    var buf: u8[1]
+    var stream = test_leb_stream(buf)
+    # less than/eq 0b0011_1111, signed == unsigned == raw byte
+    for i: u8 in 0..=0x3F:
+        buf[0] = i
+        assert(test_leb_u32(&stream) == (u32)i)
+        assert(test_leb_i32(&stream) == (i32)i)
+    # 0b0100_0000 to 0b0111_1111 unsigned == byte, signed = {{ 26'b(-1), 6'b(byte) }}
+    for i: u8 in 0x40..<0x80:
+        buf[0] = i
+        assert(test_leb_u32(&stream) == (u32)i)
+        assert(test_leb_i32(&stream) == ((i32)i | (-1 & (~0x3F))))
+    # MSB set, but input too short
+    for i: u16 in 0x80..=0xFF:
+        buf[0] = (u8)i
+        assert(test_leb_u32(&stream) == none)
+        assert(test_leb_i32(&stream) == none)
+
+test "leb128: two_bytes":
+    var buf: u8[2] = [0x00, 0x1]
+    var stream = test_leb_stream(buf)
+    # Only test with first byte expecting more, otherwise equivalent to single byte case
+    for i: u16 in 0x80..=0xFF:
+        buf[0] = (u8)i
+        # less than/eq 0b0011_1111: signed == unsigned == (j << 7) + (7 MSB of i)
+        for j: u8 in 0..=0x3F:
+            buf[1] = j
+            assert(test_leb_u32(&stream) == ((u32)j << 7) + ((u32)i & 0x7F))
+            assert(test_leb_i32(&stream) == ((i32)j << 7) + ((i32)i & 0x7F))
+        # 0b0100_0000 to 0b0111_1111: unsigned == (j << 7) + (7 MSB of i), signed == {{ 19'b(-1), 6'b(j), 7'b(i) }}
+        for j: u8 in 0x40..<0x80:
+            buf[1] = j
+            assert(test_leb_u32(&stream) == ((u32)j << 7) + ((u32)i & 0x7F))
+            assert(test_leb_i32(&stream) == (((i32)j << 7) + ((i32)i & 0x7F)) | (-1 & (~0x3FFF)))
+        # MSB set on last byte, but input too short
+        for j: u16 in 0x80..=0xFF:
+            buf[1] = (u8)j
+            assert(test_leb_u32(&stream) == none)
+            assert(test_leb_i32(&stream) == none)
+
+test "leb128: overflow_sizeof_output_unsigned":
+    let u32_max_plus_one: u8[5] = [0x80, 0x80, 0x80, 0x80, 0x10]
+    var stream = test_leb_stream(u32_max_plus_one)
+    assert(test_leb_u32(&stream) == none)
+    assert(test_leb_u64(&stream) == (u64)u32_max + 1)
+    let u32_max_bytes: u8[5] = [0xFF, 0xFF, 0xFF, 0xFF, 0x0F]
+    var max_stream = test_leb_stream(u32_max_bytes)
+    assert(test_leb_u32(&max_stream) == u32_max)
+    assert(test_leb_u64(&max_stream) == (u64)u32_max)
+
+test "leb128: overflow_sizeof_output_signed":
+    let i32_max_plus_one: u8[5] = [0x80, 0x80, 0x80, 0x80, 0x08]
+    var a = test_leb_stream(i32_max_plus_one)
+    assert(test_leb_i32(&a) == none)
+    assert(test_leb_i64(&a) == (i64)i32_max + 1)
+    let i32_max_bytes: u8[5] = [0xFF, 0xFF, 0xFF, 0xFF, 0x07]
+    var b = test_leb_stream(i32_max_bytes)
+    assert(test_leb_i32(&b) == i32_max)
+    assert(test_leb_i64(&b) == (i64)i32_max)
+    let i32_min_minus_one: u8[5] = [0xFF, 0xFF, 0xFF, 0xFF, 0x77]
+    var c = test_leb_stream(i32_min_minus_one)
+    assert(test_leb_i32(&c) == none)
+    assert(test_leb_i64(&c) == (i64)i32_min - 1)
+    let i32_min_bytes: u8[5] = [0x80, 0x80, 0x80, 0x80, 0x78]
+    var d = test_leb_stream(i32_min_bytes)
+    assert(test_leb_i32(&d) == i32_min)
+    assert(test_leb_i64(&d) == (i64)i32_min)
+
+test "leb128: construct and convert":
+    var value: Leb128[u64]
+    leb128_construct(&value, 300)
+    assert(leb128_to_t(&value) == 300)

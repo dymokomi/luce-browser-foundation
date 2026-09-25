@@ -7,6 +7,12 @@
 #       AK/BufferedStream.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
 #       Regenerate rather than edit, except to fill a field the generator could not map.
 #
+#       Edited by the r01 port: the two stream classes join the Stream hierarchy (class ids
+#       4 and 5 in stream_class's range, their vtables and class information, the upcast
+#       methods); the base field is `seekable_stream_base` as in the other stream classes.
+#       The vtables are shared by every T: their bodies see the stream through its
+#       SeekableStream base (T*'s layout does not depend on T).
+#
 #==============================================================================================
 
 # mark: BufferedHelper ==========================================================================
@@ -16,17 +22,38 @@ pub struct BufferedHelper[T]:
     pub var m_stream: T*
     pub var m_buffer: CircularBuffer
 
+## AK::BufferedHelper::Match (AK/BufferedStream.h:163): where a delimiter candidate was found.
+pub struct BufferedHelperMatch:
+    pub var offset: usize
+    pub var size: usize
+
 # mark: InputBufferedSeekable ===================================================================
 
 ## AK::InputBufferedSeekable (AK/BufferedStream.h:308): a generic struct.
-pub struct InputBufferedSeekable[T]:
-    pub var seekable_stream: SeekableStream
+pub struct InputBufferedSeekable[T]: IsSeekableStream, IsStream:
+    pub var seekable_stream_base: SeekableStream  # primary base
     pub var m_helper: BufferedHelper[T]
+
+    func seekable_stream() -> SeekableStream*: return (SeekableStream*)&self
+
+    func stream() -> Stream*: return (Stream*)&self
+
+pub let input_buffered_seekable_vtable: SeekableStreamVTable = SeekableStreamVTable(stream_vtable = StreamVTable(class_info = &input_buffered_seekable_class, read_some = input_buffered_seekable_read_some_impl, discard = seekable_stream_discard_impl, write_some = input_buffered_seekable_write_some_impl, is_eof = input_buffered_seekable_is_eof_impl, is_open = input_buffered_seekable_is_open_impl, close = input_buffered_seekable_close_impl), seek = input_buffered_seekable_seek_impl, truncate = input_buffered_seekable_truncate_impl)
+
+pub let input_buffered_seekable_class: ClassInfo = ClassInfo(name = "InputBufferedSeekable", first_id = 4, last_id = 4, size = sizeof(InputBufferedSeekable[SeekableStream]), vtable = (const void*)&input_buffered_seekable_vtable)
 
 # mark: OutputBufferedSeekable ==================================================================
 
 ## AK::OutputBufferedSeekable (AK/BufferedStream.h:377): a generic struct.
-pub struct OutputBufferedSeekable[T]:
-    pub var seekable_stream: SeekableStream
+pub struct OutputBufferedSeekable[T]: IsSeekableStream, IsStream:
+    pub var seekable_stream_base: SeekableStream  # primary base
     pub var m_stream: T*
     pub var m_buffer: CircularBuffer
+
+    func seekable_stream() -> SeekableStream*: return (SeekableStream*)&self
+
+    func stream() -> Stream*: return (Stream*)&self
+
+pub let output_buffered_seekable_vtable: SeekableStreamVTable = SeekableStreamVTable(stream_vtable = StreamVTable(class_info = &output_buffered_seekable_class, read_some = output_buffered_seekable_read_some_impl, discard = seekable_stream_discard_impl, write_some = output_buffered_seekable_write_some_impl, is_eof = output_buffered_seekable_is_eof_impl, is_open = output_buffered_seekable_is_open_impl, close = output_buffered_seekable_close_impl), seek = output_buffered_seekable_seek_impl, tell = output_buffered_seekable_tell_impl, truncate = output_buffered_seekable_truncate_impl)
+
+pub let output_buffered_seekable_class: ClassInfo = ClassInfo(name = "OutputBufferedSeekable", first_id = 5, last_id = 5, size = sizeof(OutputBufferedSeekable[SeekableStream]), vtable = (const void*)&output_buffered_seekable_vtable)

@@ -7,18 +7,37 @@
 #       AK/ByteBuffer.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
 #       Regenerate rather than edit, except to fill a field the generator could not map.
 #
+#       Edited by the r01 port: the storage union (inline buffer or outline buffer and
+#       capacity) the generator dropped, the inline flag stored inverted so that a zero
+#       ByteBuffer is the donor's default (inline, empty), and ZeroFillNewElements::Yes.
+#
 #==============================================================================================
 
 # mark: ByteBuffer ==============================================================================
 
-## AK::Detail::ByteBuffer (AK/ByteBuffer.h:21): a generic struct.
+## ByteBuffer's inline capacity (AK::ByteBuffer is Detail::ByteBuffer<32>).
+pub let byte_buffer_inline_capacity: usize = 32
+
+## The outline half of ByteBuffer's storage union: the buffer's address (a usize, so the union
+## has no member with an invariant) and capacity.
+pub struct ByteBufferOutline:
+    pub var m_outline_buffer: usize
+    pub var m_outline_capacity: usize
+
+## ByteBuffer's storage union: the inline bytes, or the outline buffer.
+pub union ByteBufferStorage:
+    pub m_inline_buffer: u8[32]
+    pub outline: ByteBufferOutline
+
+## AK::Detail::ByteBuffer<32> (AK/ByteBuffer.h:21). `m_outline` is the donor's `!m_inline`, so
+## a zero ByteBuffer is an empty inline buffer. The outline buffer is atomic storage (DESIGN.md
+## §3.3 rule 5). A C++ copy of a ByteBuffer is byte_buffer_clone (§3.3 rule 2).
 pub struct ByteBuffer:
+    pub var m_storage: ByteBufferStorage
     pub var m_size: usize  # C++ default: { 0 }
-    pub var m_inline: bool  # C++ default: { true }
+    pub var m_outline: bool  # C++ default: m_inline { true }
 
 ## AK::Detail::ByteBuffer::ZeroFillNewElements (AK/ByteBuffer.h:185).
 pub enum ZeroFillNewElements as i32:
     no = 0
-
-## AK::Detail::ByteBuffer::ZeroFillNewElements::Yes (a second name for no).
-pub let zero_fill_new_elements_yes: ZeroFillNewElements = ZeroFillNewElements.no
+    yes = 1

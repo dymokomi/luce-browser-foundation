@@ -1,0 +1,325 @@
+#==============================================================================================
+#
+#   tests_circular_buffer - ByteBuffer, CircularBuffer and SearchableCircularBuffer
+#
+#   DESCRIPTION:
+#       Ports of Tests/AK/TestByteBuffer.cpp (the Vector<ByteBuffer>::contains_slow case is
+#       an equality check here: there is no Traits<ByteBuffer> struct) and
+#       Tests/AK/TestCircularBuffer.cpp, plus focused cases for the ByteBuffer members the
+#       donor does not test (inline/outline transitions, trim, slice, xor, overwrite).
+#
+#==============================================================================================
+
+# mark: TestByteBuffer ==========================================================================
+
+func test_bb_copy(text: str, count: usize) -> ByteBuffer:
+    return byte_buffer_copy_void(text.bytes.data, count) else trap("copy failed")
+
+test "byte_buffer: equality_operator":
+    let a = test_bb_copy("Hello, world", 7)
+    let b = test_bb_copy("Hello, friend", 7)
+    # `a` and `b` are both "Hello, ".
+    let c = test_bb_copy("asdf", 4)
+    var d: ByteBuffer
+    assert(byte_buffer_eq(&a, &a))
+    assert(byte_buffer_eq(&a, &b))
+    assert(not byte_buffer_eq(&a, &c))
+    assert(not byte_buffer_eq(&a, &d))
+    assert(byte_buffer_eq(&b, &a))
+    assert(not byte_buffer_eq(&c, &b))
+    assert(byte_buffer_eq(&c, &c))
+    assert(not byte_buffer_eq(&d, &a))
+    assert(byte_buffer_eq(&d, &d))
+
+test "byte_buffer: bytes_compare":
+    let a = test_bb_copy("Hello, friend", 13)
+    assert(bytes_equal(byte_buffer_bytes_const(&a), "Hello, friend".bytes))
+
+test "byte_buffer: zero_fill_new_elements_on_growth":
+    var buffer = byte_buffer_create_uninitialized(5) else trap("create failed")
+    memory.set(byte_buffer_span(&buffer), 1)
+    let five: u8[5] = [1, 1, 1, 1, 1]
+    assert(bytes_equal(byte_buffer_span(&buffer), five))
+    byte_buffer_resize(&buffer, 8, ZeroFillNewElements.yes)
+    let eight: u8[8] = [1, 1, 1, 1, 1, 0, 0, 0]
+    assert(bytes_equal(byte_buffer_span(&buffer), eight))
+    memory.set(byte_buffer_span(&buffer), 2)
+    byte_buffer_resize(&buffer, 10, ZeroFillNewElements.yes)
+    let ten: u8[10] = [2, 2, 2, 2, 2, 2, 2, 2, 0, 0]
+    assert(bytes_equal(byte_buffer_span(&buffer), ten))
+
+test "byte_buffer: inline and outline storage":
+    var buffer: ByteBuffer
+    assert(byte_buffer_is_inline(&buffer))
+    assert(byte_buffer_capacity(&buffer) == 32)
+    for i: u8 in 0..<32:
+        byte_buffer_append_u8(&buffer, i)
+    assert(byte_buffer_is_inline(&buffer))
+    byte_buffer_append_u8(&buffer, 32)
+    assert(not byte_buffer_is_inline(&buffer))
+    # max(33, 32 * 3 / 2) = 48
+    assert(byte_buffer_capacity(&buffer) == 48)
+    for i: u8 in 33..<200:
+        byte_buffer_append_u8(&buffer, i)
+    for i in 0..<200usize:
+        assert(byte_buffer_at_const(&buffer, i) == (u8)i)
+    byte_buffer_trim(&buffer, 20, false)
+    assert(byte_buffer_is_inline(&buffer))
+    assert(byte_buffer_size(&buffer) == 20)
+    assert(byte_buffer_at_const(&buffer, 19) == 19)
+    let copy = byte_buffer_clone(&buffer)
+    *byte_buffer_at(&buffer, 0) = 99
+    assert(byte_buffer_at_const(&copy, 0) == 0)
+    let slice = byte_buffer_slice(&copy, 5, 3) else trap("slice failed")
+    assert(byte_buffer_at_const(&slice, 0) == 5 and byte_buffer_at_const(&slice, 2) == 7)
+    byte_buffer_clear(&buffer)
+    assert(byte_buffer_is_empty(&buffer))
+
+test "byte_buffer: xor, overwrite, get_bytes_for_writing":
+    let first: u8[3] = [0x0f, 0xf0, 0xaa]
+    let second: u8[3] = [0xff, 0xff, 0x0f]
+    let result = byte_buffer_xor_buffers(first, second) else trap("xor failed")
+    let expected: u8[3] = [0xf0, 0x0f, 0xa5]
+    assert(bytes_equal(byte_buffer_bytes_const(&result), expected))
+    let short: u8[2] = [1, 2]
+    byte_buffer_xor_buffers(first, short) catch failure:
+        assert(failure.code == ak_errno_error)
+        assert(ak_pending_error.m_code == einval)
+        recover ByteBuffer()
+    var buffer = test_bb_copy("abcdef", 6)
+    byte_buffer_overwrite(&buffer, 2, "XY".bytes.data, 2)
+    assert(bytes_equal(byte_buffer_bytes_const(&buffer), "abXYef".bytes))
+    let tail = byte_buffer_must_get_bytes_for_writing(&buffer, 3)
+    tail[0] = 'g'
+    tail[1] = 'h'
+    tail[2] = 'i'
+    assert(bytes_equal(byte_buffer_bytes_const(&buffer), "abXYefghi".bytes))
+    var other = test_bb_copy("!", 1)
+    byte_buffer_add_assign(&buffer, other)
+    assert(byte_buffer_size(&buffer) == 10)
+    var moved: ByteBuffer
+    byte_buffer_move_assign(&moved, &buffer)
+    assert(byte_buffer_size(&buffer) == 0)
+    assert(byte_buffer_size(&moved) == 10)
+    discard(other)
+    let leaked = byte_buffer_leak_outline_buffer(&moved)
+    assert(leaked == none)
+
+# mark: TestCircularBuffer ======================================================================
+
+func test_cb_create(size: usize) -> CircularBuffer:
+    return circular_buffer_create_empty(size) else trap("create_empty failed")
+
+func test_cb_write(buffer: CircularBuffer*, value: u8):
+    var i = value
+    let written_bytes = circular_buffer_write(buffer, u8[](&i, 1))
+    assert(written_bytes == 1)
+
+func test_cb_read(buffer: CircularBuffer*, supposed_result: u8):
+    var read_value: u8 = 0
+    let b = circular_buffer_read(buffer, u8[](&read_value, 1))
+    assert(b.length == 1)
+    assert(b[0] == supposed_result)
+
+func test_cb_discard(buffer: CircularBuffer*, size: usize):
+    circular_buffer_discard(buffer, size) else trap("discard failed")
+
+test "circular_buffer: simple_write_read and writing_above_limits":
+    var buffer = test_cb_create(1)
+    test_cb_write(&buffer, 42)
+    test_cb_read(&buffer, 42)
+    var full = test_cb_create(1)
+    test_cb_write(&full, 1)
+    var value: u8 = 42
+    assert(circular_buffer_write(&full, u8[](&value, 1)) == 0)
+
+test "circular_buffer: usage_with_wrapping_around":
+    let capacity: usize = 3
+    var buffer = test_cb_create(capacity)
+    for i: u8 in 0..<3:
+        test_cb_write(&buffer, i + 8)
+    assert(circular_buffer_used_space(&buffer) == capacity)
+    assert(circular_buffer_empty_space(&buffer) == 0)
+    test_cb_read(&buffer, 0 + 8)
+    test_cb_read(&buffer, 1 + 8)
+    assert(circular_buffer_used_space(&buffer) == capacity - 2)
+    test_cb_write(&buffer, 5)
+    test_cb_write(&buffer, 6)
+    assert(circular_buffer_used_space(&buffer) == capacity)
+    test_cb_read(&buffer, 10)
+    test_cb_read(&buffer, 5)
+    test_cb_read(&buffer, 6)
+    assert(circular_buffer_used_space(&buffer) == 0)
+
+test "circular_buffer: full_read aligned and non-aligned":
+    var buffer = test_cb_create(3)
+    for i: u8 in 0..<3:
+        test_cb_write(&buffer, i)
+    var result: u8[3]
+    assert(circular_buffer_read(&buffer, result).length == 3)
+    let source: u8[3] = [0, 1, 2]
+    assert(result == source)
+    var other = test_cb_create(3)
+    for i: u8 in 0..<3:
+        test_cb_write(&other, i + 5)
+    test_cb_read(&other, 5)
+    test_cb_write(&other, 42)
+    assert(circular_buffer_empty_space(&other) == 0)
+    var result2: u8[3]
+    assert(circular_buffer_read(&other, result2).length == 3)
+    let source2: u8[3] = [6, 7, 42]
+    assert(result2 == source2)
+
+test "circular_buffer: full_write aligned and non-aligned":
+    let source: u8[3] = [12, 13, 14]
+    var buffer = test_cb_create(3)
+    assert(circular_buffer_write(&buffer, source) == 3)
+    assert(circular_buffer_empty_space(&buffer) == 0)
+    for i: u8 in 0..<3:
+        test_cb_read(&buffer, i + 12)
+    var other = test_cb_create(3)
+    test_cb_write(&other, 10)
+    test_cb_read(&other, 10)
+    assert(circular_buffer_write(&other, source) == 3)
+    assert(circular_buffer_used_space(&other) == 3)
+    for i: u8 in 0..<3:
+        test_cb_read(&other, i + 12)
+    assert(circular_buffer_used_space(&other) == 0)
+
+test "circular_buffer: create_from_bytebuffer":
+    let source: u8[3] = [2, 4, 6]
+    let byte_buffer = byte_buffer_copy_span_u8(source) else trap("copy failed")
+    var circular_buffer = circular_buffer_create_initialized(byte_buffer) else trap("create failed")
+    assert(circular_buffer_used_space(&circular_buffer) == circular_buffer_capacity(&circular_buffer))
+    assert(circular_buffer_used_space(&circular_buffer) == 3)
+    test_cb_read(&circular_buffer, 2)
+    test_cb_read(&circular_buffer, 4)
+    test_cb_read(&circular_buffer, 6)
+
+test "circular_buffer: discard, discard_on_edge, discard_too_much":
+    var buffer = test_cb_create(3)
+    test_cb_write(&buffer, 11)
+    test_cb_write(&buffer, 12)
+    test_cb_discard(&buffer, 1)
+    test_cb_read(&buffer, 12)
+    assert(circular_buffer_used_space(&buffer) == 0)
+    assert(circular_buffer_empty_space(&buffer) == 3)
+    var edge = test_cb_create(3)
+    test_cb_write(&edge, 11)
+    test_cb_write(&edge, 12)
+    test_cb_write(&edge, 13)
+    test_cb_discard(&edge, 2)
+    test_cb_write(&edge, 14)
+    test_cb_write(&edge, 15)
+    test_cb_discard(&edge, 2)
+    test_cb_read(&edge, 15)
+    assert(circular_buffer_used_space(&edge) == 0)
+    var much = test_cb_create(3)
+    test_cb_write(&much, 11)
+    test_cb_write(&much, 12)
+    test_cb_discard(&much, 2)
+    var failed = false
+    circular_buffer_discard(&much, 2) catch:
+        failed = true
+        recover ()
+    assert(failed)
+
+func test_sv(text: str) -> StringView:
+    return StringView(m_characters = text.bytes.data, m_length = text.length)
+
+test "circular_buffer: offset_of":
+    let source = "Well Hello Friends!"
+    var byte_buffer = byte_buffer_copy_span_u8(source.bytes) else trap("copy failed")
+    var circular_buffer = circular_buffer_create_initialized(byte_buffer_clone(&byte_buffer)) else trap("create failed")
+    assert(circular_buffer_offset_of(&circular_buffer, test_sv("Well")) == 0)
+    assert(circular_buffer_offset_of(&circular_buffer, test_sv("Hello")) == 5)
+    test_cb_discard(&circular_buffer, 5)
+    assert(circular_buffer_write(&circular_buffer, byte_buffer_span(&byte_buffer)[0..<5]) == 5)
+    assert(circular_buffer_offset_of(&circular_buffer, test_sv("!Well")) == 13)
+    assert(circular_buffer_offset_of(&circular_buffer, test_sv("!Well"), none, 12) == none)
+    assert(circular_buffer_offset_of(&circular_buffer, test_sv("e"), 2) == 9)
+
+test "circular_buffer: offset_of_with_until_and_after":
+    let source = "Well Hello Friends!"
+    var byte_buffer = byte_buffer_copy_span_u8(source.bytes) else trap("copy failed")
+    var circular_buffer = circular_buffer_create_initialized(byte_buffer_clone(&byte_buffer)) else trap("create failed")
+    assert((circular_buffer_offset_of(&circular_buffer, test_sv("Well Hello Friends!"), 0, 19) else 42) == 0)
+    assert((circular_buffer_offset_of(&circular_buffer, test_sv(" Hello"), 4, 10) else 42) == 4)
+    assert((circular_buffer_offset_of(&circular_buffer, test_sv("el"), 3, 10) else 42) == 6)
+    test_cb_discard(&circular_buffer, 5)
+    assert(circular_buffer_write(&circular_buffer, byte_buffer_span(&byte_buffer)[0..<5]) == 5)
+    assert((circular_buffer_offset_of(&circular_buffer, test_sv("Hello Friends!Well "), 0, 19) else 42) == 0)
+    assert((circular_buffer_offset_of(&circular_buffer, test_sv("o Frie"), 4, 10) else 42) == 4)
+    assert((circular_buffer_offset_of(&circular_buffer, test_sv("el"), 3, 17) else 42) == 15)
+
+test "circular_buffer: offset_of_with_until_and_after_wrapping_around":
+    let source = "Well Hello Friends!"
+    var byte_buffer = byte_buffer_copy_span_u8(source.bytes) else trap("copy failed")
+    var circular_buffer = test_cb_create(19)
+    assert(circular_buffer_write(&circular_buffer, byte_buffer_span(&byte_buffer)[0..<5]) == 5)
+    assert((circular_buffer_offset_of(&circular_buffer, test_sv("Well "), 0, 5) else 42) == 0)
+    assert(circular_buffer_write(&circular_buffer, byte_buffer_span(&byte_buffer)[5..]) == 14)
+    assert((circular_buffer_offset_of(&circular_buffer, test_sv("Hello Friends!"), 5, 19) else 42) == 5)
+    test_cb_discard(&circular_buffer, 5)
+    assert((circular_buffer_offset_of(&circular_buffer, test_sv("Hello Friends!"), 0, 14) else 42) == 0)
+    assert(circular_buffer_write(&circular_buffer, byte_buffer_span(&byte_buffer)[0..<5]) == 5)
+    assert((circular_buffer_offset_of(&circular_buffer, test_sv("Well "), 14, 19) else 42) == 14)
+
+func test_expect_match(found: SearchableCircularBufferMatch?, distance: usize, length: usize):
+    let m = found else trap("no match")
+    assert(m.distance == distance)
+    assert(m.length == length)
+
+test "circular_buffer: find_copy_in_seekback":
+    let haystack = "ABABCABCDAB".bytes
+    let needle = "ABCD".bytes
+    # Set up the buffer for testing.
+    var buffer = searchable_circular_buffer_create_empty(haystack.length + needle.length) else trap("create failed")
+    assert(circular_buffer_write(&buffer.circular_buffer, haystack) == haystack.length)
+    searchable_circular_buffer_discard(&buffer, haystack.length) else trap("discard failed")
+    assert(circular_buffer_write(&buffer.circular_buffer, needle) == needle.length)
+
+    # Note: As of now, the preference during a tie is determined by which algorithm found the match.
+    #       Hash-based matching finds the shortest distance first, while memmem finds the greatest distance first.
+    # Find the largest match with a length between 1 and 1 (all "A").
+    test_expect_match(searchable_circular_buffer_find_copy_in_seekback_usize(&buffer, 1, 1), 11, 1)
+    # Find the largest match with a length between 1 and 2 (all "AB", everything smaller gets eliminated).
+    test_expect_match(searchable_circular_buffer_find_copy_in_seekback_usize(&buffer, 2, 1), 11, 2)
+    # Find the largest match with a length between 1 and 3 (all "ABC", everything smaller gets eliminated).
+    test_expect_match(searchable_circular_buffer_find_copy_in_seekback_usize(&buffer, 3, 1), 6, 3)
+    # Find the largest match with a length between 1 and 4 (all "ABCD", everything smaller gets eliminated).
+    test_expect_match(searchable_circular_buffer_find_copy_in_seekback_usize(&buffer, 4, 1), 6, 4)
+    # Find the largest match with a length between 1 and 5 (all "ABCD", nothing larger exists).
+    test_expect_match(searchable_circular_buffer_find_copy_in_seekback_usize(&buffer, 5, 1), 6, 4)
+    # Find the largest match with a length between 4 and 5.
+    test_expect_match(searchable_circular_buffer_find_copy_in_seekback_usize(&buffer, 5, 4), 6, 4)
+    # Find the largest match with a length between 5 and 5 (nothing is found).
+    assert(searchable_circular_buffer_find_copy_in_seekback_usize(&buffer, 5, 5) == none)
+    # Since we have a tie, the first qualified match is preferred.
+    let tie: usize[2] = [6, 9]
+    test_expect_match(searchable_circular_buffer_find_copy_in_seekback_span_u64(&buffer, tie, 2, 1), 6, 2)
+    # Check that we don't find anything for hints before the valid range.
+    let before: usize[1] = [0]
+    assert(searchable_circular_buffer_find_copy_in_seekback_span_u64(&buffer, before, 2, 1) == none)
+    # Check that we don't find anything for hints after the valid range.
+    let after: usize[1] = [12]
+    assert(searchable_circular_buffer_find_copy_in_seekback_span_u64(&buffer, after, 2, 1) == none)
+    # Check that we don't find anything for a minimum length beyond the whole buffer size.
+    assert(searchable_circular_buffer_find_copy_in_seekback_usize(&buffer, 12, 13) == none)
+
+test "circular_buffer: copy_from_seekback and read_with_seekback":
+    var circular_buffer = test_cb_create(64)
+    assert(circular_buffer_write(&circular_buffer, "ab".bytes) == 2)
+    let copied = circular_buffer_copy_from_seekback(&circular_buffer, 2, 9) else trap("copy failed")
+    assert(copied == 9)
+    var out: u8[11]
+    let read = circular_buffer_read(&circular_buffer, out)
+    assert(bytes_equal(read, "abababababa".bytes))
+    var seek: u8[3]
+    let back = circular_buffer_read_with_seekback(&circular_buffer, seek, 4) else trap("seekback failed")
+    assert(bytes_equal(back, "bab".bytes))
+    var failed = false
+    discard(circular_buffer_read_with_seekback(&circular_buffer, seek, 12) catch:
+        failed = true
+        recover empty_span[u8]())
+    assert(failed)

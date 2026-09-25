@@ -1,0 +1,411 @@
+#==============================================================================================
+#
+#   byte_buffer - ByteBuffer: a growable byte array with 32 bytes of inline storage
+#
+#   DESCRIPTION:
+#       Port of AK/ByteBuffer.h (lines 1-417), Detail::ByteBuffer<32>. The storage union and
+#       the inverted inline flag are in types_byte_buffer. The outline buffer is atomic
+#       storage (kmalloc_atomic, DESIGN.md §3.3 rule 5), freed with kfree as the donor frees
+#       it. Copying the struct shares an outline buffer; the C++ copy constructor is
+#       byte_buffer_clone (§3.3 rule 2), and the moving members take the other buffer by
+#       pointer so they can empty it as the donor does.
+#
+#==============================================================================================
+
+# mark: Storage access ==========================================================================
+
+# The outline buffer's address as a pointer (none only for an outline buffer never allocated).
+func byte_buffer_outline_pointer(this: const ByteBuffer*) -> u8*?:
+    return (u8*?)this.m_storage.outline.m_outline_buffer
+
+## The C++ copy constructor, ByteBuffer(ByteBuffer const&): a buffer with its own copy of the
+## bytes (DESIGN.md §3.3 rule 2).
+pub func byte_buffer_clone(other: const ByteBuffer*) -> ByteBuffer:
+    var buffer: ByteBuffer
+    byte_buffer_try_resize(&buffer, byte_buffer_size(other)) else trap("MUST: ByteBuffer copy")
+    assert(buffer.m_size == byte_buffer_size(other))
+    if other.m_size > 0:
+        memory.copy(byte_buffer_bytes(&buffer), byte_buffer_bytes_const(other), other.m_size)
+    return buffer
+
+## ByteBuffer::operator=(ByteBuffer&&): takes `other`'s storage and empties it.
+pub func byte_buffer_move_assign(this: ByteBuffer*, other: ByteBuffer*):
+    if this != other:
+        if this.m_outline:
+            kfree(byte_buffer_outline_pointer(this))
+        byte_buffer_move_from(this, other)
+
+# mark: Creation ================================================================================
+
+## Ported from AK/ByteBuffer.h:65 AK::Detail::ByteBuffer::create_uninitialized.
+pub func byte_buffer_create_uninitialized(size: usize) -> ByteBuffer!:
+    var buffer: ByteBuffer
+    try byte_buffer_try_resize(&buffer, size)
+    return buffer
+
+## Ported from AK/ByteBuffer.h:72 AK::Detail::ByteBuffer::create_zeroed.
+pub func byte_buffer_create_zeroed(size: usize) -> ByteBuffer!:
+    var buffer = try byte_buffer_create_uninitialized(size)
+    byte_buffer_zero_fill(&buffer)
+    assert(size == 0 or (*byte_buffer_at(&buffer, 0) == 0 and *byte_buffer_at(&buffer, size - 1) == 0))
+    return buffer
+
+## Ported from AK/ByteBuffer.h:81 AK::Detail::ByteBuffer::copy(void const*, size_t).
+pub func byte_buffer_copy_void(data: const void*?, size: usize) -> ByteBuffer!:
+    var buffer = try byte_buffer_create_uninitialized(size)
+    if not buffer.m_outline and size > byte_buffer_inline_capacity:
+        trap("VERIFY_NOT_REACHED")
+    if size != 0:
+        let source = (const u8*)(data else trap("VERIFY: ByteBuffer::copy from null"))
+        memory.copy(byte_buffer_bytes(&buffer), u8[]((u8*)source, size), size)
+    return buffer
+
+## Ported from AK/ByteBuffer.h:91 AK::Detail::ByteBuffer::copy(ReadonlyBytes).
+pub func byte_buffer_copy_span_u8(bytes: const u8[]) -> ByteBuffer!:
+    if bytes.length == 0:
+        return try byte_buffer_copy_void(none, 0)
+    return try byte_buffer_copy_void(bytes.data, bytes.length)
+
+## Ported from AK/ByteBuffer.h:96 AK::Detail::ByteBuffer::xor_buffers.
+pub func byte_buffer_xor_buffers(first: const u8[], second: const u8[]) -> ByteBuffer!:
+    if first.length != second.length:
+        try ak_error_throw(ak_error_from_errno(einval))
+    var buffer = try byte_buffer_create_uninitialized(first.length)
+    let buffer_data = byte_buffer_bytes(&buffer)
+    for i in 0..<first.length:
+        buffer_data[i] = first[i] ^ second[i]
+    return buffer
+
+## Ported from AK/ByteBuffer.h:109 AK::Detail::ByteBuffer::operator==.
+pub func byte_buffer_eq(this: const ByteBuffer*, other: const ByteBuffer*) -> bool:
+    if byte_buffer_size(this) != byte_buffer_size(other):
+        return false
+    # So they both have data, and the same length.
+    return bytes_equal(byte_buffer_bytes_const(this), byte_buffer_bytes_const(other))
+
+# mark: Access ==================================================================================
+
+## Ported from AK/ByteBuffer.h:121 AK::Detail::ByteBuffer::operator[].
+pub func byte_buffer_at(this: ByteBuffer*, i: usize) -> u8*:
+    assert(i < this.m_size)
+    return (byte_buffer_data(this) else trap("VERIFY: ByteBuffer without storage")) + i
+
+## Ported from AK/ByteBuffer.h:127 AK::Detail::ByteBuffer::operator[] const.
+pub func byte_buffer_at_const(this: const ByteBuffer*, i: usize) -> u8:
+    assert(i < this.m_size)
+    let data = byte_buffer_data_const(this) else trap("VERIFY: ByteBuffer without storage")
+    return data[i]
+
+## Ported from AK/ByteBuffer.h:133 AK::Detail::ByteBuffer::is_empty.
+pub func byte_buffer_is_empty(this: const ByteBuffer*) -> bool:
+    return this.m_size == 0
+
+## Ported from AK/ByteBuffer.h:134 AK::Detail::ByteBuffer::size.
+pub func byte_buffer_size(this: const ByteBuffer*) -> usize:
+    return this.m_size
+
+## Ported from AK/ByteBuffer.h:141 AK::Detail::ByteBuffer::data.
+pub func byte_buffer_data(this: ByteBuffer*) -> u8*?:
+    if this.m_outline:
+        return byte_buffer_outline_pointer(this)
+    return &this.m_storage.m_inline_buffer[0]
+
+## Ported from AK/ByteBuffer.h:145 AK::Detail::ByteBuffer::data const.
+pub func byte_buffer_data_const(this: const ByteBuffer*) -> const u8*?:
+    return byte_buffer_data((ByteBuffer*)this)
+
+## Ported from AK/ByteBuffer.h:151 AK::Detail::ByteBuffer::bytes.
+pub func byte_buffer_bytes(this: ByteBuffer*) -> u8[]:
+    let data = byte_buffer_data(this) else return empty_span[u8]()
+    return u8[](data, this.m_size)
+
+## Ported from AK/ByteBuffer.h:157 AK::Detail::ByteBuffer::bytes const.
+pub func byte_buffer_bytes_const(this: const ByteBuffer*) -> const u8[]:
+    return byte_buffer_bytes((ByteBuffer*)this)
+
+## Ported from AK/ByteBuffer.h:159 AK::Detail::ByteBuffer::span.
+pub func byte_buffer_span(this: ByteBuffer*) -> u8[]:
+    return byte_buffer_bytes(this)
+
+## Ported from AK/ByteBuffer.h:160 AK::Detail::ByteBuffer::span const.
+pub func byte_buffer_span_const(this: const ByteBuffer*) -> const u8[]:
+    return byte_buffer_bytes_const(this)
+
+## Ported from AK/ByteBuffer.h:162 AK::Detail::ByteBuffer::offset_pointer.
+pub func byte_buffer_offset_pointer(this: ByteBuffer*, offset: usize) -> u8*?:
+    let data = byte_buffer_data(this) else return none
+    return data + offset
+
+## Ported from AK/ByteBuffer.h:163 AK::Detail::ByteBuffer::offset_pointer const.
+pub func byte_buffer_offset_pointer_const(this: const ByteBuffer*, offset: usize) -> const u8*?:
+    return byte_buffer_offset_pointer((ByteBuffer*)this, offset)
+
+## Ported from AK/ByteBuffer.h:165 AK::Detail::ByteBuffer::end_pointer.
+pub func byte_buffer_end_pointer(this: ByteBuffer*) -> void*?:
+    return byte_buffer_offset_pointer(this, this.m_size)
+
+## Ported from AK/ByteBuffer.h:166 AK::Detail::ByteBuffer::end_pointer const.
+pub func byte_buffer_end_pointer_const(this: const ByteBuffer*) -> const void*?:
+    return byte_buffer_offset_pointer_const(this, this.m_size)
+
+## Ported from AK/ByteBuffer.h:168 AK::Detail::ByteBuffer::slice.
+pub func byte_buffer_slice(this: const ByteBuffer*, offset: usize, size: usize) -> ByteBuffer!:
+    # I cannot hand you a slice I don't have
+    assert(offset + size <= byte_buffer_size(this))
+    return try byte_buffer_copy_void(byte_buffer_offset_pointer_const(this, offset), size)
+
+## Ported from AK/ByteBuffer.h:176 AK::Detail::ByteBuffer::clear.
+pub func byte_buffer_clear(this: ByteBuffer*):
+    if this.m_outline:
+        kfree(byte_buffer_outline_pointer(this))
+        this.m_outline = false
+    this.m_size = 0
+
+# mark: Resizing ================================================================================
+
+## Ported from AK/ByteBuffer.h:190 AK::Detail::ByteBuffer::resize.
+pub func byte_buffer_resize(this: ByteBuffer*, new_size: usize, zero_fill_new_elements: ZeroFillNewElements = ZeroFillNewElements.no):
+    byte_buffer_try_resize(this, new_size, zero_fill_new_elements) else trap("MUST: ByteBuffer::resize")
+
+## Ported from AK/ByteBuffer.h:195 AK::Detail::ByteBuffer::trim.
+pub func byte_buffer_trim(this: ByteBuffer*, size: usize, may_discard_existing_data: bool):
+    assert(size <= this.m_size)
+    if this.m_outline and size <= byte_buffer_inline_capacity:
+        byte_buffer_shrink_into_inline_buffer(this, size, may_discard_existing_data)
+    this.m_size = size
+
+## Ported from AK/ByteBuffer.h:203 AK::Detail::ByteBuffer::ensure_capacity.
+pub func byte_buffer_ensure_capacity(this: ByteBuffer*, new_capacity: usize):
+    byte_buffer_try_ensure_capacity(this, new_capacity) else trap("MUST: ByteBuffer::ensure_capacity")
+
+## Ported from AK/ByteBuffer.h:208 AK::Detail::ByteBuffer::set_size.
+pub func byte_buffer_set_size(this: ByteBuffer*, new_size: usize, zero_fill_new_elements: ZeroFillNewElements = ZeroFillNewElements.no):
+    assert(new_size <= byte_buffer_capacity(this))
+    if zero_fill_new_elements == ZeroFillNewElements.yes and new_size > this.m_size:
+        let data = byte_buffer_data(this) else trap("VERIFY: ByteBuffer without storage")
+        memory.set(u8[](data + this.m_size, new_size - this.m_size), 0)
+    this.m_size = new_size
+
+## Ported from AK/ByteBuffer.h:219 AK::Detail::ByteBuffer::try_resize.
+pub func byte_buffer_try_resize(this: ByteBuffer*, new_size: usize, zero_fill_new_elements: ZeroFillNewElements = ZeroFillNewElements.no) -> !:
+    if new_size <= this.m_size:
+        byte_buffer_trim(this, new_size, false)
+        return
+    try byte_buffer_try_ensure_capacity(this, new_size)
+    byte_buffer_set_size(this, new_size, zero_fill_new_elements)
+
+## Ported from AK/ByteBuffer.h:232 AK::Detail::ByteBuffer::try_ensure_capacity.
+pub func byte_buffer_try_ensure_capacity(this: ByteBuffer*, new_capacity: usize) -> !:
+    if new_capacity <= byte_buffer_capacity(this):
+        return
+    return try byte_buffer_try_ensure_capacity_slowpath(this, new_capacity)
+
+## Ported from AK/ByteBuffer.h:241 AK::Detail::ByteBuffer::get_bytes_for_writing.
+# Return a span of bytes past the end of this ByteBuffer for writing.
+# Ensures that the required space is available.
+pub func byte_buffer_get_bytes_for_writing(this: ByteBuffer*, length: usize) -> u8[]!:
+    let old_size = byte_buffer_size(this)
+    try byte_buffer_try_resize(this, old_size + length)
+    return byte_buffer_bytes(this)[old_size..]
+
+## Ported from AK/ByteBuffer.h:249 AK::Detail::ByteBuffer::must_get_bytes_for_writing.
+# Like get_bytes_for_writing, but crashes if allocation fails.
+pub func byte_buffer_must_get_bytes_for_writing(this: ByteBuffer*, length: usize) -> u8[]:
+    return byte_buffer_get_bytes_for_writing(this, length) else trap("MUST: ByteBuffer::get_bytes_for_writing")
+
+# mark: Appending ===============================================================================
+
+## Ported from AK/ByteBuffer.h:254 AK::Detail::ByteBuffer::append(u8).
+pub func byte_buffer_append_u8(this: ByteBuffer*, byte: u8):
+    byte_buffer_try_append_u8(this, byte) else trap("MUST: ByteBuffer::append")
+
+## Ported from AK/ByteBuffer.h:259 AK::Detail::ByteBuffer::append(ReadonlyBytes).
+pub func byte_buffer_append_span_u8(this: ByteBuffer*, bytes: const u8[]):
+    byte_buffer_try_append_span_u8(this, bytes) else trap("MUST: ByteBuffer::append")
+
+## Ported from AK/ByteBuffer.h:264 AK::Detail::ByteBuffer::append(void const*, size_t).
+pub func byte_buffer_append_void(this: ByteBuffer*, data: const void*?, data_size: usize):
+    byte_buffer_try_append_void(this, data, data_size) else trap("MUST: ByteBuffer::append")
+
+## Ported from AK/ByteBuffer.h:266 AK::Detail::ByteBuffer::try_append(u8).
+pub func byte_buffer_try_append_u8(this: ByteBuffer*, byte: u8) -> !:
+    let old_size = byte_buffer_size(this)
+    let new_size = old_size + 1
+    assert(new_size > old_size)
+    try byte_buffer_try_resize(this, new_size)
+    *byte_buffer_at(this, old_size) = byte
+
+## Ported from AK/ByteBuffer.h:276 AK::Detail::ByteBuffer::try_append(ReadonlyBytes).
+pub func byte_buffer_try_append_span_u8(this: ByteBuffer*, bytes: const u8[]) -> !:
+    if bytes.length == 0:
+        return
+    return try byte_buffer_try_append_void(this, bytes.data, bytes.length)
+
+## Ported from AK/ByteBuffer.h:281 AK::Detail::ByteBuffer::try_append(void const*, size_t).
+pub func byte_buffer_try_append_void(this: ByteBuffer*, data: const void*?, data_size: usize) -> !:
+    if data_size == 0:
+        return
+    let source = (const u8*)(data else trap("VERIFY: ByteBuffer::try_append from null"))
+    let old_size = byte_buffer_size(this)
+    try byte_buffer_try_resize(this, byte_buffer_size(this) + data_size)
+    memory.copy(byte_buffer_bytes(this)[old_size..], u8[]((u8*)source, data_size), data_size)
+
+## Ported from AK/ByteBuffer.h:292 AK::Detail::ByteBuffer::operator+=.
+pub func byte_buffer_add_assign(this: ByteBuffer*, other: ByteBuffer):
+    var source = other
+    byte_buffer_try_append_void(this, byte_buffer_data(&source), other.m_size) else trap("MUST: ByteBuffer::operator+=")
+
+## Ported from AK/ByteBuffer.h:297 AK::Detail::ByteBuffer::overwrite.
+pub func byte_buffer_overwrite(this: ByteBuffer*, offset: usize, data: const void*?, data_size: usize):
+    # make sure we're not told to write past the end
+    assert(offset + data_size <= byte_buffer_size(this))
+    if data_size == 0:
+        return
+    let source = (const u8*)(data else trap("VERIFY: ByteBuffer::overwrite from null"))
+    memory.move(byte_buffer_bytes(this)[offset..<(offset + data_size)], u8[]((u8*)source, data_size), data_size)
+
+## Ported from AK/ByteBuffer.h:307 AK::Detail::ByteBuffer::zero_fill.
+pub func byte_buffer_zero_fill(this: ByteBuffer*):
+    memory.set(byte_buffer_bytes(this), 0)
+
+## Ported from AK/ByteBuffer.h:313 AK::Detail::ByteBuffer::operator Bytes.
+pub func byte_buffer_to_span(this: ByteBuffer*) -> u8[]:
+    return byte_buffer_bytes(this)
+
+## Ported from AK/ByteBuffer.h:315 AK::Detail::ByteBuffer::operator ReadonlyBytes.
+pub func byte_buffer_to_span_const(this: const ByteBuffer*) -> const u8[]:
+    return byte_buffer_bytes_const(this)
+
+## Ported from AK/ByteBuffer.h:317 AK::Detail::ByteBuffer::capacity.
+pub func byte_buffer_capacity(this: const ByteBuffer*) -> usize:
+    if this.m_outline:
+        return this.m_storage.outline.m_outline_capacity
+    return byte_buffer_inline_capacity
+
+## Ported from AK/ByteBuffer.h:318 AK::Detail::ByteBuffer::is_inline.
+pub func byte_buffer_is_inline(this: const ByteBuffer*) -> bool:
+    return not this.m_outline
+
+## Ported from AK/ByteBuffer.h:324 AK::Detail::ByteBuffer::leak_outline_buffer: the outline
+## buffer and its capacity, which the buffer gives up (it becomes empty and inline); none
+## for an inline buffer.
+pub func byte_buffer_leak_outline_buffer(this: ByteBuffer*) -> ByteBufferOutlineBuffer?:
+    if not this.m_outline:
+        return none
+    let buffer = byte_buffer_bytes(this)
+    let capacity = byte_buffer_capacity(this)
+    this.m_outline = false
+    this.m_size = 0
+    return ByteBufferOutlineBuffer(buffer = buffer, capacity = capacity)
+
+## AK::Detail::ByteBuffer::OutlineBuffer (AK/ByteBuffer.h:319): what leak_outline_buffer hands
+## over.
+pub struct ByteBufferOutlineBuffer:
+    pub var buffer: u8[]
+    pub var capacity: usize
+
+# mark: Private =================================================================================
+
+## Ported from AK/ByteBuffer.h:337 AK::Detail::ByteBuffer::move_from: takes `other`'s storage
+## and empties it.
+pub func byte_buffer_move_from(this: ByteBuffer*, other: ByteBuffer*):
+    this.m_size = other.m_size
+    this.m_outline = other.m_outline
+    if other.m_outline:
+        this.m_storage.outline = other.m_storage.outline
+    else:
+        assert(other.m_size <= byte_buffer_inline_capacity)
+        this.m_storage.m_inline_buffer = other.m_storage.m_inline_buffer
+    other.m_size = 0
+    other.m_outline = false
+
+## Ported from AK/ByteBuffer.h:352 AK::Detail::ByteBuffer::shrink_into_inline_buffer.
+pub func byte_buffer_shrink_into_inline_buffer(this: ByteBuffer*, size: usize, may_discard_existing_data: bool):
+    # m_inline_buffer and m_outline_buffer are part of a union, so save the pointer
+    let outline_buffer = byte_buffer_outline_pointer(this)
+    if not may_discard_existing_data and size > 0:
+        let source = outline_buffer else trap("VERIFY: ByteBuffer without storage")
+        var inline_bytes: u8[32]
+        memory.copy(inline_bytes[0..<size], u8[](source, size), size)
+        this.m_storage.m_inline_buffer = inline_bytes
+    kfree(outline_buffer)
+    this.m_outline = false
+
+## Ported from AK/ByteBuffer.h:362 AK::Detail::ByteBuffer::try_ensure_capacity_slowpath.
+pub func byte_buffer_try_ensure_capacity_slowpath(this: ByteBuffer*, new_capacity: usize) -> !:
+    # When we are asked to raise the capacity by very small amounts,
+    # the caller is perhaps appending very little data in many calls.
+    # To avoid copying the entire ByteBuffer every single time,
+    # we raise the capacity exponentially, by a factor of roughly 1.5.
+    # This is most noticeable in Lagom, where kmalloc_good_size is just a no-op.
+    var capacity = max(new_capacity, (byte_buffer_capacity(this) * 3) // 2)
+    capacity = kmalloc_good_size(capacity)
+    let new_buffer = (u8*)(kmalloc_atomic(capacity) else return try ak_error_throw(ak_error_from_errno(enomem)))
+    if not this.m_outline:
+        if this.m_size > 0:
+            let data = byte_buffer_data(this) else trap("unreachable")
+            memory.copy(u8[](new_buffer, this.m_size), u8[](data, this.m_size), this.m_size)
+    elif let old_buffer = byte_buffer_outline_pointer(this):
+        let count = min(capacity, this.m_storage.outline.m_outline_capacity)
+        memory.copy(u8[](new_buffer, count), u8[](old_buffer, count), count)
+        kfree(old_buffer)
+    this.m_storage.outline = ByteBufferOutline(m_outline_buffer = (usize)new_buffer, m_outline_capacity = capacity)
+    this.m_outline = true
+
+# mark: Span members the streams use ============================================================
+
+# Span<T>::operator== on bytes (memcmp of equal lengths).
+func bytes_equal(a: const u8[], b: const u8[]) -> bool:
+    if a.length != b.length:
+        return false
+    for i in 0..<a.length:
+        if a[i] != b[i]:
+            return false
+    return true
+
+# Span<T>::copy_trimmed_to: copies as many bytes as both spans hold (memmove) and answers how
+# many.
+func bytes_copy_trimmed_to(source: const u8[], destination: u8[]) -> usize:
+    let count = min(source.length, destination.length)
+    if count > 0:
+        memory.move(destination[0..<count], source[0..<count], count)
+    return count
+
+# Span<T>::matching_prefix_length: how many leading bytes the two spans share.
+func bytes_matching_prefix_length(a: const u8[], b: const u8[]) -> usize:
+    let length = min(a.length, b.length)
+    for i in 0..<length:
+        if a[i] != b[i]:
+            return i
+    return length
+
+# AK/MemMem.h memmem over a chain of spans (the donor's KMP search): the offset, in the spans'
+# concatenation, of the first occurrence of `needle`, or none.
+func memmem_spans(spans: const (const u8[])[], needle: const u8[]) -> usize?:
+    var total: usize = 0
+    for span in spans:
+        total += span.length
+    # The donor's KMP table has a first entry even for an empty needle (VERIFY fails).
+    assert(needle.length > 0)
+    if needle.length > total:
+        return none
+    var start: usize = 0
+    while start + needle.length <= total:
+        var matched = true
+        for j in 0..<needle.length:
+            if memmem_byte_at(spans, start + j) != needle[j]:
+                matched = false
+                break
+        if matched:
+            return start
+        start += 1
+    return none
+
+# The byte at `offset` of the spans' concatenation.
+func memmem_byte_at(spans: const (const u8[])[], offset: usize) -> u8:
+    var remaining = offset
+    for span in spans:
+        if remaining < span.length:
+            return span[remaining]
+        remaining -= span.length
+    trap("VERIFY: memmem offset out of range")

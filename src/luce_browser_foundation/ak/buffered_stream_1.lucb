@@ -1,0 +1,255 @@
+#==============================================================================================
+#
+#   buffered_stream_1 - BufferedHelper<T>: the read buffer shared by the buffered streams
+#
+#   DESCRIPTION:
+#       Port of AK/BufferedStream.h (lines 1-303). T is any SeekableStream class (the donor's
+#       StreamLike/SeekableStreamLike concepts), reached through the IsSeekableStream
+#       interface and the stream's virtuals. NonnullOwnPtr<T> is T* (DESIGN.md §2.6); the
+#       Badge parameter of the constructor is dropped. The templates over a candidate array
+#       (read_until_any_of and friends) take a span of StringViews. find_candidates, the
+#       lambda of find_and_populate_until_any_of, is a function taking its captures.
+#
+#==============================================================================================
+
+# StringView { bytes }.
+func string_view_of(bytes: const u8[]) -> StringView:
+    if bytes.length == 0:
+        return StringView(m_characters = none, m_length = 0)
+    return StringView(m_characters = bytes.data, m_length = bytes.length)
+
+## Ported from AK/BufferedStream.h:28 AK::BufferedHelper::BufferedHelper<T>.
+pub func buffered_helper_buffered_helper_t[T](this: BufferedHelper[T]*, stream: T*, buffer: CircularBuffer):
+    this.m_stream = stream
+    this.m_buffer = buffer
+
+## Ported from AK/BufferedStream.h:47 AK::BufferedHelper::stream.
+pub func buffered_helper_stream[T](this: BufferedHelper[T]*) -> T*:
+    return this.m_stream
+
+## Ported from AK/BufferedStream.h:48 AK::BufferedHelper::stream const.
+pub func buffered_helper_stream_const[T](this: const BufferedHelper[T]*) -> const T*:
+    return this.m_stream
+
+# The helper's stream as a Stream (`stream()` for the virtual calls).
+func buffered_helper_base_stream[T: IsSeekableStream](this: const BufferedHelper[T]*) -> Stream*:
+    return this.m_stream.seekable_stream().stream()
+
+## Ported from AK/BufferedStream.h:50 AK::BufferedHelper::read.
+pub func buffered_helper_read[T: IsSeekableStream](this: BufferedHelper[T]*, buffer: u8[]) -> u8[]!:
+    if not stream_is_open(buffered_helper_base_stream(this)):
+        try ak_error_throw(ak_error_from_errno(enotconn()))
+    if buffer.length == 0:
+        return buffer
+
+    # Fill the internal buffer if it has run dry.
+    if circular_buffer_used_space(&this.m_buffer) == 0:
+        discard(try buffered_helper_populate_read_buffer(this))
+
+    # Let's try to take all we can from the buffer first.
+    return circular_buffer_read(&this.m_buffer, buffer)
+
+## Ported from AK/BufferedStream.h:68 AK::BufferedHelper::read_line.
+# Reads into the buffer until \n is encountered.
+# The size of the Bytes object is the maximum amount of bytes that will be
+# read. Returns the bytes read as a StringView.
+pub func buffered_helper_read_line[T: IsSeekableStream](this: BufferedHelper[T]*, buffer: u8[]) -> StringView!:
+    return string_view_of(try buffered_helper_read_until(this, buffer, string_view_of("\n".bytes)))
+
+## Ported from AK/BufferedStream.h:73 AK::BufferedHelper::read_until.
+pub func buffered_helper_read_until[T: IsSeekableStream](this: BufferedHelper[T]*, buffer: u8[], candidate: StringView) -> u8[]!:
+    let candidates: StringView[1] = [candidate]
+    return try buffered_helper_read_until_any_of(this, buffer, candidates)
+
+## Ported from AK/BufferedStream.h:79 AK::BufferedHelper::read_until_any_of.
+pub func buffered_helper_read_until_any_of[T: IsSeekableStream](this: BufferedHelper[T]*, buffer: u8[], candidates: const StringView[]) -> u8[]!:
+    if not stream_is_open(buffered_helper_base_stream(this)):
+        try ak_error_throw(ak_error_from_errno(enotconn()))
+
+    if buffer.length == 0:
+        return buffer
+
+    let candidate = try buffered_helper_find_and_populate_until_any_of(this, candidates, buffer.length)
+
+    if stream_is_eof(buffered_helper_base_stream(this)):
+        var too_small = false
+        if let found = candidate:
+            too_small = found.offset + found.size > buffer.length
+        else:
+            too_small = buffer.length < circular_buffer_used_space(&this.m_buffer)
+        if too_small:
+            # Normally, reading from an EOFed stream and receiving bytes
+            # would mean that the stream is no longer EOF. However, it's
+            # possible with a buffered stream that the user is able to read
+            # the buffer contents even when the underlying stream is EOF.
+            # We already violate this invariant once by giving the user the
+            # chance to read the remaining buffer contents, but if the user
+            # doesn't give us a big enough buffer, then we would be
+            # violating the invariant twice the next time the user attempts
+            # to read, which is No Good. So let's give a descriptive error
+            # to the caller about why it can't read.
+            try ak_error_throw(ak_error_from_errno(emsgsize()))
+
+    if let found = candidate:
+        let read_bytes = circular_buffer_read(&this.m_buffer, buffer[0..<found.offset])
+        try circular_buffer_discard(&this.m_buffer, found.size)
+        return read_bytes
+
+    # If we still haven't found anything, then it's most likely the case
+    # that the delimiter ends beyond the length of the caller-passed
+    # buffer. Let's just fill the caller's buffer up.
+    return circular_buffer_read(&this.m_buffer, buffer)
+
+## Ported from AK/BufferedStream.h:118 AK::BufferedHelper::read_line_with_resize.
+pub func buffered_helper_read_line_with_resize[T: IsSeekableStream](this: BufferedHelper[T]*, buffer: ByteBuffer*) -> StringView!:
+    return string_view_of(try buffered_helper_read_until_with_resize(this, buffer, string_view_of("\n".bytes)))
+
+## Ported from AK/BufferedStream.h:123 AK::BufferedHelper::read_until_with_resize.
+pub func buffered_helper_read_until_with_resize[T: IsSeekableStream](this: BufferedHelper[T]*, buffer: ByteBuffer*, candidate: StringView) -> u8[]!:
+    let candidates: StringView[1] = [candidate]
+    return try buffered_helper_read_until_any_of_with_resize(this, buffer, candidates)
+
+## Ported from AK/BufferedStream.h:129 AK::BufferedHelper::read_until_any_of_with_resize.
+pub func buffered_helper_read_until_any_of_with_resize[T: IsSeekableStream](this: BufferedHelper[T]*, buffer: ByteBuffer*, candidates: const StringView[]) -> u8[]!:
+    if not stream_is_open(buffered_helper_base_stream(this)):
+        try ak_error_throw(ak_error_from_errno(enotconn()))
+
+    var candidate = try buffered_helper_find_and_populate_until_any_of(this, candidates, none)
+
+    var bytes_read_to_user_buffer: usize = 0
+    while candidate == none:
+        if circular_buffer_used_space(&this.m_buffer) == 0 and stream_is_eof(buffered_helper_base_stream(this)):
+            # If we read to the very end of the buffered and unbuffered data,
+            # then treat the remainder as a full line (the last one), even if it
+            # doesn't end in the delimiter.
+            return byte_buffer_span(buffer)[0..<bytes_read_to_user_buffer]
+
+        if byte_buffer_size(buffer) - bytes_read_to_user_buffer < circular_buffer_used_space(&this.m_buffer):
+            # Resize the user supplied buffer because it cannot fit
+            # the contents of m_buffer.
+            try byte_buffer_try_resize(buffer, byte_buffer_size(buffer) + circular_buffer_used_space(&this.m_buffer))
+
+        # Read bytes into the buffer starting from the offset of how many bytes have previously been read.
+        bytes_read_to_user_buffer += circular_buffer_read(&this.m_buffer, byte_buffer_span(buffer)[bytes_read_to_user_buffer..]).length
+        candidate = try buffered_helper_find_and_populate_until_any_of(this, candidates, none)
+
+    let found = candidate else trap("unreachable")
+    # Once the candidate has been found, read the contents of m_buffer into the buffer,
+    # offset by how many bytes have already been read in.
+    try byte_buffer_try_resize(buffer, bytes_read_to_user_buffer + found.offset)
+    discard(circular_buffer_read(&this.m_buffer, byte_buffer_span(buffer)[bytes_read_to_user_buffer..]))
+    try circular_buffer_discard(&this.m_buffer, found.size)
+    return byte_buffer_span(buffer)
+
+# find_and_populate_until_any_of's find_candidates lambda: the longest candidate match at the
+# earliest offset in the buffer at or after `min_offset` (less the longest candidate's length).
+func buffered_helper_find_candidates[T](this: BufferedHelper[T]*, candidates: const StringView[], longest_candidate: usize, min_offset: usize, max_offset_: usize?) -> BufferedHelperMatch?:
+    let corrected_minimum_offset = 0 if longest_candidate > min_offset else min_offset - longest_candidate
+    let max_offset = max_offset_ else circular_buffer_used_space(&this.m_buffer)
+
+    var longest_match: usize?
+    var match_size: usize = 0
+    for candidate in candidates:
+        let result = circular_buffer_offset_of(&this.m_buffer, candidate, corrected_minimum_offset, max_offset)
+
+        if let found = result:
+            let previous_match = longest_match else found
+            if (previous_match < found) or (previous_match == found and match_size < candidate.m_length):
+                longest_match = found
+                match_size = candidate.m_length
+
+    if let found = longest_match:
+        return BufferedHelperMatch(offset = found, size = match_size)
+
+    return none
+
+## Ported from AK/BufferedStream.h:169 AK::BufferedHelper::find_and_populate_until_any_of.
+pub func buffered_helper_find_and_populate_until_any_of[T: IsSeekableStream](this: BufferedHelper[T]*, candidates: const StringView[], max_offset: usize?) -> BufferedHelperMatch?!:
+    var longest_candidate: usize?
+    for candidate in candidates:
+        if candidate.m_length >= (longest_candidate else candidate.m_length):
+            longest_candidate = candidate.m_length
+    let longest = longest_candidate else trap("VERIFY: no delimiter candidates")
+
+    # The intention here is to try to match all the possible
+    # delimiter candidates and try to find the longest one we can
+    # remove from the buffer after copying up to the delimiter to the
+    # user buffer.
+
+    if let first_find = buffered_helper_find_candidates(this, candidates, longest, 0, max_offset):
+        return first_find
+
+    var last_size = circular_buffer_used_space(&this.m_buffer)
+
+    while circular_buffer_used_space(&this.m_buffer) < (max_offset else circular_buffer_capacity(&this.m_buffer)):
+        let read_bytes = try buffered_helper_populate_read_buffer(this)
+        if read_bytes == 0:
+            break
+
+        if let first_find = buffered_helper_find_candidates(this, candidates, longest, last_size, max_offset):
+            return first_find
+        last_size = circular_buffer_used_space(&this.m_buffer)
+
+    return none
+
+## Ported from AK/BufferedStream.h:226 AK::BufferedHelper::can_read_up_to_delimiter.
+# Populates the buffer, and returns whether it is possible to read up to the given delimiter.
+pub func buffered_helper_can_read_up_to_delimiter[T: IsSeekableStream](this: BufferedHelper[T]*, delimiter: const u8[]) -> bool!:
+    if stream_is_eof(buffered_helper_base_stream(this)):
+        return circular_buffer_offset_of(&this.m_buffer, string_view_of(delimiter)) != none
+
+    let candidates: StringView[1] = [string_view_of(delimiter)]
+    let maybe_match = try buffered_helper_find_and_populate_until_any_of(this, candidates, none)
+    if maybe_match != none:
+        return true
+
+    return stream_is_eof(buffered_helper_base_stream(this)) and circular_buffer_offset_of(&this.m_buffer, string_view_of(delimiter)) != none
+
+## Ported from AK/BufferedStream.h:238 AK::BufferedHelper::is_eof_with_data_left_over.
+pub func buffered_helper_is_eof_with_data_left_over[T: IsSeekableStream](this: const BufferedHelper[T]*) -> bool:
+    return stream_is_eof(buffered_helper_base_stream(this)) and circular_buffer_used_space(&this.m_buffer) > 0
+
+## Ported from AK/BufferedStream.h:243 AK::BufferedHelper::is_eof.
+pub func buffered_helper_is_eof[T: IsSeekableStream](this: const BufferedHelper[T]*) -> bool:
+    if circular_buffer_used_space(&this.m_buffer) > 0:
+        return false
+
+    return stream_is_eof(buffered_helper_base_stream(this))
+
+## Ported from AK/BufferedStream.h:252 AK::BufferedHelper::buffer_size.
+pub func buffered_helper_buffer_size[T](this: const BufferedHelper[T]*) -> usize:
+    return circular_buffer_capacity(&this.m_buffer)
+
+## Ported from AK/BufferedStream.h:257 AK::BufferedHelper::buffered_data_size.
+pub func buffered_helper_buffered_data_size[T](this: const BufferedHelper[T]*) -> usize:
+    return circular_buffer_used_space(&this.m_buffer)
+
+## Ported from AK/BufferedStream.h:262 AK::BufferedHelper::clear_buffer.
+pub func buffered_helper_clear_buffer[T](this: BufferedHelper[T]*):
+    circular_buffer_clear(&this.m_buffer)
+
+## Ported from AK/BufferedStream.h:267 AK::BufferedHelper::discard_bytes.
+pub func buffered_helper_discard_bytes[T](this: BufferedHelper[T]*, count: usize) -> !:
+    return try circular_buffer_discard(&this.m_buffer, count)
+
+## Ported from AK/BufferedStream.h:273 AK::BufferedHelper::populate_read_buffer.
+pub func buffered_helper_populate_read_buffer[T: IsSeekableStream](this: BufferedHelper[T]*) -> usize!:
+    if circular_buffer_empty_space(&this.m_buffer) == 0:
+        return 0
+
+    var nread: usize = 0
+
+    while true:
+        let result = circular_buffer_fill_from_stream(&this.m_buffer, buffered_helper_base_stream(this)) catch failure:
+            if failure.code != ak_errno_error:
+                error(failure.code, failure.message)
+            if failure_is_errno(failure, eintr):
+                continue
+            if failure_is_errno(failure, eagain()):
+                break
+            error(failure.code, failure.message)
+
+        nread += result
+        break
+
+    return nread

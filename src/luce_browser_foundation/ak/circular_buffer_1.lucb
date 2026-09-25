@@ -1,0 +1,273 @@
+#==============================================================================================
+#
+#   circular_buffer_1 - CircularBuffer: a ring buffer over a ByteBuffer with seekback
+#
+#   DESCRIPTION:
+#       Port of AK/CircularBuffer.cpp (lines 1-277) with the declarations of
+#       AK/CircularBuffer.h, in the .cpp's order. CircularBuffer is non-copyable in the
+#       donor; the struct here holds its ByteBuffer by value, so a copy shares the storage
+#       as a C++ move would leave it. AK::memmem over the two read spans is byte_buffer's
+#       memmem_spans.
+#
+#==============================================================================================
+
+## Ported from AK/CircularBuffer.cpp:14 AK::CircularBuffer::CircularBuffer.
+pub func circular_buffer_construct(this: CircularBuffer*, buffer: ByteBuffer):
+    this.m_buffer = buffer
+    this.m_reading_head = 0
+    this.m_used_space = 0
+    this.m_seekback_limit = 0
+
+## Ported from AK/CircularBuffer.cpp:19 AK::CircularBuffer::create_empty.
+pub func circular_buffer_create_empty(size: usize) -> CircularBuffer!:
+    let temporary_buffer = try byte_buffer_create_uninitialized(size)
+
+    var circular_buffer: CircularBuffer
+    circular_buffer_construct(&circular_buffer, temporary_buffer)
+
+    return circular_buffer
+
+## Ported from AK/CircularBuffer.cpp:28 AK::CircularBuffer::create_initialized.
+pub func circular_buffer_create_initialized(buffer: ByteBuffer) -> CircularBuffer!:
+    var circular_buffer: CircularBuffer
+    circular_buffer_construct(&circular_buffer, buffer)
+
+    circular_buffer.m_used_space = byte_buffer_size(&circular_buffer.m_buffer)
+
+    return circular_buffer
+
+## Ported from AK/CircularBuffer.cpp:37 AK::CircularBuffer::empty_space.
+pub func circular_buffer_empty_space(this: const CircularBuffer*) -> usize:
+    return circular_buffer_capacity(this) - this.m_used_space
+
+## Ported from AK/CircularBuffer.cpp:42 AK::CircularBuffer::used_space.
+pub func circular_buffer_used_space(this: const CircularBuffer*) -> usize:
+    return this.m_used_space
+
+## Ported from AK/CircularBuffer.cpp:47 AK::CircularBuffer::capacity.
+pub func circular_buffer_capacity(this: const CircularBuffer*) -> usize:
+    return byte_buffer_size(&this.m_buffer)
+
+## Ported from AK/CircularBuffer.cpp:52 AK::CircularBuffer::seekback_limit.
+pub func circular_buffer_seekback_limit(this: const CircularBuffer*) -> usize:
+    return this.m_seekback_limit
+
+## Ported from AK/CircularBuffer.cpp:57 AK::SearchableCircularBuffer::search_limit.
+pub func searchable_circular_buffer_search_limit(this: const SearchableCircularBuffer*) -> usize:
+    return this.circular_buffer.m_seekback_limit - this.circular_buffer.m_used_space
+
+## Ported from AK/CircularBuffer.cpp:62 AK::CircularBuffer::is_wrapping_around.
+pub func circular_buffer_is_wrapping_around(this: const CircularBuffer*) -> bool:
+    return circular_buffer_capacity(this) <= this.m_reading_head + this.m_used_space
+
+## Ported from AK/CircularBuffer.cpp:67 AK::CircularBuffer::offset_of.
+pub func circular_buffer_offset_of(this: const CircularBuffer*, needle: StringView, from_: usize? = none, until: usize? = none) -> usize?:
+    let read_from = from_ else 0
+    let read_until = until else this.m_used_space
+    assert(read_from <= read_until)
+
+    var spans: (const u8[])[2]
+    spans[0] = circular_buffer_next_read_span(this)
+    let original_span_0_size = spans[0].length
+
+    if read_from > 0:
+        spans[0] = spans[0][min(spans[0].length, read_from)..]
+
+    if spans[0].length + read_from > read_until:
+        spans[0] = spans[0][0..<(read_until - read_from)]
+    elif circular_buffer_is_wrapping_around(this):
+        let start = max(original_span_0_size, read_from) - original_span_0_size
+        let count = min(read_until, this.m_used_space) - original_span_0_size
+        spans[1] = byte_buffer_span_const(&this.m_buffer)[start..<(start + count)]
+
+    var needle_bytes = empty_span[u8]()
+    if let characters = needle.m_characters:
+        needle_bytes = u8[]((u8*)characters, needle.m_length)
+    var maybe_found = memmem_spans(spans, needle_bytes)
+    if let found = maybe_found:
+        maybe_found = found + read_from
+
+    return maybe_found
+
+## Ported from AK/CircularBuffer.cpp:92 AK::CircularBuffer::clear.
+pub func circular_buffer_clear(this: CircularBuffer*):
+    this.m_reading_head = 0
+    this.m_used_space = 0
+    this.m_seekback_limit = 0
+
+## Ported from AK/CircularBuffer.cpp:99 AK::CircularBuffer::next_write_span.
+pub func circular_buffer_next_write_span(this: CircularBuffer*) -> u8[]:
+    let capacity = circular_buffer_capacity(this)
+    let span = byte_buffer_span(&this.m_buffer)
+    if circular_buffer_is_wrapping_around(this):
+        let start = this.m_reading_head + this.m_used_space - capacity
+        return span[start..<(start + capacity - this.m_used_space)]
+    let start = this.m_reading_head + this.m_used_space
+    return span[start..<(start + capacity - (this.m_reading_head + this.m_used_space))]
+
+## Ported from AK/CircularBuffer.cpp:106 AK::CircularBuffer::next_read_span.
+pub func circular_buffer_next_read_span(this: const CircularBuffer*, offset: usize = 0) -> const u8[]:
+    var reading_head = this.m_reading_head
+    var used_space = this.m_used_space
+
+    if offset > 0:
+        if offset >= used_space:
+            return empty_span[u8]()
+
+        reading_head = (reading_head + offset) % circular_buffer_capacity(this)
+        used_space -= offset
+
+    let count = min(circular_buffer_capacity(this) - reading_head, used_space)
+    return byte_buffer_span_const(&this.m_buffer)[reading_head..<(reading_head + count)]
+
+## Ported from AK/CircularBuffer.cpp:122 AK::CircularBuffer::next_seekback_span.
+pub func circular_buffer_next_seekback_span(this: const CircularBuffer*, distance: usize) -> const u8[]:
+    let capacity = circular_buffer_capacity(this)
+    assert(this.m_seekback_limit <= capacity)
+    assert(distance <= this.m_seekback_limit)
+
+    # Note: We are adding the capacity once here to ensure that we can wrap around the negative space by using modulo.
+    let read_offset = (capacity + this.m_reading_head + this.m_used_space - distance) % capacity
+
+    let count = min(capacity - read_offset, distance)
+    return byte_buffer_span_const(&this.m_buffer)[read_offset..<(read_offset + count)]
+
+## Ported from AK/CircularBuffer.cpp:133 AK::SearchableCircularBuffer::next_search_span.
+pub func searchable_circular_buffer_next_search_span(this: const SearchableCircularBuffer*, distance: usize) -> const u8[]:
+    let base = &this.circular_buffer
+    let capacity = circular_buffer_capacity(base)
+    assert(searchable_circular_buffer_search_limit(this) <= capacity)
+    assert(distance <= searchable_circular_buffer_search_limit(this))
+
+    # Note: We are adding the capacity once here to ensure that we can wrap around the negative space by using modulo.
+    let read_offset = (capacity + base.m_reading_head - distance) % capacity
+
+    let count = min(capacity - read_offset, distance)
+    return byte_buffer_span_const(&base.m_buffer)[read_offset..<(read_offset + count)]
+
+## Ported from AK/CircularBuffer.cpp:144 AK::CircularBuffer::write.
+pub func circular_buffer_write(this: CircularBuffer*, bytes: const u8[]) -> usize:
+    var remaining = bytes.length
+
+    while remaining > 0:
+        let next_span = circular_buffer_next_write_span(this)
+        if next_span.length == 0:
+            break
+
+        let written_bytes = bytes_copy_trimmed_to(bytes[(bytes.length - remaining)..], next_span)
+
+        this.m_used_space += written_bytes
+
+        this.m_seekback_limit += written_bytes
+        if this.m_seekback_limit > circular_buffer_capacity(this):
+            this.m_seekback_limit = circular_buffer_capacity(this)
+
+        remaining -= written_bytes
+
+    return bytes.length - remaining
+
+## Ported from AK/CircularBuffer.cpp:167 AK::CircularBuffer::read.
+pub func circular_buffer_read(this: CircularBuffer*, bytes: u8[]) -> u8[]:
+    var remaining = bytes.length
+
+    while remaining > 0:
+        let next_span = circular_buffer_next_read_span(this)
+        if next_span.length == 0:
+            break
+
+        let written_bytes = bytes_copy_trimmed_to(next_span, bytes[(bytes.length - remaining)..])
+
+        this.m_used_space -= written_bytes
+        this.m_reading_head += written_bytes
+
+        if this.m_reading_head >= circular_buffer_capacity(this):
+            this.m_reading_head -= circular_buffer_capacity(this)
+
+        remaining -= written_bytes
+
+    return bytes[0..<(bytes.length - remaining)]
+
+## Ported from AK/CircularBuffer.cpp:190 AK::CircularBuffer::read_with_seekback.
+# Compared to `read()`, this starts reading from an offset that is `distance` bytes
+# before the current write pointer and allows for reading already-read data.
+pub func circular_buffer_read_with_seekback(this: const CircularBuffer*, bytes: u8[], distance: usize) -> u8[]!:
+    if distance > this.m_seekback_limit:
+        error(ak_error, "Tried a seekback read beyond the seekback limit")
+
+    var remaining = bytes.length
+    var current_distance = distance
+
+    while remaining > 0:
+        let next_span = circular_buffer_next_seekback_span(this, current_distance)
+        if next_span.length == 0:
+            break
+
+        let written_bytes = bytes_copy_trimmed_to(next_span, bytes[(bytes.length - remaining)..])
+
+        current_distance -= written_bytes
+        remaining -= written_bytes
+
+    return bytes[0..<(bytes.length - remaining)]
+
+## Ported from AK/CircularBuffer.cpp:211 AK::CircularBuffer::discard.
+pub func circular_buffer_discard(this: CircularBuffer*, discarding_size: usize) -> !:
+    if this.m_used_space < discarding_size:
+        error(ak_error, "Can not discard more data than what the buffer contains")
+    this.m_used_space -= discarding_size
+    this.m_reading_head = (this.m_reading_head + discarding_size) % circular_buffer_capacity(this)
+
+## Ported from AK/CircularBuffer.cpp:221 AK::CircularBuffer::fill_from_stream.
+pub func circular_buffer_fill_from_stream(this: CircularBuffer*, stream: Stream*) -> usize!:
+    let next_span = circular_buffer_next_write_span(this)
+    if next_span.length == 0:
+        return 0
+
+    let bytes = try stream_read_some(stream, next_span)
+    this.m_used_space += bytes.length
+
+    this.m_seekback_limit += bytes.length
+    if this.m_seekback_limit > circular_buffer_capacity(this):
+        this.m_seekback_limit = circular_buffer_capacity(this)
+
+    return bytes.length
+
+## Ported from AK/CircularBuffer.cpp:237 AK::CircularBuffer::flush_to_stream.
+pub func circular_buffer_flush_to_stream(this: CircularBuffer*, stream: Stream*) -> usize!:
+    let next_span = circular_buffer_next_read_span(this)
+    if next_span.length == 0:
+        return 0
+
+    let written_bytes = try stream_write_some(stream, next_span)
+
+    this.m_used_space -= written_bytes
+    this.m_reading_head += written_bytes
+
+    if this.m_reading_head >= circular_buffer_capacity(this):
+        this.m_reading_head -= circular_buffer_capacity(this)
+
+    return written_bytes
+
+## Ported from AK/CircularBuffer.cpp:254 AK::CircularBuffer::copy_from_seekback.
+pub func circular_buffer_copy_from_seekback(this: CircularBuffer*, distance: usize, length: usize) -> usize!:
+    if distance > this.m_seekback_limit:
+        error(ak_error, "Tried a seekback copy beyond the seekback limit")
+
+    var current_distance = distance
+    var remaining_length = length
+    while remaining_length > 0:
+        if circular_buffer_empty_space(this) == 0:
+            break
+
+        let next_span = circular_buffer_next_seekback_span(this, current_distance)
+        if next_span.length == 0:
+            break
+
+        let length_written = circular_buffer_write(this, next_span[0..<min(next_span.length, remaining_length)])
+        remaining_length -= length_written
+
+        # If we copied right from the end of the seekback area (i.e. our length is larger than the distance)
+        # and the last copy was one complete "chunk", we can now double the distance to copy twice as much data in one go.
+        if remaining_length > current_distance and length_written == current_distance:
+            current_distance *= 2
+
+    return length - remaining_length
