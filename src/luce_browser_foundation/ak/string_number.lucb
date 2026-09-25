@@ -1,0 +1,68 @@
+#==============================================================================================
+#
+#   string_number - create_string_from_number: decimal text of an integer
+#
+#   DESCRIPTION:
+#       Port of AK/StringNumber.h (lines 1-52). The C++ template takes the string type and any
+#       integral type; the port writes the digits once and instantiates it for String and
+#       Utf16String over i64 and u64, into which every narrower integer widens.
+#
+#==============================================================================================
+
+## Ported from AK/StringNumber.h:12 AK::create_string_from_number: the digits of the magnitude
+## `unsigned_value`, with a '-' when `is_negative`, written at the end of `buffer`.
+func create_string_from_number_digits(buffer: u8[], unsigned_value: u64, is_negative: bool) -> const u8[]:
+    var ptr = buffer.length
+    var remaining = unsigned_value
+
+    if remaining == 0:
+        ptr -= 1
+        buffer[ptr] = '0'
+    else:
+        while remaining != 0:
+            ptr -= 1
+            buffer[ptr] = (u8)((u64)'0' + (remaining % 10))
+            remaining //= 10
+
+    if is_negative:
+        ptr -= 1
+        buffer[ptr] = '-'
+
+    return buffer[ptr..]
+
+## The magnitude and sign of a signed value (`static_cast<UnsignedT>(0) - value` handles the
+## minimum correctly).
+func create_string_from_number_split(value: i64) -> (u64, bool):
+    if value < 0:
+        return (0 -% (u64)value, true)
+    return ((u64)value, false)
+
+## Ported from AK/StringNumber.h:12 AK::create_string_from_number<String, T> for signed T.
+pub func create_string_from_number_string_i64(value: i64) -> String:
+    # Maximum number of base-10 digits for T + sign
+    var buffer: u8[26]
+    let (unsigned_value, is_negative) = create_string_from_number_split(value)
+    return string_from_ascii_without_validation(create_string_from_number_digits(buffer, unsigned_value, is_negative))
+
+## Ported from AK/StringNumber.h:12 AK::create_string_from_number<String, T> for unsigned T.
+pub func create_string_from_number_string_u64(value: u64) -> String:
+    var buffer: u8[26]
+    return string_from_ascii_without_validation(create_string_from_number_digits(buffer, value, false))
+
+## Ported from AK/StringNumber.h:12 AK::create_string_from_number<Utf16String, T> for signed T.
+pub func create_string_from_number_utf16_string_i64(value: i64) -> Utf16String:
+    var buffer: u8[26]
+    let (unsigned_value, is_negative) = create_string_from_number_split(value)
+    return utf16_string_from_ascii_without_validation(create_string_from_number_digits(buffer, unsigned_value, is_negative))
+
+## Ported from AK/StringNumber.h:12 AK::create_string_from_number<Utf16String, T> for unsigned T.
+pub func create_string_from_number_utf16_string_u64(value: u64) -> Utf16String:
+    var buffer: u8[26]
+    return utf16_string_from_ascii_without_validation(create_string_from_number_digits(buffer, value, false))
+
+## The VariadicFormatParams of `formatted("{}", value)` for one double: `storage` holds the one
+## type-erased parameter.
+pub func type_erased_format_params_for_f64(storage: TypeErasedParameter*, value: f64) -> TypeErasedFormatParams:
+    storage.value.as_double = value
+    storage.type_ = TypeErasedParameterType.double
+    return TypeErasedFormatParams(m_size = 1, m_next_index = 0, m_parameters = storage)

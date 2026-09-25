@@ -16,9 +16,9 @@
 pub struct FlyStringTableHashTraits: Traits[const StringData*?]:
     pub var empty_: u8
 
-    func hash_of(key: const (const StringData*?)*) -> u32: trap("unported: AK::FlyStringTableHashTraits::hash")
+    func hash_of(key: const (const StringData*?)*) -> u32: return fly_string_table_hash_traits_hash(*key)
 
-    func equals(a: const (const StringData*?)*, b: const (const StringData*?)*) -> bool: trap("unported: AK::FlyStringTableHashTraits::equals")
+    func equals(a: const (const StringData*?)*, b: const (const StringData*?)*) -> bool: return fly_string_table_hash_traits_equals(*a, *b)
 
 # mark: FlyString ===============================================================================
 
@@ -32,6 +32,6 @@ pub struct FlyString:
 pub struct AsciiCaseInsensitiveFlyStringTraits: Traits[FlyString]:
     pub var empty_: u8
 
-    func hash_of(key: const FlyString*) -> u32: trap("unported: AK::ASCIICaseInsensitiveFlyStringTraits::hash")
+    func hash_of(key: const FlyString*) -> u32: return ascii_case_insensitive_fly_string_traits_hash(key)
 
-    func equals(a: const FlyString*, b: const FlyString*) -> bool: trap("unported: AK::ASCIICaseInsensitiveFlyStringTraits::equals")
+    func equals(a: const FlyString*, b: const FlyString*) -> bool: return ascii_case_insensitive_fly_string_traits_equals(a, b)

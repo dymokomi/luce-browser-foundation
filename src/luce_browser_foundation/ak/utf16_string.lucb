@@ -1,0 +1,359 @@
+#==============================================================================================
+#
+#   utf16_string - Utf16String: a strongly owned sequence of code points encoded as UTF-16
+#
+#   DESCRIPTION:
+#       Port of AK/Utf16String.h (lines 1-375) and AK/Utf16String.cpp (lines 1-203), in the
+#       header's order with the .cpp bodies in place of their declarations.
+#
+#       As a memory optimization, a UTF-16 string that is entirely ASCII is stored as 8-bit
+#       bytes: inline for up to seven of them, otherwise in a Utf16StringData. `==` on
+#       Utf16String does not compile (its base holds a union): compare with the utf16_string_base
+#       functions.
+#
+#==============================================================================================
+
+# mark: Construction ============================================================================
+
+## Ported from AK/Utf16String.h:34 AK::Utf16String::Utf16String(Utf16StringBase&&).
+pub func utf16_string_construct_utf16_string_base(this: Utf16String*, base_: Utf16StringBase):
+    this.utf16_string_base = base_
+
+## `Utf16String {}`: the empty string.
+pub func utf16_string_new() -> Utf16String:
+    return Utf16String(utf16_string_base = utf16_string_base_new())
+
+## A Utf16String over a Utf16StringData (the private NonnullRefPtr constructor).
+func utf16_string_from_data(data: const Utf16StringData*) -> Utf16String:
+    var string = Utf16String(utf16_string_base = Utf16StringBase())
+    utf16_string_base_construct_utf16_string_data(&string.utf16_string_base, data)
+    return string
+
+## A Utf16String whose short ASCII storage holds `bytes` (the C++ writes
+## `string.m_value.short_ascii_string` and copies into its storage).
+func utf16_string_from_short_ascii(bytes: const u8[]) -> Utf16String:
+    var short_string = short_string_create_with_byte_count(bytes.length)
+    copy_bytes(short_string.storage[..<bytes.length], bytes)
+    var string = Utf16String(utf16_string_base = Utf16StringBase())
+    utf16_string_base_construct_short_string(&string.utf16_string_base, short_string)
+    return string
+
+## Ported from AK/Utf16String.h:39 AK::Utf16String::from_utf8(StringView): `utf8_string` must be
+## valid UTF-8.
+pub func utf16_string_from_utf8_string_view(utf8_string: StringView) -> Utf16String:
+    let utf8 = Utf8View(m_string = utf8_string)
+    assert(utf8_view_validate_allow_lonely_surrogates(&utf8))
+    return utf16_string_from_utf8_without_validation(utf8_string)
+
+## Ported from AK/Utf16String.h:45 AK::Utf16String::from_utf8(String const&).
+pub func utf16_string_from_utf8_string(utf8_string: const String*) -> Utf16String:
+    return utf16_string_from_utf8_without_validation(string_bytes_as_string_view(utf8_string))
+
+## Ported from AK/Utf16String.h:50 AK::Utf16String::from_utf8(FlyString const&).
+pub func utf16_string_from_utf8_fly_string(utf8_string: const FlyString*) -> Utf16String:
+    return utf16_string_from_utf8_without_validation(fly_string_bytes_as_string_view(utf8_string))
+
+## `u"text"_utf16` from a `str`: a Utf16String of a literal or any other valid UTF-8 text.
+pub func utf16_string_from_str(text: str) -> Utf16String:
+    return utf16_string_from_utf8_without_validation(sv(text))
+
+## Ported from AK/Utf16String.cpp:17 AK::Utf16String::from_utf8_with_replacement_character.
+pub func utf16_string_from_utf8_with_replacement_character(utf8_string: StringView, with_bom_handling: Utf16StringWithBomHandling = Utf16StringWithBomHandling.yes) -> Utf16String:
+    var input = utf8_string
+    let bytes = string_view_bytes(&utf8_string)
+    if with_bom_handling == Utf16StringWithBomHandling.yes and bytes.length >= 3 and bytes[0] == 0xef and bytes[1] == 0xbb and bytes[2] == 0xbf:
+        input = string_view_substring_view(&utf8_string, 3)
+
+    let utf8_view = Utf8View(m_string = input)
+
+    if utf8_view_validate_allow_lonely_surrogates(&utf8_view, AllowLonelySurrogates.no):
+        return utf16_string_from_utf8_without_validation(input)
+
+    var builder = string_builder_new_mode(StringBuilderMode.utf16)
+
+    var it = utf8_view_begin(&utf8_view)
+    while not utf8_code_point_iterator_done(&it):
+        let code_point = utf8_code_point_iterator_deref(&it)
+        if is_unicode_surrogate(code_point):
+            string_builder_append_code_point(&builder, unicode_utils_replacement_code_point)
+        else:
+            string_builder_append_code_point(&builder, code_point)
+        discard(utf8_code_point_iterator_inc(&it))
+
+    return string_builder_to_utf16_string(&builder)
+
+## Ported from AK/Utf16String.h:63 AK::Utf16String::try_from_utf8: fails when `utf8_string` is
+## not valid UTF-8.
+pub func utf16_string_try_from_utf8(utf8_string: StringView) -> Utf16String!:
+    let utf8 = Utf8View(m_string = utf8_string)
+    if not utf8_view_validate_allow_lonely_surrogates(&utf8):
+        error(ak_error, "Input was not valid UTF-8")
+    return utf16_string_from_utf8_without_validation(utf8_string)
+
+## Ported from AK/Utf16String.cpp:57 AK::Utf16String::from_utf8_without_validation.
+pub func utf16_string_from_utf8_without_validation(utf8_string: StringView) -> Utf16String:
+    if string_view_length(&utf8_string) <= max_short_string_byte_count and string_view_is_ascii(&utf8_string):
+        return utf16_string_from_short_ascii(string_view_bytes(&utf8_string))
+
+    return utf16_string_from_data(utf16_string_data_from_utf8(utf8_string, Utf16StringDataAllowAsciiStorage.yes))
+
+## Ported from AK/Utf16String.cpp:43 AK::Utf16String::from_ascii_without_validation.
+pub func utf16_string_from_ascii_without_validation(ascii_string: const u8[]) -> Utf16String:
+    if ascii_string.length <= max_short_string_byte_count:
+        return utf16_string_from_short_ascii(ascii_string)
+
+    return utf16_string_from_data(utf16_string_data_from_ascii(ascii_string))
+
+## Ported from AK/Utf16String.cpp:71 AK::Utf16String::from_utf16.
+pub func utf16_string_from_utf16(utf16_string: Utf16View) -> Utf16String:
+    if utf16_view_length_in_code_units(&utf16_string) <= max_short_string_byte_count and utf16_view_is_ascii(&utf16_string):
+        if utf16_view_has_ascii_storage(&utf16_string):
+            return utf16_string_from_short_ascii(utf16_view_bytes(&utf16_string))
+
+        var ascii: u8[8]
+        let result = simdutf_convert_utf16_to_utf8(utf16_view_utf16_span(&utf16_string), ascii)
+        assert(result == utf16_view_length_in_code_units(&utf16_string))
+        return utf16_string_from_short_ascii(ascii[..<result])
+
+    return utf16_string_from_data(utf16_string_data_from_utf16(utf16_string))
+
+## Ported from AK/Utf16String.cpp:91 AK::Utf16String::from_utf32.
+pub func utf16_string_from_utf32(utf32_string: Utf32View) -> Utf16String:
+    if utf32_view_length(&utf32_string) <= max_short_string_byte_count and utf32_view_is_ascii(&utf32_string):
+        var ascii: u8[8]
+        let result = simdutf_convert_utf32_to_utf8(utf32_view_span(&utf32_string), ascii)
+        assert(result == utf32_view_length(&utf32_string))
+        return utf16_string_from_short_ascii(ascii[..<result])
+
+    return utf16_string_from_data(utf16_string_data_from_utf32(utf32_string))
+
+## Ported from AK/Utf16String.h:92 AK::Utf16String::from_ascii_character.
+pub func utf16_string_from_ascii_character(character: u8) -> Utf16String:
+    var bytes: u8[1] = [character]
+    return utf16_string_from_short_ascii(bytes)
+
+## Ported from AK/Utf16String.h:99 AK::Utf16String::from_ascii_short_string_without_validation(char const*, size_t).
+pub func utf16_string_from_ascii_short_string_without_validation_u8(data: const u8[]) -> Utf16String:
+    assert(data.length <= max_short_string_byte_count)
+    return utf16_string_from_short_ascii(data)
+
+## Ported from AK/Utf16String.h:108 AK::Utf16String::from_ascii_short_string_without_validation(char16_t const*, size_t).
+pub func utf16_string_from_ascii_short_string_without_validation_u16(data: const u16[]) -> Utf16String:
+    assert(data.length <= max_short_string_byte_count)
+    var bytes: u8[8]
+    for i in 0..<data.length:
+        bytes[i] = (u8)data[i]
+    return utf16_string_from_short_ascii(bytes[..<data.length])
+
+## The lambda of Utf16String::from_code_point and repeated: collects the code units.
+struct Utf16StringCodeUnits: Utf16CodeUnitCallback:
+    var code_units: u16[2]
+    var length_in_code_units: usize
+
+    mutating func call(code_unit: u16):
+        self.code_units[self.length_in_code_units] = code_unit
+        self.length_in_code_units += 1
+
+## Ported from AK/Utf16String.h:117 AK::Utf16String::from_code_point.
+pub func utf16_string_from_code_point(code_point: u32) -> Utf16String:
+    var code_units = Utf16StringCodeUnits()
+    discard(unicode_utils_code_point_to_utf16(code_point, &code_units))
+
+    return utf16_string_from_utf16(utf16_view_from_utf16(code_units.code_units[..<code_units.length_in_code_units]))
+
+## Ported from AK/Utf16String.h:141 AK::Utf16String::number(T) for signed integral T.
+pub func utf16_string_number_i64(value: i64) -> Utf16String:
+    return create_string_from_number_utf16_string_i64(value)
+
+## Ported from AK/Utf16String.h:141 AK::Utf16String::number(T) for unsigned integral T.
+pub func utf16_string_number_u64(value: u64) -> Utf16String:
+    return create_string_from_number_utf16_string_u64(value)
+
+## Ported from AK/Utf16String.h:150 AK::Utf16String::join over StringViews with the default "{}"
+## format.
+pub func utf16_string_join_string_view(separator: StringView, collection: const StringView[]) -> Utf16String:
+    var builder = string_builder_new_mode(StringBuilderMode.utf16)
+    string_builder_join_string_view(&builder, separator, collection)
+
+    return string_builder_to_utf16_string(&builder)
+
+## Ported from AK/Utf16String.cpp:163 AK::Utf16String::repeated.
+pub func utf16_string_repeated(code_point: u32, count: usize) -> Utf16String:
+    if count <= max_short_string_byte_count and is_ascii(code_point):
+        var bytes: u8[8]
+        for i in 0..<count:
+            bytes[i] = (u8)code_point
+        return utf16_string_from_short_ascii(bytes[..<count])
+
+    var code_units = Utf16StringCodeUnits()
+    discard(unicode_utils_code_point_to_utf16(code_point, &code_units))
+
+    var builder = string_builder_new_mode(StringBuilderMode.utf16)
+    string_builder_append_repeated_utf16_view(&builder, utf16_view_from_utf16(code_units.code_units[..<code_units.length_in_code_units]), count)
+    return string_builder_to_utf16_string(&builder)
+
+# mark: Conversions =============================================================================
+
+## Ported from AK/Utf16String.cpp:186 AK::Utf16String::to_well_formed: lonely surrogates
+## replaced by U+FFFD.
+pub func utf16_string_to_well_formed(this: const Utf16String*) -> Utf16String:
+    let view = utf16_string_base_utf16_view(&this.utf16_string_base)
+    if utf16_view_validate(&view):
+        return *this
+    return utf16_string_from_data(utf16_string_data_to_well_formed(view))
+
+## Ported from AK/Utf16String.cpp:193 AK::Utf16String::to_well_formed_utf8.
+pub func utf16_string_to_well_formed_utf8(this: const Utf16String*) -> String:
+    let view = utf16_string_base_utf16_view(&this.utf16_string_base)
+    if utf16_view_validate(&view):
+        return utf16_string_base_to_utf8(&this.utf16_string_base, AllowLonelySurrogates.no)
+    let well_formed = utf16_string_to_well_formed(this)
+    return utf16_string_base_to_utf8(&well_formed.utf16_string_base, AllowLonelySurrogates.no)
+
+## Ported from AK/Utf16String.h:175 AK::Utf16String::to_ascii_lowercase.
+pub func utf16_string_to_ascii_lowercase(this: const Utf16String*) -> Utf16String:
+    let view = utf16_string_base_utf16_view(&this.utf16_string_base)
+
+    var has_upper = false
+    if utf16_view_has_ascii_storage(&view):
+        for byte in utf16_view_ascii_span(&view):
+            if is_ascii_upper_alpha(byte):
+                has_upper = true
+                break
+    else:
+        for code_unit in utf16_view_utf16_span(&view):
+            if is_ascii_upper_alpha(code_unit):
+                has_upper = true
+                break
+    if not has_upper:
+        return *this
+
+    return utf16_view_to_ascii_lowercase(&view)
+
+## Ported from AK/Utf16String.h:190 AK::Utf16String::to_ascii_uppercase.
+pub func utf16_string_to_ascii_uppercase(this: const Utf16String*) -> Utf16String:
+    let view = utf16_string_base_utf16_view(&this.utf16_string_base)
+
+    var has_lower = false
+    if utf16_view_has_ascii_storage(&view):
+        for byte in utf16_view_ascii_span(&view):
+            if is_ascii_lower_alpha(byte):
+                has_lower = true
+                break
+    else:
+        for code_unit in utf16_view_utf16_span(&view):
+            if is_ascii_lower_alpha(code_unit):
+                has_lower = true
+                break
+    if not has_lower:
+        return *this
+
+    return utf16_view_to_ascii_uppercase(&view)
+
+## Ported from AK/Utf16String.h:205 AK::Utf16String::to_ascii_titlecase.
+pub func utf16_string_to_ascii_titlecase(this: const Utf16String*) -> Utf16String:
+    let view = utf16_string_base_utf16_view(&this.utf16_string_base)
+    return utf16_view_to_ascii_titlecase(&view)
+
+## Ported from AK/Utf16String.h:210 AK::Utf16String::replace(char16_t, ...).
+pub func utf16_string_replace_u16(this: const Utf16String*, needle: u16, replacement: Utf16View, replace_mode: ReplaceMode) -> Utf16String:
+    let view = utf16_string_base_utf16_view(&this.utf16_string_base)
+    if utf16_view_is_empty(&view) or not utf16_view_contains_u16(&view, needle):
+        return *this
+
+    return utf16_view_replace_u16(&view, needle, replacement, replace_mode)
+
+## Ported from AK/Utf16String.h:219 AK::Utf16String::replace(Utf16View const&, ...).
+pub func utf16_string_replace_utf16_view(this: const Utf16String*, needle: Utf16View, replacement: Utf16View, replace_mode: ReplaceMode) -> Utf16String:
+    let view = utf16_string_base_utf16_view(&this.utf16_string_base)
+    if utf16_view_is_empty(&view) or not utf16_view_contains_utf16_view(&view, needle):
+        return *this
+
+    return utf16_view_replace_utf16_view(&view, needle, replacement, replace_mode)
+
+## Ported from AK/Utf16String.h:228 AK::Utf16String::trim.
+pub func utf16_string_trim(this: const Utf16String*, code_units: Utf16View, mode: TrimMode = TrimMode.both) -> Utf16String:
+    if utf16_string_base_is_empty(&this.utf16_string_base):
+        return utf16_string_new()
+
+    var needs_trimming = false
+
+    if mode == TrimMode.left or mode == TrimMode.both:
+        needs_trimming = needs_trimming or utf16_view_contains_u16(&code_units, utf16_string_base_code_unit_at(&this.utf16_string_base, 0))
+    if mode == TrimMode.right or mode == TrimMode.both:
+        needs_trimming = needs_trimming or utf16_view_contains_u16(&code_units, utf16_string_base_code_unit_at(&this.utf16_string_base, utf16_string_base_length_in_code_units(&this.utf16_string_base) - 1))
+
+    if not needs_trimming:
+        return *this
+
+    let view = utf16_string_base_utf16_view(&this.utf16_string_base)
+    return utf16_string_from_utf16(utf16_view_trim(&view, code_units, mode))
+
+## Ported from AK/Utf16String.h:246 AK::Utf16String::trim_ascii_whitespace.
+pub func utf16_string_trim_ascii_whitespace(this: const Utf16String*, mode: TrimMode = TrimMode.both) -> Utf16String:
+    return utf16_string_trim(this, utf16_sv(" \n\t\u{b}\u{c}\r"), mode)
+
+## Ported from AK/Utf16String.h:251 AK::Utf16String::escape_html_entities.
+pub func utf16_string_escape_html_entities(this: const Utf16String*) -> Utf16String:
+    let view = utf16_string_base_utf16_view(&this.utf16_string_base)
+    return utf16_view_escape_html_entities(&view)
+
+## Ported from AK/Utf16String.cpp:110 AK::Utf16String::from_string_builder.
+pub func utf16_string_from_string_builder(builder: StringBuilder*) -> Utf16String:
+    let view = string_builder_utf16_string_view(builder)
+
+    if utf16_view_length_in_code_units(&view) <= max_short_string_byte_count and utf16_view_has_ascii_storage(&view):
+        return utf16_string_from_short_ascii(utf16_view_bytes(&view))
+
+    return utf16_string_from_data(utf16_string_data_from_string_builder(builder))
+
+## Ported from AK/Utf16String.cpp:127 AK::Utf16String::from_ipc_stream.
+pub func utf16_string_from_ipc_stream(stream: Stream*, length_in_code_units: usize, is_ascii_: bool) -> Utf16String!:
+    if is_ascii_ and length_in_code_units <= max_short_string_byte_count:
+        var bytes: u8[8]
+        try stream_read_until_filled(stream, bytes[..<length_in_code_units])
+
+        let view = string_view_from_bytes(bytes[..<length_in_code_units])
+        if not string_view_is_ascii(&view):
+            error(ak_error, "Stream contains invalid ASCII data")
+
+        return utf16_string_from_short_ascii(bytes[..<length_in_code_units])
+
+    return utf16_string_from_data(try utf16_string_data_from_ipc_stream(stream, length_in_code_units, is_ascii_))
+
+## Ported from AK/Utf16String.h:257 AK::Utf16String::Utf16String(Badge<Optional<Utf16String>>, nullptr_t):
+## the invalid (null) string, the sentinel of Optional<Utf16String>.
+pub func utf16_string_construct_utf16_string(this: Utf16String*):
+    utf16_string_base_utf16_string_base(&this.utf16_string_base)
+
+## Ported from AK/Utf16String.h:262 AK::Utf16String::is_invalid.
+pub func utf16_string_is_invalid(this: const Utf16String*) -> bool:
+    return utf16_string_base_raw(&this.utf16_string_base) == 0
+
+## Ported from AK/Utf16String.h:265 AK::Utf16String::Utf16String(NonnullRefPtr<Utf16StringData const>).
+pub func utf16_string_construct_utf16_string_data(this: Utf16String*, value: const Utf16StringData*):
+    utf16_string_base_construct_utf16_string_data(&this.utf16_string_base, value)
+
+# mark: Literals ================================================================================
+
+## Ported from AK/Utf16String.h:353 operator""_utf16(char const*, size_t): short ASCII literals
+## become short strings; anything else must be valid UTF-8.
+pub func literalutf16_u8(string: const u8*?, length: usize) -> Utf16String:
+    let view = literalsv_u8(string, length)
+    # OPTIMIZATION: Short ASCII strings become compile-time constants with no runtime validation
+    # or heap allocation.
+    if length <= max_short_string_byte_count and string_view_is_ascii(&view):
+        return utf16_string_from_ascii_short_string_without_validation_u8(string_view_bytes(&view))
+
+    let utf8 = Utf8View(m_string = view)
+    assert(utf8_view_validate_allow_lonely_surrogates(&utf8))
+    return utf16_string_from_utf8_without_validation(view)
+
+## Ported from AK/Utf16String.h:367 operator""_utf16(char16_t const*, size_t).
+pub func literalutf16_u16(string: const u16*?, length: usize) -> Utf16String:
+    let view = literalsv_u16(string, length)
+    # OPTIMIZATION: Short ASCII strings become compile-time constants with no runtime work.
+    if length <= max_short_string_byte_count and utf16_view_is_ascii(&view):
+        return utf16_string_from_ascii_short_string_without_validation_u16(utf16_view_utf16_span(&view))
+
+    return utf16_string_from_utf16(view)

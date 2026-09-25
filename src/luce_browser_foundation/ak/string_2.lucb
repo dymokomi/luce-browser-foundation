@@ -1,0 +1,368 @@
+#==============================================================================================
+#
+#   string_2 - String: queries, case mapping, substrings, splitting and comparison
+#
+#   DESCRIPTION:
+#       Port of AK/String.h (lines 1-289) and AK/String.cpp (lines 188-587): String's member
+#       functions, in the header's order.
+#
+#==============================================================================================
+
+# mark: Case ====================================================================================
+
+## The lambda of String::to_ascii_lowercase and to_ascii_uppercase.
+struct StringToAsciiCaseCopy: BytesCallback:
+    var source: const u8[]
+    var to_uppercase: bool
+
+    mutating func call(buffer: u8[]) -> !:
+        for i in 0..<self.source.length:
+            let byte = (u32)self.source[i]
+            buffer[i] = (u8)(to_ascii_uppercase(byte) if self.to_uppercase else to_ascii_lowercase(byte))
+
+## Ported from AK/String.cpp:409 AK::String::to_ascii_lowercase.
+pub func string_to_ascii_lowercase(this: const String*) -> String:
+    let bytes = string_base_bytes(&this.string_base)
+    var has_upper = false
+    for byte in bytes:
+        if is_ascii_upper_alpha(byte):
+            has_upper = true
+            break
+    if not has_upper:
+        return *this
+
+    var result = string_new()
+
+    var copy = StringToAsciiCaseCopy(source = bytes, to_uppercase = false)
+    string_base_replace_with_new_string_usize(&result.string_base, string_base_byte_count(&this.string_base), &copy) else trap("MUST: to_ascii_lowercase")
+
+    return result
+
+## Ported from AK/String.cpp:425 AK::String::to_ascii_uppercase.
+pub func string_to_ascii_uppercase(this: const String*) -> String:
+    let bytes = string_base_bytes(&this.string_base)
+    var has_lower = false
+    for byte in bytes:
+        if is_ascii_lower_alpha(byte):
+            has_lower = true
+            break
+    if not has_lower:
+        return *this
+
+    var result = string_new()
+
+    var copy = StringToAsciiCaseCopy(source = bytes, to_uppercase = true)
+    string_base_replace_with_new_string_usize(&result.string_base, string_base_byte_count(&this.string_base), &copy) else trap("MUST: to_ascii_uppercase")
+
+    return result
+
+## Ported from AK/String.h:118 AK::String::is_ascii.
+pub func string_is_ascii(this: const String*) -> bool:
+    let view = string_bytes_as_string_view(this)
+    return string_view_is_ascii(&view)
+
+## Ported from AK/String.cpp:441 AK::String::equals_ignoring_ascii_case(String const&).
+pub func string_equals_ignoring_ascii_case_string(this: const String*, other: const String*) -> bool:
+    return string_utils_equals_ignoring_ascii_case(string_bytes_as_string_view(this), string_bytes_as_string_view(other))
+
+## Ported from AK/String.cpp:446 AK::String::equals_ignoring_ascii_case(StringView).
+pub func string_equals_ignoring_ascii_case_string_view(this: const String*, other: StringView) -> bool:
+    return string_utils_equals_ignoring_ascii_case(string_bytes_as_string_view(this), other)
+
+# mark: Prefixes and substrings =================================================================
+
+## Ported from AK/String.cpp:359 AK::String::starts_with(u32).
+pub func string_starts_with(this: const String*, code_point: u32) -> bool:
+    if string_is_empty(this):
+        return false
+
+    let code_points = string_code_points(this)
+    let it = utf8_view_begin(&code_points)
+    return utf8_code_point_iterator_deref(&it) == code_point
+
+## Ported from AK/String.cpp:367 AK::String::starts_with_bytes.
+pub func string_starts_with_bytes(this: const String*, bytes: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    let view = string_bytes_as_string_view(this)
+    return string_view_starts_with_string_view(&view, bytes, case_sensitivity)
+
+## Ported from AK/String.cpp:372 AK::String::ends_with(u32).
+pub func string_ends_with(this: const String*, code_point: u32) -> bool:
+    assert(is_unicode(code_point))
+
+    if string_is_empty(this):
+        return false
+
+    var code_point_as_utf8 = CodePointAsUtf8()
+    let code_point_byte_length = (usize)unicode_utils_code_point_to_utf8(code_point, &code_point_as_utf8)
+
+    return string_ends_with_bytes(this, string_view_from_bytes(code_point_as_utf8.bytes[..<code_point_byte_length]))
+
+## Ported from AK/String.cpp:389 AK::String::ends_with_bytes.
+pub func string_ends_with_bytes(this: const String*, bytes: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    let view = string_bytes_as_string_view(this)
+    return string_view_ends_with_string_view(&view, bytes, case_sensitivity)
+
+## Ported from AK/String.cpp:264 AK::String::substring_from_byte_offset(size_t, size_t): a deep
+## copy of the window.
+pub func string_substring_from_byte_offset_usize(this: const String*, start: usize, byte_count: usize) -> String!:
+    if byte_count == 0:
+        return string_new()
+    let view = string_bytes_as_string_view(this)
+    return try string_from_utf8(string_view_substring_view_usize(&view, start, byte_count))
+
+## Ported from AK/String.cpp:271 AK::String::substring_from_byte_offset(size_t).
+pub func string_substring_from_byte_offset(this: const String*, start: usize) -> String!:
+    let view = string_bytes_as_string_view(this)
+    assert(start <= string_view_length(&view))
+    return try string_substring_from_byte_offset_usize(this, start, string_view_length(&view) - start)
+
+## Ported from AK/String.cpp:277 AK::String::substring_from_byte_offset_with_shared_superstring:
+## a substring that references the origin superstring instead of copying the data.
+pub func string_substring_from_byte_offset_with_shared_superstring_usize(this: const String*, start: usize, byte_count: usize) -> String!:
+    return String(string_base = try string_base_substring_from_byte_offset_with_shared_superstring(&this.string_base, start, byte_count))
+
+## Ported from AK/String.cpp:282 AK::String::substring_from_byte_offset_with_shared_superstring(size_t).
+pub func string_substring_from_byte_offset_with_shared_superstring(this: const String*, start: usize) -> String!:
+    let view = string_bytes_as_string_view(this)
+    assert(start <= string_view_length(&view))
+    return try string_substring_from_byte_offset_with_shared_superstring_usize(this, start, string_view_length(&view) - start)
+
+## Ported from AK/String.cpp:298 AK::String::code_points: an iterable view over the code points.
+pub func string_code_points(this: const String*) -> Utf8View:
+    return Utf8View(m_string = string_bytes_as_string_view(this))
+
+## Ported from AK/String.h:145 AK::String::is_empty: whether the String is zero-length.
+pub func string_is_empty(this: const String*) -> bool:
+    return string_base_byte_count(&this.string_base) == 0
+
+## Ported from AK/String.h:148 AK::String::bytes_as_string_view: a view of the full length of the
+## string. Iterating it goes byte-at-a-time, not code-point-at-a-time.
+pub func string_bytes_as_string_view(this: const String*) -> StringView:
+    return string_view_from_bytes(string_base_bytes(&this.string_base))
+
+## Ported from AK/String.h:151 AK::String::count.
+pub func string_count(this: const String*, needle: StringView) -> usize:
+    return string_utils_count_string_view(string_bytes_as_string_view(this), needle)
+
+## Ported from AK/String.cpp:308 AK::String::replace.
+pub func string_replace(this: const String*, needle: StringView, replacement: StringView, replace_mode: ReplaceMode) -> String!:
+    return try string_utils_replace_string(this, needle, replacement, replace_mode)
+
+## Ported from AK/String.cpp:313 AK::String::reverse: the code points in reverse order.
+pub func string_reverse(this: const String*) -> String!:
+    # FIXME: This handles multi-byte code points, but not e.g. grapheme clusters.
+    # FIXME: We could avoid allocating a temporary vector if Utf8View supports reverse iteration.
+    let view = string_code_points(this)
+    let code_point_length = utf8_view_length(&view)
+
+    let code_points = new u32[code_point_length] else error(ak_errno_error, "ENOMEM")
+
+    var count: usize = 0
+    var it = utf8_view_begin(&view)
+    while not utf8_code_point_iterator_done(&it):
+        code_points[count] = utf8_code_point_iterator_deref(&it)
+        count += 1
+        utf8_code_point_iterator_inc(&it)
+
+    var builder = string_builder_new_usize(code_point_length * sizeof(u32))
+    while count > 0:
+        count -= 1
+        try string_builder_try_append_code_point(&builder, code_points[count])
+
+    return try string_builder_to_string(&builder)
+
+## Ported from AK/String.cpp:332 AK::String::trim(Utf8View const&, TrimMode).
+pub func string_trim_utf8_view(this: const String*, code_points_to_trim: Utf8View, mode: TrimMode = TrimMode.both) -> String!:
+    let code_points = string_code_points(this)
+    let trimmed = utf8_view_trim(&code_points, code_points_to_trim, mode)
+    return try string_from_utf8(utf8_view_as_string(&trimmed))
+
+## Ported from AK/String.cpp:338 AK::String::trim(StringView, TrimMode).
+pub func string_trim_string_view(this: const String*, code_points_to_trim: StringView, mode: TrimMode = TrimMode.both) -> String!:
+    return try string_trim_utf8_view(this, Utf8View(m_string = code_points_to_trim), mode)
+
+## Ported from AK/String.cpp:343 AK::String::trim_ascii_whitespace.
+pub func string_trim_ascii_whitespace(this: const String*, mode: TrimMode = TrimMode.both) -> String!:
+    return try string_trim_string_view(this, sv(" \n\t\u{b}\u{c}\r"), mode)
+
+# mark: Splitting and searching =================================================================
+
+## Ported from AK/String.cpp:200 AK::String::split_limit: splits at `separator` into at most
+## `limit` parts (0 for no limit); the parts share this string's data.
+pub func string_split_limit(this: const String*, separator: u32, limit: usize, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[String]!:
+    var result: Vector[String]
+
+    if string_is_empty(this):
+        return result
+
+    let keep_empty = has_flag(split_behavior, SplitBehavior.keep_empty)
+
+    let code_points = string_code_points(this)
+    var substring_start: usize = 0
+    var it = utf8_view_begin(&code_points)
+    while not utf8_code_point_iterator_done(&it) and (vector_size(&result) + 1) != limit:
+        let code_point = utf8_code_point_iterator_deref(&it)
+        if code_point == separator:
+            let substring_length = utf8_view_iterator_offset(&code_points, it) - substring_start
+            if substring_length != 0 or keep_empty:
+                try vector_try_append_t(&result, try string_substring_from_byte_offset_with_shared_superstring_usize(this, substring_start, substring_length))
+            substring_start = utf8_view_iterator_offset(&code_points, it) + utf8_code_point_iterator_underlying_code_point_length_in_bytes(&it)
+        utf8_code_point_iterator_inc(&it)
+    let tail_length = utf8_view_byte_length(&code_points) - substring_start
+    if tail_length != 0 or keep_empty:
+        try vector_try_append_t(&result, try string_substring_from_byte_offset_with_shared_superstring_usize(this, substring_start, tail_length))
+    return result
+
+## Ported from AK/String.cpp:195 AK::String::split.
+pub func string_split(this: const String*, separator: u32, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[String]!:
+    return try string_split_limit(this, separator, 0, split_behavior)
+
+## Ported from AK/String.cpp:225 AK::String::find_byte_offset(u32, size_t).
+pub func string_find_byte_offset_u32(this: const String*, code_point: u32, from_byte_offset: usize = 0) -> usize?:
+    let code_points = string_code_points(this)
+    if from_byte_offset >= utf8_view_byte_length(&code_points):
+        return none
+
+    var it = utf8_view_iterator_at_byte_offset(&code_points, from_byte_offset)
+    while not utf8_code_point_iterator_done(&it):
+        if utf8_code_point_iterator_deref(&it) == code_point:
+            return utf8_view_byte_offset_of_utf8_code_point_iterator(&code_points, it)
+        utf8_code_point_iterator_inc(&it)
+
+    return none
+
+## Ported from AK/String.cpp:239 AK::String::find_byte_offset(StringView, size_t).
+pub func string_find_byte_offset_string_view(this: const String*, substring: StringView, from_byte_offset: usize = 0) -> usize?:
+    let view = string_bytes_as_string_view(this)
+    if from_byte_offset >= string_view_length(&view):
+        return none
+
+    let index = memmem_optional(string_view_bytes(&view)[from_byte_offset..], string_view_bytes(&substring)) else return none
+    return index + from_byte_offset
+
+# mark: Comparison ==============================================================================
+
+## `String::operator==(String const&) = default`: compares the StringBases.
+pub func string_equals(this: const String*, other: const String*) -> bool:
+    return string_base_eq(&this.string_base, &other.string_base)
+
+## Ported from AK/String.cpp:254 AK::String::operator==(FlyString const&).
+pub func string_eq_fly_string(this: const String*, other: const FlyString*) -> bool:
+    let other_data = fly_string_data(other)
+    return string_base_eq(&this.string_base, &other_data)
+
+## Ported from AK/String.cpp:259 AK::String::operator==(StringView).
+pub func string_eq_string_view(this: const String*, other: StringView) -> bool:
+    let view = string_bytes_as_string_view(this)
+    return string_view_eq_string_view(&view, other)
+
+## Ported from AK/String.cpp:288 AK::String::operator==(char const*).
+pub func string_eq_u8(this: const String*, c_string: const u8*?) -> bool:
+    let view = string_bytes_as_string_view(this)
+    return string_view_eq_u8_const(&view, c_string)
+
+## Ported from AK/String.h:176 AK::String::operator<=>. NOTE: UTF-8 is defined in a way that
+## lexicographic ordering of code points is equivalent to lexicographic ordering of bytes.
+pub func string_cmp(this: const String*, other: const String*) -> i32:
+    let view = string_bytes_as_string_view(this)
+    return string_view_compare(&view, string_bytes_as_string_view(other))
+
+## Ported from AK/String.cpp:348 AK::String::contains(StringView, CaseSensitivity).
+pub func string_contains_string_view(this: const String*, needle: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    return string_utils_contains(string_bytes_as_string_view(this), needle, case_sensitivity)
+
+## Ported from AK/String.cpp:353 AK::String::contains(u32, CaseSensitivity).
+pub func string_contains_u32(this: const String*, needle: u32, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    let needle_as_string = string_from_code_point(needle)
+    return string_contains_string_view(this, string_bytes_as_string_view(&needle_as_string), case_sensitivity)
+
+## Ported from AK/String.cpp:293 AK::String::ascii_case_insensitive_hash.
+pub func string_ascii_case_insensitive_hash(this: const String*) -> u32:
+    let bytes = string_base_bytes(&this.string_base)
+    return case_insensitive_string_hash(bytes.data, bytes.length)
+
+## `Traits<String>::hash` (AK/String.cpp): the string's hash.
+pub func string_hash_value(this: const String*) -> u32:
+    return string_base_hash(&this.string_base)
+
+# mark: Numbers, formatting and joining =========================================================
+
+## Ported from AK/String.h:193 AK::String::number(T) for signed integral T (every signed width
+## widens to i64 and prints the same digits).
+pub func string_number_i64(value: i64) -> String:
+    return create_string_from_number_string_i64(value)
+
+## Ported from AK/String.h:193 AK::String::number(T) for unsigned integral T.
+pub func string_number_u64(value: u64) -> String:
+    return create_string_from_number_string_u64(value)
+
+## Ported from AK/String.h:199 AK::String::number(T) for floating-point T: formatted("{}", value).
+pub func string_number_f64(value: f64) -> String:
+    var parameter: TypeErasedParameter
+    var params = type_erased_format_params_for_f64(&parameter, value)
+    return string_vformatted(sv("{}"), &params) else trap("MUST: String::number")
+
+## Ported from AK/String.cpp:188 AK::String::vformatted.
+pub func string_vformatted(fmtstr: StringView, params: TypeErasedFormatParams*) -> String!:
+    var builder = string_builder_new()
+    try vformat(&builder, fmtstr, params)
+    return try string_builder_to_string(&builder)
+
+## Ported from AK/String.h:214 AK::String::join over StringViews with the default "{}" format.
+pub func string_join_string_view(separator: StringView, collection: const StringView[]) -> String!:
+    var builder = string_builder_new()
+    try string_builder_try_join_string_view(&builder, separator, collection)
+    return try string_builder_to_string(&builder)
+
+## Ported from AK/String.h:214 AK::String::join over Strings with the default "{}" format.
+pub func string_join_string(separator: StringView, collection: const String[]) -> String!:
+    var builder = string_builder_new()
+    try string_builder_try_join_string(&builder, separator, collection)
+    return try string_builder_to_string(&builder)
+
+## Ported from AK/String.cpp:399 AK::String::to_byte_string. FIXME: Remove these once all code
+## has been ported to String.
+pub func string_to_byte_string(this: const String*) -> ByteString:
+    return byte_string_from_string_view(string_bytes_as_string_view(this))
+
+## Ported from AK/String.cpp:404 AK::String::from_byte_string.
+pub func string_from_byte_string(byte_string: ByteString) -> String!:
+    return try string_from_utf8(byte_string_view(&byte_string))
+
+## Ported from AK/String.h:234 AK::String::is_invalid: whether this is the null sentinel of
+## Optional<String>.
+pub func string_is_invalid(this: const String*) -> bool:
+    return string_base_raw_string(&this.string_base) == 0
+
+## Ported from AK/String.h:239 AK::String::String(StringBase&&).
+pub func string_construct_string_base(this: String*, base_: StringBase):
+    this.string_base = base_
+
+## Ported from AK/String.h:244 AK::String::String(nullptr_t): the invalid sentinel.
+pub func string_construct_void(this: String*):
+    string_base_construct_void(&this.string_base)
+
+# mark: Traits and literals =====================================================================
+
+## Ported from AK/String.h:273 AK::ASCIICaseInsensitiveStringTraits::hash.
+pub func ascii_case_insensitive_string_traits_hash(s: const String*) -> u32:
+    return string_ascii_case_insensitive_hash(s)
+
+## Ported from AK/String.h:274 AK::ASCIICaseInsensitiveStringTraits::equals.
+pub func ascii_case_insensitive_string_traits_equals(a: const String*, b: const String*) -> bool:
+    let a_view = string_bytes_as_string_view(a)
+    return string_view_equals_ignoring_ascii_case(&a_view, string_bytes_as_string_view(b))
+
+## Ported from AK/String.h:279 operator""_string: short ASCII literals become short strings
+## without validation; anything else must be valid UTF-8.
+pub func literalstring(cstring: const u8*?, length: usize) -> String:
+    let view = literalsv_u8(cstring, length)
+    let bytes = string_view_bytes(&view)
+    # OPTIMIZATION: Short ASCII strings become compile-time constants with no runtime validation
+    # or heap allocation.
+    if length <= max_short_string_byte_count and simdutf_validate_ascii(bytes):
+        return string_from_ascii_short_string_without_validation(bytes)
+
+    let utf8 = Utf8View(m_string = view)
+    assert(utf8_view_validate_allow_lonely_surrogates(&utf8))
+    return string_from_utf8_without_validation(bytes)

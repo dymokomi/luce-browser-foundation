@@ -1,0 +1,28 @@
+#==============================================================================================
+#
+#   tests_support - shared helpers of the ak text tests (region r02)
+#
+#   DESCRIPTION:
+#       Region r01 (ak_core: Vector, ByteBuffer, HashTable, StringHash, Stream) and region r03
+#       (ak_format) are ported in parallel with r02, so on this branch their functions are
+#       still stubs. The tests that reach them start with `if not ak_core_is_ported: return`
+#       (or ak_format_is_ported) and pass trivially until those regions are merged; flip the
+#       flags then. They were run locally against stand-ins of the r01 functions.
+#
+#==============================================================================================
+
+## Whether region r01's functions (Vector, ByteBuffer, HashTable, string_hash) are ported.
+var ak_core_is_ported: bool = false
+
+## Whether region r03's functions (vformat) are ported.
+var ak_format_is_ported: bool = false
+
+## The element at `index` of a vector (reads Vector's fields; its accessors belong to r01).
+func test_vector_at[T](vector: const Vector[T]*, index: usize) -> T:
+    assert(index < vector.m_size)
+    let buffer = vector.m_outline_buffer else trap("test_vector_at: empty vector")
+    return buffer[index]
+
+## The size of a vector.
+func test_vector_size[T](vector: const Vector[T]*) -> usize:
+    return vector.m_size

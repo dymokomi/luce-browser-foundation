@@ -11,19 +11,21 @@
 
 ## AK::Detail::MAX_SHORT_STRING_BYTE_COUNT (AK/StringData.h:17).
 # C++ initializer: sizeof ( StringData * ) - sizeof ( u8 )
-pub var max_short_string_byte_count: usize
+pub let max_short_string_byte_count: usize = sizeof(StringData*) - sizeof(u8)
 
 # mark: StringData ==============================================================================
 
-## AK::Detail::StringData (AK/StringData.h:23).
-pub struct StringData:
+## AK::Detail::StringData (AK/StringData.h:23). The C++ ends in a flexible array member,
+## `alignas(SubstringData) u8 m_bytes_or_substring_data[0]`: the bytes (or the SubstringData of
+## a substring) follow the struct, at `(u8*)this + sizeof(StringData)` (hand-edited by r02).
+pub align(8) struct StringData:
     pub var m_byte_count: u32  # C++ default: { 0 }
     pub var m_hash: u32  # C++ default: { 0 }
     pub var m_has_hash: bool  # C++ default: { false }
     pub var m_substring: bool  # C++ default: { false }
     pub var m_is_fly_string: bool  # C++ default: { false }
-    pub var m_bytes_or_substring_data: u8*?
 
-## AK::Detail::StringData::SubstringData (AK/StringData.h:63): opaque in this phase (not in the phase-1 closure).
+## AK::Detail::StringData::SubstringData (AK/StringData.h:63) (fields filled by r02).
 pub struct StringDataSubstringData:
-    pub var opaque_: u8
+    pub var superstring: const StringData*?  # C++ default: { nullptr }
+    pub var start_offset: u32  # C++ default: { 0 }

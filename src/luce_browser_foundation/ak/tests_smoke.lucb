@@ -1,0 +1,48 @@
+test "smoke: string view basics":
+    let v = sv("hello world")
+    assert(string_view_length(&v) == 11)
+    assert(string_view_starts_with_string_view(&v, sv("hello")))
+    assert(string_view_ends_with_string_view(&v, sv("WORLD"), CaseSensitivity.case_insensitive))
+    assert(string_view_find_u8(&v, 'o') == 4)
+    assert(string_view_find_string_view(&v, sv("wor")) == 6)
+    assert(string_view_find_last_u8(&v, 'o') == 7)
+    let t = sv("  x  ")
+    let trimmed = string_view_trim_whitespace(&t)
+    assert(string_view_equals(&trimmed, "x"))
+    assert(string_utils_matches(sv("hello"), sv("h*o")))
+    assert(not string_utils_matches(sv("hello"), sv("h*x")))
+    assert(string_view_count_string_view(&v, sv("o")) == 2)
+
+test "smoke: short strings":
+    let s = string_from_str("abc")
+    assert(string_base_is_short_string(&s.string_base))
+    assert(string_eq_string_view(&s, sv("abc")))
+    let u = string_to_ascii_uppercase(&s)
+    assert(string_eq_string_view(&u, sv("ABC")))
+    let e = string_new()
+    assert(string_is_empty(&e))
+    let cp = string_from_code_point(0x1f600)
+    assert(string_base_byte_count(&cp.string_base) == 4)
+
+test "smoke: long strings":
+    let s = string_from_utf8(sv("hello friends!")) else trap("utf8")
+    assert(not string_base_is_short_string(&s.string_base))
+    assert(string_eq_string_view(&s, sv("hello friends!")))
+    let tail = string_substring_from_byte_offset_with_shared_superstring_usize(&s, 6, 8) else trap("sub")
+    assert(string_eq_string_view(&tail, sv("friends!")))
+    var failed = false
+    discard(string_from_utf8(string_view_from_bytes(b"\xff")) catch:
+        failed = true
+        recover string_new())
+    assert(failed)
+
+test "smoke: split view":
+    if not ak_core_is_ported:
+        return
+    let v = sv("a,b,,c")
+    let parts = string_view_split_view_u8(&v, ',')
+    assert(test_vector_size(&parts) == 3)
+    let third = test_vector_at(&parts, 2)
+    assert(string_view_equals(&third, "c"))
+    let with_empty = string_view_split_view_u8(&v, ',', SplitBehavior.keep_empty)
+    assert(test_vector_size(&with_empty) == 4)

@@ -1,0 +1,176 @@
+#==============================================================================================
+#
+#   utf32_view - Utf32View: a view of code points stored as u32
+#
+#   DESCRIPTION:
+#       Port of AK/Utf32View.h (lines 1-155) and AK/Utf32View.cpp (lines 1-43).
+#
+#==============================================================================================
+
+# mark: Utf32CodePointIterator ==================================================================
+
+## Ported from AK/Utf32View.h:27 AK::Utf32CodePointIterator::operator==.
+pub func utf32_code_point_iterator_eq(this: const Utf32CodePointIterator*, other: const Utf32CodePointIterator*) -> bool:
+    return this.m_ptr == other.m_ptr and this.m_length == other.m_length
+
+## Ported from AK/Utf32View.h:31 AK::Utf32CodePointIterator::operator++.
+pub func utf32_code_point_iterator_inc(this: Utf32CodePointIterator*) -> Utf32CodePointIterator*:
+    assert(this.m_length > 0)
+    this.m_ptr = (this.m_ptr else trap("VERIFY: iterator without code points")) + 1
+    this.m_length -= 1
+    return this
+
+## Ported from AK/Utf32View.h:38 AK::Utf32CodePointIterator::operator-: the code point distance.
+pub func utf32_code_point_iterator_sub(this: const Utf32CodePointIterator*, other: const Utf32CodePointIterator*) -> isize:
+    let this_address = (isize)(usize)(this.m_ptr else trap("VERIFY: iterator without code points"))
+    let other_address = (isize)(usize)(other.m_ptr else trap("VERIFY: iterator without code points"))
+    return (this_address - other_address) // (isize)sizeof(u32)
+
+## Ported from AK/Utf32View.h:42 AK::Utf32CodePointIterator::operator*.
+pub func utf32_code_point_iterator_deref(this: const Utf32CodePointIterator*) -> u32:
+    assert(this.m_length > 0)
+    return (this.m_ptr else trap("VERIFY: iterator without code points"))[0]
+
+## Ported from AK/Utf32View.cpp:12 AK::Utf32CodePointIterator::peek. NOTE: This returns none if
+## the peek is at or past EOF.
+pub func utf32_code_point_iterator_peek(this: const Utf32CodePointIterator*, offset: usize = 0) -> u32?:
+    if offset == 0:
+        if utf32_code_point_iterator_done(this):
+            return none
+        return utf32_code_point_iterator_deref(this)
+
+    var new_iterator = *this
+    for _index in 0..<offset:
+        discard(utf32_code_point_iterator_inc(&new_iterator))
+        if utf32_code_point_iterator_done(&new_iterator):
+            return none
+
+    return utf32_code_point_iterator_deref(&new_iterator)
+
+## Ported from AK/Utf32View.h:51 AK::Utf32CodePointIterator::code_point_length_in_bytes.
+pub func utf32_code_point_iterator_code_point_length_in_bytes(this: const Utf32CodePointIterator*) -> i32:
+    return (i32)sizeof(u32)
+
+## Ported from AK/Utf32View.h:52 AK::Utf32CodePointIterator::done.
+pub func utf32_code_point_iterator_done(this: const Utf32CodePointIterator*) -> bool:
+    return this.m_length == 0
+
+## Ported from AK/Utf32View.h:55 AK::Utf32CodePointIterator::Utf32CodePointIterator(u32 const*, size_t).
+pub func utf32_code_point_iterator_construct(this: Utf32CodePointIterator*, ptr: const u32*?, length: usize):
+    this.m_ptr = ptr
+    this.m_length = (isize)length
+
+# mark: Utf32View ===============================================================================
+
+## Ported from AK/Utf32View.h:68 AK::Utf32View::Utf32View(u32 const*, size_t).
+pub func utf32_view_construct_u32(this: Utf32View*, code_points: const u32*?, length: usize):
+    this.m_code_points = code_points
+    this.m_length = length
+    assert(code_points != none or length == 0)
+
+## Ported from AK/Utf32View.h:75 AK::Utf32View::Utf32View(ReadonlySpan<u32>).
+pub func utf32_view_construct_span_u32(this: Utf32View*, code_points: const u32[]):
+    utf32_view_construct_u32(this, code_points.data, code_points.length)
+
+## `Utf32View { code_points }`: the value form of the span constructor.
+pub func utf32_view_from_span(code_points: const u32[]) -> Utf32View:
+    var view = Utf32View()
+    utf32_view_construct_span_u32(&view, code_points)
+    return view
+
+## `ReadonlySpan<u32> { m_code_points, m_length }`: the code points as a span.
+pub func utf32_view_span(this: const Utf32View*) -> const u32[]:
+    let code_points = this.m_code_points else return u32[](none_code_points(), 0)
+    return u32[]((u32*)code_points, this.m_length)
+
+## Storage for the empty span of code points of a view without code points.
+var s_no_code_points: u32[1]
+
+## A correctly aligned pointer for an empty span of code points.
+func none_code_points() -> u32*:
+    return &s_no_code_points[0]
+
+## Ported from AK/Utf32View.h:80 AK::Utf32View::begin.
+pub func utf32_view_begin(this: const Utf32View*) -> Utf32CodePointIterator:
+    var it = Utf32CodePointIterator()
+    utf32_code_point_iterator_construct(&it, utf32_view_begin_ptr(this), this.m_length)
+    return it
+
+## Ported from AK/Utf32View.h:85 AK::Utf32View::end.
+pub func utf32_view_end(this: const Utf32View*) -> Utf32CodePointIterator:
+    var it = Utf32CodePointIterator()
+    utf32_code_point_iterator_construct(&it, utf32_view_end_ptr(this), 0)
+    return it
+
+## Ported from AK/Utf32View.h:90 AK::Utf32View::at.
+pub func utf32_view_at_const(this: const Utf32View*, index: usize) -> u32:
+    assert(index < this.m_length)
+    return utf32_view_span(this)[index]
+
+## Ported from AK/Utf32View.h:96 AK::Utf32View::operator[].
+pub func utf32_view_at_const_2(this: const Utf32View*, index: usize) -> u32:
+    return utf32_view_at_const(this, index)
+
+## Ported from AK/Utf32View.h:98 AK::Utf32View::code_points.
+pub func utf32_view_code_points(this: const Utf32View*) -> const u32*?:
+    return this.m_code_points
+
+## Ported from AK/Utf32View.h:99 AK::Utf32View::is_empty.
+pub func utf32_view_is_empty(this: const Utf32View*) -> bool:
+    return this.m_length == 0
+
+## Ported from AK/Utf32View.h:100 AK::Utf32View::is_null.
+pub func utf32_view_is_null(this: const Utf32View*) -> bool:
+    return this.m_code_points == none
+
+## Ported from AK/Utf32View.h:101 AK::Utf32View::length.
+pub func utf32_view_length(this: const Utf32View*) -> usize:
+    return this.m_length
+
+## Ported from AK/Utf32View.h:103 AK::Utf32View::is_ascii.
+pub func utf32_view_is_ascii(this: const Utf32View*) -> bool:
+    # FIXME: Petition simdutf to implement an ASCII validator for UTF-32.
+    for code_point in utf32_view_span(this):
+        if not is_ascii(code_point):
+            return false
+    return true
+
+## Ported from AK/Utf32View.h:109 AK::Utf32View::iterator_offset.
+pub func utf32_view_iterator_offset(this: const Utf32View*, it: const Utf32CodePointIterator*) -> usize:
+    let position = (usize)(it.m_ptr else trap("VERIFY: iterator without code points"))
+    let start = (usize)(this.m_code_points else trap("VERIFY: view without code points"))
+    assert(position >= start)
+    assert(position < start + this.m_length * sizeof(u32))
+    return (position - start) // sizeof(u32)
+
+## Ported from AK/Utf32View.h:116 AK::Utf32View::substring_view(size_t, size_t).
+pub func utf32_view_substring_view_usize(this: const Utf32View*, offset: usize, length: usize) -> Utf32View:
+    assert(offset <= this.m_length)
+    let end = offset +? length else trap("VERIFY: substring_view overflow")
+    assert(end <= this.m_length)
+    return utf32_view_from_span(utf32_view_span(this)[offset..<end])
+
+## Ported from AK/Utf32View.h:124 AK::Utf32View::substring_view(size_t).
+pub func utf32_view_substring_view(this: const Utf32View*, offset: usize) -> Utf32View:
+    return utf32_view_substring_view_usize(this, offset, utf32_view_length(this) - offset)
+
+## Ported from AK/Utf32View.cpp:31 AK::Utf32View::operator==.
+pub func utf32_view_eq(this: const Utf32View*, other: const Utf32View*) -> bool:
+    let code_points = utf32_view_span(this)
+    let other_code_points = utf32_view_span(other)
+
+    if code_points.length != other_code_points.length:
+        return false
+    for i in 0..<code_points.length:
+        if code_points[i] != other_code_points[i]:
+            return false
+    return true
+
+## Ported from AK/Utf32View.h:132 AK::Utf32View::begin_ptr.
+pub func utf32_view_begin_ptr(this: const Utf32View*) -> const u32*?:
+    return this.m_code_points
+
+## Ported from AK/Utf32View.h:136 AK::Utf32View::end_ptr.
+pub func utf32_view_end_ptr(this: const Utf32View*) -> const u32*?:
+    let code_points = this.m_code_points else return none
+    return code_points + this.m_length

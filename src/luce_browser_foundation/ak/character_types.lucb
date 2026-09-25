@@ -1,0 +1,159 @@
+#==============================================================================================
+#
+#   character_types - ASCII and Unicode code point classification
+#
+#   DESCRIPTION:
+#       Port of AK/CharacterTypes.h (lines 1-222).
+#
+#       NOTE: For a quick reference for most of this, see https://www.cplusplus.com/reference/cctype/
+#       and https://infra.spec.whatwg.org/#code-points.
+#       NOTE: To avoid ambiguity, all functions contain "ascii" or "unicode" in their names.
+#
+#==============================================================================================
+
+# mark: ASCII classes ===========================================================================
+
+## Ported from AK/CharacterTypes.h:18 AK::is_ascii.
+pub func is_ascii(code_point: u32) -> bool:
+    return code_point < 0x80
+
+## Ported from AK/CharacterTypes.h:23 AK::is_ascii_digit.
+pub func is_ascii_digit(code_point: u32) -> bool:
+    return code_point >= (u32)'0' and code_point <= (u32)'9'
+
+## Ported from AK/CharacterTypes.h:28 AK::is_ascii_upper_alpha.
+pub func is_ascii_upper_alpha(code_point: u32) -> bool:
+    return code_point >= (u32)'A' and code_point <= (u32)'Z'
+
+## Ported from AK/CharacterTypes.h:33 AK::is_ascii_lower_alpha.
+pub func is_ascii_lower_alpha(code_point: u32) -> bool:
+    return code_point >= (u32)'a' and code_point <= (u32)'z'
+
+## Ported from AK/CharacterTypes.h:38 AK::is_ascii_alpha.
+pub func is_ascii_alpha(code_point: u32) -> bool:
+    return is_ascii_lower_alpha(code_point) or is_ascii_upper_alpha(code_point)
+
+## Ported from AK/CharacterTypes.h:43 AK::is_ascii_alphanumeric.
+pub func is_ascii_alphanumeric(code_point: u32) -> bool:
+    return is_ascii_alpha(code_point) or is_ascii_digit(code_point)
+
+## Ported from AK/CharacterTypes.h:48 AK::is_ascii_base36_digit.
+pub func is_ascii_base36_digit(code_point: u32) -> bool:
+    return is_ascii_digit(code_point) or (code_point >= (u32)'A' and code_point <= (u32)'Z') or (code_point >= (u32)'a' and code_point <= (u32)'z')
+
+## Ported from AK/CharacterTypes.h:53 AK::is_ascii_binary_digit.
+pub func is_ascii_binary_digit(code_point: u32) -> bool:
+    return code_point == (u32)'0' or code_point == (u32)'1'
+
+## Ported from AK/CharacterTypes.h:58 AK::is_ascii_octal_digit.
+pub func is_ascii_octal_digit(code_point: u32) -> bool:
+    return code_point >= (u32)'0' and code_point <= (u32)'7'
+
+## Ported from AK/CharacterTypes.h:63 AK::is_ascii_uppercase_hex_digit.
+pub func is_ascii_uppercase_hex_digit(code_point: u32) -> bool:
+    return is_ascii_digit(code_point) or (code_point >= (u32)'A' and code_point <= (u32)'F')
+
+## Ported from AK/CharacterTypes.h:68 AK::is_ascii_hex_digit.
+pub func is_ascii_hex_digit(code_point: u32) -> bool:
+    return is_ascii_uppercase_hex_digit(code_point) or (code_point >= (u32)'a' and code_point <= (u32)'f')
+
+## Ported from AK/CharacterTypes.h:73 AK::is_ascii_blank.
+pub func is_ascii_blank(code_point: u32) -> bool:
+    return code_point == (u32)'\t' or code_point == (u32)' '
+
+## Ported from AK/CharacterTypes.h:78 AK::is_ascii_space.
+pub func is_ascii_space(code_point: u32) -> bool:
+    return code_point == (u32)' ' or code_point == (u32)'\t' or code_point == (u32)'\n' or code_point == 0x0b or code_point == 0x0c or code_point == (u32)'\r'
+
+## Ported from AK/CharacterTypes.h:83 AK::is_ascii_punctuation.
+pub func is_ascii_punctuation(code_point: u32) -> bool:
+    return (code_point >= 0x21 and code_point <= 0x2f) or (code_point >= 0x3a and code_point <= 0x40) or (code_point >= 0x5b and code_point <= 0x60) or (code_point >= 0x7b and code_point <= 0x7e)
+
+## Ported from AK/CharacterTypes.h:88 AK::is_ascii_graphical.
+pub func is_ascii_graphical(code_point: u32) -> bool:
+    return code_point >= 0x21 and code_point <= 0x7e
+
+## Ported from AK/CharacterTypes.h:93 AK::is_ascii_printable.
+pub func is_ascii_printable(code_point: u32) -> bool:
+    return code_point >= 0x20 and code_point <= 0x7e
+
+## Ported from AK/CharacterTypes.h:98 AK::is_ascii_c0_control.
+pub func is_ascii_c0_control(code_point: u32) -> bool:
+    return code_point < 0x20
+
+## Ported from AK/CharacterTypes.h:104 AK::is_ascii_c0_control_or_space.
+# https://infra.spec.whatwg.org/#c0-control-or-space
+pub func is_ascii_c0_control_or_space(code_point: u32) -> bool:
+    return code_point <= 0x20
+
+## Ported from AK/CharacterTypes.h:109 AK::is_ascii_control.
+pub func is_ascii_control(code_point: u32) -> bool:
+    return is_ascii_c0_control(code_point) or code_point == 0x7f
+
+# mark: Unicode classes =========================================================================
+
+## Ported from AK/CharacterTypes.h:114 AK::is_unicode.
+pub func is_unicode(code_point: u32) -> bool:
+    return code_point <= 0x10ffff
+
+## Ported from AK/CharacterTypes.h:119 AK::is_unicode_control.
+pub func is_unicode_control(code_point: u32) -> bool:
+    return is_ascii_c0_control(code_point) or (code_point >= 0x7e and code_point <= 0x9f)
+
+## Ported from AK/CharacterTypes.h:124 AK::is_unicode_surrogate.
+pub func is_unicode_surrogate(code_point: u32) -> bool:
+    return code_point >= 0xd800 and code_point <= 0xdfff
+
+## Ported from AK/CharacterTypes.h:129 AK::is_unicode_scalar_value.
+pub func is_unicode_scalar_value(code_point: u32) -> bool:
+    return is_unicode(code_point) and not is_unicode_surrogate(code_point)
+
+## Ported from AK/CharacterTypes.h:134 AK::is_unicode_noncharacter.
+pub func is_unicode_noncharacter(code_point: u32) -> bool:
+    return is_unicode(code_point) and ((code_point >= 0xfdd0 and code_point <= 0xfdef) or ((code_point & 0xfffe) == 0xfffe) or ((code_point & 0xffff) == 0xffff))
+
+# mark: Conversions =============================================================================
+
+## Ported from AK/CharacterTypes.h:139 AK::to_ascii_lowercase.
+pub func to_ascii_lowercase(code_point: u32) -> u32:
+    if is_ascii_upper_alpha(code_point):
+        return code_point + 0x20
+    return code_point
+
+## Ported from AK/CharacterTypes.h:146 AK::to_ascii_uppercase.
+pub func to_ascii_uppercase(code_point: u32) -> u32:
+    if is_ascii_lower_alpha(code_point):
+        return code_point - 0x20
+    return code_point
+
+## Ported from AK/CharacterTypes.h:153 AK::parse_ascii_digit.
+pub func parse_ascii_digit(code_point: u32) -> u32:
+    if is_ascii_digit(code_point):
+        return code_point - (u32)'0'
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from AK/CharacterTypes.h:160 AK::parse_ascii_hex_digit.
+pub func parse_ascii_hex_digit(code_point: u32) -> u32:
+    if is_ascii_digit(code_point):
+        return parse_ascii_digit(code_point)
+    if code_point >= (u32)'A' and code_point <= (u32)'F':
+        return code_point - (u32)'A' + 10
+    if code_point >= (u32)'a' and code_point <= (u32)'f':
+        return code_point - (u32)'a' + 10
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from AK/CharacterTypes.h:171 AK::parse_ascii_base36_digit.
+pub func parse_ascii_base36_digit(code_point: u32) -> u32:
+    if is_ascii_digit(code_point):
+        return parse_ascii_digit(code_point)
+    if code_point >= (u32)'A' and code_point <= (u32)'Z':
+        return code_point - (u32)'A' + 10
+    if code_point >= (u32)'a' and code_point <= (u32)'z':
+        return code_point - (u32)'a' + 10
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from AK/CharacterTypes.h:182 AK::to_ascii_base36_digit.
+pub func to_ascii_base36_digit(digit: u32) -> u32:
+    let base36_map = "0123456789abcdefghijklmnopqrstuvwxyz".bytes
+    assert(digit < base36_map.length)
+    return base36_map[digit]

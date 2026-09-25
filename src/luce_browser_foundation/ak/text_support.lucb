@@ -1,0 +1,81 @@
+#==============================================================================================
+#
+#   text_support - callback shapes and byte helpers shared by the AK text types
+#
+#   DESCRIPTION:
+#       Not a port of one C++ file. AK's text code passes lambdas to templates
+#       (`code_point_to_utf8(code_point, [&](char c) {...})`, `replace_with_new_string(n,
+#       [&](Bytes buffer) {...})`, `for_each_split_view(sep, behavior, [&](StringView) {...})`);
+#       luce-base has no closures, so each template parameter becomes an interface and the
+#       lambda becomes a small capture struct that conforms to it (DESIGN.md §2.7, case 2). The
+#       interfaces are declared here, with `compare_bytes`, the `memcmp` the C++ calls.
+#
+#==============================================================================================
+
+import memory
+
+# mark: Callback interfaces =====================================================================
+
+## The `Callback` of UnicodeUtils::code_point_to_utf8: receives one UTF-8 byte.
+pub interface Utf8ByteCallback:
+    mutating func call(byte: u8)
+
+## The `Callback` of UnicodeUtils::try_code_point_to_utf8: receives one UTF-8 byte, may fail.
+pub interface FallibleUtf8ByteCallback:
+    mutating func call(byte: u8) -> !
+
+## The `Callback` of UnicodeUtils::code_point_to_utf16: receives one UTF-16 code unit.
+pub interface Utf16CodeUnitCallback:
+    mutating func call(code_unit: u16)
+
+## The `Callback` of UnicodeUtils::try_code_point_to_utf16: receives one code unit, may fail.
+pub interface FallibleUtf16CodeUnitCallback:
+    mutating func call(code_unit: u16) -> !
+
+## The `Func` of StringBase::replace_with_new_string: fills the new string's bytes.
+pub interface BytesCallback:
+    mutating func call(buffer: u8[]) -> !
+
+## The `Func` of StringBase::replace_with_new_short_string: fills a short string's bytes.
+pub interface ShortStringBytesCallback:
+    mutating func call(buffer: u8[])
+
+## The `Callback` of StringView::for_each_split_view: receives each part. The C++ callback may
+## return nothing, an IterationDecision or an ErrorOr of either; here it returns an
+## IterationDecision and may fail, and a callback that returns `continue_` is the void form.
+pub interface StringViewCallback:
+    mutating func call(part: StringView) -> IterationDecision!
+
+## The `Callback` of Utf8View::for_each_split_view: receives each part.
+pub interface Utf8ViewCallback:
+    mutating func call(part: Utf8View)
+
+## The `Callback` of Utf16View::for_each_split_view: receives each part, answers whether to go on.
+pub interface Utf16ViewCallback:
+    mutating func call(part: Utf16View) -> IterationDecision
+
+## A `Function<bool(u32)>`-shaped predicate over code points (Utf8View::for_each_split_view's
+## splitter, GenericLexer's predicates).
+pub interface CodePointPredicate:
+    func matches(code_point: u32) -> bool
+
+## A `Function<bool(char)>`-shaped predicate over bytes (StringView::split_view_if).
+pub interface CharPredicate:
+    func matches(ch: u8) -> bool
+
+# mark: Bytes ===================================================================================
+
+## `__builtin_memcmp(a, b, min(a.size(), b.size()))`: compares the common prefix of two byte
+## spans, negative, zero or positive as memcmp answers.
+pub func compare_bytes(a: const u8[], b: const u8[]) -> i32:
+    let length = a.length if a.length < b.length else b.length
+    for i in 0..<length:
+        if a[i] != b[i]:
+            return (i32)a[i] - (i32)b[i]
+    return 0
+
+## `bytes.copy_to(buffer)`: copies `bytes` to the front of `buffer`, which must be large enough.
+pub func copy_bytes(buffer: u8[], bytes: const u8[]):
+    assert(buffer.length >= bytes.length)
+    if bytes.length != 0:
+        memory.copy(buffer, bytes, bytes.length)

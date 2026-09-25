@@ -1,0 +1,353 @@
+#==============================================================================================
+#
+#   utf16_string_data - Utf16StringData: the heap block behind a long Utf16String
+#
+#   DESCRIPTION:
+#       Port of AK/Utf16StringData.h (lines 1-160) and AK/Utf16StringData.cpp (lines 1-215).
+#
+#       The code units follow the header at offset_of_string_storage(): ASCII bytes while the
+#       string is all ASCII, otherwise host-endian UTF-16 (the storage kind is the top bit of
+#       m_length_in_code_units). Blocks come from the current allocator (the managed heap once
+#       region gc lands); there is no reference count and no destructor (DESIGN.md §3.3): the
+#       Utf16FlyString table entry is removed by did_destroy_utf16_fly_string_data, which the
+#       collector's finalizer will call.
+#
+#==============================================================================================
+
+# mark: Creation ================================================================================
+
+## Ported from AK/Utf16StringData.cpp:15 VERIFY_UTF16_LENGTH: due to internal optimizations,
+## the maximum string length is 2**63 - 1.
+func verify_utf16_length(length: usize):
+    assert(length >> utf16_flag == 0)
+
+## Ported from AK/Utf16StringData.cpp:67 AK::Detail::Utf16StringData::from_utf8.
+pub func utf16_string_data_from_utf8(utf8_string: StringView, allow_ascii_storage: Utf16StringDataAllowAsciiStorage) -> Utf16StringData*:
+    if allow_ascii_storage == Utf16StringDataAllowAsciiStorage.yes and string_view_is_ascii(&utf8_string):
+        verify_utf16_length(string_view_length(&utf8_string))
+
+        let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.ascii, string_view_length(&utf8_string))
+        copy_bytes(utf16_string_data_ascii_storage(string), string_view_bytes(&utf8_string))
+        return string
+
+    let view = Utf8View(m_string = utf8_string)
+    if utf8_view_validate_allow_lonely_surrogates(&view, AllowLonelySurrogates.no):
+        let code_unit_length = simdutf_utf16_length_from_utf8(string_view_bytes(&utf8_string))
+        verify_utf16_length(code_unit_length)
+
+        let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.utf16, code_unit_length)
+
+        let result = simdutf_convert_utf8_to_utf16(string_view_bytes(&utf8_string), utf16_string_data_utf16_storage(string))
+        assert(result == code_unit_length)
+        return string
+
+    return utf16_string_data_create_from_code_point_iterable_utf8_view(view)
+
+## Ported from AK/Utf16StringData.cpp:59 AK::Detail::Utf16StringData::from_ascii.
+pub func utf16_string_data_from_ascii(ascii_string: const u8[]) -> Utf16StringData*:
+    verify_utf16_length(ascii_string.length)
+    let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.ascii, ascii_string.length)
+    copy_bytes(utf16_string_data_ascii_storage(string), ascii_string)
+    return string
+
+## Ported from AK/Utf16StringData.cpp:91 AK::Detail::Utf16StringData::from_utf16.
+pub func utf16_string_data_from_utf16(utf16_string: Utf16View) -> Utf16StringData*:
+    verify_utf16_length(utf16_view_length_in_code_units(&utf16_string))
+
+    if utf16_view_has_ascii_storage(&utf16_string):
+        let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.ascii, utf16_view_length_in_code_units(&utf16_string))
+        copy_bytes(utf16_string_data_ascii_storage(string), utf16_view_ascii_span(&utf16_string))
+        return string
+
+    if utf16_view_is_ascii(&utf16_string):
+        let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.ascii, utf16_view_length_in_code_units(&utf16_string))
+
+        let result = simdutf_convert_utf16_to_utf8(utf16_view_utf16_span(&utf16_string), utf16_string_data_ascii_storage(string))
+        assert(result == utf16_view_length_in_code_units(&utf16_string))
+        return string
+
+    let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.utf16, utf16_view_length_in_code_units(&utf16_string))
+    let storage = utf16_string_data_utf16_storage(string)
+    let source = utf16_view_utf16_span(&utf16_string)
+    for i in 0..<source.length:
+        storage[i] = source[i]
+
+    string.m_length_in_code_points = utf16_string.m_length_in_code_points
+    return string
+
+## Ported from AK/Utf16StringData.cpp:114 AK::Detail::Utf16StringData::from_utf32.
+pub func utf16_string_data_from_utf32(utf32_string: Utf32View) -> Utf16StringData*:
+    let utf32_data = utf32_view_span(&utf32_string)
+    let utf32_length = utf32_view_length(&utf32_string)
+
+    if utf32_view_is_ascii(&utf32_string):
+        verify_utf16_length(utf32_length)
+
+        let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.ascii, utf32_length)
+
+        let result = simdutf_convert_utf32_to_utf8(utf32_data, utf16_string_data_ascii_storage(string))
+        assert(result == utf32_length)
+        return string
+
+    if simdutf_validate_utf32(utf32_data):
+        let code_unit_length = simdutf_utf16_length_from_utf32(utf32_data)
+        verify_utf16_length(code_unit_length)
+
+        let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.utf16, code_unit_length)
+        string.m_length_in_code_points = utf32_length
+
+        let result = simdutf_convert_utf32_to_utf16(utf32_data, utf16_string_data_utf16_storage(string))
+        assert(result == code_unit_length)
+        return string
+
+    return utf16_string_data_create_from_code_point_iterable_utf32_view(utf32_string)
+
+## Ported from AK/Utf16StringData.cpp:144 AK::Detail::Utf16StringData::from_string_builder. The
+## C++ adopts the builder's heap buffer when it has one; the port always copies (see
+## string_data_create_from_string_builder) and clears the builder as a leak would.
+pub func utf16_string_data_from_string_builder(builder: StringBuilder*) -> Utf16StringData*:
+    let view = string_builder_utf16_string_view(builder)
+
+    let code_unit_length = utf16_view_length_in_code_units(&view)
+    verify_utf16_length(code_unit_length)
+
+    let storage_type = Utf16StringDataStorageType.ascii if utf16_view_has_ascii_storage(&view) else Utf16StringDataStorageType.utf16
+    let string = utf16_string_data_create_uninitialized(storage_type, code_unit_length)
+    if utf16_view_has_ascii_storage(&view):
+        copy_bytes(utf16_string_data_ascii_storage(string), utf16_view_ascii_span(&view))
+    else:
+        let storage = utf16_string_data_utf16_storage(string)
+        let source = utf16_view_utf16_span(&view)
+        for i in 0..<source.length:
+            storage[i] = source[i]
+
+        string.m_length_in_code_points = view.m_length_in_code_points
+
+    string_builder_clear(builder)
+    return string
+
+## Ported from AK/Utf16StringData.cpp:171 AK::Detail::Utf16StringData::from_ipc_stream: a string of
+## `length_in_code_units` ASCII bytes or host-endian code units read from `stream`.
+pub func utf16_string_data_from_ipc_stream(stream: Stream*, length_in_code_units: usize, is_ascii_: bool) -> Utf16StringData*!:
+    if is_ascii_:
+        let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.ascii, length_in_code_units)
+
+        try stream_read_until_filled(stream, utf16_string_data_ascii_storage(string))
+
+        let ascii = utf16_string_data_ascii_view(string)
+        if not string_view_is_ascii(&ascii):
+            error(ak_error, "Stream contains invalid ASCII data")
+        return string
+
+    let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.utf16, length_in_code_units)
+
+    let bytes = u8[]((u8*)string + utf16_string_data_offset_of_string_storage(), length_in_code_units * sizeof(u16))
+    try stream_read_until_filled(stream, bytes)
+
+    return string
+
+## Ported from AK/Utf16StringData.cpp:193 AK::Detail::Utf16StringData::to_well_formed: a copy with
+## every lonely surrogate replaced by U+FFFD.
+pub func utf16_string_data_to_well_formed(utf16_string: Utf16View) -> Utf16StringData*:
+    assert(not utf16_view_has_ascii_storage(&utf16_string))
+
+    let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.utf16, utf16_view_length_in_code_units(&utf16_string))
+    simdutf_to_well_formed_utf16(utf16_view_utf16_span(&utf16_string), utf16_string_data_utf16_storage(string))
+
+    return string
+
+## Ported from AK/Utf16StringData.h:48 AK::Detail::Utf16StringData::offset_of_string_storage.
+pub func utf16_string_data_offset_of_string_storage() -> usize:
+    return sizeof(Utf16StringData)
+
+# mark: Comparison and accessors ================================================================
+
+## Ported from AK/Utf16StringData.h:58 AK::Detail::Utf16StringData::operator==(Utf16StringData const&).
+pub func utf16_string_data_eq_utf16_string_data(this: const Utf16StringData*, other: const Utf16StringData*) -> bool:
+    if utf16_string_data_is_fly_string(this) and utf16_string_data_is_fly_string(other):
+        return this == other
+    let view = utf16_string_data_utf16_view(this)
+    let other_view = utf16_string_data_utf16_view(other)
+    return utf16_view_eq_utf16_view(&view, &other_view)
+
+## Ported from AK/Utf16StringData.h:65 AK::Detail::Utf16StringData::operator==(Utf16View const&).
+pub func utf16_string_data_eq_utf16_view(this: const Utf16StringData*, other: const Utf16View*) -> bool:
+    let view = utf16_string_data_utf16_view(this)
+    return utf16_view_eq_utf16_view(&view, other)
+
+## Ported from AK/Utf16StringData.h:70 AK::Detail::Utf16StringData::operator==(StringView const&):
+## compares with ASCII text code unit by code unit.
+pub func utf16_string_data_eq_string_view(this: const Utf16StringData*, other: StringView) -> bool:
+    if utf16_string_data_has_ascii_storage(this):
+        let view = utf16_string_data_ascii_view(this)
+        return string_view_eq_string_view(&view, other)
+    let view = utf16_string_data_utf16_view(this)
+    let other_view = utf16_view_from_ascii(string_view_bytes(&other))
+    return utf16_view_eq_utf16_view(&view, &other_view)
+
+## Ported from AK/Utf16StringData.h:77 AK::Detail::Utf16StringData::has_ascii_storage.
+pub func utf16_string_data_has_ascii_storage(this: const Utf16StringData*) -> bool:
+    return this.m_length_in_code_units >> utf16_flag == 0
+
+## Ported from AK/Utf16StringData.h:78 AK::Detail::Utf16StringData::has_utf16_storage.
+pub func utf16_string_data_has_utf16_storage(this: const Utf16StringData*) -> bool:
+    return this.m_length_in_code_units >> utf16_flag != 0
+
+## Ported from AK/Utf16StringData.h:80 AK::Detail::Utf16StringData::hash (the hash fields are `mutable`).
+pub func utf16_string_data_hash(this: const Utf16StringData*) -> u32:
+    if not this.m_has_hash:
+        let mutable_this = (Utf16StringData*)this
+        let view = utf16_string_data_utf16_view(this)
+        mutable_this.m_hash = utf16_view_hash(&view)
+        mutable_this.m_has_hash = true
+
+    return this.m_hash
+
+## Ported from AK/Utf16StringData.h:90 AK::Detail::Utf16StringData::length_in_code_units.
+pub func utf16_string_data_length_in_code_units(this: const Utf16StringData*) -> usize:
+    return this.m_length_in_code_units & ~((usize)1 << utf16_flag)
+
+## Ported from AK/Utf16StringData.h:91 AK::Detail::Utf16StringData::length_in_code_points (the
+## count is `mutable` and cached here).
+pub func utf16_string_data_length_in_code_points(this: const Utf16StringData*) -> usize:
+    if utf16_string_data_has_ascii_storage(this):
+        return utf16_string_data_length_in_code_units(this)
+    if this.m_length_in_code_points == usize_max_code_points:
+        let mutable_this = (Utf16StringData*)this
+        mutable_this.m_length_in_code_points = utf16_string_data_calculate_code_point_length(this)
+    return this.m_length_in_code_points
+
+## Ported from AK/Utf16StringData.h:100 AK::Detail::Utf16StringData::ascii_view.
+pub func utf16_string_data_ascii_view(this: const Utf16StringData*) -> StringView:
+    assert(utf16_string_data_has_ascii_storage(this))
+    return string_view_from_bytes(u8[]((u8*)this + utf16_string_data_offset_of_string_storage(), utf16_string_data_length_in_code_units(this)))
+
+## Ported from AK/Utf16StringData.h:106 AK::Detail::Utf16StringData::utf16_view.
+pub func utf16_string_data_utf16_view(this: const Utf16StringData*) -> Utf16View:
+    let storage = (u8*)this + utf16_string_data_offset_of_string_storage()
+    if utf16_string_data_has_ascii_storage(this):
+        return utf16_view_from_ascii(u8[](storage, utf16_string_data_length_in_code_units(this)))
+
+    var view = utf16_view_from_utf16(u16[]((u16*)storage, utf16_string_data_length_in_code_units(this)))
+    view.m_length_in_code_points = this.m_length_in_code_points
+
+    return view
+
+## Ported from AK/Utf16StringData.h:117 AK::Detail::Utf16StringData::mark_as_fly_string (a
+## `mutable` field).
+pub func utf16_string_data_mark_as_fly_string(this: const Utf16StringData*):
+    let mutable_this = (Utf16StringData*)this
+    mutable_this.m_is_fly_string = true
+
+## Ported from AK/Utf16StringData.h:118 AK::Detail::Utf16StringData::is_fly_string.
+pub func utf16_string_data_is_fly_string(this: const Utf16StringData*) -> bool:
+    return this.m_is_fly_string
+
+## The ASCII storage of a string being filled.
+func utf16_string_data_ascii_storage(this: Utf16StringData*) -> u8[]:
+    return u8[]((u8*)this + utf16_string_data_offset_of_string_storage(), utf16_string_data_length_in_code_units(this))
+
+## The UTF-16 storage of a string being filled.
+func utf16_string_data_utf16_storage(this: Utf16StringData*) -> u16[]:
+    return u16[]((u16*)((u8*)this + utf16_string_data_offset_of_string_storage()), utf16_string_data_length_in_code_units(this))
+
+# mark: Construction ============================================================================
+
+## Ported from AK/Utf16StringData.h:121 AK::Detail::Utf16StringData::Utf16StringData.
+func utf16_string_data_construct(this: Utf16StringData*, storage_type: Utf16StringDataStorageType, code_unit_length: usize):
+    this.m_length_in_code_units = code_unit_length
+    this.m_length_in_code_points = usize_max_code_points
+    this.m_hash = 0
+    this.m_has_hash = false
+    this.m_is_fly_string = false
+    if storage_type == Utf16StringDataStorageType.utf16:
+        this.m_length_in_code_units |= (usize)1 << utf16_flag
+
+## Ported from AK/Utf16StringData.cpp:18 AK::Detail::Utf16StringData::create_uninitialized.
+func utf16_string_data_create_uninitialized(storage_type: Utf16StringDataStorageType, code_unit_length: usize) -> Utf16StringData*:
+    let allocation_size = utf16_string_data_allocation_size_for_string_data(storage_type == Utf16StringDataStorageType.ascii, code_unit_length)
+
+    let slot = alloc(allocation_size, alignof(Utf16StringData)) else trap("VERIFY: kmalloc")
+
+    let string = (Utf16StringData*)slot.data
+    utf16_string_data_construct(string, storage_type, code_unit_length)
+    return string
+
+## Ported from AK/Utf16StringData.cpp:28 AK::Detail::Utf16StringData::create_from_code_point_iterable
+## over a Utf8View: UTF-16 storage for its code points (invalid bytes become U+FFFD).
+func utf16_string_data_create_from_code_point_iterable_utf8_view(view: Utf8View) -> Utf16StringData*:
+    var code_unit_length: usize = 0
+    var code_point_length: usize = 0
+
+    var it = utf8_view_begin(&view)
+    while not utf8_code_point_iterator_done(&it):
+        code_unit_length += unicode_utils_code_unit_length_for_code_point(utf8_code_point_iterator_deref(&it))
+        code_point_length += 1
+        discard(utf8_code_point_iterator_inc(&it))
+
+    verify_utf16_length(code_unit_length)
+
+    let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.utf16, code_unit_length)
+    string.m_length_in_code_points = code_point_length
+
+    var writer = Utf16StringDataCodeUnitWriter(storage = utf16_string_data_utf16_storage(string), code_unit_index = 0)
+
+    it = utf8_view_begin(&view)
+    while not utf8_code_point_iterator_done(&it):
+        discard(unicode_utils_code_point_to_utf16(utf8_code_point_iterator_deref(&it), &writer))
+        discard(utf8_code_point_iterator_inc(&it))
+
+    return string
+
+## Ported from AK/Utf16StringData.cpp:28 AK::Detail::Utf16StringData::create_from_code_point_iterable
+## over a Utf32View.
+func utf16_string_data_create_from_code_point_iterable_utf32_view(view: Utf32View) -> Utf16StringData*:
+    var code_unit_length: usize = 0
+    var code_point_length: usize = 0
+
+    for code_point in utf32_view_span(&view):
+        code_unit_length += unicode_utils_code_unit_length_for_code_point(code_point)
+        code_point_length += 1
+
+    verify_utf16_length(code_unit_length)
+
+    let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.utf16, code_unit_length)
+    string.m_length_in_code_points = code_point_length
+
+    var writer = Utf16StringDataCodeUnitWriter(storage = utf16_string_data_utf16_storage(string), code_unit_index = 0)
+
+    for code_point in utf32_view_span(&view):
+        discard(unicode_utils_code_point_to_utf16(code_point, &writer))
+
+    return string
+
+## The lambda of create_from_code_point_iterable: stores each code unit.
+struct Utf16StringDataCodeUnitWriter: Utf16CodeUnitCallback:
+    var storage: u16[]
+    var code_unit_index: usize
+
+    mutating func call(code_unit: u16):
+        self.storage[self.code_unit_index] = code_unit
+        self.code_unit_index += 1
+
+## Ported from AK/Utf16StringData.h:134 AK::Detail::Utf16StringData::allocation_size_for_string_data.
+func utf16_string_data_allocation_size_for_string_data(has_ascii_storage: bool, code_unit_length: usize) -> usize:
+    if has_ascii_storage:
+        return sizeof(Utf16StringData) + (sizeof(u8) * code_unit_length)
+    return sizeof(Utf16StringData) + (sizeof(u16) * code_unit_length)
+
+## Ported from AK/Utf16StringData.cpp:203 AK::Detail::Utf16StringData::calculate_code_point_length.
+func utf16_string_data_calculate_code_point_length(this: const Utf16StringData*) -> usize:
+    assert(not utf16_string_data_has_ascii_storage(this))
+
+    let view = utf16_string_data_utf16_view(this)
+    let code_units = utf16_view_utf16_span(&view)
+    if simdutf_validate_utf16(code_units):
+        return simdutf_count_utf16(code_units)
+
+    var code_points: usize = 0
+    var it = utf16_view_begin(&view)
+    while not utf16_code_point_iterator_done(&it):
+        code_points += 1
+        discard(utf16_code_point_iterator_inc(&it))
+    return code_points

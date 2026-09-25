@@ -1,0 +1,469 @@
+#==============================================================================================
+#
+#   simdutf - the simdutf routines AK's text types call, as plain loops
+#
+#   DESCRIPTION:
+#       AK validates, measures and transcodes UTF-8/16/32 with the simdutf library (v7.4.0 in the
+#       donor build). simdutf is replaced, not ported: these are its scalar ("fallback")
+#       kernels, which every SIMD kernel matches result for result, rewritten over spans. Only
+#       the entry points AK uses exist; each is named `simdutf_<entry point>`. Base64 lives in
+#       simdutf_base64.
+#
+#       UTF-16 data in memory is host-endian (little-endian on every supported target); the
+#       `_le`/`_be` forms read raw bytes of a stated order.
+#
+#==============================================================================================
+
+# mark: Results =================================================================================
+
+## simdutf::error_code.
+pub enum SimdutfErrorCode as i32:
+    success = 0
+    header_bits = 1
+    too_short = 2
+    too_long = 3
+    overlong = 4
+    too_large = 5
+    surrogate = 6
+    invalid_base64_character = 7
+    base64_input_remainder = 8
+    base64_extra_bits = 9
+    output_buffer_too_small = 10
+    other = 11
+
+## simdutf::result: an error code and the input position it concerns (or the count processed).
+pub struct SimdutfResult:
+    pub var error: SimdutfErrorCode
+    pub var count: usize
+
+# mark: ASCII and search ========================================================================
+
+## simdutf::validate_ascii: whether every byte is below 0x80.
+pub func simdutf_validate_ascii(bytes: const u8[]) -> bool:
+    for byte in bytes:
+        if byte >= 0x80:
+            return false
+    return true
+
+## simdutf::find over bytes: the index of the first `needle`, or none.
+pub func simdutf_find(bytes: const u8[], needle: u8) -> usize?:
+    for i in 0..<bytes.length:
+        if bytes[i] == needle:
+            return i
+    return none
+
+## simdutf::find over UTF-16 code units: the index of the first `needle`, or none.
+pub func simdutf_find_u16(code_units: const u16[], needle: u16) -> usize?:
+    for i in 0..<code_units.length:
+        if code_units[i] == needle:
+            return i
+    return none
+
+# mark: UTF-8 ===================================================================================
+
+## simdutf::validate_utf8_with_errors (scalar utf8::validate_with_errors): the first error and
+## the position of the sequence it starts at, or success and the length.
+pub func simdutf_validate_utf8_with_errors(data: const u8[]) -> SimdutfResult:
+    let len = data.length
+    var pos: usize = 0
+    while pos < len:
+        let byte = data[pos]
+        if byte < 0x80:
+            pos += 1
+            continue
+
+        var next_pos: usize = 0
+        if (byte & 0b11100000) == 0b11000000:
+            next_pos = pos + 2
+            if next_pos > len:
+                return SimdutfResult(error = .too_short, count = pos)
+            if (data[pos + 1] & 0b11000000) != 0b10000000:
+                return SimdutfResult(error = .too_short, count = pos)
+            # range check
+            let code_point = ((u32)byte & 0b00011111) << 6 | ((u32)data[pos + 1] & 0b00111111)
+            if code_point < 0x80 or 0x7ff < code_point:
+                return SimdutfResult(error = .overlong, count = pos)
+        elif (byte & 0b11110000) == 0b11100000:
+            next_pos = pos + 3
+            if next_pos > len:
+                return SimdutfResult(error = .too_short, count = pos)
+            if (data[pos + 1] & 0b11000000) != 0b10000000:
+                return SimdutfResult(error = .too_short, count = pos)
+            if (data[pos + 2] & 0b11000000) != 0b10000000:
+                return SimdutfResult(error = .too_short, count = pos)
+            # range check
+            let code_point = ((u32)byte & 0b00001111) << 12 | ((u32)data[pos + 1] & 0b00111111) << 6 | ((u32)data[pos + 2] & 0b00111111)
+            if code_point < 0x800 or 0xffff < code_point:
+                return SimdutfResult(error = .overlong, count = pos)
+            if 0xd7ff < code_point and code_point < 0xe000:
+                return SimdutfResult(error = .surrogate, count = pos)
+        elif (byte & 0b11111000) == 0b11110000:
+            next_pos = pos + 4
+            if next_pos > len:
+                return SimdutfResult(error = .too_short, count = pos)
+            if (data[pos + 1] & 0b11000000) != 0b10000000:
+                return SimdutfResult(error = .too_short, count = pos)
+            if (data[pos + 2] & 0b11000000) != 0b10000000:
+                return SimdutfResult(error = .too_short, count = pos)
+            if (data[pos + 3] & 0b11000000) != 0b10000000:
+                return SimdutfResult(error = .too_short, count = pos)
+            # range check
+            let code_point = ((u32)byte & 0b00000111) << 18 | ((u32)data[pos + 1] & 0b00111111) << 12 | ((u32)data[pos + 2] & 0b00111111) << 6 | ((u32)data[pos + 3] & 0b00111111)
+            if code_point <= 0xffff:
+                return SimdutfResult(error = .overlong, count = pos)
+            if 0x10ffff < code_point:
+                return SimdutfResult(error = .too_large, count = pos)
+        else:
+            # we either have too many continuation bytes or an invalid leading byte
+            if (byte & 0b11000000) == 0b10000000:
+                return SimdutfResult(error = .too_long, count = pos)
+            return SimdutfResult(error = .header_bits, count = pos)
+        pos = next_pos
+    return SimdutfResult(error = .success, count = len)
+
+## simdutf::validate_utf8.
+pub func simdutf_validate_utf8(data: const u8[]) -> bool:
+    return simdutf_validate_utf8_with_errors(data).error == SimdutfErrorCode.success
+
+## simdutf::count_utf8: the number of code points of valid UTF-8 (bytes that are not
+## continuation bytes).
+pub func simdutf_count_utf8(data: const u8[]) -> usize:
+    var counter: usize = 0
+    for byte in data:
+        if (i8)byte > -65:
+            counter += 1
+    return counter
+
+## simdutf::utf16_length_from_utf8: the UTF-16 code units valid UTF-8 needs.
+pub func simdutf_utf16_length_from_utf8(data: const u8[]) -> usize:
+    var counter: usize = 0
+    for byte in data:
+        if (i8)byte > -65:
+            counter += 1
+        if byte >= 240:
+            counter += 1
+    return counter
+
+## simdutf::convert_utf8_to_utf16: transcodes UTF-8 into host-endian UTF-16 and answers the code
+## units written, or 0 when the input is not valid UTF-8.
+pub func simdutf_convert_utf8_to_utf16(data: const u8[], output: u16[]) -> usize:
+    let len = data.length
+    var pos: usize = 0
+    var written: usize = 0
+    while pos < len:
+        let leading_byte = data[pos]
+        if leading_byte < 0b10000000:
+            # converting one ASCII byte !!!
+            output[written] = leading_byte
+            written += 1
+            pos += 1
+        elif (leading_byte & 0b11100000) == 0b11000000:
+            # We have a two-byte UTF-8, it should become a single UTF-16 word.
+            if pos + 1 >= len:
+                return 0
+            if (data[pos + 1] & 0b11000000) != 0b10000000:
+                return 0
+            # range check
+            let code_point = ((u32)leading_byte & 0b00011111) << 6 | ((u32)data[pos + 1] & 0b00111111)
+            if code_point < 0x80 or 0x7ff < code_point:
+                return 0
+            output[written] = (u16)code_point
+            written += 1
+            pos += 2
+        elif (leading_byte & 0b11110000) == 0b11100000:
+            # We have a three-byte UTF-8, it should become a single UTF-16 word.
+            if pos + 2 >= len:
+                return 0
+            if (data[pos + 1] & 0b11000000) != 0b10000000:
+                return 0
+            if (data[pos + 2] & 0b11000000) != 0b10000000:
+                return 0
+            # range check
+            let code_point = ((u32)leading_byte & 0b00001111) << 12 | ((u32)data[pos + 1] & 0b00111111) << 6 | ((u32)data[pos + 2] & 0b00111111)
+            if code_point < 0x800 or 0xffff < code_point or (0xd7ff < code_point and code_point < 0xe000):
+                return 0
+            output[written] = (u16)code_point
+            written += 1
+            pos += 3
+        elif (leading_byte & 0b11111000) == 0b11110000:
+            # We have a four-byte UTF-8 word.
+            if pos + 3 >= len:
+                return 0
+            if (data[pos + 1] & 0b11000000) != 0b10000000:
+                return 0
+            if (data[pos + 2] & 0b11000000) != 0b10000000:
+                return 0
+            if (data[pos + 3] & 0b11000000) != 0b10000000:
+                return 0
+            # range check
+            var code_point = ((u32)leading_byte & 0b00000111) << 18 | ((u32)data[pos + 1] & 0b00111111) << 12 | ((u32)data[pos + 2] & 0b00111111) << 6 | ((u32)data[pos + 3] & 0b00111111)
+            if code_point <= 0xffff or 0x10ffff < code_point:
+                return 0
+            code_point -= 0x10000
+            output[written] = (u16)(0xd800 + (code_point >> 10))
+            output[written + 1] = (u16)(0xdc00 + (code_point & 0x3ff))
+            written += 2
+            pos += 4
+        else:
+            return 0
+    return written
+
+# mark: UTF-16 ==================================================================================
+
+## Reads the code unit at `index` of UTF-16 bytes in the stated byte order.
+func simdutf_utf16_unit_at(bytes: const u8[], index: usize, big_endian: bool) -> u16:
+    let first = (u16)bytes[index * 2]
+    let second = (u16)bytes[index * 2 + 1]
+    if big_endian:
+        return (first << 8) | second
+    return (second << 8) | first
+
+## simdutf::validate_utf16_with_errors (scalar utf16::validate_with_errors).
+pub func simdutf_validate_utf16_with_errors(data: const u16[]) -> SimdutfResult:
+    let len = data.length
+    var pos: usize = 0
+    while pos < len:
+        let word = data[pos]
+        if (word & 0xf800) == 0xd800:
+            if pos + 1 >= len:
+                return SimdutfResult(error = .surrogate, count = pos)
+            let diff = word -% 0xd800
+            if diff > 0x3ff:
+                return SimdutfResult(error = .surrogate, count = pos)
+            let diff2 = data[pos + 1] -% 0xdc00
+            if diff2 > 0x3ff:
+                return SimdutfResult(error = .surrogate, count = pos)
+            pos += 2
+        else:
+            pos += 1
+    return SimdutfResult(error = .success, count = pos)
+
+## simdutf::validate_utf16: whether host-endian UTF-16 has no lonely surrogate.
+pub func simdutf_validate_utf16(data: const u16[]) -> bool:
+    return simdutf_validate_utf16_with_errors(data).error == SimdutfErrorCode.success
+
+## simdutf::validate_utf16le / validate_utf16be over raw bytes (a trailing odd byte is ignored).
+pub func simdutf_validate_utf16_bytes(bytes: const u8[], big_endian: bool) -> bool:
+    let len = bytes.length // 2
+    var pos: usize = 0
+    while pos < len:
+        let word = simdutf_utf16_unit_at(bytes, pos, big_endian)
+        if (word & 0xf800) == 0xd800:
+            if pos + 1 >= len:
+                return false
+            let diff = word -% 0xd800
+            if diff > 0x3ff:
+                return false
+            let diff2 = simdutf_utf16_unit_at(bytes, pos + 1, big_endian) -% 0xdc00
+            if diff2 > 0x3ff:
+                return false
+            pos += 2
+        else:
+            pos += 1
+    return true
+
+## simdutf::validate_utf16_as_ascii: whether every code unit is below 0x80.
+pub func simdutf_validate_utf16_as_ascii(data: const u16[]) -> bool:
+    for word in data:
+        if word >= 0x80:
+            return false
+    return true
+
+## simdutf::count_utf16: the number of code points of valid UTF-16.
+pub func simdutf_count_utf16(data: const u16[]) -> usize:
+    var counter: usize = 0
+    for word in data:
+        if (word & 0xfc00) != 0xdc00:
+            counter += 1
+    return counter
+
+## simdutf::utf8_length_from_utf16: the UTF-8 bytes valid UTF-16 needs.
+pub func simdutf_utf8_length_from_utf16(data: const u16[]) -> usize:
+    var counter: usize = 0
+    for word in data:
+        counter += simdutf_utf8_length_of_utf16_unit(word)
+    return counter
+
+## simdutf::utf8_length_from_utf16le / utf8_length_from_utf16be over raw bytes.
+pub func simdutf_utf8_length_from_utf16_bytes(bytes: const u8[], big_endian: bool) -> usize:
+    var counter: usize = 0
+    for i in 0..<(bytes.length // 2):
+        counter += simdutf_utf8_length_of_utf16_unit(simdutf_utf16_unit_at(bytes, i, big_endian))
+    return counter
+
+## One code unit's share of utf8_length_from_utf16: surrogates count 2 each, 4 a pair.
+func simdutf_utf8_length_of_utf16_unit(word: u16) -> usize:
+    var counter: usize = 1 # ASCII
+    if word > 0x7f:
+        counter += 1 # non-ASCII is at least 2 bytes, surrogates are 2*2 == 4 bytes
+    if (word > 0x7ff and word <= 0xd7ff) or word >= 0xe000:
+        counter += 1 # three-byte
+    return counter
+
+## simdutf::convert_utf16_to_utf8_with_errors (scalar utf16_to_utf8::convert_with_errors): writes
+## UTF-8 for host-endian UTF-16 until a lonely surrogate; `count` is the input position reached.
+## The bytes written are `written` of the answer.
+pub func simdutf_convert_utf16_to_utf8_with_errors(data: const u16[], output: u8[]) -> (SimdutfResult, usize):
+    let len = data.length
+    var pos: usize = 0
+    var written: usize = 0
+    while pos < len:
+        let word = data[pos]
+        if (word & 0xff80) == 0:
+            # will generate one UTF-8 bytes
+            output[written] = (u8)word
+            written += 1
+            pos += 1
+        elif (word & 0xf800) == 0:
+            # will generate two UTF-8 bytes
+            # we have 0b110XXXXX 0b10XXXXXX
+            output[written] = (u8)((word >> 6) | 0b11000000)
+            output[written + 1] = (u8)((word & 0b111111) | 0b10000000)
+            written += 2
+            pos += 1
+        elif (word & 0xf800) != 0xd800:
+            # will generate three UTF-8 bytes
+            # we have 0b1110XXXX 0b10XXXXXX 0b10XXXXXX
+            output[written] = (u8)((word >> 12) | 0b11100000)
+            output[written + 1] = (u8)(((word >> 6) & 0b111111) | 0b10000000)
+            output[written + 2] = (u8)((word & 0b111111) | 0b10000000)
+            written += 3
+            pos += 1
+        else:
+            # must be a surrogate pair
+            if pos + 1 >= len:
+                return (SimdutfResult(error = .surrogate, count = pos), written)
+            let diff = word -% 0xd800
+            if diff > 0x3ff:
+                return (SimdutfResult(error = .surrogate, count = pos), written)
+            let diff2 = data[pos + 1] -% 0xdc00
+            if diff2 > 0x3ff:
+                return (SimdutfResult(error = .surrogate, count = pos), written)
+            let value = ((u32)diff << 10) + (u32)diff2 + 0x10000
+            # will generate four UTF-8 bytes
+            # we have 0b11110XXX 0b10XXXXXX 0b10XXXXXX 0b10XXXXXX
+            output[written] = (u8)((value >> 18) | 0b11110000)
+            output[written + 1] = (u8)(((value >> 12) & 0b111111) | 0b10000000)
+            output[written + 2] = (u8)(((value >> 6) & 0b111111) | 0b10000000)
+            output[written + 3] = (u8)((value & 0b111111) | 0b10000000)
+            written += 4
+            pos += 2
+    return (SimdutfResult(error = .success, count = pos), written)
+
+## simdutf::convert_utf16_to_utf8: the UTF-8 bytes written for host-endian UTF-16, or 0 when the
+## input has a lonely surrogate.
+pub func simdutf_convert_utf16_to_utf8(data: const u16[], output: u8[]) -> usize:
+    let (result, written) = simdutf_convert_utf16_to_utf8_with_errors(data, output)
+    if result.error != SimdutfErrorCode.success:
+        return 0
+    return written
+
+## simdutf::convert_utf16le_to_utf8 / convert_utf16be_to_utf8 over raw bytes: the UTF-8 bytes
+## written, or 0 when the input has a lonely surrogate.
+pub func simdutf_convert_utf16_bytes_to_utf8(bytes: const u8[], big_endian: bool, output: u8[]) -> usize:
+    let units = new u16[bytes.length // 2] else trap("out of memory")
+    for i in 0..<units.length:
+        units[i] = simdutf_utf16_unit_at(bytes, i, big_endian)
+    return simdutf_convert_utf16_to_utf8(units, output)
+
+## simdutf::to_well_formed_utf16 (scalar utf16::to_well_formed_utf16): copies host-endian UTF-16,
+## replacing every lonely surrogate by U+FFFD.
+pub func simdutf_to_well_formed_utf16(input: const u16[], output: u16[]):
+    let replacement: u16 = 0xfffd
+    var high_surrogate_prev = false
+    var i: usize = 0
+    while i < input.length:
+        let c = input[i]
+        let high_surrogate = 0xd800 <= c and c <= 0xdbff
+        let low_surrogate = 0xdc00 <= c and c <= 0xdfff
+        if high_surrogate_prev and not low_surrogate:
+            output[i - 1] = replacement
+
+        if not high_surrogate_prev and low_surrogate:
+            output[i] = replacement
+        else:
+            output[i] = input[i]
+        high_surrogate_prev = high_surrogate
+        i += 1
+
+    # string may not end with high surrogate
+    if high_surrogate_prev:
+        output[i - 1] = replacement
+
+## simdutf::to_well_formed_utf16le / to_well_formed_utf16be over raw bytes: the well-formed
+## code units, in host order.
+pub func simdutf_to_well_formed_utf16_bytes(bytes: const u8[], big_endian: bool) -> u16[]:
+    let units = new u16[bytes.length // 2] else trap("out of memory")
+    for i in 0..<units.length:
+        units[i] = simdutf_utf16_unit_at(bytes, i, big_endian)
+    let output = new u16[units.length] else trap("out of memory")
+    simdutf_to_well_formed_utf16(units, output)
+    return output
+
+# mark: UTF-32 ==================================================================================
+
+## simdutf::validate_utf32: whether every value is a Unicode scalar value.
+pub func simdutf_validate_utf32(data: const u32[]) -> bool:
+    for word in data:
+        if word > 0x10ffff or (word >= 0xd800 and word <= 0xdfff):
+            return false
+    return true
+
+## simdutf::utf16_length_from_utf32.
+pub func simdutf_utf16_length_from_utf32(data: const u32[]) -> usize:
+    var counter: usize = 0
+    for word in data:
+        counter += 1 # non-surrogate word
+        if word > 0xffff:
+            counter += 1 # surrogate pair
+    return counter
+
+## simdutf::convert_utf32_to_utf8: the UTF-8 bytes written, or 0 for an invalid value.
+pub func simdutf_convert_utf32_to_utf8(data: const u32[], output: u8[]) -> usize:
+    var written: usize = 0
+    for word in data:
+        if (word & 0xffffff80) == 0:
+            # will generate one UTF-8 bytes
+            output[written] = (u8)word
+            written += 1
+        elif (word & 0xfffff800) == 0:
+            # will generate two UTF-8 bytes
+            output[written] = (u8)((word >> 6) | 0b11000000)
+            output[written + 1] = (u8)((word & 0b111111) | 0b10000000)
+            written += 2
+        elif (word & 0xffff0000) == 0:
+            # will generate three UTF-8 bytes
+            if word >= 0xd800 and word <= 0xdfff:
+                return 0
+            output[written] = (u8)((word >> 12) | 0b11100000)
+            output[written + 1] = (u8)(((word >> 6) & 0b111111) | 0b10000000)
+            output[written + 2] = (u8)((word & 0b111111) | 0b10000000)
+            written += 3
+        else:
+            # will generate four UTF-8 bytes
+            if word > 0x10ffff:
+                return 0
+            output[written] = (u8)((word >> 18) | 0b11110000)
+            output[written + 1] = (u8)(((word >> 12) & 0b111111) | 0b10000000)
+            output[written + 2] = (u8)(((word >> 6) & 0b111111) | 0b10000000)
+            output[written + 3] = (u8)((word & 0b111111) | 0b10000000)
+            written += 4
+    return written
+
+## simdutf::convert_utf32_to_utf16: the host-endian code units written, or 0 for an invalid value.
+pub func simdutf_convert_utf32_to_utf16(data: const u32[], output: u16[]) -> usize:
+    var written: usize = 0
+    for word in data:
+        if (word & 0xffff0000) == 0:
+            if word >= 0xd800 and word <= 0xdfff:
+                return 0
+            output[written] = (u16)word
+            written += 1
+        else:
+            if word > 0x10ffff:
+                return 0
+            let value = word - 0x10000
+            output[written] = (u16)(0xd800 + (value >> 10))
+            output[written + 1] = (u16)(0xdc00 + (value & 0x3ff))
+            written += 2
+    return written

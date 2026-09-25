@@ -1,0 +1,222 @@
+#==============================================================================================
+#
+#   string_base - StringBase: the eight bytes shared by String and FlyString
+#
+#   DESCRIPTION:
+#       Port of AK/StringBase.h (lines 1-294) and AK/StringBase.cpp (lines 1-50).
+#
+#       A StringBase is a union of a ShortString (up to seven bytes inline, with the byte count
+#       shifted left by two and the low bit set as SHORT_STRING_FLAG) and a pointer to a
+#       StringData. Copies are plain copies: there is no reference count to adjust (DESIGN.md
+#       §3.3). The union's pointer member is read through its bits (`raw`), since reading an
+#       optional-pointer member the short string wrote is undefined in luce-base; this is the
+#       `__builtin_launder` of the C++.
+#
+#==============================================================================================
+
+# mark: ShortString =============================================================================
+
+## Ported from AK/StringBase.h:188 AK::Detail::ShortString::create_empty.
+pub func short_string_create_empty() -> ShortString:
+    return short_string_create_with_byte_count(0)
+
+## Ported from AK/StringBase.h:193 AK::Detail::ShortString::create_with_byte_count.
+pub func short_string_create_with_byte_count(byte_count: usize) -> ShortString:
+    var string = ShortString()
+    string.byte_count_and_short_string_flag = (u8)((byte_count << (usize)string_base_short_string_byte_count_shift_count) | string_base_short_string_flag)
+
+    return string
+
+## Ported from AK/StringBase.h:201 AK::Detail::ShortString::bytes.
+pub func short_string_bytes(this: const ShortString*) -> const u8[]:
+    return this.storage[..<short_string_byte_count(this)]
+
+## Ported from AK/StringBase.h:206 AK::Detail::ShortString::byte_count.
+pub func short_string_byte_count(this: const ShortString*) -> usize:
+    return (usize)(this.byte_count_and_short_string_flag >> (u8)string_base_short_string_byte_count_shift_count)
+
+# mark: StringBase ==============================================================================
+
+## Ported from AK/StringBase.h:42 AK::Detail::StringBase::StringBase(): the empty string.
+pub func string_base_construct(this: StringBase*):
+    string_base_construct_short_string(this, short_string_create_empty())
+
+## The value of `StringBase {}`: the empty string.
+pub func string_base_new() -> StringBase:
+    var base = StringBase()
+    string_base_construct(&base)
+    return base
+
+## Ported from AK/StringBase.h:247 AK::Detail::StringBase::StringBase(NonnullRefPtr<StringData>).
+pub func string_base_construct_string_data(this: StringBase*, data: const StringData*):
+    this.m_impl.data = data
+
+## Ported from AK/StringBase.h:68 AK::Detail::StringBase::is_short_string. NOTE: This is
+## primarily interesting to unit tests.
+pub func string_base_is_short_string(this: const StringBase*) -> bool:
+    return (string_base_short_string_without_union_member_assertion(this).byte_count_and_short_string_flag & (u8)string_base_short_string_flag) != 0
+
+## Ported from AK/StringBase.h:211 AK::Detail::StringBase::bytes: the underlying UTF-8 encoded
+## bytes, inside the StringBase itself for a short string. NOTE: There is no guarantee about
+## null-termination.
+pub func string_base_bytes(this: const StringBase*) -> const u8[]:
+    if string_base_is_short_string(this):
+        return short_string_bytes(&this.m_impl.short_string)
+    let data = string_base_data_without_union_member_assertion(this) else return b""
+    return string_data_bytes(data)
+
+## Ported from AK/StringBase.h:220 AK::Detail::StringBase::hash.
+pub func string_base_hash(this: const StringBase*) -> u32:
+    if string_base_is_short_string(this):
+        let bytes = string_base_bytes(this)
+        return string_hash[u8](bytes.data, bytes.length)
+    let data = string_base_data_without_union_member_assertion(this) else return string_hash[u8](none, 0)
+    return string_data_hash(data)
+
+## Ported from AK/StringBase.h:231 AK::Detail::StringBase::byte_count.
+pub func string_base_byte_count(this: const StringBase*) -> usize:
+    if string_base_is_short_string(this):
+        return short_string_byte_count(&this.m_impl.short_string)
+
+    let data = string_base_data_without_union_member_assertion(this) else return 0
+    return string_data_byte_count(data)
+
+## Ported from AK/StringBase.h:83 AK::Detail::StringBase::length_in_code_units.
+pub func string_base_length_in_code_units(this: const StringBase*) -> usize:
+    return string_base_byte_count(this)
+
+## Ported from AK/StringBase.h:281 AK::Detail::StringBase::operator==.
+pub func string_base_eq(this: const StringBase*, other: const StringBase*) -> bool:
+    if string_base_is_short_string(this):
+        return string_base_raw(this) == string_base_raw(other)
+    if string_base_is_short_string(other):
+        return false
+    let this_data = string_base_data_without_union_member_assertion(this)
+    let other_data = string_base_data_without_union_member_assertion(other)
+    if this_data == none or other_data == none:
+        return this_data == other_data
+    if string_data_is_fly_string(this_data else trap("unreachable")) and string_data_is_fly_string(other_data else trap("unreachable")):
+        return this_data == other_data
+    let this_bytes = string_view_from_bytes(string_base_bytes(this))
+    return string_view_eq_string_view(&this_bytes, string_view_from_bytes(string_base_bytes(other)))
+
+## `bit_cast<FlatPtr>(m_impl)`: the union's eight bytes as one word.
+func string_base_raw(this: const StringBase*) -> usize:
+    return memory.read[usize](&this.m_impl)
+
+## Ported from AK/StringBase.h:87 AK::Detail::StringBase::raw(Badge<FlyString>).
+pub func string_base_raw_fly_string(this: const StringBase*) -> usize:
+    return string_base_raw(this)
+
+## Ported from AK/StringBase.h:88 AK::Detail::StringBase::raw(Badge<String>).
+pub func string_base_raw_string(this: const StringBase*) -> usize:
+    return string_base_raw(this)
+
+## Ported from AK/StringBase.h:91 AK::Detail::StringBase::replace_with_new_string(Badge<StringView>, ...).
+pub func string_base_replace_with_new_string_string_view[TFunc: BytesCallback](this: StringBase*, byte_count: usize, callback: TFunc*) -> !:
+    try string_base_replace_with_new_string_usize(this, byte_count, callback)
+
+## Ported from AK/StringBase.h:97 AK::Detail::StringBase::replace_with_new_string(Badge<Utf16View>, ...).
+pub func string_base_replace_with_new_string_utf16_view[TFunc: BytesCallback](this: StringBase*, byte_count: usize, callback: TFunc*) -> !:
+    try string_base_replace_with_new_string_usize(this, byte_count, callback)
+
+## Ported from AK/StringBase.h:104 AK::Detail::StringBase::replace_with_new_string: replaces
+## the string by `byte_count` bytes that `callback` writes.
+pub func string_base_replace_with_new_string_usize[TFunc: BytesCallback](this: StringBase*, byte_count: usize, callback: TFunc*) -> !:
+    let buffer = try string_base_replace_with_uninitialized_buffer(this, byte_count)
+    if byte_count != 0:
+        try callback.call(buffer)
+
+## Ported from AK/StringBase.h:113 AK::Detail::StringBase::replace_with_new_short_string.
+pub func string_base_replace_with_new_short_string[TFunc: ShortStringBytesCallback](this: StringBase*, byte_count: usize, callback: TFunc*):
+    let buffer = string_base_replace_with_uninitialized_short_string(this, byte_count)
+    if byte_count != 0:
+        callback.call(buffer)
+
+## Ported from AK/StringBase.cpp:12 AK::Detail::StringBase::replace_with_string_builder.
+pub func string_base_replace_with_string_builder(this: StringBase*, builder: StringBuilder*):
+    if string_builder_length(builder) <= max_short_string_byte_count:
+        let view = string_builder_string_view(builder)
+        var copy = CopyBytesToShortString(source = string_view_bytes(&view))
+        string_base_replace_with_new_short_string(this, string_builder_length(builder), &copy)
+        return
+
+    string_base_destroy_string(this)
+
+    this.m_impl.data = string_data_create_from_string_builder(builder)
+
+## Ported from AK/StringBase.cpp:36 AK::Detail::StringBase::substring_from_byte_offset_with_shared_superstring.
+## This is not a trivial operation with storage, so it does not belong here. Unfortunately, it
+## is impossible to implement it without access to StringData.
+pub func string_base_substring_from_byte_offset_with_shared_superstring(this: const StringBase*, start: usize, length: usize) -> StringBase!:
+    assert(start + length <= string_base_byte_count(this))
+
+    if length == 0:
+        return string_base_new()
+    if length <= max_short_string_byte_count:
+        var result = string_base_new()
+        let destination = string_base_replace_with_uninitialized_short_string(&result, length)
+        copy_bytes(destination, string_base_bytes(this)[start..<start + length])
+        return result
+    let data = string_base_data_without_union_member_assertion(this) else trap("VERIFY: substring of a null string")
+    var result = StringBase()
+    string_base_construct_string_data(&result, try string_data_create_substring(data, start, length))
+    return result
+
+## Ported from AK/StringBase.h:131 AK::Detail::StringBase::StringBase(nullptr_t): the invalid
+## string (a null data pointer), the sentinel of Optional<String>.
+pub func string_base_construct_void(this: StringBase*):
+    this.m_impl.data = none
+
+## Ported from AK/StringBase.h:136 AK::Detail::StringBase::StringBase(ShortString).
+pub func string_base_construct_short_string(this: StringBase*, short_string: ShortString):
+    this.m_impl.short_string = short_string
+
+## Ported from AK/StringBase.cpp:25 AK::Detail::StringBase::replace_with_uninitialized_buffer.
+pub func string_base_replace_with_uninitialized_buffer(this: StringBase*, byte_count: usize) -> u8[]!:
+    if byte_count <= max_short_string_byte_count:
+        return string_base_replace_with_uninitialized_short_string(this, byte_count)
+
+    var buffer: u8*? = none
+    string_base_destroy_string(this)
+    this.m_impl.data = try string_data_create_uninitialized(byte_count, &buffer)
+    return u8[](buffer else trap("VERIFY: create_uninitialized"), byte_count)
+
+## Ported from AK/StringBase.h:143 AK::Detail::StringBase::replace_with_uninitialized_short_string:
+## the short string's storage, inside this StringBase.
+pub func string_base_replace_with_uninitialized_short_string(this: StringBase*, byte_count: usize) -> u8[]:
+    assert(string_base_is_short_string(this))
+    assert(byte_count <= max_short_string_byte_count)
+
+    this.m_impl.short_string = short_string_create_with_byte_count(byte_count)
+    return this.m_impl.short_string.storage[..<byte_count]
+
+## Ported from AK/StringBase.h:241 AK::Detail::StringBase::destroy_string: nothing to release in
+## managed memory (the C++ unrefs the StringData).
+pub func string_base_destroy_string(this: StringBase*):
+    return
+
+## Ported from AK/StringBase.h:178 AK::Detail::StringBase::short_string_without_union_member_assertion.
+pub func string_base_short_string_without_union_member_assertion(this: const StringBase*) -> ShortString:
+    return this.m_impl.short_string
+
+## Ported from AK/StringBase.h:179 AK::Detail::StringBase::data_without_union_member_assertion.
+pub func string_base_data_without_union_member_assertion(this: const StringBase*) -> const StringData*?:
+    return (const StringData*?)string_base_raw(this)
+
+# mark: Shared callbacks ========================================================================
+
+## The `[&](Bytes buffer) { bytes.copy_to(buffer); }` lambda several String functions pass to
+## replace_with_new_string.
+pub struct CopyBytesToBuffer: BytesCallback:
+    pub var source: const u8[]
+
+    pub mutating func call(buffer: u8[]) -> !:
+        copy_bytes(buffer, self.source)
+
+## The same lambda for replace_with_new_short_string.
+pub struct CopyBytesToShortString: ShortStringBytesCallback:
+    pub var source: const u8[]
+
+    pub mutating func call(buffer: u8[]):
+        copy_bytes(buffer, self.source)

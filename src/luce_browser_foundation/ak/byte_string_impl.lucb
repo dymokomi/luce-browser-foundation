@@ -1,0 +1,139 @@
+#==============================================================================================
+#
+#   byte_string_impl - ByteStringImpl: the NUL-terminated heap block behind a ByteString
+#
+#   DESCRIPTION:
+#       Port of AK/ByteStringImpl.h (lines 1-115) and AK/ByteStringImpl.cpp (lines 1-107).
+#
+#       The characters and a NUL follow the header at `sizeof(ByteStringImpl)`. Blocks come
+#       from the current allocator (the managed heap once region gc lands); there is no
+#       reference count (DESIGN.md §3.3). The empty impl is the static s_the_empty_stringimpl.
+#
+#==============================================================================================
+
+# mark: Creation ================================================================================
+
+## Ported from AK/ByteStringImpl.h:97 AK::allocation_size_for_stringimpl: header, characters and NUL.
+pub func allocation_size_for_stringimpl(length: usize) -> usize:
+    return sizeof(ByteStringImpl) + (sizeof(u8) * length) + sizeof(u8)
+
+## Ported from AK/ByteStringImpl.cpp:47 AK::ByteStringImpl::create_uninitialized: an impl of
+## `length` uninitialized characters (NUL-terminated); `buffer` receives their address.
+pub func byte_string_impl_create_uninitialized(length: usize, buffer: (u8*?)*) -> const ByteStringImpl*:
+    assert(length != 0)
+    let slot = alloc(allocation_size_for_stringimpl(length), alignof(ByteStringImpl)) else trap("VERIFY: kmalloc")
+    let new_stringimpl = (ByteStringImpl*)slot.data
+    byte_string_impl_construct_byte_string_impl_construct_wit(new_stringimpl, ByteStringImplConstructWithInlineBufferTag.construct_with_inline_buffer, length)
+    let characters = (u8*)new_stringimpl + sizeof(ByteStringImpl)
+    characters[length] = 0
+    *buffer = characters
+    return new_stringimpl
+
+## Ported from AK/ByteStringImpl.cpp:80 AK::ByteStringImpl::create(char const*, ShouldChomp): an
+## impl of a NUL-terminated string.
+pub func byte_string_impl_create_u8_should_chomp(cstring: const u8*?, should_chomp: ShouldChomp = ShouldChomp.no_chomp) -> const ByteStringImpl*:
+    let characters = cstring else return byte_string_impl_the_empty_stringimpl()
+    if characters[0] == 0:
+        return byte_string_impl_the_empty_stringimpl()
+
+    var length: usize = 0
+    while characters[length] != 0:
+        length += 1
+    return byte_string_impl_create_u8_usize(characters, length, should_chomp)
+
+## Ported from AK/ByteStringImpl.cpp:58 AK::ByteStringImpl::create(char const*, size_t, ShouldChomp).
+pub func byte_string_impl_create_u8_usize(cstring: const u8*?, length: usize, should_chomp: ShouldChomp = ShouldChomp.no_chomp) -> const ByteStringImpl*:
+    var remaining = length
+    if should_chomp == ShouldChomp.chomp:
+        let characters = cstring else trap("VERIFY: cstring")
+        while remaining != 0:
+            let last_ch = characters[remaining - 1]
+            if last_ch == 0 or last_ch == '\n' or last_ch == '\r':
+                remaining -= 1
+            else:
+                break
+
+    if remaining == 0:
+        return byte_string_impl_the_empty_stringimpl()
+
+    var buffer: u8*? = none
+    let new_stringimpl = byte_string_impl_create_uninitialized(remaining, &buffer)
+    copy_bytes(u8[](buffer else trap("VERIFY: buffer"), remaining), u8[]((u8*)(cstring else trap("VERIFY: cstring")), remaining))
+
+    return new_stringimpl
+
+## Ported from AK/ByteStringImpl.cpp:88 AK::ByteStringImpl::create(ReadonlyBytes, ShouldChomp).
+pub func byte_string_impl_create_span_u8(bytes: const u8[], should_chomp: ShouldChomp = ShouldChomp.no_chomp) -> const ByteStringImpl*:
+    if bytes.length == 0:
+        return byte_string_impl_the_empty_stringimpl()
+    return byte_string_impl_create_u8_usize(bytes.data, bytes.length, should_chomp)
+
+## Ported from AK/ByteStringImpl.cpp:35 AK::ByteStringImpl::the_empty_stringimpl.
+pub func byte_string_impl_the_empty_stringimpl() -> ByteStringImpl*:
+    return &s_the_empty_stringimpl.impl
+
+# mark: Accessors ===============================================================================
+
+## Ported from AK/ByteStringImpl.h:40 AK::ByteStringImpl::length.
+pub func byte_string_impl_length(this: const ByteStringImpl*) -> usize:
+    return this.m_length
+
+## Ported from AK/ByteStringImpl.h:42 AK::ByteStringImpl::characters: includes the NUL terminator.
+pub func byte_string_impl_characters(this: const ByteStringImpl*) -> const u8*:
+    return (const u8*)((u8*)this + sizeof(ByteStringImpl))
+
+## Ported from AK/ByteStringImpl.h:44 AK::ByteStringImpl::bytes.
+pub func byte_string_impl_bytes(this: const ByteStringImpl*) -> const u8[]:
+    return u8[]((u8*)byte_string_impl_characters(this), byte_string_impl_length(this))
+
+## Ported from AK/ByteStringImpl.h:45 AK::ByteStringImpl::view.
+pub func byte_string_impl_view(this: const ByteStringImpl*) -> StringView:
+    return StringView(m_characters = byte_string_impl_characters(this), m_length = byte_string_impl_length(this))
+
+## Ported from AK/ByteStringImpl.h:47 AK::ByteStringImpl::operator[].
+pub func byte_string_impl_at(this: const ByteStringImpl*, i: usize) -> u8:
+    assert(i < this.m_length)
+    return byte_string_impl_characters(this)[i]
+
+## Ported from AK/ByteStringImpl.h:53 AK::ByteStringImpl::operator==.
+pub func byte_string_impl_eq(this: const ByteStringImpl*, other: const ByteStringImpl*) -> bool:
+    if byte_string_impl_length(this) != byte_string_impl_length(other):
+        return false
+    return compare_bytes(byte_string_impl_bytes(this), byte_string_impl_bytes(other)) == 0
+
+## Ported from AK/ByteStringImpl.h:60 AK::ByteStringImpl::hash.
+pub func byte_string_impl_hash(this: const ByteStringImpl*) -> u32:
+    if not this.m_has_hash:
+        byte_string_impl_compute_hash(this)
+    return this.m_hash
+
+## Ported from AK/ByteStringImpl.h:67 AK::ByteStringImpl::existing_hash.
+pub func byte_string_impl_existing_hash(this: const ByteStringImpl*) -> u32:
+    return this.m_hash
+
+## Ported from AK/ByteStringImpl.cpp:93 AK::ByteStringImpl::case_insensitive_hash.
+pub func byte_string_impl_case_insensitive_hash(this: const ByteStringImpl*) -> u32:
+    return case_insensitive_string_hash(byte_string_impl_characters(this), byte_string_impl_length(this))
+
+# mark: Construction ============================================================================
+
+## Ported from AK/ByteStringImpl.h:80 AK::ByteStringImpl::ByteStringImpl(ConstructTheEmptyStringImplTag).
+pub func byte_string_impl_construct_byte_string_impl_construct_the(this: ByteStringImpl*, tag: ByteStringImplConstructTheEmptyStringImplTag):
+    this.m_length = 0
+    this.m_hash = 0
+    this.m_has_hash = false
+
+## Ported from AK/ByteStringImpl.cpp:40 AK::ByteStringImpl::ByteStringImpl(ConstructWithInlineBufferTag, size_t).
+pub func byte_string_impl_construct_byte_string_impl_construct_wit(this: ByteStringImpl*, tag: ByteStringImplConstructWithInlineBufferTag, length: usize):
+    this.m_length = length
+    this.m_hash = 0
+    this.m_has_hash = false
+
+## Ported from AK/ByteStringImpl.cpp:98 AK::ByteStringImpl::compute_hash (the hash fields are `mutable`).
+func byte_string_impl_compute_hash(this: const ByteStringImpl*):
+    let mutable_this = (ByteStringImpl*)this
+    if byte_string_impl_length(this) == 0:
+        mutable_this.m_hash = 0
+    else:
+        mutable_this.m_hash = string_hash[u8](byte_string_impl_characters(this), this.m_length)
+    mutable_this.m_has_hash = true

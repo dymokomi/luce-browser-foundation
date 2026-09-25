@@ -34,10 +34,16 @@ pub struct Utf8ViewUtf8EncodedByteData:
     pub var first_code_point: u32  # C++ default: { 0 }
     pub var last_code_point: u32  # C++ default: { 0 }
 
-## AK::Utf8View::utf8_encoded_byte_data (AK/Utf8View.h:202).
-# C++ initializer: { { { 1 , 0b0000'0000 , 0b1000'0000 , 0x0000 , 0x007F } , { 2 , 0b1100'0000 , 0b1110'0000 , 0x0080 ,
-pub var utf8_view_utf8_encoded_byte_data: Utf8ViewUtf8EncodedByteData[4]
+## AK::Utf8View::utf8_encoded_byte_data (AK/Utf8View.h:202) (initializer filled by r02).
+pub let utf8_view_utf8_encoded_byte_data: Utf8ViewUtf8EncodedByteData[4] = [
+    Utf8ViewUtf8EncodedByteData(byte_length = 1, encoding_bits = 0b0000_0000, encoding_mask = 0b1000_0000, first_code_point = 0x0000, last_code_point = 0x007f),
+    Utf8ViewUtf8EncodedByteData(byte_length = 2, encoding_bits = 0b1100_0000, encoding_mask = 0b1110_0000, first_code_point = 0x0080, last_code_point = 0x07ff),
+    Utf8ViewUtf8EncodedByteData(byte_length = 3, encoding_bits = 0b1110_0000, encoding_mask = 0b1111_0000, first_code_point = 0x0800, last_code_point = 0xffff),
+    Utf8ViewUtf8EncodedByteData(byte_length = 4, encoding_bits = 0b1111_0000, encoding_mask = 0b1111_1000, first_code_point = 0x10000, last_code_point = 0x10ffff),
+]
 
-## AK::Utf8View::LeadingByte (AK/Utf8View.h:209): opaque in this phase (not in the phase-1 closure).
+## AK::Utf8View::LeadingByte (AK/Utf8View.h:209) (fields filled by r02).
 pub struct Utf8ViewLeadingByte:
-    pub var opaque_: u8
+    pub var byte_length: usize  # C++ default: { 0 }
+    pub var code_point_bits: u32  # C++ default: { 0 }
+    pub var is_valid: bool  # C++ default: { false }

@@ -12,17 +12,12 @@
 
 # mark: EmptyByteStringImpl =====================================================================
 
-## AK::EmptyByteStringImpl (AK/ByteStringImpl.cpp:16).
+## AK::EmptyByteStringImpl (AK/ByteStringImpl.cpp:16): static storage for the empty
+## ByteStringImpl, laid out as a ByteStringImpl whose inline buffer holds the NUL terminator
+## (hand-edited by r02; there is no reference count to mirror).
 pub struct EmptyByteStringImpl:
-    pub var ref_count: u32  # C++ default: { 1 }
-    pub var length: usize  # C++ default: { 0 }
-    pub var hash: u32  # C++ default: { 0 }
-    pub var has_hash: bool  # C++ default: { false }
-    pub var inline_buffer: u8[1]
-
-## The non-zero default member initializers of AK::EmptyByteStringImpl; the constructor runs them first.
-pub func empty_byte_string_impl_init_fields(this: EmptyByteStringImpl*):
-    this.ref_count = 1
+    pub var impl: ByteStringImpl
+    pub var inline_buffer: u8[8]  # C++ default: { '\0' }
 
 ## AK::ShouldChomp (AK/ByteStringImpl.h:17).
 pub enum ShouldChomp as u32:
@@ -31,12 +26,13 @@ pub enum ShouldChomp as u32:
 
 # mark: ByteStringImpl ==========================================================================
 
-## AK::ByteStringImpl (AK/ByteStringImpl.h:24).
+## AK::ByteStringImpl (AK/ByteStringImpl.h:24). The C++ ends in `char m_inline_buffer[0]`: the
+## characters and a NUL follow the struct at `(u8*)this + sizeof(ByteStringImpl)` (hand-edited
+## by r02).
 pub struct ByteStringImpl:
     pub var m_length: usize  # C++ default: { 0 }
     pub var m_hash: u32  # C++ default: { 0 }
     pub var m_has_hash: bool  # C++ default: { false }
-    pub var m_inline_buffer: u8*?
 
 ## AK::s_the_empty_stringimpl (AK/ByteStringImpl.cpp:33).
 pub var s_the_empty_stringimpl: EmptyByteStringImpl
