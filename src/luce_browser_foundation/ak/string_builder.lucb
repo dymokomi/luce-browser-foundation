@@ -530,6 +530,16 @@ pub func string_builder_join_fly_string(this: StringBuilder*, separator: StringV
         string_builder_append_string_view(this, fly_string_bytes_as_string_view(item))
         first = false
 
+## Ported from AK/StringBuilder.h:100 AK::StringBuilder::join over Utf16Views with the default "{}"
+## format (Formatter<Utf16View> appends the view).
+pub func string_builder_join_utf16_view(this: StringBuilder*, separator: Utf16View, collection: const Utf16View[]):
+    var first = true
+    for item in collection:
+        if not first:
+            string_builder_append_utf16_view(this, separator)
+        string_builder_append_utf16_view(this, item)
+        first = false
+
 # mark: Buffer management =======================================================================
 
 ## Ported from AK/StringBuilder.h:118 AK::StringBuilder::leak_buffer_for_string_construction(Badge<StringData>).

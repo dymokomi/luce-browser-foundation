@@ -1,0 +1,421 @@
+#==============================================================================================
+#
+#   tests_utf16_view_1 - Utf16View tests (decoding, validation, case, comparison)
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestUtf16View.cpp (lines 1-541), with the helpers every Utf16 test
+#       fragment uses. `u"..."sv` literals are built by t16 (UTF-16 storage from UTF-8 text) or
+#       t16u (explicit code units, for lonely surrogates). EXPECT_DEATH checks are not ported:
+#       a trap cannot be caught.
+#
+#==============================================================================================
+
+# mark: Helpers =================================================================================
+
+## `u"text"sv`: a view with UTF-16 storage of `text` (copied into the test allocator).
+func t16(text: str) -> Utf16View:
+    let bytes = text.bytes
+    let length = simdutf_utf16_length_from_utf8(bytes)
+    let units = new u16[length + 1] else trap("t16: out of memory")
+    let written = simdutf_convert_utf8_to_utf16(bytes, units)
+    assert(written == length)
+    return utf16_view_from_utf16(units[..<length])
+
+## `u"\x...\x..."sv`: a view with UTF-16 storage of the given code units.
+func t16u(code_units: const u16[]) -> Utf16View:
+    let units = new u16[code_units.length + 1] else trap("t16u: out of memory")
+    for i in 0..<code_units.length:
+        units[i] = code_units[i]
+    return utf16_view_from_utf16(units[..<code_units.length])
+
+## `EXPECT_EQ(view, other)` for two views.
+func t16_eq(a: Utf16View, b: Utf16View) -> bool:
+    return utf16_view_eq_utf16_view(&a, &b)
+
+## `EXPECT_EQ(view, "utf8"sv)`.
+func t16_eq_str(a: Utf16View, text: str) -> bool:
+    return utf16_view_eq_string_view(&a, sv(text))
+
+## `a <=> b` for two views.
+func t16_cmp(a: Utf16View, b: Utf16View) -> i32:
+    return utf16_view_cmp(&a, &b)
+
+## `EXPECT_EQ(string, view)` for a Utf16String.
+func t16s_eq(string: const Utf16String*, view: Utf16View) -> bool:
+    return utf16_string_base_eq_utf16_view(&string.utf16_string_base, &view)
+
+## `EXPECT_EQ(string, "utf8"sv)` for a Utf16String.
+func t16s_eq_str(string: const Utf16String*, text: str) -> bool:
+    return utf16_string_base_eq_string_view(&string.utf16_string_base, sv(text))
+
+## `Utf16View { string }`.
+func t16s_view(string: const Utf16String*) -> Utf16View:
+    return utf16_string_base_utf16_view(&string.utf16_string_base)
+
+## Checks that iterating `view` yields `expected`.
+func t16_expect_code_points(view: Utf16View, expected: const u32[]):
+    assert(utf16_view_length_in_code_points(&view) == expected.length)
+    var i: usize = 0
+    var it = utf16_view_begin(&view)
+    while not utf16_code_point_iterator_done(&it):
+        assert(utf16_code_point_iterator_deref(&it) == expected[i])
+        i += 1
+        discard(utf16_code_point_iterator_inc(&it))
+    assert(i == expected.length)
+
+## Checks that `view.to_utf8(allow)` equals `expected`.
+func t16_to_utf8_is(view: Utf16View, allow: AllowLonelySurrogates, expected: const u8[]) -> bool:
+    let utf8 = utf16_view_to_utf8(&view, allow) else trap("to_utf8 failed")
+    let bytes = string_bytes_as_string_view(&utf8)
+    return string_view_eq_string_view(&bytes, string_view_from_bytes(expected))
+
+## Whether `view.to_utf8(allow)` fails.
+func t16_to_utf8_fails(view: Utf16View, allow: AllowLonelySurrogates) -> bool:
+    var failed = false
+    discard(utf16_view_to_utf8(&view, allow) catch:
+        failed = true
+        recover string_new())
+    return failed
+
+# mark: Decoding ================================================================================
+
+test "decode_ascii":
+    let string = utf16_string_from_utf8_string_view(sv("Hello World!11"))
+    let view = t16s_view(&string)
+
+    var valid_code_units: usize = 0
+    assert(utf16_view_validate_usize(&view, &valid_code_units))
+    assert(valid_code_units == utf16_view_length_in_code_units(&view))
+
+    t16_expect_code_points(view, [72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33, 49, 49])
+
+test "decode_utf8":
+    let string = utf16_string_from_utf8_string_view(sv("Привет, мир! 😀 γειά σου κόσμος こんにちは世界"))
+    let view = t16s_view(&string)
+
+    var valid_code_units: usize = 0
+    assert(utf16_view_validate_usize(&view, &valid_code_units))
+    assert(valid_code_units == utf16_view_length_in_code_units(&view))
+
+    t16_expect_code_points(view, [1055, 1088, 1080, 1074, 1077, 1090, 44, 32, 1084, 1080, 1088, 33, 32, 128512, 32, 947, 949, 953, 940, 32, 963, 959, 965, 32, 954, 972, 963, 956, 959, 962, 32, 12371, 12435, 12395, 12385, 12399, 19990, 30028])
+
+test "encode_utf8":
+    if not ak_core_is_ported:
+        return
+    let utf8_string = string_from_str("Привет, мир! 😀 γειά σου κόσμος こんにちは世界")
+    let string = utf16_string_from_utf8_string(&utf8_string)
+    let view = t16s_view(&string)
+    assert(t16_to_utf8_is(view, AllowLonelySurrogates.yes, string_base_bytes(&utf8_string.string_base)))
+    assert(t16_to_utf8_is(view, AllowLonelySurrogates.no, string_base_bytes(&utf8_string.string_base)))
+
+    let lonely = t16u([0xd83d])
+    assert(t16_to_utf8_is(lonely, AllowLonelySurrogates.yes, b"\xed\xa0\xbd"))
+    assert(t16_to_utf8_fails(lonely, AllowLonelySurrogates.no))
+
+test "decode_utf16":
+    let view = t16("Привет, мир! 😀 γειά σου κόσμος こんにちは世界")
+    assert(utf16_view_length_in_code_units(&view) == 39)
+
+    var valid_code_units: usize = 0
+    assert(utf16_view_validate_usize(&view, &valid_code_units))
+    assert(valid_code_units == utf16_view_length_in_code_units(&view))
+
+    t16_expect_code_points(view, [1055, 1088, 1080, 1074, 1077, 1090, 44, 32, 1084, 1080, 1088, 33, 32, 128512, 32, 947, 949, 953, 940, 32, 963, 959, 965, 32, 954, 972, 963, 956, 959, 962, 32, 12371, 12435, 12395, 12385, 12399, 19990, 30028])
+
+test "null_view":
+    let view = utf16_view_new()
+    assert(utf16_view_validate(&view))
+    assert(utf16_view_length_in_code_units(&view) == 0)
+    assert(utf16_view_length_in_code_points(&view) == 0)
+    assert(t16_to_utf8_is(view, AllowLonelySurrogates.no, b""))
+    assert(t16_to_utf8_is(view, AllowLonelySurrogates.yes, b""))
+
+    let it = utf16_view_begin(&view)
+    assert(utf16_code_point_iterator_done(&it))
+
+test "default_empty_view_is_empty_ascii_string":
+    let view = utf16_view_new()
+    assert(utf16_view_has_ascii_storage(&view))
+    assert(utf16_view_ascii_span(&view).length == 0)
+    assert(utf16_view_length_in_code_units(&view) == 0)
+    assert(t16_eq_str(view, ""))
+
+test "utf16_literal":
+    let empty = t16("")
+    assert(utf16_view_validate(&empty))
+    assert(utf16_view_length_in_code_units(&empty) == 0)
+
+    let a = t16("a")
+    assert(utf16_view_validate(&a))
+    assert(utf16_view_length_in_code_units(&a) == 1)
+    assert(utf16_view_code_unit_at(&a, 0) == 0x61)
+
+    let abc = t16("abc")
+    assert(utf16_view_validate(&abc))
+    assert(utf16_view_length_in_code_units(&abc) == 3)
+    assert(utf16_view_code_unit_at(&abc, 0) == 0x61)
+    assert(utf16_view_code_unit_at(&abc, 1) == 0x62)
+    assert(utf16_view_code_unit_at(&abc, 2) == 0x63)
+
+    let emoji = t16("🙃")
+    assert(utf16_view_validate(&emoji))
+    assert(utf16_view_length_in_code_units(&emoji) == 2)
+    assert(utf16_view_code_unit_at(&emoji, 0) == 0xd83d)
+    assert(utf16_view_code_unit_at(&emoji, 1) == 0xde43)
+
+## Checks the iterator's current code point, its length and its peeks at `expected`.
+func t16_expect_iterator(it: const Utf16CodePointIterator*, expected: const u32[], length_in_code_units: usize):
+    assert(utf16_code_point_iterator_deref(it) == expected[0])
+    assert(utf16_code_point_iterator_length_in_code_units(it) == length_in_code_units)
+    for offset in 0..<expected.length:
+        assert(utf16_code_point_iterator_peek(it, offset) == expected[offset])
+    assert(utf16_code_point_iterator_peek(it, expected.length) == none)
+
+test "iterate_utf16":
+    let view = t16("Привет 😀🙃")
+    let end = utf16_view_end(&view)
+    var iterator = utf16_view_begin(&view)
+
+    t16_expect_iterator(&iterator, [0x041f, 0x0440, 0x0438, 0x0432, 0x0435, 0x0442, 0x0020, 0x1f600, 0x1f643], 1)
+
+    assert(not utf16_code_point_iterator_eq(utf16_code_point_iterator_inc(&iterator), &end))
+    t16_expect_iterator(&iterator, [0x0440, 0x0438, 0x0432, 0x0435, 0x0442, 0x0020, 0x1f600, 0x1f643], 1)
+
+    assert(not utf16_code_point_iterator_eq(utf16_code_point_iterator_inc(&iterator), &end))
+    t16_expect_iterator(&iterator, [0x0438, 0x0432, 0x0435, 0x0442, 0x0020, 0x1f600, 0x1f643], 1)
+
+    assert(not utf16_code_point_iterator_eq(utf16_code_point_iterator_inc(&iterator), &end))
+    t16_expect_iterator(&iterator, [0x0432, 0x0435, 0x0442, 0x0020, 0x1f600, 0x1f643], 1)
+
+    assert(not utf16_code_point_iterator_eq(utf16_code_point_iterator_inc(&iterator), &end))
+    t16_expect_iterator(&iterator, [0x0435, 0x0442, 0x0020, 0x1f600, 0x1f643], 1)
+
+    assert(not utf16_code_point_iterator_eq(utf16_code_point_iterator_inc(&iterator), &end))
+    t16_expect_iterator(&iterator, [0x0442, 0x0020, 0x1f600, 0x1f643], 1)
+
+    assert(not utf16_code_point_iterator_eq(utf16_code_point_iterator_inc(&iterator), &end))
+    assert(utf16_code_point_iterator_deref(&iterator) == (u32)' ')
+    t16_expect_iterator(&iterator, [0x0020, 0x1f600, 0x1f643], 1)
+
+    assert(not utf16_code_point_iterator_eq(utf16_code_point_iterator_inc(&iterator), &end))
+    t16_expect_iterator(&iterator, [0x1f600, 0x1f643], 2)
+
+    assert(not utf16_code_point_iterator_eq(utf16_code_point_iterator_inc(&iterator), &end))
+    t16_expect_iterator(&iterator, [0x1f643], 2)
+
+    assert(utf16_code_point_iterator_eq(utf16_code_point_iterator_inc(&iterator), &end))
+    assert(utf16_code_point_iterator_peek(&iterator, 0) == none)
+
+## `EXPECT(!invalid.validate(valid_code_units)); EXPECT_EQ(valid_code_units, expected)`.
+func t16_expect_invalid(code_units: const u16[], expected_valid_code_units: usize):
+    let invalid = t16u(code_units)
+    var valid_code_units: usize = 0
+    assert(not utf16_view_validate_usize(&invalid, &valid_code_units))
+    assert(valid_code_units == expected_valid_code_units)
+
+test "validate_invalid_utf16":
+    # Lonely high surrogate.
+    t16_expect_invalid([0xd800], 0)
+    t16_expect_invalid([0xdbff], 0)
+
+    # Lonely low surrogate.
+    t16_expect_invalid([0xdc00], 0)
+    t16_expect_invalid([0xdfff], 0)
+
+    # High surrogate followed by non-surrogate.
+    t16_expect_invalid([0xd800, 0x0000], 0)
+    t16_expect_invalid([0xd800, 0xe000], 0)
+
+    # High surrogate followed by high surrogate.
+    t16_expect_invalid([0xd800, 0xd800], 0)
+    t16_expect_invalid([0xd800, 0xdbff], 0)
+
+    # Valid UTF-16 followed by invalid code units.
+    t16_expect_invalid([0x0041, 0x0041, 0xd800], 2)
+    t16_expect_invalid([0x0041, 0x0041, 0xd800], 2)
+
+test "decode_invalid_utf16":
+    # Lonely high surrogate.
+    let high = t16u([0x41, 0x42, 0xd800])
+    assert(utf16_view_length_in_code_units(&high) == 3)
+    t16_expect_code_points(high, [0x41, 0x42, 0xd800])
+
+    # Lonely low surrogate.
+    let low = t16u([0x41, 0x42, 0xdc00])
+    assert(utf16_view_length_in_code_units(&low) == 3)
+    t16_expect_code_points(low, [0x41, 0x42, 0xdc00])
+
+    # High surrogate followed by non-surrogate.
+    let non_surrogate = t16u([0x41, 0x42, 0xd800, 0x0000])
+    assert(utf16_view_length_in_code_units(&non_surrogate) == 4)
+    t16_expect_code_points(non_surrogate, [0x41, 0x42, 0xd800, 0])
+
+    # High surrogate followed by high surrogate.
+    let two_high = t16u([0x41, 0x42, 0xd800, 0xd800])
+    assert(utf16_view_length_in_code_units(&two_high) == 4)
+    t16_expect_code_points(two_high, [0x41, 0x42, 0xd800, 0xd800])
+
+## `view.is_ascii()` of UTF-16 text.
+func t16_is_ascii(text: str) -> bool:
+    let view = t16(text)
+    return utf16_view_is_ascii(&view)
+
+## `view.is_ascii_whitespace()` of UTF-16 text.
+func t16_is_ascii_whitespace(text: str) -> bool:
+    let view = t16(text)
+    return utf16_view_is_ascii_whitespace(&view)
+
+test "is_ascii":
+    let empty = utf16_view_new()
+    assert(utf16_view_is_ascii(&empty))
+    assert(t16_is_ascii("a"))
+    assert(t16_is_ascii("foo"))
+    assert(t16_is_ascii("foo\t\n\rbar\u{b}\u{8}123"))
+    assert(t16_is_ascii("The quick (\"brown\") fox can't jump 32.3 feet, right?"))
+
+    assert(not t16_is_ascii("😀"))
+    assert(not t16_is_ascii("foo 😀"))
+    assert(not t16_is_ascii("😀 foo"))
+    assert(not t16_is_ascii("The quick (“brown”) fox can’t jump 32.3 feet, right?"))
+
+test "is_ascii_whitespace":
+    let empty = utf16_view_new()
+    assert(utf16_view_is_ascii_whitespace(&empty))
+    assert(t16_is_ascii_whitespace(" "))
+    assert(t16_is_ascii_whitespace("\t"))
+    assert(t16_is_ascii_whitespace("\r"))
+    assert(t16_is_ascii_whitespace("\n"))
+    assert(t16_is_ascii_whitespace(" \t\r\n\u{b} "))
+
+    assert(not t16_is_ascii_whitespace("a"))
+    assert(not t16_is_ascii_whitespace("😀"))
+    assert(not t16_is_ascii_whitespace("\u{a0}"))
+    assert(not t16_is_ascii_whitespace("\u{feff}"))
+    assert(not t16_is_ascii_whitespace("  \t \u{a0} \u{feff}  "))
+
+# mark: Case ====================================================================================
+
+## `EXPECT_EQ(u"input"sv.to_ascii_lowercase(), u"expected"sv)`.
+func t16_lowercase_is(input: str, expected: str) -> bool:
+    let view = t16(input)
+    let result = utf16_view_to_ascii_lowercase(&view)
+    return t16s_eq(&result, t16(expected))
+
+## `EXPECT_EQ(u"input"sv.to_ascii_uppercase(), u"expected"sv)`.
+func t16_uppercase_is(input: str, expected: str) -> bool:
+    let view = t16(input)
+    let result = utf16_view_to_ascii_uppercase(&view)
+    return t16s_eq(&result, t16(expected))
+
+## `EXPECT_EQ(u"input"sv.to_ascii_titlecase(), u"expected"sv)`.
+func t16_titlecase_is(input: str, expected: str) -> bool:
+    let view = t16(input)
+    let result = utf16_view_to_ascii_titlecase(&view)
+    return t16s_eq(&result, t16(expected))
+
+test "to_ascii_lowercase":
+    if not ak_core_is_ported:
+        return
+    assert(t16_lowercase_is("", ""))
+    assert(t16_lowercase_is("foobar", "foobar"))
+    assert(t16_lowercase_is("FooBar", "foobar"))
+    assert(t16_lowercase_is("FOOBAR", "foobar"))
+    assert(t16_lowercase_is("FOO 😀 BAR", "foo 😀 bar"))
+
+test "to_ascii_uppercase":
+    if not ak_core_is_ported:
+        return
+    assert(t16_uppercase_is("", ""))
+    assert(t16_uppercase_is("foobar", "FOOBAR"))
+    assert(t16_uppercase_is("FooBar", "FOOBAR"))
+    assert(t16_uppercase_is("FOOBAR", "FOOBAR"))
+    assert(t16_uppercase_is("foo 😀 bar", "FOO 😀 BAR"))
+
+test "to_ascii_titlecase":
+    if not ak_core_is_ported:
+        return
+    assert(t16_titlecase_is("", ""))
+    assert(t16_titlecase_is("foobar", "Foobar"))
+    assert(t16_titlecase_is("FooBar", "Foobar"))
+    assert(t16_titlecase_is("foo bar", "Foo Bar"))
+    assert(t16_titlecase_is("FOO BAR", "Foo Bar"))
+    assert(t16_titlecase_is("foo 😀 bar", "Foo 😀 Bar"))
+
+# mark: Comparison ==============================================================================
+
+test "equals_utf8":
+    assert(t16_eq_str(t16(""), ""))
+
+    assert(t16_eq_str(t16("foo bar"), "foo bar"))
+    assert(not t16_eq_str(t16("foo bar"), "foo ba"))
+    assert(not t16_eq_str(t16("foo bar"), "foo"))
+    assert(not t16_eq_str(t16("foo bar"), ""))
+
+    assert(t16_eq_str(t16("foo 😀 bar"), "foo 😀 bar"))
+    assert(not t16_eq_str(t16("foo 😀 bar"), "foo 😀"))
+    assert(not t16_eq_str(t16("foo 😀 bar"), "foo"))
+    assert(not t16_eq_str(t16("foo 😀 bar"), ""))
+
+    assert(not t16_eq_str(t16("foo 😀 bar"), "foo 😂 bar"))
+    assert(not t16_eq_str(t16("foo 😂 bar"), "foo 😀 bar"))
+
+test "comparison":
+    assert(not (t16_cmp(t16(""), t16("")) < 0))
+    assert(not (t16_cmp(t16(""), t16("")) > 0))
+    assert(t16_cmp(t16(""), t16("")) <= 0)
+    assert(t16_cmp(t16(""), t16("")) >= 0)
+
+    assert(not (t16_cmp(t16("a"), t16("a")) < 0))
+    assert(not (t16_cmp(t16("a"), t16("a")) > 0))
+    assert(t16_cmp(t16("a"), t16("a")) <= 0)
+    assert(t16_cmp(t16("a"), t16("a")) >= 0)
+
+    assert(not (t16_cmp(t16("😀"), t16("😀")) < 0))
+    assert(not (t16_cmp(t16("😀"), t16("😀")) > 0))
+    assert(t16_cmp(t16("😀"), t16("😀")) <= 0)
+    assert(t16_cmp(t16("😀"), t16("😀")) >= 0)
+
+    assert(t16_cmp(t16("a"), t16("b")) < 0)
+    assert(not (t16_cmp(t16("a"), t16("b")) > 0))
+    assert(t16_cmp(t16("a"), t16("b")) <= 0)
+    assert(not (t16_cmp(t16("a"), t16("b")) >= 0))
+
+    assert(t16_cmp(utf16_sv("a"), t16("b")) < 0)
+    assert(not (t16_cmp(utf16_sv("a"), t16("b")) > 0))
+    assert(t16_cmp(utf16_sv("a"), t16("b")) <= 0)
+    assert(not (t16_cmp(utf16_sv("a"), t16("b")) >= 0))
+
+    assert(t16_cmp(t16("a"), t16("aa")) < 0)
+    assert(not (t16_cmp(t16("a"), t16("aa")) > 0))
+    assert(t16_cmp(t16("a"), t16("aa")) <= 0)
+    assert(not (t16_cmp(t16("a"), t16("aa")) >= 0))
+
+    assert(t16_cmp(utf16_sv("a"), t16("aa")) < 0)
+    assert(not (t16_cmp(utf16_sv("a"), t16("aa")) > 0))
+    assert(t16_cmp(utf16_sv("a"), t16("aa")) <= 0)
+    assert(not (t16_cmp(utf16_sv("a"), t16("aa")) >= 0))
+
+    assert(not (t16_cmp(t16("b"), t16("a")) < 0))
+    assert(t16_cmp(t16("b"), t16("a")) > 0)
+    assert(not (t16_cmp(t16("b"), t16("a")) <= 0))
+    assert(t16_cmp(t16("b"), t16("a")) >= 0)
+
+    assert(t16_cmp(t16("😀"), t16("😂")) < 0)
+    assert(not (t16_cmp(t16("😀"), t16("😂")) > 0))
+    assert(t16_cmp(t16("😀"), t16("😂")) <= 0)
+    assert(not (t16_cmp(t16("😀"), t16("😂")) >= 0))
+
+    assert(not (t16_cmp(t16("😂"), t16("😀")) < 0))
+    assert(t16_cmp(t16("😂"), t16("😀")) > 0)
+    assert(not (t16_cmp(t16("😂"), t16("😀")) <= 0))
+    assert(t16_cmp(t16("😂"), t16("😀")) >= 0)
+
+    assert(t16_cmp(t16("ÿ"), t16("Ā")) < 0)
+    assert(not (t16_cmp(t16("ÿ"), t16("Ā")) > 0))
+    assert(t16_cmp(t16("Ā"), t16("ÿ")) > 0)
+    assert(not (t16_cmp(t16("Ā"), t16("ÿ")) < 0))
+
+    assert(t16_cmp(t16("❤"), t16("😀")) < 0)
+    assert(not (t16_cmp(t16("❤"), t16("😀")) > 0))
+    assert(t16_cmp(t16("😀"), t16("❤")) > 0)
+    assert(not (t16_cmp(t16("😀"), t16("❤")) < 0))

@@ -177,6 +177,14 @@ pub func utf16_string_join_string_view(separator: StringView, collection: const 
 
     return string_builder_to_utf16_string(&builder)
 
+## Ported from AK/Utf16String.h:150 AK::Utf16String::join over Utf16Views with the default "{}"
+## format.
+pub func utf16_string_join_utf16_view(separator: Utf16View, collection: const Utf16View[]) -> Utf16String:
+    var builder = string_builder_new_mode(StringBuilderMode.utf16)
+    string_builder_join_utf16_view(&builder, separator, collection)
+
+    return string_builder_to_utf16_string(&builder)
+
 ## Ported from AK/Utf16String.cpp:163 AK::Utf16String::repeated.
 pub func utf16_string_repeated(code_point: u32, count: usize) -> Utf16String:
     if count <= max_short_string_byte_count and is_ascii(code_point):

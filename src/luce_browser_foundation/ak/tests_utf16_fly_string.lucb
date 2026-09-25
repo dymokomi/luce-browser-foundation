@@ -1,0 +1,205 @@
+#==============================================================================================
+#
+#   tests_utf16_fly_string - Utf16FlyString tests
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestUtf16FlyString.cpp (lines 1-184). The fly string table is a module
+#       global and string data is never destroyed in managed memory, so each test starts from an
+#       empty table, and the checks that a table entry disappears with its last string (and that
+#       a moved-from string is empty) are left out.
+#
+#==============================================================================================
+
+## Empties the Utf16FlyString table, as every donor test starts with one. Tests that intern
+## long strings also empty it when they end: the table would otherwise keep pointers into the
+## per-test allocator after the test.
+func t16_reset_fly_strings():
+    s_all_utf16_fly_strings = HashTable[const Utf16StringData*?, Utf16FlyStringTableHashTraits]()
+
+## `EXPECT_EQ(fly, "text"sv)`.
+func t16f_eq_str(fly: const Utf16FlyString*, text: str) -> bool:
+    return utf16_fly_string_eq_string_view(fly, sv(text))
+
+## `EXPECT_EQ(fly1, fly2)`.
+func t16f_eq(a: const Utf16FlyString*, b: const Utf16FlyString*) -> bool:
+    return utf16_fly_string_eq_utf16_fly_string(a, b)
+
+## `"text"_utf16_fly_string`.
+func t16f(text: str) -> Utf16FlyString:
+    return literalutf16_fly_string_u8(text.bytes.data, text.length)
+
+## `u"text"_utf16_fly_string`.
+func t16f_lit(text: str) -> Utf16FlyString:
+    let view = t16(text)
+    let units = utf16_view_utf16_span(&view)
+    return literalutf16_fly_string_u16(units.data, units.length)
+
+test "short_ascii_literal_is_constexpr (Utf16FlyString)":
+    # The _utf16_fly_string UDL folds short ASCII literals to compile-time constants, both for
+    # char and char16_t inputs.
+    let from_char = t16f("foo")
+    let from_char16 = t16f_lit("bar")
+    assert(t16f_eq_str(&from_char, "foo"))
+    assert(t16f_eq_str(&from_char16, "bar"))
+    assert(utf16_fly_string_length_in_code_units(&from_char) == 3)
+    assert(utf16_fly_string_length_in_code_units(&from_char16) == 3)
+
+test "empty_string (Utf16FlyString)":
+    t16_reset_fly_strings()
+    defer t16_reset_fly_strings()
+    let fly = utf16_fly_string_new()
+    assert(utf16_fly_string_is_empty(&fly))
+    assert(t16f_eq_str(&fly, ""))
+
+    # Short strings do not get stored in the fly string table.
+    if ak_core_is_ported:
+        assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
+
+test "short_string (Utf16FlyString)":
+    t16_reset_fly_strings()
+    defer t16_reset_fly_strings()
+    let fly1 = utf16_fly_string_from_utf16_string(utf16_string_from_str("foo"))
+    assert(t16f_eq_str(&fly1, "foo"))
+
+    let fly2 = utf16_fly_string_from_utf16_string(utf16_string_from_str("foo"))
+    assert(t16f_eq_str(&fly2, "foo"))
+
+    let fly3 = utf16_fly_string_from_utf16_string(utf16_string_from_str("bar"))
+    assert(t16f_eq_str(&fly3, "bar"))
+
+    assert(t16f_eq(&fly1, &fly2))
+    assert(not t16f_eq(&fly1, &fly3))
+    assert(not t16f_eq(&fly2, &fly3))
+
+    let string1 = utf16_fly_string_to_utf16_string_const_2(&fly1)
+    let string2 = utf16_fly_string_to_utf16_string_const_2(&fly2)
+    let string3 = utf16_fly_string_to_utf16_string_const_2(&fly3)
+    assert(utf16_string_base_has_short_ascii_storage(&string1.utf16_string_base))
+    assert(utf16_string_base_has_short_ascii_storage(&string2.utf16_string_base))
+    assert(utf16_string_base_has_short_ascii_storage(&string3.utf16_string_base))
+
+    # Short strings do not get stored in the fly string table.
+    if ak_core_is_ported:
+        assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
+
+test "long_string (Utf16FlyString)":
+    if not ak_core_is_ported:
+        return
+    t16_reset_fly_strings()
+    defer t16_reset_fly_strings()
+    let fly1 = utf16_fly_string_from_utf16_string(utf16_string_from_str("thisisdefinitelymorethan7bytes"))
+    assert(t16f_eq_str(&fly1, "thisisdefinitelymorethan7bytes"))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
+
+    let fly2 = utf16_fly_string_from_utf16_string(utf16_string_from_str("thisisdefinitelymorethan7bytes"))
+    assert(t16f_eq_str(&fly2, "thisisdefinitelymorethan7bytes"))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
+
+    let fly3 = utf16_fly_string_from_utf16_string(utf16_string_from_str("thisisalsoforsuremorethan7bytes"))
+    assert(t16f_eq_str(&fly3, "thisisalsoforsuremorethan7bytes"))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 2)
+
+    assert(t16f_eq(&fly1, &fly2))
+    assert(not t16f_eq(&fly1, &fly3))
+    assert(not t16f_eq(&fly2, &fly3))
+
+    let string1 = utf16_fly_string_to_utf16_string_const_2(&fly1)
+    let string2 = utf16_fly_string_to_utf16_string_const_2(&fly2)
+    let string3 = utf16_fly_string_to_utf16_string_const_2(&fly3)
+    assert(utf16_string_base_has_long_ascii_storage(&string1.utf16_string_base))
+    assert(utf16_string_base_has_long_ascii_storage(&string2.utf16_string_base))
+    assert(utf16_string_base_has_long_ascii_storage(&string3.utf16_string_base))
+
+test "user_defined_literal (Utf16FlyString)":
+    if not ak_core_is_ported:
+        return
+    t16_reset_fly_strings()
+    defer t16_reset_fly_strings()
+    let fly1 = t16f("thisisdefinitelymorethan7bytes")
+    assert(t16f_eq_str(&fly1, "thisisdefinitelymorethan7bytes"))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
+
+    let fly2 = t16f("thisisdefinitelymorethan7bytes")
+    assert(t16f_eq_str(&fly2, "thisisdefinitelymorethan7bytes"))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
+
+    let fly3 = t16f_lit("thisisdefinitelymorethan7bytes")
+    let fly3_view = t16("thisisdefinitelymorethan7bytes")
+    assert(utf16_fly_string_eq_utf16_view(&fly3, &fly3_view))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
+
+    let fly4 = t16f("foo")
+    assert(t16f_eq_str(&fly4, "foo"))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
+
+    assert(t16f_eq(&fly1, &fly2))
+    assert(t16f_eq(&fly1, &fly3))
+    assert(t16f_eq(&fly3, &fly3))
+
+    assert(not t16f_eq(&fly1, &fly4))
+    assert(not t16f_eq(&fly2, &fly4))
+    assert(not t16f_eq(&fly3, &fly4))
+
+test "fly_string_keep_string_data_alive (Utf16FlyString)":
+    if not ak_core_is_ported:
+        return
+    t16_reset_fly_strings()
+    defer t16_reset_fly_strings()
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
+    var fly = utf16_fly_string_new()
+    let string = utf16_string_from_str("thisisdefinitelymorethan7bytes")
+    fly = utf16_fly_string_from_utf16_string(string)
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
+
+    assert(t16f_eq_str(&fly, "thisisdefinitelymorethan7bytes"))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
+
+test "moved_fly_string_becomes_empty (Utf16FlyString)":
+    if not ak_core_is_ported:
+        return
+    t16_reset_fly_strings()
+    defer t16_reset_fly_strings()
+    var fly1 = utf16_fly_string_new()
+    assert(utf16_fly_string_is_empty(&fly1))
+
+    let fly2 = utf16_fly_string_from_utf16_string(utf16_string_from_str("thisisdefinitelymorethan7bytes"))
+    assert(t16f_eq_str(&fly2, "thisisdefinitelymorethan7bytes"))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
+
+    fly1 = fly2
+
+    assert(t16f_eq_str(&fly1, "thisisdefinitelymorethan7bytes"))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
+
+test "is_one_of (Utf16FlyString)":
+    let foo = utf16_fly_string_from_utf8_string_view(sv("foo"))
+    let bar = utf16_fly_string_from_utf16(t16("bar"))
+
+    assert(t16f_eq(&foo, &foo))
+    assert(t16f_eq(&foo, &foo) or t16f_eq(&foo, &bar))
+    assert(t16f_eq(&foo, &bar) or t16f_eq(&foo, &foo))
+    assert(not t16f_eq(&foo, &bar))
+
+    assert(not t16f_eq_str(&bar, "foo"))
+    assert(t16f_eq_str(&bar, "foo") or t16f_eq_str(&bar, "bar"))
+    assert(t16f_eq_str(&bar, "bar") or t16f_eq_str(&bar, "foo"))
+    assert(t16f_eq_str(&bar, "bar"))
+
+test "optional (Utf16FlyString)":
+    t16_reset_fly_strings()
+    defer t16_reset_fly_strings()
+    # Optional<Utf16FlyString> is the null sentinel (is_invalid) in the C++.
+    var string = utf16_fly_string_new()
+    utf16_fly_string_construct_utf16_fly_string(&string)
+    assert(utf16_fly_string_is_invalid(&string))
+
+    string = t16f("ascii")
+    assert(not utf16_fly_string_is_invalid(&string))
+    assert(t16f_eq_str(&string, "ascii"))
+
+    if not ak_core_is_ported:
+        return
+    string = t16f_lit("well 😀 hello")
+    assert(not utf16_fly_string_is_invalid(&string))
+    let expected = t16("well 😀 hello")
+    assert(utf16_fly_string_eq_utf16_view(&string, &expected))
