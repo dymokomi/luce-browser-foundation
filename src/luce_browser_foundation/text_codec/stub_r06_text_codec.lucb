@@ -347,7 +347,7 @@ pub func utf16_le_decoder_process_impl(base: Decoder*, arg0: ak.StringView, arg1
 
 ## Ported from Libraries/LibTextCodec/Decoder.h:66 TextCodec::SingleByteDecoder::SingleByteDecoder<ArrayType>.
 pub func single_byte_decoder_construct[TArrayType](this: SingleByteDecoder[TArrayType]*, translation_table: TArrayType[]):
-    return
+    trap("unported: TextCodec::SingleByteDecoder::SingleByteDecoder<ArrayType>")
 
 ## Ported from Libraries/LibTextCodec/Decoder.cpp:821 TextCodec::SingleByteDecoder::process.
 pub func single_byte_decoder_process[TArrayType](this: SingleByteDecoder[TArrayType]*, input: ak.StringView, on_code_point: ak.Function1[u32, unit]) -> !:
@@ -435,7 +435,7 @@ pub func replacement_decoder_validate_impl(base: Decoder*, input: ak.StringView)
 
 ## Ported from Libraries/LibTextCodec/Decoder.h:140 TextCodec::StreamingDecoder::StreamingDecoder.
 pub func streaming_decoder_construct(this: StreamingDecoder*, decoder: Decoder*):
-    return
+    trap("unported: TextCodec::StreamingDecoder::StreamingDecoder")
 
 ## Ported from Libraries/LibTextCodec/Decoder.cpp:665 TextCodec::StreamingDecoder::to_utf8.
 pub func streaming_decoder_to_utf8(this: StreamingDecoder*, input: const u8[]) -> ak.String!:
@@ -577,7 +577,7 @@ pub func big5_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byte: 
 
 ## Ported from Libraries/LibTextCodec/Encoder.cpp:550 TextCodec::GB18030Encoder::GB18030Encoder.
 pub func gb18030_encoder_construct(this: Gb18030Encoder*, is_gbk: Gb18030EncoderIsGbk = Gb18030EncoderIsGbk.no):
-    return
+    trap("unported: TextCodec::GB18030Encoder::GB18030Encoder")
 
 ## Ported from Libraries/LibTextCodec/Encoder.cpp:556 TextCodec::GB18030Encoder::process (override).
 pub func gb18030_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byte: ak.Function1[u8, unit], on_error: ak.Function1[u32, unit]) -> !:
@@ -585,7 +585,7 @@ pub func gb18030_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byt
 
 ## Ported from Libraries/LibTextCodec/Encoder.h:80 TextCodec::SingleByteEncoder::SingleByteEncoder<ArrayType>.
 pub func single_byte_encoder_construct[TArrayType](this: SingleByteEncoder[TArrayType]*, translation_table: TArrayType[]):
-    return
+    trap("unported: TextCodec::SingleByteEncoder::SingleByteEncoder<ArrayType>")
 
 ## Ported from Libraries/LibTextCodec/Encoder.cpp:642 TextCodec::SingleByteEncoder::process.
 pub func single_byte_encoder_process[TArrayType](this: SingleByteEncoder[TArrayType]*, input: ak.Utf8View, on_byte: ak.Function1[u8, unit], on_error: ak.Function1[u32, unit]) -> !:

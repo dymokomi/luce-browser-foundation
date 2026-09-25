@@ -56,7 +56,7 @@ AK::BaseRedBlackTree::size	luce-browser-foundation	ak	base_red_black_tree_size	A
 AK::BaseRedBlackTree::successor	luce-browser-foundation	ak	base_red_black_tree_successor	AK/RedBlackTree.h:364	stub
 AK::BigEndian	luce-browser-foundation	ak	BigEndian	AK/Endian.h:80	generic struct
 AK::BigEndian::BigEndian<T>	luce-browser-foundation	ak	big_endian_construct	AK/Endian.h:84	construct
-AK::BigEndian::operator type-parameter-0-0	luce-browser-foundation	ak	big_endian_to_type_parameter_0_0	AK/Endian.h:89	stub
+AK::BigEndian::operator type-parameter-0-0	luce-browser-foundation	ak	big_endian_to_t	AK/Endian.h:89	stub
 AK::BinaryHeap	luce-browser-foundation	ak	BinaryHeap	AK/BinaryHeap.h:120	generic struct
 AK::BinaryHeap::BinaryHeap<K, V, inline_capacity>	luce-browser-foundation	ak	binary_heap_construct	AK/BinaryHeap.h:126	construct
 AK::BinaryHeap::Node	luce-browser-foundation	ak	Node	AK/BinaryHeap.h:164	opaque
@@ -286,8 +286,8 @@ AK::CircularQueue::size	luce-browser-foundation	ak	circular_queue_size	AK/Circul
 AK::CopyOnWrite	luce-browser-foundation	ak	CopyOnWrite	AK/CopyOnWrite.h:14	generic struct
 AK::CopyOnWrite::CopyOnWrite<T>	luce-browser-foundation	ak	copy_on_write_construct	AK/CopyOnWrite.h:16	construct
 AK::CopyOnWrite::mutable_value	luce-browser-foundation	ak	copy_on_write_mutable_value	AK/CopyOnWrite.h:20	stub
-AK::CopyOnWrite::operator const type-parameter-0-0 &	luce-browser-foundation	ak	copy_on_write_to_const_type_parameter_0_0	AK/CopyOnWrite.h:28	stub
-AK::CopyOnWrite::operator type-parameter-0-0 &	luce-browser-foundation	ak	copy_on_write_to_type_parameter_0_0	AK/CopyOnWrite.h:29	stub
+AK::CopyOnWrite::operator const type-parameter-0-0 &	luce-browser-foundation	ak	copy_on_write_to_const_t	AK/CopyOnWrite.h:28	stub
+AK::CopyOnWrite::operator type-parameter-0-0 &	luce-browser-foundation	ak	copy_on_write_to_t	AK/CopyOnWrite.h:29	stub
 AK::CopyOnWrite::operator->	luce-browser-foundation	ak	copy_on_write_arrow	AK/CopyOnWrite.h:32	stub
 AK::CopyOnWrite::operator->	luce-browser-foundation	ak	copy_on_write_arrow_const	AK/CopyOnWrite.h:31	stub
 AK::CopyOnWrite::ptr	luce-browser-foundation	ak	copy_on_write_ptr	AK/CopyOnWrite.h:35	stub
@@ -348,7 +348,7 @@ AK::Detail::ByteBuffer::try_resize	luce-browser-foundation	ak	byte_buffer_try_re
 AK::Detail::ByteBuffer::xor_buffers	luce-browser-foundation	ak	byte_buffer_xor_buffers	AK/ByteBuffer.h:96	stub
 AK::Detail::ByteBuffer::zero_fill	luce-browser-foundation	ak	byte_buffer_zero_fill	AK/ByteBuffer.h:307	stub
 AK::Detail::EmptyArrayStorage	luce-browser-foundation	ak	EmptyArrayStorage	AK/Array.h:22	generic struct
-AK::Detail::EmptyArrayStorage::operator type-parameter-0-0 *	luce-browser-foundation	ak	empty_array_storage_to_type_parameter_0_0	AK/Array.h:24	stub
+AK::Detail::EmptyArrayStorage::operator type-parameter-0-0 *	luce-browser-foundation	ak	empty_array_storage_to_t	AK/Array.h:24	stub
 AK::Detail::EmptyArrayStorage::operator[]	luce-browser-foundation	ak	empty_array_storage_at	AK/Array.h:23	stub
 AK::Detail::Enumerator	luce-browser-foundation	ak	Enumerator	AK/Enumerate.h:16	generic struct
 AK::Detail::Enumerator::Iterator	luce-browser-foundation	ak	EnumeratorIterator	AK/Enumerate.h:25	opaque
@@ -489,12 +489,12 @@ AK::Detail::StringBase::hash	luce-browser-foundation	ak	string_base_hash	AK/Stri
 AK::Detail::StringBase::is_short_string	luce-browser-foundation	ak	string_base_is_short_string	AK/StringBase.h:68	stub
 AK::Detail::StringBase::length_in_code_units	luce-browser-foundation	ak	string_base_length_in_code_units	AK/StringBase.h:83	stub
 AK::Detail::StringBase::operator==	luce-browser-foundation	ak	string_base_eq	AK/StringBase.h:281	stub
-AK::Detail::StringBase::raw	luce-browser-foundation	ak	string_base_raw_const	AK/StringBase.h:87	stub
-AK::Detail::StringBase::raw	luce-browser-foundation	ak	string_base_raw_const_2	AK/StringBase.h:88	stub
+AK::Detail::StringBase::raw	luce-browser-foundation	ak	string_base_raw_fly_string	AK/StringBase.h:87	stub
+AK::Detail::StringBase::raw	luce-browser-foundation	ak	string_base_raw_string	AK/StringBase.h:88	stub
 AK::Detail::StringBase::replace_with_new_short_string	luce-browser-foundation	ak	string_base_replace_with_new_short_string	AK/StringBase.h:113	stub
-AK::Detail::StringBase::replace_with_new_string	luce-browser-foundation	ak	string_base_replace_with_new_string	AK/StringBase.h:91	stub
-AK::Detail::StringBase::replace_with_new_string	luce-browser-foundation	ak	string_base_replace_with_new_string_2	AK/StringBase.h:97	stub
-AK::Detail::StringBase::replace_with_new_string	luce-browser-foundation	ak	string_base_replace_with_new_string_3	AK/StringBase.h:104	stub
+AK::Detail::StringBase::replace_with_new_string	luce-browser-foundation	ak	string_base_replace_with_new_string_string_view	AK/StringBase.h:91	stub
+AK::Detail::StringBase::replace_with_new_string	luce-browser-foundation	ak	string_base_replace_with_new_string_usize	AK/StringBase.h:104	stub
+AK::Detail::StringBase::replace_with_new_string	luce-browser-foundation	ak	string_base_replace_with_new_string_utf16_view	AK/StringBase.h:97	stub
 AK::Detail::StringBase::replace_with_string_builder	luce-browser-foundation	ak	string_base_replace_with_string_builder	AK/StringBase.cpp:12	stub
 AK::Detail::StringBase::replace_with_uninitialized_buffer	luce-browser-foundation	ak	string_base_replace_with_uninitialized_buffer	AK/StringBase.cpp:25	stub
 AK::Detail::StringBase::replace_with_uninitialized_short_string	luce-browser-foundation	ak	string_base_replace_with_uninitialized_short_string	AK/StringBase.h:143	stub
@@ -562,7 +562,7 @@ AK::Detail::UFixedBigInt::is_equal_to_constant_time	luce-browser-foundation	ak	u
 AK::Detail::UFixedBigInt::is_zero_constant_time	luce-browser-foundation	ak	u_fixed_big_int_is_zero_constant_time	AK/UFixedBigInt.h:454	stub
 AK::Detail::UFixedBigInt::low	luce-browser-foundation	ak	u_fixed_big_int_low	AK/UFixedBigInt.h:156	stub
 AK::Detail::UFixedBigInt::operator bool	luce-browser-foundation	ak	u_fixed_big_int_to_bool	AK/UFixedBigInt.h:250	stub
-AK::Detail::UFixedBigInt::operator type-parameter-1-0	luce-browser-foundation	ak	u_fixed_big_int_to_type_parameter_1_0	AK/UFixedBigInt.h:137	stub
+AK::Detail::UFixedBigInt::operator type-parameter-1-0	luce-browser-foundation	ak	u_fixed_big_int_to_t	AK/UFixedBigInt.h:137	stub
 AK::Detail::UFixedBigInt::operator!	luce-browser-foundation	ak	u_fixed_big_int_not	AK/UFixedBigInt.h:242	stub
 AK::Detail::UFixedBigInt::operator%	luce-browser-foundation	ak	u_fixed_big_int_rem_integer_wrapper	AK/UFixedBigInt.h:437	stub
 AK::Detail::UFixedBigInt::operator%	luce-browser-foundation	ak	u_fixed_big_int_rem_t	AK/UFixedBigInt.h:428	stub
@@ -665,8 +665,8 @@ AK::Detail::Utf16StringBase::operator<=>	luce-browser-foundation	ak	utf16_string
 AK::Detail::Utf16StringBase::operator==	luce-browser-foundation	ak	utf16_string_base_eq_string_view	AK/Utf16StringBase.h:153	stub
 AK::Detail::Utf16StringBase::operator==	luce-browser-foundation	ak	utf16_string_base_eq_utf16_string_base	AK/Utf16StringBase.h:134	stub
 AK::Detail::Utf16StringBase::operator==	luce-browser-foundation	ak	utf16_string_base_eq_utf16_view	AK/Utf16StringBase.h:152	stub
-AK::Detail::Utf16StringBase::raw	luce-browser-foundation	ak	utf16_string_base_raw_const	AK/Utf16StringBase.h:342	stub
-AK::Detail::Utf16StringBase::raw	luce-browser-foundation	ak	utf16_string_base_raw_const_2	AK/Utf16StringBase.h:345	stub
+AK::Detail::Utf16StringBase::raw	luce-browser-foundation	ak	utf16_string_base_raw	AK/Utf16StringBase.h:345	stub
+AK::Detail::Utf16StringBase::raw	luce-browser-foundation	ak	utf16_string_base_raw_utf16_fly_string	AK/Utf16StringBase.h:342	stub
 AK::Detail::Utf16StringBase::set_data	luce-browser-foundation	ak	utf16_string_base_set_data	AK/Utf16StringBase.h:329	stub
 AK::Detail::Utf16StringBase::short_ascii_string_without_union_member_assertion	luce-browser-foundation	ak	utf16_string_base_short_ascii_string_without_union_member_assertion	AK/Utf16StringBase.h:356	stub
 AK::Detail::Utf16StringBase::split_view	luce-browser-foundation	ak	utf16_string_base_split_view_u16	AK/Utf16StringBase.h:264	stub
@@ -726,8 +726,8 @@ AK::Detail::operator<=>	luce-browser-foundation	ak	cmp_integer_wrapper	AK/UFixed
 AK::Detail::operator<=>	luce-browser-foundation	ak	cmp_opaque	AK/UFixedBigInt.h:498	stub
 AK::Detail::operator==	luce-browser-foundation	ak	eq_integer_wrapper	AK/UFixedBigInt.h:499	stub
 AK::Detail::operator==	luce-browser-foundation	ak	eq_opaque_opaque_2	AK/UFixedBigInt.h:497	stub
-AK::Details::product_even	luce-browser-foundation	ak	details_product_even	AK/Math.h:42	stub
-AK::Details::product_odd	luce-browser-foundation	ak	details_product_odd	AK/Math.h:49	stub
+AK::Details::product_even	luce-browser-foundation	ak	details_product_even_x	AK/Math.h:42	stub
+AK::Details::product_odd	luce-browser-foundation	ak	details_product_odd_x	AK/Math.h:49	stub
 AK::DistinctNumericFeature::Arithmetic	luce-browser-foundation	ak	Arithmetic	AK/DistinctNumeric.h:50	enum
 AK::DistinctNumericFeature::CastToBool	luce-browser-foundation	ak	CastToBool	AK/DistinctNumeric.h:51	enum
 AK::DistinctNumericFeature::CastToUnderlying	luce-browser-foundation	ak	CastToUnderlying	AK/DistinctNumeric.h:52	enum
@@ -865,7 +865,7 @@ AK::FixedPoint::lfloor	luce-browser-foundation	ak	fixed_point_lfloor	AK/FixedPoi
 AK::FixedPoint::log2	luce-browser-foundation	ak	fixed_point_log2	AK/FixedPoint.h:155	stub
 AK::FixedPoint::lrint	luce-browser-foundation	ak	fixed_point_lrint	AK/FixedPoint.h:139	stub
 AK::FixedPoint::ltrunc	luce-browser-foundation	ak	fixed_point_ltrunc	AK/FixedPoint.h:146	stub
-AK::FixedPoint::operator type-parameter-1-0	luce-browser-foundation	ak	fixed_point_to_type_parameter_1_0	AK/FixedPoint.h:59	stub
+AK::FixedPoint::operator type-parameter-1-0	luce-browser-foundation	ak	fixed_point_to_t	AK/FixedPoint.h:59	stub
 AK::FixedPoint::operator!=	luce-browser-foundation	ak	fixed_point_ne_fixed_point	AK/FixedPoint.h:362	stub
 AK::FixedPoint::operator!=	luce-browser-foundation	ak	fixed_point_ne_i	AK/FixedPoint.h:375	stub
 AK::FixedPoint::operator*	luce-browser-foundation	ak	fixed_point_mul_fixed_point	AK/FixedPoint.h:207	stub
@@ -1349,7 +1349,7 @@ AK::JsonValue::serialized	luce-browser-foundation	ak	json_value2_serialized	AK/J
 AK::JsonValue::type	luce-browser-foundation	ak	json_value2_type	AK/JsonValue.h:150	stub
 AK::LEB128	luce-browser-foundation	ak	Leb128	AK/LEB128.h:16	generic struct
 AK::LEB128::LEB128<ValueType>	luce-browser-foundation	ak	leb128_construct	AK/LEB128.h:20	construct
-AK::LEB128::operator type-parameter-0-0	luce-browser-foundation	ak	leb128_to_type_parameter_0_0	AK/LEB128.h:25	stub
+AK::LEB128::operator type-parameter-0-0	luce-browser-foundation	ak	leb128_to_t	AK/LEB128.h:25	stub
 AK::LEB128::read_from_stream	luce-browser-foundation	ak	leb128_read_from_stream	AK/LEB128.h:27	stub
 AK::LastChunkHandling	luce-browser-foundation	ak	LastChunkHandling	AK/Base64.h:18	enum
 AK::LexicalPath	luce-browser-foundation	ak	LexicalPath	AK/LexicalPath.h:20	struct
@@ -1385,7 +1385,7 @@ AK::LineTrackingLexer::current_position	luce-browser-foundation	ak	line_tracking
 AK::LineTrackingLexer::position_for	luce-browser-foundation	ak	line_tracking_lexer_position_for	AK/GenericLexer.cpp:11	stub
 AK::LittleEndian	luce-browser-foundation	ak	LittleEndian	AK/Endian.h:64	generic struct
 AK::LittleEndian::LittleEndian<T>	luce-browser-foundation	ak	little_endian_construct	AK/Endian.h:68	construct
-AK::LittleEndian::operator type-parameter-0-0	luce-browser-foundation	ak	little_endian_to_type_parameter_0_0	AK/Endian.h:73	stub
+AK::LittleEndian::operator type-parameter-0-0	luce-browser-foundation	ak	little_endian_to_t	AK/Endian.h:73	stub
 AK::MaskSpan	luce-browser-foundation	ak	MaskSpan	AK/StringUtils.h:66	struct
 AK::MaskSpan::operator==	luce-browser-foundation	ak	mask_span_eq	AK/StringUtils.h:70	stub
 AK::MemoryOrder	luce-browser-foundation	ak	MemoryOrder	AK/Types.h:193	enum
@@ -1599,8 +1599,8 @@ AK::SimpleReverseIterator::rend	luce-browser-foundation	ak	simple_reverse_iterat
 AK::Singleton	luce-browser-foundation	ak	Singleton	AK/Singleton.h:34	generic struct
 AK::Singleton::ensure_instance	luce-browser-foundation	ak	singleton_ensure_instance	AK/Singleton.h:104	stub
 AK::Singleton::is_initialized	luce-browser-foundation	ak	singleton_is_initialized	AK/Singleton.h:98	stub
-AK::Singleton::operator type-parameter-0-0 &	luce-browser-foundation	ak	singleton_to_type_parameter_0_0_const_2	AK/Singleton.h:93	stub
-AK::Singleton::operator type-parameter-0-0 *	luce-browser-foundation	ak	singleton_to_type_parameter_0_0_const	AK/Singleton.h:88	stub
+AK::Singleton::operator type-parameter-0-0 &	luce-browser-foundation	ak	singleton_to_t_const_2	AK/Singleton.h:93	stub
+AK::Singleton::operator type-parameter-0-0 *	luce-browser-foundation	ak	singleton_to_t_const	AK/Singleton.h:88	stub
 AK::Singleton::operator*	luce-browser-foundation	ak	singleton_deref	AK/Singleton.h:83	stub
 AK::Singleton::operator->	luce-browser-foundation	ak	singleton_arrow	AK/Singleton.h:78	stub
 AK::Singleton::ptr	luce-browser-foundation	ak	singleton_ptr	AK/Singleton.h:73	stub
@@ -1797,9 +1797,9 @@ AK::StringBuilder::initialize_buffer	luce-browser-foundation	ak	string_builder_i
 AK::StringBuilder::inline_capacity	luce-browser-foundation	ak	string_builder_inline_capacity	AK/StringBuilder.h:25	variable
 AK::StringBuilder::is_empty	luce-browser-foundation	ak	string_builder_is_empty	AK/StringBuilder.cpp:113	stub
 AK::StringBuilder::join	luce-browser-foundation	ak	string_builder_join	AK/StringBuilder.h:100	stub
-AK::StringBuilder::leak_buffer_for_string_construction	luce-browser-foundation	ak	string_builder_leak_buffer_for_string_construction	AK/StringBuilder.h:118	stub
-AK::StringBuilder::leak_buffer_for_string_construction	luce-browser-foundation	ak	string_builder_leak_buffer_for_string_construction_2	AK/StringBuilder.h:119	stub
-AK::StringBuilder::leak_buffer_for_string_construction	luce-browser-foundation	ak	string_builder_leak_buffer_for_string_construction_3	AK/StringBuilder.cpp:559	stub
+AK::StringBuilder::leak_buffer_for_string_construction	luce-browser-foundation	ak	string_builder_leak_buffer_for_string_construction	AK/StringBuilder.cpp:559	stub
+AK::StringBuilder::leak_buffer_for_string_construction	luce-browser-foundation	ak	string_builder_leak_buffer_for_string_construction_string_data	AK/StringBuilder.h:118	stub
+AK::StringBuilder::leak_buffer_for_string_construction	luce-browser-foundation	ak	string_builder_leak_buffer_for_string_construction_utf16_string_data	AK/StringBuilder.h:119	stub
 AK::StringBuilder::length	luce-browser-foundation	ak	string_builder_length	AK/StringBuilder.cpp:108	stub
 AK::StringBuilder::string_view	luce-browser-foundation	ak	string_builder_string_view	AK/StringBuilder.cpp:346	stub
 AK::StringBuilder::to_byte_buffer	luce-browser-foundation	ak	string_builder_to_byte_buffer	AK/StringBuilder.cpp:289	stub
@@ -1856,9 +1856,9 @@ AK::StringView::StringView	luce-browser-foundation	ak	string_view_construct_byte
 AK::StringView::StringView	luce-browser-foundation	ak	string_view_construct_fly_string	AK/StringView.cpp:28	construct
 AK::StringView::StringView	luce-browser-foundation	ak	string_view_construct_span_u8	AK/StringView.h:45	construct
 AK::StringView::StringView	luce-browser-foundation	ak	string_view_construct_string	AK/StringView.cpp:22	construct
+AK::StringView::StringView	luce-browser-foundation	ak	string_view_construct_string_view	AK/StringView.h:357	construct
 AK::StringView::StringView	luce-browser-foundation	ak	string_view_construct_u8_usize	AK/StringView.h:27	construct
 AK::StringView::StringView	luce-browser-foundation	ak	string_view_construct_u8_usize_2	AK/StringView.h:37	construct
-AK::StringView::StringView	luce-browser-foundation	ak	string_view_construct_void	AK/StringView.h:357	construct
 AK::StringView::begin	luce-browser-foundation	ak	string_view_begin	AK/StringView.h:81	stub
 AK::StringView::bytes	luce-browser-foundation	ak	string_view_bytes	AK/StringView.h:69	stub
 AK::StringView::characters_without_null_termination	luce-browser-foundation	ak	string_view_characters_without_null_termination	AK/StringView.h:66	stub
@@ -2024,9 +2024,9 @@ AK::Utf16CodePointIterator::operator==	luce-browser-foundation	ak	utf16_code_poi
 AK::Utf16CodePointIterator::peek	luce-browser-foundation	ak	utf16_code_point_iterator_peek	AK/Utf16View.h:84	stub
 AK::Utf16CodePointIterator::remaining_code_units	luce-browser-foundation	ak	utf16_code_point_iterator_remaining_code_units	AK/Utf16View.h:138	stub
 AK::Utf16FlyString	luce-browser-foundation	ak	Utf16FlyString	AK/Utf16FlyString.h:16	struct
+AK::Utf16FlyString::Utf16FlyString	luce-browser-foundation	ak	utf16_fly_string_construct_utf16_fly_string	AK/Utf16FlyString.h:139	construct
 AK::Utf16FlyString::Utf16FlyString	luce-browser-foundation	ak	utf16_fly_string_construct_utf16_string	AK/Utf16FlyString.cpp:75	construct
 AK::Utf16FlyString::Utf16FlyString	luce-browser-foundation	ak	utf16_fly_string_construct_utf16_string_base	AK/Utf16FlyString.h:168	construct
-AK::Utf16FlyString::Utf16FlyString	luce-browser-foundation	ak	utf16_fly_string_construct_void	AK/Utf16FlyString.h:139	construct
 AK::Utf16FlyString::code_point_at	luce-browser-foundation	ak	utf16_fly_string_code_point_at	AK/Utf16FlyString.h:134	stub
 AK::Utf16FlyString::code_point_offset_of	luce-browser-foundation	ak	utf16_fly_string_code_point_offset_of	AK/Utf16FlyString.h:137	stub
 AK::Utf16FlyString::code_unit_at	luce-browser-foundation	ak	utf16_fly_string_code_unit_at	AK/Utf16FlyString.h:133	stub
@@ -2068,9 +2068,9 @@ AK::Utf16FlyStringTableHashTraits::equals	luce-browser-foundation	ak	utf16_fly_s
 AK::Utf16FlyStringTableHashTraits::hash	luce-browser-foundation	ak	utf16_fly_string_table_hash_traits_hash	AK/Utf16FlyString.cpp:14	stub
 AK::Utf16FlyStringTableHashTraits::may_have_slow_equality_check	luce-browser-foundation	ak	utf16_fly_string_table_hash_traits_may_have_slow_equality_check	AK/Utf16FlyString.cpp:16	stub
 AK::Utf16String	luce-browser-foundation	ak	Utf16String	AK/Utf16String.h:29	struct
+AK::Utf16String::Utf16String	luce-browser-foundation	ak	utf16_string_construct_utf16_string	AK/Utf16String.h:237	construct
 AK::Utf16String::Utf16String	luce-browser-foundation	ak	utf16_string_construct_utf16_string_base	AK/Utf16String.h:33	construct
 AK::Utf16String::Utf16String	luce-browser-foundation	ak	utf16_string_construct_utf16_string_data	AK/Utf16String.h:245	construct
-AK::Utf16String::Utf16String	luce-browser-foundation	ak	utf16_string_construct_void	AK/Utf16String.h:237	construct
 AK::Utf16String::WithBOMHandling	luce-browser-foundation	ak	Utf16StringWithBomHandling	AK/Utf16String.h:54	enum
 AK::Utf16String::escape_html_entities	luce-browser-foundation	ak	utf16_string_escape_html_entities	AK/Utf16String.h:232	stub
 AK::Utf16String::from_ascii_character	luce-browser-foundation	ak	utf16_string_from_ascii_character	AK/Utf16String.h:78	stub
@@ -2295,8 +2295,8 @@ AK::Vector::is_empty	luce-browser-foundation	ak	vector_is_empty	AK/Vector.h:144	
 AK::Vector::last	luce-browser-foundation	ak	vector_last	AK/Vector.h:212	stub
 AK::Vector::last	luce-browser-foundation	ak	vector_last_const	AK/Vector.h:200	stub
 AK::Vector::last_matching	luce-browser-foundation	ak	vector_last_matching	AK/Vector.h:261	stub
-AK::Vector::operator Span<__Conditional<contains_reference, _RawPtr<__RemoveReference<type-parameter-0-0>::Type>::Type, type-parameter-0-0>::Type>	luce-browser-foundation	ak	vector_to_span_conditional_contains_reference_raw_ptr_remove_reference_type_parameter00_type_type_type_parameter00_type	AK/Vector.h:141	stub
-AK::Vector::operator Span<const __Conditional<contains_reference, _RawPtr<__RemoveReference<type-parameter-0-0>::Type>::Type, type-parameter-0-0>::Type>	luce-browser-foundation	ak	vector_to_span_const_conditional_contains_reference_raw_ptr_remove_reference_type_parameter00_type_type_type_parameter00_type	AK/Vector.h:142	stub
+AK::Vector::operator Span<__Conditional<contains_reference, _RawPtr<__RemoveReference<type-parameter-0-0>::Type>::Type, type-parameter-0-0>::Type>	luce-browser-foundation	ak	vector_to_span_conditional_contains_reference_raw_ptr_remove_reference_t_type_type_t_type	AK/Vector.h:141	stub
+AK::Vector::operator Span<const __Conditional<contains_reference, _RawPtr<__RemoveReference<type-parameter-0-0>::Type>::Type, type-parameter-0-0>::Type>	luce-browser-foundation	ak	vector_to_span_const_conditional_contains_reference_raw_ptr_remove_reference_t_type_type_t_type	AK/Vector.h:142	stub
 AK::Vector::operator==	luce-browser-foundation	ak	vector_eq	AK/Vector.h:273	stub
 AK::Vector::operator[]	luce-browser-foundation	ak	vector_at_2	AK/Vector.h:181	stub
 AK::Vector::operator[]	luce-browser-foundation	ak	vector_at_const_2	AK/Vector.h:180	stub

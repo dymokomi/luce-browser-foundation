@@ -167,7 +167,7 @@ pub func cell_heap(this: Cell*) -> Heap*:
 
 ## Ported from Libraries/LibGC/CellAllocator.cpp:15 GC::CellAllocator::CellAllocator.
 pub func cell_allocator_construct(this: CellAllocator*, cell_size: usize, class_name: ak.StringView? = none, overrides_must_survive_garbage_collection: bool = false, overrides_finalize: bool = false):
-    return
+    trap("unported: GC::CellAllocator::CellAllocator")
 
 ## Ported from Libraries/LibGC/CellAllocator.h:37 GC::CellAllocator::class_name.
 pub func cell_allocator_class_name(this: const CellAllocator*) -> ak.StringView?:
@@ -186,11 +186,11 @@ pub func cell_allocator_for_each_block[TCallback](this: CellAllocator*, callback
     trap("unported: GC::CellAllocator::for_each_block")
 
 ## Ported from Libraries/LibGC/CellAllocator.cpp:46 GC::CellAllocator::block_did_become_empty.
-pub func cell_allocator_block_did_become_empty(this: CellAllocator*, arg0: HeapBlock*):
+pub func cell_allocator_block_did_become_empty(this: CellAllocator*, block: HeapBlock*):
     trap("unported: GC::CellAllocator::block_did_become_empty")
 
 ## Ported from Libraries/LibGC/CellAllocator.cpp:54 GC::CellAllocator::block_did_become_usable.
-pub func cell_allocator_block_did_become_usable(this: CellAllocator*, arg0: HeapBlock*):
+pub func cell_allocator_block_did_become_usable(this: CellAllocator*, block: HeapBlock*):
     trap("unported: GC::CellAllocator::block_did_become_usable")
 
 ## Ported from Libraries/LibGC/CellAllocator.h:62 GC::CellAllocator::block_allocator.
@@ -207,7 +207,7 @@ pub func cell_allocator_max_block_address(this: const CellAllocator*) -> usize:
 
 ## Ported from Libraries/LibGC/CellAllocator.h:86 GC::TypeIsolatingCellAllocator::TypeIsolatingCellAllocator<T>.
 pub func type_isolating_cell_allocator_construct[T](this: TypeIsolatingCellAllocator[T]*, class_name: ak.StringView, overrides_must_survive_garbage_collection: bool, overrides_finalize: bool):
-    return
+    trap("unported: GC::TypeIsolatingCellAllocator::TypeIsolatingCellAllocator<T>")
 
 ## Ported from Libraries/LibGC/ConservativeVector.h:19 GC::ConservativeVectorBase::possible_values (virtual).
 pub func conservative_vector_base_possible_values_impl(this: ConservativeVectorBase*) -> const u64[]:
@@ -252,39 +252,39 @@ pub func heap_set_should_collect_on_every_allocation(this: Heap*, b: bool):
     trap("unported: GC::Heap::set_should_collect_on_every_allocation")
 
 ## Ported from Libraries/LibGC/Heap.h:189 GC::Heap::did_create_root.
-pub func heap_did_create_root(this: Heap*, arg0: RootImpl*):
+pub func heap_did_create_root(this: Heap*, impl: RootImpl*):
     trap("unported: GC::Heap::did_create_root")
 
 ## Ported from Libraries/LibGC/Heap.h:195 GC::Heap::did_destroy_root.
-pub func heap_did_destroy_root(this: Heap*, arg0: RootImpl*):
+pub func heap_did_destroy_root(this: Heap*, impl: RootImpl*):
     trap("unported: GC::Heap::did_destroy_root")
 
 ## Ported from Libraries/LibGC/Heap.h:201 GC::Heap::did_create_root_vector.
-pub func heap_did_create_root_vector(this: Heap*, arg0: RootVectorBase*):
+pub func heap_did_create_root_vector(this: Heap*, vector: RootVectorBase*):
     trap("unported: GC::Heap::did_create_root_vector")
 
 ## Ported from Libraries/LibGC/Heap.h:207 GC::Heap::did_destroy_root_vector.
-pub func heap_did_destroy_root_vector(this: Heap*, arg0: RootVectorBase*):
+pub func heap_did_destroy_root_vector(this: Heap*, vector: RootVectorBase*):
     trap("unported: GC::Heap::did_destroy_root_vector")
 
 ## Ported from Libraries/LibGC/Heap.h:213 GC::Heap::did_create_root_hash_map.
-pub func heap_did_create_root_hash_map(this: Heap*, arg0: RootHashMapBase*):
+pub func heap_did_create_root_hash_map(this: Heap*, hash_map: RootHashMapBase*):
     trap("unported: GC::Heap::did_create_root_hash_map")
 
 ## Ported from Libraries/LibGC/Heap.h:219 GC::Heap::did_destroy_root_hash_map.
-pub func heap_did_destroy_root_hash_map(this: Heap*, arg0: RootHashMapBase*):
+pub func heap_did_destroy_root_hash_map(this: Heap*, hash_map: RootHashMapBase*):
     trap("unported: GC::Heap::did_destroy_root_hash_map")
 
 ## Ported from Libraries/LibGC/Heap.h:225 GC::Heap::did_create_conservative_vector.
-pub func heap_did_create_conservative_vector(this: Heap*, arg0: ConservativeVectorBase*):
+pub func heap_did_create_conservative_vector(this: Heap*, vector: ConservativeVectorBase*):
     trap("unported: GC::Heap::did_create_conservative_vector")
 
 ## Ported from Libraries/LibGC/Heap.h:231 GC::Heap::did_destroy_conservative_vector.
-pub func heap_did_destroy_conservative_vector(this: Heap*, arg0: ConservativeVectorBase*):
+pub func heap_did_destroy_conservative_vector(this: Heap*, vector: ConservativeVectorBase*):
     trap("unported: GC::Heap::did_destroy_conservative_vector")
 
 ## Ported from Libraries/LibGC/Heap.h:237 GC::Heap::did_create_weak_container.
-pub func heap_did_create_weak_container(this: Heap*, arg0: WeakContainer*):
+pub func heap_did_create_weak_container(this: Heap*, set: WeakContainer*):
     trap("unported: GC::Heap::did_create_weak_container")
 
 ## Ported from Libraries/LibGC/Heap.cpp:80 GC::add_possible_value.
@@ -293,7 +293,7 @@ pub func add_possible_value(possible_pointers: ak.HashMap[u64, HeapRoot, ak.U64T
     trap("unported: GC::add_possible_value")
 
 ## Ported from Libraries/LibGC/Heap.h:243 GC::Heap::did_destroy_weak_container.
-pub func heap_did_destroy_weak_container(this: Heap*, arg0: WeakContainer*):
+pub func heap_did_destroy_weak_container(this: Heap*, set: WeakContainer*):
     trap("unported: GC::Heap::did_destroy_weak_container")
 
 ## Ported from Libraries/LibGC/Heap.cpp:408 GC::Heap::register_sweep_callback.
@@ -301,7 +301,7 @@ pub func heap_register_sweep_callback(this: Heap*, callback: ak.Function0[unit])
     trap("unported: GC::Heap::register_sweep_callback")
 
 ## Ported from Libraries/LibGC/Heap.h:249 GC::Heap::register_cell_allocator.
-pub func heap_register_cell_allocator(this: Heap*, arg0: CellAllocator*):
+pub func heap_register_cell_allocator(this: Heap*, allocator: CellAllocator*):
     trap("unported: GC::Heap::register_cell_allocator")
 
 ## Ported from Libraries/LibGC/Heap.cpp:820 GC::Heap::uproot_cell.
@@ -511,7 +511,7 @@ pub func heap_block_base_heap(this: HeapBlockBase*) -> Heap*:
 
 ## Ported from Libraries/LibGC/Internals.h:30 GC::HeapBlockBase::HeapBlockBase.
 pub func heap_block_base_construct(this: HeapBlockBase*, heap: Heap*):
-    return
+    trap("unported: GC::HeapBlockBase::HeapBlockBase")
 
 ## Ported from Libraries/LibGC/NanBoxedValue.h:60 GC::NanBoxedValue::is_cell.
 pub func nan_boxed_value_is_cell(this: const NanBoxedValue*) -> bool:
@@ -619,7 +619,7 @@ pub func root_vector_base_assign_heap(this: RootVectorBase*, heap: Heap*?):
 
 ## Ported from Libraries/LibGC/Weak.h:24 GC::WeakImpl::WeakImpl.
 pub func weak_impl_construct(this: WeakImpl*, ptr: void*?):
-    return
+    trap("unported: GC::WeakImpl::WeakImpl")
 
 ## Ported from Libraries/LibGC/Weak.h:29 GC::WeakImpl::ptr.
 pub func weak_impl_ptr(this: const WeakImpl*) -> void*?:

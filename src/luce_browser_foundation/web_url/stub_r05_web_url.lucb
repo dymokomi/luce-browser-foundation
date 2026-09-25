@@ -51,11 +51,11 @@ pub func public_suffix_data_get_public_suffix(this: PublicSuffixData*, string: a
 
 ## Ported from Libraries/LibURL/Host.cpp:15 URL::Host::Host.
 pub func host_construct_host_variant_type(this: Host*, value: ak.HostVariantType):
-    return
+    trap("unported: URL::Host::Host")
 
 ## Ported from Libraries/LibURL/Host.cpp:20 URL::Host::Host.
 pub func host_construct_string(this: Host*, string: ak.String):
-    return
+    trap("unported: URL::Host::Host")
 
 ## Ported from Libraries/LibURL/Host.cpp:26 URL::serialize_ipv4_address.
 # internal linkage in C++: make it private when it is ported.
@@ -106,7 +106,7 @@ pub func serialize_ipv6_address(address: ak.IPv6Address, output: ak.StringBuilde
 
 ## Ported from Libraries/LibURL/Origin.h:31 URL::Origin::Origin.
 pub func origin_construct_origin_opaque_data(this: Origin*, opaque_data: OriginOpaqueData):
-    return
+    trap("unported: URL::Origin::Origin")
 
 ## Ported from Libraries/LibURL/Origin.cpp:14 URL::Origin::create_opaque.
 pub func origin_create_opaque(type_: OriginOpaqueDataType = OriginOpaqueDataType.standard) -> Origin:
@@ -114,7 +114,7 @@ pub func origin_create_opaque(type_: OriginOpaqueDataType = OriginOpaqueDataType
 
 ## Ported from Libraries/LibURL/Origin.cpp:19 URL::Origin::Origin.
 pub func origin_construct_optional_string(this: Origin*, scheme: ak.String?, host: Host, port: u16?, domain: ak.String? = none):
-    return
+    trap("unported: URL::Origin::Origin")
 
 ## Ported from Libraries/LibURL/Origin.h:41 URL::Origin::is_opaque.
 pub func origin_is_opaque(this: const Origin*) -> bool:
@@ -344,7 +344,7 @@ pub func constructor_string_parser_parse(input: ak.Utf8View) -> Init!:
 
 ## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:44 URL::Pattern::ConstructorStringParser::ConstructorStringParser.
 pub func constructor_string_parser_construct(this: ConstructorStringParser*, input: ak.Utf8View, token_list: ak.Vector[Token]):
-    return
+    trap("unported: URL::Pattern::ConstructorStringParser::ConstructorStringParser")
 
 ## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:15 URL::Pattern::ConstructorStringParser::state_to_string.
 pub func constructor_string_parser_state_to_string(this: const ConstructorStringParser*) -> ak.StringView:
@@ -510,11 +510,11 @@ pub func part_type_to_string(type_: PartType) -> ak.StringView:
 
 ## Ported from Libraries/LibURL/Pattern/Part.cpp:12 URL::Pattern::Part::Part.
 pub func part_construct(this: Part*, type_: PartType, value: ak.String, modifier: PartModifier):
-    return
+    trap("unported: URL::Pattern::Part::Part")
 
 ## Ported from Libraries/LibURL/Pattern/Part.cpp:19 URL::Pattern::Part::Part.
 pub func part_construct_string(this: Part*, type_: PartType, value: ak.String, modifier: PartModifier, name: ak.String, prefix: ak.String, suffix: ak.String):
-    return
+    trap("unported: URL::Pattern::Part::Part")
 
 ## Ported from Libraries/LibURL/Pattern/Pattern.cpp:16 URL::Pattern::hostname_pattern_is_an_ipv6_address.
 # internal linkage in C++: make it private when it is ported.
@@ -571,7 +571,7 @@ pub func pattern_parser_parse(input: ak.Utf8View, options: Options, encoding_cal
 
 ## Ported from Libraries/LibURL/Pattern/PatternParser.cpp:13 URL::Pattern::PatternParser::PatternParser.
 pub func pattern_parser_construct(this: PatternParser*, encoding_callback: ak.Function1[const ak.String*, ak.String], segment_wildcard_regexp: ak.String):
-    return
+    trap("unported: URL::Pattern::PatternParser::PatternParser")
 
 ## Ported from Libraries/LibURL/Pattern/PatternParser.cpp:266 URL::Pattern::PatternParser::try_to_consume_a_token.
 pub func pattern_parser_try_to_consume_a_token(this: PatternParser*, type_: TokenType) -> const Token*?:
@@ -639,7 +639,7 @@ pub func tokenizer_is_a_valid_name_code_point(code_point: u32, first: bool) -> b
 
 ## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:45 URL::Pattern::Tokenizer::Tokenizer.
 pub func tokenizer_construct(this: Tokenizer*, input: ak.Utf8View, policy: TokenizerPolicy):
-    return
+    trap("unported: URL::Pattern::Tokenizer::Tokenizer")
 
 ## Ported from Libraries/LibURL/Pattern/Tokenizer.cpp:355 URL::Pattern::Tokenizer::get_the_next_code_point.
 pub func tokenizer_get_the_next_code_point(this: Tokenizer*):
@@ -679,7 +679,7 @@ pub func site_serialize(this: const Site*) -> ak.String:
 
 ## Ported from Libraries/LibURL/Site.cpp:29 URL::Site::Site.
 pub func site_construct(this: Site*, value: OriginOrSchemeAndHost):
-    return
+    trap("unported: URL::Site::Site")
 
 ## Ported from Libraries/LibURL/URL.cpp:449 URL::append_percent_encoded_if_necessary.
 pub func append_percent_encoded_if_necessary(builder: ak.StringBuilder*, code_point: u32, set: PercentEncodeSet = PercentEncodeSet.userinfo):

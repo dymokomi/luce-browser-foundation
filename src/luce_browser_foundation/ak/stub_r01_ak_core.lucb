@@ -78,7 +78,7 @@ pub func empty_array_storage_at[T](this: const EmptyArrayStorage[T]*, arg0: usiz
     trap("unported: AK::Detail::EmptyArrayStorage::operator[]")
 
 ## Ported from AK/Array.h:24 AK::Detail::EmptyArrayStorage::operator type-parameter-0-0 *.
-pub func empty_array_storage_to_type_parameter_0_0[T](this: const EmptyArrayStorage[T]*) -> T*?:
+pub func empty_array_storage_to_t[T](this: const EmptyArrayStorage[T]*) -> T*?:
     return none
 
 ## Ported from AK/Assertions.cpp:46 dump_backtrace.
@@ -360,7 +360,7 @@ pub func bitmap_create(size: usize, default_value: bool) -> Bitmap!:
 
 ## Ported from AK/Bitmap.h:38 AK::Bitmap::Bitmap.
 pub func bitmap_construct(this: Bitmap*, data: u8*?, size: usize, is_owning: bool = false):
-    return
+    trap("unported: AK::Bitmap::Bitmap")
 
 ## Ported from AK/Bitmap.h:68 AK::Bitmap::view.
 pub func bitmap_view(this: const Bitmap*) -> BitmapView:
@@ -392,7 +392,7 @@ pub func bitmap_fill(this: Bitmap*, value: bool):
 
 ## Ported from AK/BitmapView.h:24 AK::BitmapView::BitmapView.
 pub func bitmap_view_construct(this: BitmapView*, data: u8*?, size: usize):
-    return
+    trap("unported: AK::BitmapView::BitmapView")
 
 ## Ported from AK/BitmapView.h:30 AK::BitmapView::size.
 pub func bitmap_view_size(this: const BitmapView*) -> usize:
@@ -459,7 +459,7 @@ pub func bitmap_view_eq(this: const BitmapView*, other: BitmapView) -> bool:
     trap("unported: AK::BitmapView::operator==")
 
 ## Ported from AK/BufferedStream.h:28 AK::BufferedHelper::BufferedHelper<T>.
-pub func buffered_helper_buffered_helper_t[T, U](this: BufferedHelper[T]*, stream: T*, stream_: CircularBuffer):
+pub func buffered_helper_buffered_helper_t[T, U](this: BufferedHelper[T]*, stream: T*, buffer: CircularBuffer):
     return
 
 ## Ported from AK/BufferedStream.h:47 AK::BufferedHelper::stream.
@@ -584,7 +584,7 @@ pub func input_buffered_seekable_buffer_size[T](this: const InputBufferedSeekabl
 
 ## Ported from AK/BufferedStream.h:368 AK::InputBufferedSeekable::InputBufferedSeekable<T>.
 pub func input_buffered_seekable_construct[T](this: InputBufferedSeekable[T]*, stream: T*, buffer: CircularBuffer):
-    return
+    trap("unported: AK::InputBufferedSeekable::InputBufferedSeekable<T>")
 
 ## Ported from AK/BufferedStream.h:379 AK::OutputBufferedSeekable::create.
 pub func output_buffered_seekable_create[T](stream: T*, buffer_size: usize) -> OutputBufferedSeekable[T]*!:
@@ -628,7 +628,7 @@ pub func output_buffered_seekable_truncate[T](this: OutputBufferedSeekable[T]*, 
 
 ## Ported from AK/BufferedStream.h:458 AK::OutputBufferedSeekable::OutputBufferedSeekable<T>.
 pub func output_buffered_seekable_construct[T](this: OutputBufferedSeekable[T]*, stream: T*, buffer: CircularBuffer):
-    return
+    trap("unported: AK::OutputBufferedSeekable::OutputBufferedSeekable<T>")
 
 ## Ported from AK/ByteBuffer.h:65 AK::Detail::ByteBuffer::create_uninitialized.
 pub func byte_buffer_create_uninitialized(size: usize) -> ByteBuffer!:
@@ -821,7 +821,7 @@ pub func is_within_range[TDestination, TSource](value: TSource) -> bool:
 
 ## Ported from AK/Checked.h:118 AK::Checked::Checked<T>.
 pub func checked_construct[T](this: Checked[T]*, value: T):
-    return
+    trap("unported: AK::Checked::Checked<T>")
 
 ## Ported from AK/Checked.h:124 AK::Checked::Checked<T>.
 pub func checked_checked_t[T, U](this: Checked[T]*, value: U):
@@ -1079,7 +1079,7 @@ pub func circular_buffer_clear(this: CircularBuffer*):
 
 ## Ported from AK/CircularBuffer.cpp:14 AK::CircularBuffer::CircularBuffer.
 pub func circular_buffer_construct(this: CircularBuffer*, buffer: ByteBuffer):
-    return
+    trap("unported: AK::CircularBuffer::CircularBuffer")
 
 ## Ported from AK/CircularBuffer.cpp:62 AK::CircularBuffer::is_wrapping_around.
 pub func circular_buffer_is_wrapping_around(this: const CircularBuffer*) -> bool:
@@ -1135,7 +1135,7 @@ pub func searchable_circular_buffer_next_search_span(this: const SearchableCircu
 
 ## Ported from AK/CircularBuffer.cpp:280 AK::SearchableCircularBuffer::SearchableCircularBuffer.
 pub func searchable_circular_buffer_construct(this: SearchableCircularBuffer*, buffer: ByteBuffer):
-    return
+    trap("unported: AK::SearchableCircularBuffer::SearchableCircularBuffer")
 
 ## Ported from AK/CircularBuffer.cpp:516 AK::SearchableCircularBuffer::insert_location_hash.
 pub func searchable_circular_buffer_insert_location_hash(this: SearchableCircularBuffer*, value: const u8[], raw_offset: usize) -> !:
@@ -1215,7 +1215,7 @@ pub func circular_queue_elements_const[T](this: const CircularQueue[T]*) -> cons
 
 ## Ported from AK/CopyOnWrite.h:16 AK::CopyOnWrite::CopyOnWrite<T>.
 pub func copy_on_write_construct[T](this: CopyOnWrite[T]*):
-    return
+    trap("unported: AK::CopyOnWrite::CopyOnWrite<T>")
 
 ## Ported from AK/CopyOnWrite.h:20 AK::CopyOnWrite::mutable_value.
 pub func copy_on_write_mutable_value[T](this: CopyOnWrite[T]*) -> T*:
@@ -1226,11 +1226,11 @@ pub func copy_on_write_value[T](this: const CopyOnWrite[T]*) -> T:
     trap("unported: AK::CopyOnWrite::value")
 
 ## Ported from AK/CopyOnWrite.h:28 AK::CopyOnWrite::operator const type-parameter-0-0 &.
-pub func copy_on_write_to_const_type_parameter_0_0[T](this: const CopyOnWrite[T]*) -> T:
+pub func copy_on_write_to_const_t[T](this: const CopyOnWrite[T]*) -> T:
     trap("unported: AK::CopyOnWrite::operator const type-parameter-0-0 &")
 
 ## Ported from AK/CopyOnWrite.h:29 AK::CopyOnWrite::operator type-parameter-0-0 &.
-pub func copy_on_write_to_type_parameter_0_0[T](this: CopyOnWrite[T]*) -> T*:
+pub func copy_on_write_to_t[T](this: CopyOnWrite[T]*) -> T*:
     trap("unported: AK::CopyOnWrite::operator type-parameter-0-0 &")
 
 ## Ported from AK/CopyOnWrite.h:31 AK::CopyOnWrite::operator->.
@@ -1284,7 +1284,7 @@ pub func doubly_linked_list_iterator_universal_end[TListType, TElementType]() ->
 ## Ported from AK/DoublyLinkedList.h:33 AK::DoublyLinkedListIterator::DoublyLinkedListIterator<ListType, ElementType>.
 # unmapped: typename ListType::Node
 pub func doubly_linked_list_iterator_construct[TListType, TElementType](this: DoublyLinkedListIterator[TListType, TElementType]*, node: void*?):
-    return
+    trap("unported: AK::DoublyLinkedListIterator::DoublyLinkedListIterator<ListType, ElementType>")
 
 ## Ported from AK/DoublyLinkedList.h:51 AK::DoublyLinkedList::Node::value.
 # unmapped: T
@@ -1402,18 +1402,18 @@ pub func convert_between_host_and_network_endian[T](value: T) -> T:
 
 ## Ported from AK/Endian.h:68 AK::LittleEndian::LittleEndian<T>.
 pub func little_endian_construct[T](this: LittleEndian[T]*, value: T):
-    return
+    trap("unported: AK::LittleEndian::LittleEndian<T>")
 
 ## Ported from AK/Endian.h:73 AK::LittleEndian::operator type-parameter-0-0.
-pub func little_endian_to_type_parameter_0_0[T](this: const LittleEndian[T]*) -> T:
+pub func little_endian_to_t[T](this: const LittleEndian[T]*) -> T:
     trap("unported: AK::LittleEndian::operator type-parameter-0-0")
 
 ## Ported from AK/Endian.h:84 AK::BigEndian::BigEndian<T>.
 pub func big_endian_construct[T](this: BigEndian[T]*, value: T):
-    return
+    trap("unported: AK::BigEndian::BigEndian<T>")
 
 ## Ported from AK/Endian.h:89 AK::BigEndian::operator type-parameter-0-0.
-pub func big_endian_to_type_parameter_0_0[T](this: const BigEndian[T]*) -> T:
+pub func big_endian_to_t[T](this: const BigEndian[T]*) -> T:
     trap("unported: AK::BigEndian::operator type-parameter-0-0")
 
 ## Ported from AK/Endian.h:116 AK::bitswap.
@@ -1483,11 +1483,11 @@ pub func ak_error_construct_i32(this: AkError*, code: i32, kind: AkErrorKind):
 
 ## Ported from AK/Error.h:95 AK::Error::Error.
 pub func ak_error_construct_string_view(this: AkError*, string_literal: StringView):
-    return
+    trap("unported: AK::Error::Error")
 
 ## Ported from AK/Error.h:101 AK::Error::Error.
 pub func ak_error_construct_string_view_i32(this: AkError*, syscall_name: StringView, code: i32):
-    return
+    trap("unported: AK::Error::Error")
 
 ## Ported from AK/Find.h:17 AK::find_if.
 pub func find_if[TTEndIterator, TTIterator, TTUnaryPredicate](first: TTIterator, last: TTEndIterator, pred: TTUnaryPredicate) -> TTIterator:
@@ -1511,7 +1511,7 @@ pub func fixed_point_fixed_point_precision_underlying[TUnderlying, I](this: Fixe
     return
 
 ## Ported from AK/FixedPoint.h:59 AK::FixedPoint::operator type-parameter-1-0.
-pub func fixed_point_to_type_parameter_1_0[TUnderlying, F](this: const FixedPoint[TUnderlying]*) -> F:
+pub func fixed_point_to_t[TUnderlying, F](this: const FixedPoint[TUnderlying]*) -> F:
     trap("unported: AK::FixedPoint::operator type-parameter-1-0")
 
 ## Ported from AK/FixedPoint.h:70 AK::FixedPoint::create_raw.
@@ -1733,7 +1733,7 @@ pub func callable_wrapper_base_raw_callable_impl(this: CallableWrapperBase*) -> 
 
 ## Ported from AK/Function.h:217 AK::Function::CallableWrapper::CallableWrapper<CallableType>.
 pub func callable_wrapper_construct[TCallableType](this: CallableWrapper[TCallableType]*, callable: TCallableType):
-    return
+    trap("unported: AK::Function::CallableWrapper::CallableWrapper<CallableType>")
 
 ## Ported from AK/Function.h:238 AK::Function::CallableWrapper::init_and_swap.
 pub func callable_wrapper_init_and_swap[TCallableType](this: CallableWrapper[TCallableType]*, destination: u8*?, size: usize):
@@ -1990,7 +1990,7 @@ pub func hash_table_iterator_skip_to_next[THashTableType, T, TBucketType](this: 
 
 ## Ported from AK/HashTable.h:67 AK::HashTableIterator::HashTableIterator<HashTableType, T, BucketType>.
 pub func hash_table_iterator_construct[THashTableType, T, TBucketType](this: HashTableIterator[THashTableType, T, TBucketType]*, bucket: TBucketType*?, end_bucket: TBucketType*?):
-    return
+    trap("unported: AK::HashTableIterator::HashTableIterator<HashTableType, T, BucketType>")
 
 ## Ported from AK/HashTable.h:82 AK::OrderedHashTableIterator::operator==.
 pub func ordered_hash_table_iterator_eq[TOrderedHashTableType, T, TBucketType](this: const OrderedHashTableIterator[TOrderedHashTableType, T, TBucketType]*, other: OrderedHashTableIterator[u8, u8, u8]) -> bool:
@@ -2018,7 +2018,7 @@ pub func ordered_hash_table_iterator_dec[TOrderedHashTableType, T, TBucketType](
 
 ## Ported from AK/HashTable.h:90 AK::OrderedHashTableIterator::OrderedHashTableIterator<OrderedHashTableType, T, BucketType>.
 pub func ordered_hash_table_iterator_construct[TOrderedHashTableType, T, TBucketType](this: OrderedHashTableIterator[TOrderedHashTableType, T, TBucketType]*, bucket: TBucketType*?, arg1: TBucketType*?):
-    return
+    trap("unported: AK::OrderedHashTableIterator::OrderedHashTableIterator<OrderedHashTableType, T, BucketType>")
 
 ## Ported from AK/HashTable.h:103 AK::ReverseOrderedHashTableIterator::operator==.
 pub func reverse_ordered_hash_table_iterator_eq[TOrderedHashTableType, T, TBucketType](this: const ReverseOrderedHashTableIterator[TOrderedHashTableType, T, TBucketType]*, other: ReverseOrderedHashTableIterator[u8, u8, u8]) -> bool:
@@ -2046,7 +2046,7 @@ pub func reverse_ordered_hash_table_iterator_dec[TOrderedHashTableType, T, TBuck
 
 ## Ported from AK/HashTable.h:111 AK::ReverseOrderedHashTableIterator::ReverseOrderedHashTableIterator<OrderedHashTableType, T, BucketType>.
 pub func reverse_ordered_hash_table_iterator_construct[TOrderedHashTableType, T, TBucketType](this: ReverseOrderedHashTableIterator[TOrderedHashTableType, T, TBucketType]*, bucket: TBucketType*?):
-    return
+    trap("unported: AK::ReverseOrderedHashTableIterator::ReverseOrderedHashTableIterator<OrderedHashTableType, T, BucketType>")
 
 ## Ported from AK/HashTable.h:179 AK::HashTable::HashTable<T, TraitsForT, IsOrdered>.
 pub func hash_table_construct[T, TT: Traits[T]](this: HashTable[T, TT]*, capacity: usize):
@@ -2297,7 +2297,7 @@ pub func hash_table_delete_bucket[T, TT: Traits[T]](this: HashTable[T, TT]*, buc
 
 ## Ported from AK/IDAllocator.h:21 AK::IDAllocator::IDAllocator.
 pub func id_allocator_construct(this: IdAllocator*, minimum_value: i32):
-    return
+    trap("unported: AK::IDAllocator::IDAllocator")
 
 ## Ported from AK/IDAllocator.h:28 AK::IDAllocator::allocate.
 pub func id_allocator_allocate(this: IdAllocator*) -> i32:
@@ -2497,7 +2497,7 @@ pub func base_iterator_key[TElementType](this: const BaseIterator[TElementType]*
 ## Ported from AK/IntrusiveRedBlackTree.h:115 AK::Detail::IntrusiveRedBlackTree::BaseIterator::BaseIterator<ElementType>.
 # unmapped: SubstitutedIntrusiveRedBlackTreeNode<K, V, Container>; SubstitutedIntrusiveRedBlackTreeNode<K, V, Container>
 pub func base_iterator_construct[TElementType](this: BaseIterator[TElementType]*, node: void*?, prev: void*?):
-    return
+    trap("unported: AK::Detail::IntrusiveRedBlackTree::BaseIterator::BaseIterator<ElementType>")
 
 ## Ported from AK/IntrusiveRedBlackTree.h:125 AK::Detail::IntrusiveRedBlackTree::begin.
 pub func intrusive_red_black_tree_begin[K, V, TContainer](this: IntrusiveRedBlackTree[K, V, TContainer]*) -> BaseIterator[V]:
@@ -2623,14 +2623,14 @@ pub func simple_iterator_end[TContainer, TValueType](container: TContainer*) -> 
 
 ## Ported from AK/Iterator.h:118 AK::SimpleIterator::SimpleIterator<Container, ValueType>.
 pub func simple_iterator_construct[TContainer, TValueType](this: SimpleIterator[TContainer, TValueType]*, container: TContainer*, index: usize):
-    return
+    trap("unported: AK::SimpleIterator::SimpleIterator<Container, ValueType>")
 
 ## Ported from AK/LEB128.h:20 AK::LEB128::LEB128<ValueType>.
 pub func leb128_construct[TValueType](this: Leb128[TValueType]*, value: TValueType):
-    return
+    trap("unported: AK::LEB128::LEB128<ValueType>")
 
 ## Ported from AK/LEB128.h:25 AK::LEB128::operator type-parameter-0-0.
-pub func leb128_to_type_parameter_0_0[TValueType](this: const Leb128[TValueType]*) -> TValueType:
+pub func leb128_to_t[TValueType](this: const Leb128[TValueType]*) -> TValueType:
     trap("unported: AK::LEB128::operator type-parameter-0-0")
 
 ## Ported from AK/LEB128.h:27 AK::LEB128::read_from_stream.
@@ -2638,11 +2638,11 @@ pub func leb128_read_from_stream[TValueType](stream: Stream*) -> Leb128[TValueTy
     trap("unported: AK::LEB128::read_from_stream")
 
 ## Ported from AK/Math.h:42 AK::Details::product_even.
-pub func details_product_even() -> usize:
+pub func details_product_even_x() -> usize:
     return 2
 
 ## Ported from AK/Math.h:49 AK::Details::product_odd.
-pub func details_product_odd() -> usize:
+pub func details_product_odd_x() -> usize:
     return 1
 
 ## Ported from AK/Math.h:56 AK::to_radians.
@@ -2803,11 +2803,11 @@ pub func timing_safe_compare(b1: const void*?, b2: const void*?, len: usize) -> 
 
 ## Ported from AK/MemoryStream.cpp:14 AK::FixedMemoryStream::FixedMemoryStream.
 pub func fixed_memory_stream_construct_fixed_memory_stream_mode(this: FixedMemoryStream*, bytes: u8[], mode: FixedMemoryStreamMode = FixedMemoryStreamMode.read_write):
-    return
+    trap("unported: AK::FixedMemoryStream::FixedMemoryStream")
 
 ## Ported from AK/MemoryStream.cpp:20 AK::FixedMemoryStream::FixedMemoryStream.
 pub func fixed_memory_stream_construct(this: FixedMemoryStream*, bytes: const u8[]):
-    return
+    trap("unported: AK::FixedMemoryStream::FixedMemoryStream")
 
 ## Ported from AK/MemoryStream.cpp:26 AK::FixedMemoryStream::is_eof (override).
 pub func fixed_memory_stream_is_eof_impl(base: Stream*) -> bool:
@@ -2903,7 +2903,7 @@ pub func allocating_memory_stream_offset_of(this: AllocatingMemoryStream*, needl
 
 ## Ported from AK/MemoryStream.h:117 AK::AllocatingMemoryStream::Chunk::Chunk.
 pub func allocating_memory_stream_chunk_construct(this: AllocatingMemoryStreamChunk*):
-    return
+    trap("unported: AK::AllocatingMemoryStream::Chunk::Chunk")
 
 ## Ported from AK/MemoryStream.cpp:141 AK::AllocatingMemoryStream::append_new_chunk.
 pub func allocating_memory_stream_append_new_chunk(this: AllocatingMemoryStream*) -> !:
@@ -3159,11 +3159,11 @@ pub func base_red_black_tree_is_empty[K](this: const BaseRedBlackTree[K]*) -> bo
 ## Ported from AK/RedBlackTree.h:38 AK::BaseRedBlackTree::Node::Node.
 # unmapped: K
 pub func base_red_black_tree_node_construct_opaque(this: BaseRedBlackTreeNode*, key: void*?):
-    return
+    trap("unported: AK::BaseRedBlackTree::Node::Node")
 
 ## Ported from AK/RedBlackTree.h:42 AK::BaseRedBlackTree::Node::Node.
 pub func base_red_black_tree_node_construct(this: BaseRedBlackTreeNode*):
-    return
+    trap("unported: AK::BaseRedBlackTree::Node::Node")
 
 ## Ported from AK/RedBlackTree.h:52 AK::BaseRedBlackTree::rotate_left.
 pub func base_red_black_tree_rotate_left[K](this: BaseRedBlackTree[K]*, subtree_root: BaseRedBlackTreeNode*?):
@@ -3245,7 +3245,7 @@ pub func red_black_tree_iterator_key[TTreeType, TElementType](this: const RedBla
 ## Ported from AK/RedBlackTree.h:434 AK::RedBlackTreeIterator::RedBlackTreeIterator<TreeType, ElementType>.
 # unmapped: typename TreeType::Node; typename TreeType::Node
 pub func red_black_tree_iterator_construct[TTreeType, TElementType](this: RedBlackTreeIterator[TTreeType, TElementType]*, node: void*?, prev: void*?):
-    return
+    trap("unported: AK::RedBlackTreeIterator::RedBlackTreeIterator<TreeType, ElementType>")
 
 ## Ported from AK/RedBlackTree.h:454 AK::RedBlackTree::find.
 pub func red_black_tree_find[K, V](this: RedBlackTree[K, V]*, key: K) -> V*?:
@@ -3377,22 +3377,22 @@ pub func adopt_ref_if_nonnull[T](object: T*?) -> T*?:
 
 ## Ported from AK/Result.h:20 AK::Result::Result<ValueT, ErrorT>.
 pub func result_construct_t_value_t[TValueT, TErrorT](this: Result[TValueT, TErrorT]*, res: TValueT):
-    return
+    trap("unported: AK::Result::Result<ValueT, ErrorT>")
 
 ## Ported from AK/Result.h:25 AK::Result::Result<ValueT, ErrorT>.
 # unmapped: T
 pub func result_construct_opaque[TValueT, TErrorT](this: Result[TValueT, TErrorT]*, res: void*?):
-    return
+    trap("unported: AK::Result::Result<ValueT, ErrorT>")
 
 ## Ported from AK/Result.h:30 AK::Result::Result<ValueT, ErrorT>.
 # unmapped: E
 pub func result_construct_opaque_2[TValueT, TErrorT](this: Result[TValueT, TErrorT]*, error_: void*?):
-    return
+    trap("unported: AK::Result::Result<ValueT, ErrorT>")
 
 ## Ported from AK/Result.h:35 AK::Result::Result<ValueT, ErrorT>.
 # unmapped: E
 pub func result_construct_opaque_3[TValueT, TErrorT](this: Result[TValueT, TErrorT]*, error_: void*?):
-    return
+    trap("unported: AK::Result::Result<ValueT, ErrorT>")
 
 ## Ported from AK/Result.h:44 AK::Result::value.
 # unmapped: T
@@ -3500,7 +3500,7 @@ pub func simple_reverse_iterator_rend[TContainer, TValueType](container: TContai
 
 ## Ported from AK/ReverseIterator.h:80 AK::SimpleReverseIterator::SimpleReverseIterator<Container, ValueType>.
 pub func simple_reverse_iterator_construct[TContainer, TValueType](this: SimpleReverseIterator[TContainer, TValueType]*, container: TContainer*, index: i32):
-    return
+    trap("unported: AK::SimpleReverseIterator::SimpleReverseIterator<Container, ValueType>")
 
 ## Ported from AK/ReverseIterator.h:98 AK::ReverseWrapper::begin.
 # unmapped: auto
@@ -3530,11 +3530,11 @@ pub func saturating_mul[T](a: T, b: T) -> T:
 
 ## Ported from AK/ScopeGuard.h:16 AK::ScopeGuard::ScopeGuard<Callback>.
 pub func scope_guard_construct[TCallback](this: ScopeGuard[TCallback]*, callback: TCallback):
-    return
+    trap("unported: AK::ScopeGuard::ScopeGuard<Callback>")
 
 ## Ported from AK/ScopeGuard.h:33 AK::ArmedScopeGuard::ArmedScopeGuard<Callback>.
 pub func armed_scope_guard_construct[TCallback](this: ArmedScopeGuard[TCallback]*, callback: TCallback):
-    return
+    trap("unported: AK::ArmedScopeGuard::ArmedScopeGuard<Callback>")
 
 ## Ported from AK/ScopeGuard.h:44 AK::ArmedScopeGuard::disarm.
 pub func armed_scope_guard_disarm[TCallback](this: ArmedScopeGuard[TCallback]*):
@@ -3553,11 +3553,11 @@ pub func singleton_deref[T](this: const Singleton[T]*) -> T*:
     trap("unported: AK::Singleton::operator*")
 
 ## Ported from AK/Singleton.h:88 AK::Singleton::operator type-parameter-0-0 *.
-pub func singleton_to_type_parameter_0_0_const[T](this: const Singleton[T]*) -> T*?:
+pub func singleton_to_t_const[T](this: const Singleton[T]*) -> T*?:
     trap("unported: AK::Singleton::operator type-parameter-0-0 *")
 
 ## Ported from AK/Singleton.h:93 AK::Singleton::operator type-parameter-0-0 &.
-pub func singleton_to_type_parameter_0_0_const_2[T](this: const Singleton[T]*) -> T*:
+pub func singleton_to_t_const_2[T](this: const Singleton[T]*) -> T*:
     trap("unported: AK::Singleton::operator type-parameter-0-0 &")
 
 ## Ported from AK/Singleton.h:98 AK::Singleton::is_initialized.
@@ -3599,17 +3599,17 @@ pub func singly_linked_list_iterator_is_begin[TListType, TElementType](this: con
 ## Ported from AK/SinglyLinkedList.h:45 AK::SinglyLinkedListIterator::SinglyLinkedListIterator<ListType, ElementType>.
 # unmapped: typename ListType::Node; typename ListType::Node
 pub func singly_linked_list_iterator_construct[TListType, TElementType](this: SinglyLinkedListIterator[TListType, TElementType]*, node: void*?, prev: void*?):
-    return
+    trap("unported: AK::SinglyLinkedListIterator::SinglyLinkedListIterator<ListType, ElementType>")
 
 ## Ported from AK/SinglyLinkedList.h:60 AK::SinglyLinkedList::Node::Node.
 # unmapped: T
 pub func singly_linked_list_node_construct(this: SinglyLinkedListNode*, v: void*?):
-    return
+    trap("unported: AK::SinglyLinkedList::Node::Node")
 
 ## Ported from AK/SinglyLinkedList.h:64 AK::SinglyLinkedList::Node::Node.
 # unmapped: T
 pub func singly_linked_list_node_construct_2(this: SinglyLinkedListNode*, v: void*?):
-    return
+    trap("unported: AK::SinglyLinkedList::Node::Node")
 
 ## Ported from AK/SinglyLinkedList.h:87 AK::SinglyLinkedList::is_empty.
 pub func singly_linked_list_is_empty[T, TTSizeCalculationPolicy](this: const SinglyLinkedList[T, TTSizeCalculationPolicy]*) -> bool:
@@ -3733,7 +3733,7 @@ pub func singly_linked_list_tail_const[T, TTSizeCalculationPolicy](this: const S
 
 ## Ported from AK/Span.h:24 AK::Detail::Span::Span<T>.
 pub func span_construct[T](this: Span[T]*, values: T*?, size: usize):
-    return
+    trap("unported: AK::Detail::Span::Span<T>")
 
 ## Ported from AK/Span.h:402 AK::to_readonly_bytes.
 pub func to_readonly_bytes[T](span: Span[T]) -> const u8[]:
@@ -4122,7 +4122,7 @@ pub func duration_cmp(this: const Duration*, other: Duration) -> i32:
 
 ## Ported from AK/Time.h:361 AK::Duration::Duration.
 pub func duration_construct(this: Duration*, seconds: i64, nanoseconds: u32):
-    return
+    trap("unported: AK::Duration::Duration")
 
 ## Ported from AK/Time.cpp:249 AK::Duration::from_half_sanitized.
 pub func duration_from_half_sanitized(seconds: i64, extra_seconds: i32, nanoseconds: u32) -> Duration:
@@ -4138,11 +4138,11 @@ pub func unaware_time_to_timeval(this: const UnawareTime*) -> Timeval:
 
 ## Ported from AK/Time.h:395 AK::Detail::UnawareTime::UnawareTime.
 pub func unaware_time_construct(this: UnawareTime*, offset: Duration):
-    return
+    trap("unported: AK::Detail::UnawareTime::UnawareTime")
 
 ## Ported from AK/Time.h:409 AK::UnixDateTime::UnixDateTime.
 pub func unix_date_time_construct(this: UnixDateTime*):
-    return
+    trap("unported: AK::UnixDateTime::UnixDateTime")
 
 ## Ported from AK/Time.h:414 AK::UnixDateTime::epoch.
 pub func unix_date_time_epoch() -> UnixDateTime:
@@ -4263,7 +4263,7 @@ pub func unix_date_time_cmp(this: const UnixDateTime*, other: UnixDateTime) -> i
 
 ## Ported from AK/Time.h:540 AK::UnixDateTime::UnixDateTime.
 pub func unix_date_time_construct_duration(this: UnixDateTime*, offset: Duration):
-    return
+    trap("unported: AK::UnixDateTime::UnixDateTime")
 
 ## Ported from AK/Time.cpp:489 AK::UnixDateTime::to_string_impl.
 pub func unix_date_time_to_string_impl(this: const UnixDateTime*, builder: StringBuilder*, format_: StringView, local_time: UnixDateTimeLocalTime) -> !:
@@ -4323,7 +4323,7 @@ pub func monotonic_time_sub_monotonic_time(this: const MonotonicTime*, other: Mo
 
 ## Ported from AK/Time.h:582 AK::MonotonicTime::MonotonicTime.
 pub func monotonic_time_construct(this: MonotonicTime*, offset: Duration):
-    return
+    trap("unported: AK::MonotonicTime::MonotonicTime")
 
 ## Ported from AK/Time.h:589 AK::timeval_sub.
 pub func timeval_sub[TTimevalType](a: TTimevalType, b: TTimevalType, result: TTimevalType*):
@@ -4372,7 +4372,7 @@ pub func time_literals_literalsec(seconds: u64) -> Duration:
 ## Ported from AK/Trie.h:36 AK::Detail::Trie::Trie<DeclaredBaseType, DefaultBaseType, ValueType, MetadataT, ValueTraits, MapType>.
 # unmapped: Optional<MetadataType>
 pub func trie2_construct[TDeclaredBaseType, TDefaultBaseType, TValueType, TMetadataT, TValueTraits](this: Trie2[TDeclaredBaseType, TDefaultBaseType, TValueType, TMetadataT, TValueTraits]*, value: TValueType, metadata: void*?):
-    return
+    trap("unported: AK::Detail::Trie::Trie<DeclaredBaseType, DefaultBaseType, ValueType, MetadataT, ValueTraits, MapType>")
 
 ## Ported from AK/Trie.h:43 AK::Detail::Trie::traverse_until_last_accessible_node.
 # unmapped: typename SubstituteIfVoid<DeclaredBaseType, DefaultBaseType>::Type
@@ -4492,11 +4492,11 @@ pub func trie2_pop_and_get_next_iterator[TDeclaredBaseType, TDefaultBaseType, TV
 ## Ported from AK/Trie.h:293 AK::Trie::Trie<ValueType, MetadataT, ValueTraits, BaseT, MapType>.
 # unmapped: typename DetailTrie::MetadataType
 pub func trie_construct_opaque[TValueType, TMetadataT, TValueTraits, TBaseT](this: Trie[TValueType, TMetadataT, TValueTraits, TBaseT]*, value: TValueType, metadata: void*?):
-    return
+    trap("unported: AK::Trie::Trie<ValueType, MetadataT, ValueTraits, BaseT, MapType>")
 
 ## Ported from AK/Trie.h:299 AK::Trie::Trie<ValueType, MetadataT, ValueTraits, BaseT, MapType>.
 pub func trie_construct[TValueType, TMetadataT, TValueTraits, TBaseT](this: Trie[TValueType, TMetadataT, TValueTraits, TBaseT]*, value: TValueType):
-    return
+    trap("unported: AK::Trie::Trie<ValueType, MetadataT, ValueTraits, BaseT, MapType>")
 
 ## Ported from AK/TypeCasts.h:17 AK::is.
 pub func is[TOutputType, TInputType](input: TInputType*) -> bool:
@@ -4570,7 +4570,7 @@ pub func u_fixed_big_int_construct_opaque[TStorage](this: UFixedBigInt[TStorage]
     trap("unported: AK::Detail::UFixedBigInt::UFixedBigInt<bit_size, Storage>")
 
 ## Ported from AK/UFixedBigInt.h:137 AK::Detail::UFixedBigInt::operator type-parameter-1-0.
-pub func u_fixed_big_int_to_type_parameter_1_0[TStorage, T](this: const UFixedBigInt[TStorage]*) -> T:
+pub func u_fixed_big_int_to_t[TStorage, T](this: const UFixedBigInt[TStorage]*) -> T:
     trap("unported: AK::Detail::UFixedBigInt::operator type-parameter-1-0")
 
 ## Ported from AK/UFixedBigInt.h:156 AK::Detail::UFixedBigInt::low.
@@ -4940,12 +4940,12 @@ pub func vector_span_const[T](this: const Vector[T]*) -> void*?:
 
 ## Ported from AK/Vector.h:141 AK::Vector::operator Span<__Conditional<contains_reference, _RawPtr<__RemoveReference<type-parameter-0-0>::Type>::Type, type-parameter-0-0>::Type>.
 # unmapped: Conditional<contains_reference, RawPtr<RemoveReference<T>>, T>
-pub func vector_to_span_conditional_contains_reference_raw_ptr_remove_reference_type_parameter00_type_type_type_parameter00_type[T](this: Vector[T]*) -> void*?:
+pub func vector_to_span_conditional_contains_reference_raw_ptr_remove_reference_t_type_type_t_type[T](this: Vector[T]*) -> void*?:
     trap("unported: AK::Vector::operator Span<__Conditional<contains_reference, _RawPtr<__RemoveReference<type-parameter-0-0>::Type>::Type, type-parameter-0-0>::Type>")
 
 ## Ported from AK/Vector.h:142 AK::Vector::operator Span<const __Conditional<contains_reference, _RawPtr<__RemoveReference<type-parameter-0-0>::Type>::Type, type-parameter-0-0>::Type>.
 # unmapped: ReadonlySpan<StorageType>
-pub func vector_to_span_const_conditional_contains_reference_raw_ptr_remove_reference_type_parameter00_type_type_type_parameter00_type[T](this: const Vector[T]*) -> void*?:
+pub func vector_to_span_const_conditional_contains_reference_raw_ptr_remove_reference_t_type_type_t_type[T](this: const Vector[T]*) -> void*?:
     trap("unported: AK::Vector::operator Span<const __Conditional<contains_reference, _RawPtr<__RemoveReference<type-parameter-0-0>::Type>::Type, type-parameter-0-0>::Type>")
 
 ## Ported from AK/Vector.h:144 AK::Vector::is_empty.

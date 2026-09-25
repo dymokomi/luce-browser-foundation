@@ -73,7 +73,7 @@ pub func is_debug_only_formatter[TFormatter]() -> bool:
 
 ## Ported from AK/Format.cpp:128 AK::FormatParser::FormatParser.
 pub func format_parser_construct(this: FormatParser*, input: StringView):
-    return
+    trap("unported: AK::FormatParser::FormatParser")
 
 ## Ported from AK/Format.cpp:132 AK::FormatParser::consume_literal.
 pub func format_parser_consume_literal(this: FormatParser*) -> StringView:
@@ -111,27 +111,27 @@ pub func vformat_impl(params: TypeErasedFormatParams*, builder: FormatBuilder*, 
 
 ## Ported from AK/Format.h:100 AK::TypeErasedParameter::TypeErasedParameter.
 pub func type_erased_parameter_construct_bool(this: TypeErasedParameter*, value: bool):
-    return
+    trap("unported: AK::TypeErasedParameter::TypeErasedParameter")
 
 ## Ported from AK/Format.h:106 AK::TypeErasedParameter::TypeErasedParameter.
 pub func type_erased_parameter_construct_u8(this: TypeErasedParameter*, value: u8):
-    return
+    trap("unported: AK::TypeErasedParameter::TypeErasedParameter")
 
 ## Ported from AK/Format.h:112 AK::TypeErasedParameter::TypeErasedParameter.
 pub func type_erased_parameter_construct_f32(this: TypeErasedParameter*, value: f32):
-    return
+    trap("unported: AK::TypeErasedParameter::TypeErasedParameter")
 
 ## Ported from AK/Format.h:118 AK::TypeErasedParameter::TypeErasedParameter.
 pub func type_erased_parameter_construct_f64(this: TypeErasedParameter*, value: f64):
-    return
+    trap("unported: AK::TypeErasedParameter::TypeErasedParameter")
 
 ## Ported from AK/Format.h:124 AK::TypeErasedParameter::TypeErasedParameter.
 pub func type_erased_parameter_construct_string_view(this: TypeErasedParameter*, value: StringView):
-    return
+    trap("unported: AK::TypeErasedParameter::TypeErasedParameter")
 
 ## Ported from AK/Format.h:130 AK::TypeErasedParameter::TypeErasedParameter.
 pub func type_erased_parameter_construct_u8_2(this: TypeErasedParameter*, value: const u8*?):
-    return
+    trap("unported: AK::TypeErasedParameter::TypeErasedParameter")
 
 ## Ported from AK/Format.h:144 AK::TypeErasedParameter::visit.
 # unmapped: auto
@@ -144,7 +144,7 @@ pub func type_erased_parameter_to_size(this: const TypeErasedParameter*) -> usiz
 
 ## Ported from AK/Format.h:219 AK::FormatBuilder::FormatBuilder.
 pub func format_builder_construct(this: FormatBuilder*, builder: StringBuilder*):
-    return
+    trap("unported: AK::FormatBuilder::FormatBuilder")
 
 ## Ported from AK/Format.cpp:218 AK::FormatBuilder::put_padding.
 pub func format_builder_put_padding(this: FormatBuilder*, fill: u8, amount: usize) -> !:
@@ -196,7 +196,7 @@ pub func format_builder_put_f64_with_precision(this: FormatBuilder*, value: f64,
 
 ## Ported from AK/Format.h:332 AK::TypeErasedFormatParams::TypeErasedFormatParams.
 pub func type_erased_format_params_construct(this: TypeErasedFormatParams*, size: u32):
-    return
+    trap("unported: AK::TypeErasedFormatParams::TypeErasedFormatParams")
 
 ## Ported from AK/Format.h:337 AK::TypeErasedFormatParams::parameters.
 pub func type_erased_format_params_parameters(this: const TypeErasedFormatParams*) -> const TypeErasedParameter[]:
@@ -253,7 +253,7 @@ pub func set_rich_debug_enabled(value: bool):
 
 ## Ported from AK/Format.h:751 AK::FormatIfSupported::FormatIfSupported<T>.
 pub func format_if_supported_construct[T](this: FormatIfSupported[T]*, value: T):
-    return
+    trap("unported: AK::FormatIfSupported::FormatIfSupported<T>")
 
 ## Ported from AK/Format.h:756 AK::FormatIfSupported::value.
 pub func format_if_supported_value[T](this: const FormatIfSupported[T]*) -> T:
@@ -429,7 +429,7 @@ pub func json_array_serializer_finish[TBuilder](this: JsonArraySerializer[TBuild
 
 ## Ported from AK/JsonArraySerializer.h:186 AK::JsonArraySerializer::JsonArraySerializer<type-parameter-0-0>.
 pub func json_array_serializer_construct[TBuilder](this: JsonArraySerializer[TBuilder]*, builder: TBuilder*):
-    return
+    trap("unported: AK::JsonArraySerializer::JsonArraySerializer<type-parameter-0-0>")
 
 ## Ported from AK/JsonArraySerializer.h:191 AK::JsonArraySerializer::begin_item.
 pub func json_array_serializer_begin_item[TBuilder](this: JsonArraySerializer[TBuilder]*) -> !:
@@ -690,7 +690,7 @@ pub func json_object_serializer_finish[TBuilder](this: JsonObjectSerializer[TBui
 
 ## Ported from AK/JsonObjectSerializer.h:204 AK::JsonObjectSerializer::JsonObjectSerializer<type-parameter-0-0>.
 pub func json_object_serializer_construct[TBuilder](this: JsonObjectSerializer[TBuilder]*, builder: TBuilder*):
-    return
+    trap("unported: AK::JsonObjectSerializer::JsonObjectSerializer<type-parameter-0-0>")
 
 ## Ported from AK/JsonObjectSerializer.h:209 AK::JsonObjectSerializer::begin_item.
 pub func json_object_serializer_begin_item[TBuilder](this: JsonObjectSerializer[TBuilder]*, key: StringView) -> !:
@@ -706,7 +706,7 @@ pub func is_space(ch: i32) -> bool:
 
 ## Ported from AK/JsonParser.h:19 AK::JsonParser::JsonParser.
 pub func json_parser_construct(this: JsonParser*, input: StringView):
-    return
+    trap("unported: AK::JsonParser::JsonParser")
 
 ## Ported from AK/JsonParser.cpp:353 AK::JsonParser::parse_json.
 pub func json_parser_parse_json(this: JsonParser*) -> JsonValue2!:
@@ -763,39 +763,39 @@ pub func json_value2_construct(this: JsonValue2*):
 
 ## Ported from AK/JsonValue.cpp:126 AK::JsonValue::JsonValue.
 pub func json_value2_construct_i32(this: JsonValue2*, value: i32):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:131 AK::JsonValue::JsonValue.
 pub func json_value2_construct_u32(this: JsonValue2*, value: u32):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:136 AK::JsonValue::JsonValue.
 pub func json_value2_construct_i64(this: JsonValue2*, value: i64):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:141 AK::JsonValue::JsonValue.
 pub func json_value2_construct_u64(this: JsonValue2*, value: u64):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:146 AK::JsonValue::JsonValue.
 pub func json_value2_construct_i64_2(this: JsonValue2*, value: i64):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:151 AK::JsonValue::JsonValue.
 pub func json_value2_construct_u64_2(this: JsonValue2*, value: u64):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:156 AK::JsonValue::JsonValue.
 pub func json_value2_construct_f64(this: JsonValue2*, value: f64):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:161 AK::JsonValue::JsonValue.
 pub func json_value2_construct_string(this: JsonValue2*, value: String):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:166 AK::JsonValue::JsonValue.
 pub func json_value2_construct_string_view(this: JsonValue2*, value: StringView):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.h:63 AK::JsonValue::JsonValue.
 pub func json_value2_json_value[T](this: JsonValue2*, value: T):
@@ -803,19 +803,19 @@ pub func json_value2_json_value[T](this: JsonValue2*, value: T):
 
 ## Ported from AK/JsonValue.cpp:176 AK::JsonValue::JsonValue.
 pub func json_value2_construct_json_array(this: JsonValue2*, value: JsonArray):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:171 AK::JsonValue::JsonValue.
 pub func json_value2_construct_json_object(this: JsonValue2*, value: JsonObject):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:186 AK::JsonValue::JsonValue.
 pub func json_value2_construct_json_array_2(this: JsonValue2*, value: JsonArray):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:181 AK::JsonValue::JsonValue.
 pub func json_value2_construct_json_object_2(this: JsonValue2*, value: JsonObject):
-    return
+    trap("unported: AK::JsonValue::JsonValue")
 
 ## Ported from AK/JsonValue.cpp:196 AK::JsonValue::serialized.
 pub func json_value2_serialized(this: const JsonValue2*) -> String:

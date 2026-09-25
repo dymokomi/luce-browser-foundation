@@ -103,35 +103,35 @@ pub func encode_base64_impl(input: const u8[], options: CNSimdutfEBase64Options)
 
 ## Ported from AK/ByteString.h:43 AK::ByteString::ByteString.
 pub func byte_string_construct(this: ByteString*):
-    return
+    trap("unported: AK::ByteString::ByteString")
 
 ## Ported from AK/ByteString.h:48 AK::ByteString::ByteString.
 pub func byte_string_construct_string_view(this: ByteString*, view: StringView):
-    return
+    trap("unported: AK::ByteString::ByteString")
 
 ## Ported from AK/ByteString.h:64 AK::ByteString::ByteString.
 pub func byte_string_construct_u8_should_chomp(this: ByteString*, cstring: const u8*?, shouldChomp: ShouldChomp = ShouldChomp.no_chomp):
-    return
+    trap("unported: AK::ByteString::ByteString")
 
 ## Ported from AK/ByteString.h:69 AK::ByteString::ByteString.
 pub func byte_string_construct_u8_usize(this: ByteString*, cstring: const u8*?, length: usize, shouldChomp: ShouldChomp = ShouldChomp.no_chomp):
-    return
+    trap("unported: AK::ByteString::ByteString")
 
 ## Ported from AK/ByteString.h:74 AK::ByteString::ByteString.
 pub func byte_string_construct_span_u8(this: ByteString*, bytes: const u8[], shouldChomp: ShouldChomp = ShouldChomp.no_chomp):
-    return
+    trap("unported: AK::ByteString::ByteString")
 
 ## Ported from AK/ByteString.h:79 AK::ByteString::ByteString.
 pub func byte_string_construct_byte_string_impl(this: ByteString*, impl: ByteStringImpl):
-    return
+    trap("unported: AK::ByteString::ByteString")
 
 ## Ported from AK/ByteString.h:84 AK::ByteString::ByteString.
 pub func byte_string_construct_byte_string_impl_2(this: ByteString*, impl: const ByteStringImpl*):
-    return
+    trap("unported: AK::ByteString::ByteString")
 
 ## Ported from AK/ByteString.cpp:240 AK::ByteString::ByteString.
 pub func byte_string_construct_fly_string(this: ByteString*, string: FlyString):
-    return
+    trap("unported: AK::ByteString::ByteString")
 
 ## Ported from AK/ByteString.cpp:167 AK::ByteString::repeated.
 pub func byte_string_repeated_u8(ch: u8, count: usize) -> ByteString:
@@ -460,11 +460,11 @@ pub func byte_string_impl_case_insensitive_hash(this: const ByteStringImpl*) -> 
 
 ## Ported from AK/ByteStringImpl.h:80 AK::ByteStringImpl::ByteStringImpl.
 pub func byte_string_impl_construct_byte_string_impl_construct_the(this: ByteStringImpl*, arg0: ByteStringImplConstructTheEmptyStringImplTag):
-    return
+    trap("unported: AK::ByteStringImpl::ByteStringImpl")
 
 ## Ported from AK/ByteStringImpl.cpp:40 AK::ByteStringImpl::ByteStringImpl.
 pub func byte_string_impl_construct_byte_string_impl_construct_wit(this: ByteStringImpl*, arg0: ByteStringImplConstructWithInlineBufferTag, length: usize):
-    return
+    trap("unported: AK::ByteStringImpl::ByteStringImpl")
 
 ## Ported from AK/ByteStringImpl.cpp:98 AK::ByteStringImpl::compute_hash.
 pub func byte_string_impl_compute_hash(this: const ByteStringImpl*):
@@ -603,7 +603,7 @@ pub func fly_string_table_hash_traits_may_have_slow_equality_check() -> bool:
     return true
 
 ## Ported from AK/FlyString.cpp:210 AK::Detail::did_destroy_fly_string_data.
-pub func did_destroy_fly_string_data(arg0: StringData):
+pub func did_destroy_fly_string_data(string_data: StringData):
     trap("unported: AK::Detail::did_destroy_fly_string_data")
 
 ## Ported from AK/FlyString.cpp:23 AK::all_fly_strings.
@@ -717,11 +717,11 @@ pub func fly_string_ends_with_bytes(this: const FlyString*, bytes: StringView, c
 
 ## Ported from AK/FlyString.h:100 AK::FlyString::FlyString.
 pub func fly_string_construct_void(this: FlyString*, arg0: void*?):
-    return
+    trap("unported: AK::FlyString::FlyString")
 
 ## Ported from AK/FlyString.h:105 AK::FlyString::FlyString.
 pub func fly_string_construct_string_base(this: FlyString*, data: StringBase):
-    return
+    trap("unported: AK::FlyString::FlyString")
 
 ## Ported from AK/FlyString.h:112 AK::FlyString::is_invalid.
 pub func fly_string_is_invalid(this: const FlyString*) -> bool:
@@ -752,7 +752,7 @@ pub func is_not_any_of(values: StringView) -> void*?:
 ## Ported from AK/GenericLexer.h:47 AK::Detail::GenericLexer::GenericLexer<CharType>.
 # unmapped: Conditional<IsSame<CharType, char>, StringView, Utf16View>
 pub func generic_lexer_construct[TCharType](this: GenericLexer[TCharType]*, input: void*?):
-    return
+    trap("unported: AK::Detail::GenericLexer::GenericLexer<CharType>")
 
 ## Ported from AK/GenericLexer.h:52 AK::Detail::GenericLexer::tell.
 pub func generic_lexer_tell[TCharType](this: const GenericLexer[TCharType]*) -> usize:
@@ -938,7 +938,7 @@ pub func line_tracking_lexer_construct_line_tracking_lexer_position(this: LineTr
 
 ## Ported from AK/GenericLexer.h:511 AK::LineTrackingLexer::LineTrackingLexer.
 pub func line_tracking_lexer_construct(this: LineTrackingLexer*, input: StringView):
-    return
+    trap("unported: AK::LineTrackingLexer::LineTrackingLexer")
 
 ## Ported from AK/GenericLexer.cpp:11 AK::LineTrackingLexer::position_for.
 pub func line_tracking_lexer_position_for(this: const LineTrackingLexer*, index: usize) -> LineTrackingLexerPosition:
@@ -970,7 +970,7 @@ pub func i_pv4_address_construct_array_u8(this: IPv4Address*, data: u8[4]):
 
 ## Ported from AK/IPv4Address.h:42 AK::IPv4Address::IPv4Address.
 pub func i_pv4_address_construct_big_endian(this: IPv4Address*, address: BigEndian[u32]):
-    return
+    trap("unported: AK::IPv4Address::IPv4Address")
 
 ## Ported from AK/IPv4Address.h:47 AK::IPv4Address::operator[].
 pub func i_pv4_address_at(this: const IPv4Address*, i: i32) -> u8:
@@ -1174,7 +1174,7 @@ pub func source_location_current(file: const u8*?, line: u32, function: const u8
 
 ## Ported from AK/SourceLocation.h:32 AK::SourceLocation::SourceLocation.
 pub func source_location_construct(this: SourceLocation*, file: const u8*?, line: u32, function: const u8*?):
-    return
+    trap("unported: AK::SourceLocation::SourceLocation")
 
 ## Ported from AK/String.cpp:62 AK::String::from_utf8.
 pub func string_from_utf8(view: StringView) -> String!:
@@ -1197,11 +1197,11 @@ pub func string_from_ascii_short_string_without_validation(data: const u8*?, len
     trap("unported: AK::String::from_ascii_short_string_without_validation")
 
 ## Ported from AK/String.cpp:145 AK::String::from_string_builder.
-pub func string_from_string_builder(arg0: StringBuilder*) -> String!:
+pub func string_from_string_builder(builder: StringBuilder*) -> String!:
     trap("unported: AK::String::from_string_builder")
 
 ## Ported from AK/String.cpp:155 AK::String::from_string_builder_without_validation.
-pub func string_from_string_builder_without_validation(arg0: StringBuilder*) -> String:
+pub func string_from_string_builder_without_validation(builder: StringBuilder*) -> String:
     trap("unported: AK::String::from_string_builder_without_validation")
 
 ## Ported from AK/String.cpp:75 AK::String::from_utf16_le_with_replacement_character.
@@ -1403,11 +1403,11 @@ pub func string_is_invalid(this: const String*) -> bool:
 
 ## Ported from AK/String.h:239 AK::String::String.
 pub func string_construct_string_base(this: String*, base_: StringBase):
-    return
+    trap("unported: AK::String::String")
 
 ## Ported from AK/String.h:244 AK::String::String.
 pub func string_construct_void(this: String*, arg0: void*?):
-    return
+    trap("unported: AK::String::String")
 
 ## Ported from AK/String.h:273 AK::ASCIICaseInsensitiveStringTraits::hash.
 pub func ascii_case_insensitive_string_traits_hash(s: String) -> u32:
@@ -1439,11 +1439,11 @@ pub func short_string_byte_count(this: const ShortString*) -> usize:
 
 ## Ported from AK/StringBase.h:42 AK::Detail::StringBase::StringBase.
 pub func string_base_construct(this: StringBase*):
-    return
+    trap("unported: AK::Detail::StringBase::StringBase")
 
 ## Ported from AK/StringBase.h:247 AK::Detail::StringBase::StringBase.
 pub func string_base_construct_string_data(this: StringBase*, data: const StringData*):
-    return
+    trap("unported: AK::Detail::StringBase::StringBase")
 
 ## Ported from AK/StringBase.h:68 AK::Detail::StringBase::is_short_string.
 pub func string_base_is_short_string(this: const StringBase*) -> bool:
@@ -1470,23 +1470,23 @@ pub func string_base_eq(this: const StringBase*, other: StringBase) -> bool:
     trap("unported: AK::Detail::StringBase::operator==")
 
 ## Ported from AK/StringBase.h:87 AK::Detail::StringBase::raw.
-pub func string_base_raw_const(this: const StringBase*) -> usize:
+pub func string_base_raw_fly_string(this: const StringBase*) -> usize:
     trap("unported: AK::Detail::StringBase::raw")
 
 ## Ported from AK/StringBase.h:88 AK::Detail::StringBase::raw.
-pub func string_base_raw_const_2(this: const StringBase*) -> usize:
+pub func string_base_raw_string(this: const StringBase*) -> usize:
     trap("unported: AK::Detail::StringBase::raw")
 
 ## Ported from AK/StringBase.h:91 AK::Detail::StringBase::replace_with_new_string.
-pub func string_base_replace_with_new_string[TFunc](this: StringBase*, byte_count: usize, byte_count_: TFunc) -> !:
+pub func string_base_replace_with_new_string_string_view[TFunc](this: StringBase*, byte_count: usize, callback: TFunc) -> !:
     trap("unported: AK::Detail::StringBase::replace_with_new_string")
 
 ## Ported from AK/StringBase.h:97 AK::Detail::StringBase::replace_with_new_string.
-pub func string_base_replace_with_new_string_2[TFunc](this: StringBase*, byte_count: usize, byte_count_: TFunc) -> !:
+pub func string_base_replace_with_new_string_utf16_view[TFunc](this: StringBase*, byte_count: usize, callback: TFunc) -> !:
     trap("unported: AK::Detail::StringBase::replace_with_new_string")
 
 ## Ported from AK/StringBase.h:104 AK::Detail::StringBase::replace_with_new_string.
-pub func string_base_replace_with_new_string_3[TFunc](this: StringBase*, byte_count: usize, callback: TFunc) -> !:
+pub func string_base_replace_with_new_string_usize[TFunc](this: StringBase*, byte_count: usize, callback: TFunc) -> !:
     trap("unported: AK::Detail::StringBase::replace_with_new_string")
 
 ## Ported from AK/StringBase.h:113 AK::Detail::StringBase::replace_with_new_short_string.
@@ -1503,11 +1503,11 @@ pub func string_base_substring_from_byte_offset_with_shared_superstring(this: co
 
 ## Ported from AK/StringBase.h:131 AK::Detail::StringBase::StringBase.
 pub func string_base_construct_void(this: StringBase*, arg0: void*?):
-    return
+    trap("unported: AK::Detail::StringBase::StringBase")
 
 ## Ported from AK/StringBase.h:136 AK::Detail::StringBase::StringBase.
 pub func string_base_construct_short_string(this: StringBase*, short_string: ShortString):
-    return
+    trap("unported: AK::Detail::StringBase::StringBase")
 
 ## Ported from AK/StringBase.cpp:25 AK::Detail::StringBase::replace_with_uninitialized_buffer.
 pub func string_base_replace_with_uninitialized_buffer(this: StringBase*, byte_count: usize) -> u8[]!:
@@ -1716,12 +1716,12 @@ pub func string_builder_try_join[TSeparatorType, TCollectionType](this: StringBu
 
 ## Ported from AK/StringBuilder.h:118 AK::StringBuilder::leak_buffer_for_string_construction.
 # unmapped: AK::Detail::ByteBuffer::OutlineBuffer
-pub func string_builder_leak_buffer_for_string_construction(this: StringBuilder*) -> void*?:
+pub func string_builder_leak_buffer_for_string_construction_string_data(this: StringBuilder*) -> void*?:
     trap("unported: AK::StringBuilder::leak_buffer_for_string_construction")
 
 ## Ported from AK/StringBuilder.h:119 AK::StringBuilder::leak_buffer_for_string_construction.
 # unmapped: AK::Detail::ByteBuffer::OutlineBuffer
-pub func string_builder_leak_buffer_for_string_construction_2(this: StringBuilder*) -> void*?:
+pub func string_builder_leak_buffer_for_string_construction_utf16_string_data(this: StringBuilder*) -> void*?:
     trap("unported: AK::StringBuilder::leak_buffer_for_string_construction")
 
 ## Ported from AK/StringBuilder.cpp:37 AK::StringBuilder::initialize_buffer.
@@ -1730,7 +1730,7 @@ pub func string_builder_initialize_buffer(this: StringBuilder*, mode: StringBuil
 
 ## Ported from AK/StringBuilder.cpp:559 AK::StringBuilder::leak_buffer_for_string_construction.
 # unmapped: AK::Detail::ByteBuffer::OutlineBuffer
-pub func string_builder_leak_buffer_for_string_construction_3(this: StringBuilder*) -> void*?:
+pub func string_builder_leak_buffer_for_string_construction(this: StringBuilder*) -> void*?:
     trap("unported: AK::StringBuilder::leak_buffer_for_string_construction")
 
 ## Ported from AK/StringBuilder.cpp:70 AK::StringBuilder::will_append.
@@ -1839,7 +1839,7 @@ pub func string_data_allocation_size_for_string_data(length: usize) -> usize:
 
 ## Ported from AK/StringData.h:121 AK::Detail::StringData::StringData.
 pub func string_data_construct_usize(this: StringData*, byte_count: usize):
-    return
+    trap("unported: AK::Detail::StringData::StringData")
 
 ## Ported from AK/StringData.h:126 AK::Detail::StringData::StringData.
 pub func string_data_construct_string_data(this: StringData*, superstring: StringData, start: usize, byte_count: usize):
@@ -1992,7 +1992,7 @@ pub func string_view_construct_u8_usize_2(this: StringView*, characters: const u
 
 ## Ported from AK/StringView.h:45 AK::StringView::StringView.
 pub func string_view_construct_span_u8(this: StringView*, bytes: const u8[]):
-    return
+    trap("unported: AK::StringView::StringView")
 
 ## Ported from AK/StringView.cpp:40 AK::StringView::StringView.
 pub func string_view_construct_byte_buffer(this: StringView*, buffer: ByteBuffer):
@@ -2000,15 +2000,15 @@ pub func string_view_construct_byte_buffer(this: StringView*, buffer: ByteBuffer
 
 ## Ported from AK/StringView.cpp:22 AK::StringView::StringView.
 pub func string_view_construct_string(this: StringView*, string: String):
-    return
+    trap("unported: AK::StringView::StringView")
 
 ## Ported from AK/StringView.cpp:28 AK::StringView::StringView.
 pub func string_view_construct_fly_string(this: StringView*, string: FlyString):
-    return
+    trap("unported: AK::StringView::StringView")
 
 ## Ported from AK/StringView.cpp:34 AK::StringView::StringView.
 pub func string_view_construct_byte_string(this: StringView*, string: ByteString):
-    return
+    trap("unported: AK::StringView::StringView")
 
 ## Ported from AK/StringView.cpp:63 AK::for_each_line.
 # internal linkage in C++: make it private when it is ported.
@@ -2263,8 +2263,8 @@ pub func string_view_to_number[T](this: const StringView*, trim_whitespace: Trim
     trap("unported: AK::StringView::to_number")
 
 ## Ported from AK/StringView.h:357 AK::StringView::StringView.
-pub func string_view_construct_void(this: StringView*, arg0: void*?):
-    return
+pub func string_view_construct_string_view(this: StringView*, arg0: void*?):
+    trap("unported: AK::StringView::StringView")
 
 ## Ported from AK/StringView.h:387 AK::CaseInsensitiveASCIIStringViewTraits::hash.
 pub func case_insensitive_ascii_string_view_traits_hash(s: StringView) -> u32:
@@ -2337,7 +2337,7 @@ pub func all_utf16_fly_strings() -> HashTable[const Utf16StringData*?, Utf16FlyS
     trap("unported: AK::all_utf16_fly_strings")
 
 ## Ported from AK/Utf16FlyString.cpp:27 AK::Detail::did_destroy_utf16_fly_string_data.
-pub func did_destroy_utf16_fly_string_data(arg0: Utf16StringData):
+pub func did_destroy_utf16_fly_string_data(data: Utf16StringData):
     trap("unported: AK::Detail::did_destroy_utf16_fly_string_data")
 
 ## Ported from AK/Utf16FlyString.cpp:54 AK::Utf16FlyString::from_utf8.
@@ -2470,8 +2470,8 @@ pub func utf16_fly_string_code_point_offset_of(this: const Utf16FlyString*, code
     trap("unported: AK::Utf16FlyString::code_point_offset_of")
 
 ## Ported from AK/Utf16FlyString.h:139 AK::Utf16FlyString::Utf16FlyString.
-pub func utf16_fly_string_construct_void(this: Utf16FlyString*, arg0: void*?):
-    return
+pub func utf16_fly_string_construct_utf16_fly_string(this: Utf16FlyString*, arg0: void*?):
+    trap("unported: AK::Utf16FlyString::Utf16FlyString")
 
 ## Ported from AK/Utf16FlyString.h:144 AK::Utf16FlyString::is_invalid.
 pub func utf16_fly_string_is_invalid(this: const Utf16FlyString*) -> bool:
@@ -2491,7 +2491,7 @@ pub func utf16_fly_string_from_ascii_short_string_without_validation_u16(data: c
 
 ## Ported from AK/Utf16FlyString.h:168 AK::Utf16FlyString::Utf16FlyString.
 pub func utf16_fly_string_construct_utf16_string_base(this: Utf16FlyString*, data: Utf16StringBase):
-    return
+    trap("unported: AK::Utf16FlyString::Utf16FlyString")
 
 ## Ported from AK/Utf16FlyString.cpp:35 AK::Utf16FlyString::create_fly_string_from_cache.
 pub func utf16_fly_string_create_fly_string_from_cache[TViewType](string: TViewType) -> Utf16FlyString?:
@@ -2507,7 +2507,7 @@ pub func literalutf16_fly_string_u16(string: const u16*?, length: usize) -> Utf1
 
 ## Ported from AK/Utf16String.h:33 AK::Utf16String::Utf16String.
 pub func utf16_string_construct_utf16_string_base(this: Utf16String*, base_: Utf16StringBase):
-    return
+    trap("unported: AK::Utf16String::Utf16String")
 
 ## Ported from AK/Utf16String.h:38 AK::Utf16String::from_utf8.
 pub func utf16_string_from_utf8_string_view(utf8_string: StringView) -> Utf16String:
@@ -2622,8 +2622,8 @@ pub func utf16_string_from_ipc_stream(stream: Stream*, length_in_code_units: usi
     trap("unported: AK::Utf16String::from_ipc_stream")
 
 ## Ported from AK/Utf16String.h:237 AK::Utf16String::Utf16String.
-pub func utf16_string_construct_void(this: Utf16String*, arg0: void*?):
-    return
+pub func utf16_string_construct_utf16_string(this: Utf16String*, arg0: void*?):
+    trap("unported: AK::Utf16String::Utf16String")
 
 ## Ported from AK/Utf16String.h:242 AK::Utf16String::is_invalid.
 pub func utf16_string_is_invalid(this: const Utf16String*) -> bool:
@@ -2631,7 +2631,7 @@ pub func utf16_string_is_invalid(this: const Utf16String*) -> bool:
 
 ## Ported from AK/Utf16String.h:245 AK::Utf16String::Utf16String.
 pub func utf16_string_construct_utf16_string_data(this: Utf16String*, value: const Utf16StringData*):
-    return
+    trap("unported: AK::Utf16String::Utf16String")
 
 ## Ported from AK/Utf16String.h:353 operator""_utf16.
 pub func literalutf16_u8(string: const u8*?, length: usize) -> Utf16String:
@@ -2643,15 +2643,15 @@ pub func literalutf16_u16(string: const u16*?, length: usize) -> Utf16String:
 
 ## Ported from AK/Utf16StringBase.h:20 AK::Detail::Utf16StringBase::Utf16StringBase.
 pub func utf16_string_base_construct(this: Utf16StringBase*):
-    return
+    trap("unported: AK::Detail::Utf16StringBase::Utf16StringBase")
 
 ## Ported from AK/Utf16StringBase.h:25 AK::Detail::Utf16StringBase::Utf16StringBase.
 pub func utf16_string_base_construct_short_string(this: Utf16StringBase*, short_string: ShortString):
-    return
+    trap("unported: AK::Detail::Utf16StringBase::Utf16StringBase")
 
 ## Ported from AK/Utf16StringBase.h:30 AK::Detail::Utf16StringBase::Utf16StringBase.
 pub func utf16_string_base_construct_utf16_string_data(this: Utf16StringBase*, value: const Utf16StringData*):
-    return
+    trap("unported: AK::Detail::Utf16StringBase::Utf16StringBase")
 
 ## Ported from AK/Utf16StringBase.h:57 AK::Detail::Utf16StringBase::operator Utf16View.
 pub func utf16_string_base_to_utf16_view(this: const Utf16StringBase*) -> Utf16View:
@@ -2859,11 +2859,11 @@ pub func utf16_string_base_utf16_string_base[T](this: Utf16StringBase*, arg0: vo
     return
 
 ## Ported from AK/Utf16StringBase.h:342 AK::Detail::Utf16StringBase::raw.
-pub func utf16_string_base_raw_const(this: const Utf16StringBase*) -> usize:
+pub func utf16_string_base_raw_utf16_fly_string(this: const Utf16StringBase*) -> usize:
     trap("unported: AK::Detail::Utf16StringBase::raw")
 
 ## Ported from AK/Utf16StringBase.h:345 AK::Detail::Utf16StringBase::raw.
-pub func utf16_string_base_raw_const_2(this: const Utf16StringBase*) -> usize:
+pub func utf16_string_base_raw(this: const Utf16StringBase*) -> usize:
     trap("unported: AK::Detail::Utf16StringBase::raw")
 
 ## Ported from AK/Utf16StringBase.h:347 AK::Detail::Utf16StringBase::destroy_string.
@@ -3008,7 +3008,7 @@ pub func utf16_code_point_iterator_length_in_code_units(this: Utf16CodePointIter
 
 ## Ported from AK/Utf16View.h:124 AK::Utf16CodePointIterator::Utf16CodePointIterator.
 pub func utf16_code_point_iterator_construct_u8(this: Utf16CodePointIterator*, iterator: const u8*?, length: usize):
-    return
+    trap("unported: AK::Utf16CodePointIterator::Utf16CodePointIterator")
 
 ## Ported from AK/Utf16View.h:130 AK::Utf16CodePointIterator::Utf16CodePointIterator.
 pub func utf16_code_point_iterator_construct_u16(this: Utf16CodePointIterator*, iterator: const u16*?, length: usize):
@@ -3024,7 +3024,7 @@ pub func utf16_code_point_iterator_remaining_code_units(this: const Utf16CodePoi
 
 ## Ported from AK/Utf16View.h:154 AK::Utf16View::Utf16View.
 pub func utf16_view_construct(this: Utf16View*):
-    return
+    trap("unported: AK::Utf16View::Utf16View")
 
 ## Ported from AK/Utf16View.h:160 AK::Utf16View::Utf16View.
 pub func utf16_view_construct_u16(this: Utf16View*, string: const u16*?, length_in_code_units: usize):
@@ -3273,7 +3273,7 @@ pub func utf16_view_is_code_unit_less_than(this: const Utf16View*, other: Utf16V
 
 ## Ported from AK/Utf16View.h:666 AK::Utf16View::Utf16View.
 pub func utf16_view_construct_u8(this: Utf16View*, string: const u8*?, length_in_code_units: usize):
-    return
+    trap("unported: AK::Utf16View::Utf16View")
 
 ## Ported from AK/Utf16View.cpp:337 AK::Utf16View::calculate_length_in_code_points.
 pub func utf16_view_calculate_length_in_code_points(this: const Utf16View*) -> usize:
@@ -3313,7 +3313,7 @@ pub func utf32_code_point_iterator_done(this: const Utf32CodePointIterator*) -> 
 
 ## Ported from AK/Utf32View.h:55 AK::Utf32CodePointIterator::Utf32CodePointIterator.
 pub func utf32_code_point_iterator_construct(this: Utf32CodePointIterator*, ptr: const u32*?, length: usize):
-    return
+    trap("unported: AK::Utf32CodePointIterator::Utf32CodePointIterator")
 
 ## Ported from AK/Utf32View.h:69 AK::Utf32View::Utf32View.
 pub func utf32_view_construct_u32(this: Utf32View*, code_points: const u32*?, length: usize):
@@ -3321,7 +3321,7 @@ pub func utf32_view_construct_u32(this: Utf32View*, code_points: const u32*?, le
 
 ## Ported from AK/Utf32View.h:76 AK::Utf32View::Utf32View.
 pub func utf32_view_construct_span_u32(this: Utf32View*, code_points: const u32[]):
-    return
+    trap("unported: AK::Utf32View::Utf32View")
 
 ## Ported from AK/Utf32View.h:81 AK::Utf32View::begin.
 pub func utf32_view_begin(this: const Utf32View*) -> Utf32CodePointIterator:
@@ -3417,15 +3417,15 @@ pub func utf8_code_point_iterator_done(this: const Utf8CodePointIterator*) -> bo
 
 ## Ported from AK/Utf8View.h:54 AK::Utf8CodePointIterator::Utf8CodePointIterator.
 pub func utf8_code_point_iterator_construct(this: Utf8CodePointIterator*, ptr: const u8*?, length: usize):
-    return
+    trap("unported: AK::Utf8CodePointIterator::Utf8CodePointIterator")
 
 ## Ported from AK/Utf8View.h:70 AK::Utf8View::Utf8View.
 pub func utf8_view_construct_string_view(this: Utf8View*, string: StringView):
-    return
+    trap("unported: AK::Utf8View::Utf8View")
 
 ## Ported from AK/Utf8View.h:75 AK::Utf8View::Utf8View.
 pub func utf8_view_construct_byte_string(this: Utf8View*, string: ByteString*):
-    return
+    trap("unported: AK::Utf8View::Utf8View")
 
 ## Ported from AK/Utf8View.h:83 AK::Utf8View::as_string.
 pub func utf8_view_as_string(this: const Utf8View*) -> StringView:
