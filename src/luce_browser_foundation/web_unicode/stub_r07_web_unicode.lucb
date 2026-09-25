@@ -509,16 +509,16 @@ pub func ascii_grapheme_segmenter_previous_boundary_impl(base: Segmenter*, index
 pub func ascii_grapheme_segmenter_next_boundary_impl(base: Segmenter*, index: usize, inclusive: SegmenterInclusive) -> u64?:
     trap("unported: Unicode::AsciiGraphemeSegmenter::next_boundary")
 
-## Ported from Libraries/LibUnicode/Segmenter.cpp:98 Unicode::AsciiGraphemeSegmenter::for_each_boundary (virtual).
-pub func ascii_grapheme_segmenter_for_each_boundary_string_impl(this: AsciiGraphemeSegmenter*, text: ak.String, callback: ak.Function1[u64, ak.IterationDecision]):
+## Ported from Libraries/LibUnicode/Segmenter.cpp:98 Unicode::AsciiGraphemeSegmenter::for_each_boundary (override).
+pub func ascii_grapheme_segmenter_for_each_boundary_string_impl(base: Segmenter*, text: ak.String, callback: ak.Function1[u64, ak.IterationDecision]):
     trap("unported: Unicode::AsciiGraphemeSegmenter::for_each_boundary")
 
-## Ported from Libraries/LibUnicode/Segmenter.cpp:104 Unicode::AsciiGraphemeSegmenter::for_each_boundary (virtual).
-pub func ascii_grapheme_segmenter_for_each_boundary_utf16_view_impl(this: AsciiGraphemeSegmenter*, text: ak.Utf16View, callback: ak.Function1[u64, ak.IterationDecision]):
+## Ported from Libraries/LibUnicode/Segmenter.cpp:104 Unicode::AsciiGraphemeSegmenter::for_each_boundary (override).
+pub func ascii_grapheme_segmenter_for_each_boundary_utf16_view_impl(base: Segmenter*, text: ak.Utf16View, callback: ak.Function1[u64, ak.IterationDecision]):
     trap("unported: Unicode::AsciiGraphemeSegmenter::for_each_boundary")
 
-## Ported from Libraries/LibUnicode/Segmenter.cpp:110 Unicode::AsciiGraphemeSegmenter::for_each_boundary (virtual).
-pub func ascii_grapheme_segmenter_for_each_boundary_utf32_view_impl(this: AsciiGraphemeSegmenter*, text: ak.Utf32View, callback: ak.Function1[u64, ak.IterationDecision]):
+## Ported from Libraries/LibUnicode/Segmenter.cpp:110 Unicode::AsciiGraphemeSegmenter::for_each_boundary (override).
+pub func ascii_grapheme_segmenter_for_each_boundary_utf32_view_impl(base: Segmenter*, text: ak.Utf32View, callback: ak.Function1[u64, ak.IterationDecision]):
     trap("unported: Unicode::AsciiGraphemeSegmenter::for_each_boundary")
 
 ## Ported from Libraries/LibUnicode/Segmenter.cpp:116 Unicode::AsciiGraphemeSegmenter::is_current_boundary_word_like (override).
@@ -557,16 +557,16 @@ pub func segmenter_impl_previous_boundary_impl(base: Segmenter*, boundary: usize
 pub func segmenter_impl_next_boundary_impl(base: Segmenter*, boundary: usize, inclusive: SegmenterInclusive) -> u64?:
     trap("unported: Unicode::SegmenterImpl::next_boundary")
 
-## Ported from Libraries/LibUnicode/Segmenter.cpp:212 Unicode::SegmenterImpl::for_each_boundary (virtual).
-pub func segmenter_impl_for_each_boundary_string_impl(this: SegmenterImpl*, text: ak.String, callback: ak.Function1[u64, ak.IterationDecision]):
+## Ported from Libraries/LibUnicode/Segmenter.cpp:212 Unicode::SegmenterImpl::for_each_boundary (override).
+pub func segmenter_impl_for_each_boundary_string_impl(base: Segmenter*, text: ak.String, callback: ak.Function1[u64, ak.IterationDecision]):
     trap("unported: Unicode::SegmenterImpl::for_each_boundary")
 
-## Ported from Libraries/LibUnicode/Segmenter.cpp:221 Unicode::SegmenterImpl::for_each_boundary (virtual).
-pub func segmenter_impl_for_each_boundary_utf16_view_impl(this: SegmenterImpl*, text: ak.Utf16View, callback: ak.Function1[u64, ak.IterationDecision]):
+## Ported from Libraries/LibUnicode/Segmenter.cpp:221 Unicode::SegmenterImpl::for_each_boundary (override).
+pub func segmenter_impl_for_each_boundary_utf16_view_impl(base: Segmenter*, text: ak.Utf16View, callback: ak.Function1[u64, ak.IterationDecision]):
     trap("unported: Unicode::SegmenterImpl::for_each_boundary")
 
-## Ported from Libraries/LibUnicode/Segmenter.cpp:230 Unicode::SegmenterImpl::for_each_boundary (virtual).
-pub func segmenter_impl_for_each_boundary_utf32_view_impl(this: SegmenterImpl*, text: ak.Utf32View, callback: ak.Function1[u64, ak.IterationDecision]):
+## Ported from Libraries/LibUnicode/Segmenter.cpp:230 Unicode::SegmenterImpl::for_each_boundary (override).
+pub func segmenter_impl_for_each_boundary_utf32_view_impl(base: Segmenter*, text: ak.Utf32View, callback: ak.Function1[u64, ak.IterationDecision]):
     trap("unported: Unicode::SegmenterImpl::for_each_boundary")
 
 ## Ported from Libraries/LibUnicode/Segmenter.cpp:254 Unicode::SegmenterImpl::is_current_boundary_word_like (override).

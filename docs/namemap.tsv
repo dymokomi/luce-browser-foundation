@@ -3466,9 +3466,6 @@ Unicode::AsciiGraphemeSegmenter::current_boundary	luce-browser-foundation	web_un
 Unicode::AsciiGraphemeSegmenter::for_each_boundary	luce-browser-foundation	web_unicode	ascii_grapheme_segmenter_for_each_boundary_string_impl	Libraries/LibUnicode/Segmenter.cpp:98	impl
 Unicode::AsciiGraphemeSegmenter::for_each_boundary	luce-browser-foundation	web_unicode	ascii_grapheme_segmenter_for_each_boundary_utf16_view_impl	Libraries/LibUnicode/Segmenter.cpp:104	impl
 Unicode::AsciiGraphemeSegmenter::for_each_boundary	luce-browser-foundation	web_unicode	ascii_grapheme_segmenter_for_each_boundary_utf32_view_impl	Libraries/LibUnicode/Segmenter.cpp:110	impl
-Unicode::AsciiGraphemeSegmenter::for_each_boundary [dispatch]	luce-browser-foundation	web_unicode	ascii_grapheme_segmenter_for_each_boundary_string	Libraries/LibUnicode/Segmenter.cpp:50	dispatcher
-Unicode::AsciiGraphemeSegmenter::for_each_boundary [dispatch]	luce-browser-foundation	web_unicode	ascii_grapheme_segmenter_for_each_boundary_utf16_view	Libraries/LibUnicode/Segmenter.cpp:50	dispatcher
-Unicode::AsciiGraphemeSegmenter::for_each_boundary [dispatch]	luce-browser-foundation	web_unicode	ascii_grapheme_segmenter_for_each_boundary_utf32_view	Libraries/LibUnicode/Segmenter.cpp:50	dispatcher
 Unicode::AsciiGraphemeSegmenter::for_each_boundary_impl	luce-browser-foundation	web_unicode	ascii_grapheme_segmenter_for_each_boundary_impl	Libraries/LibUnicode/Segmenter.cpp:122	stub
 Unicode::AsciiGraphemeSegmenter::is_current_boundary_word_like	luce-browser-foundation	web_unicode	ascii_grapheme_segmenter_is_current_boundary_word_like_impl	Libraries/LibUnicode/Segmenter.cpp:116	impl
 Unicode::AsciiGraphemeSegmenter::next_boundary	luce-browser-foundation	web_unicode	ascii_grapheme_segmenter_next_boundary_impl	Libraries/LibUnicode/Segmenter.cpp:89	impl
@@ -3553,9 +3550,6 @@ Unicode::SegmenterImpl::for_each_boundary	luce-browser-foundation	web_unicode	se
 Unicode::SegmenterImpl::for_each_boundary	luce-browser-foundation	web_unicode	segmenter_impl_for_each_boundary_string_impl	Libraries/LibUnicode/Segmenter.cpp:212	impl
 Unicode::SegmenterImpl::for_each_boundary	luce-browser-foundation	web_unicode	segmenter_impl_for_each_boundary_utf16_view_impl	Libraries/LibUnicode/Segmenter.cpp:221	impl
 Unicode::SegmenterImpl::for_each_boundary	luce-browser-foundation	web_unicode	segmenter_impl_for_each_boundary_utf32_view_impl	Libraries/LibUnicode/Segmenter.cpp:230	impl
-Unicode::SegmenterImpl::for_each_boundary [dispatch]	luce-browser-foundation	web_unicode	segmenter_impl_for_each_boundary_string	Libraries/LibUnicode/Segmenter.cpp:134	dispatcher
-Unicode::SegmenterImpl::for_each_boundary [dispatch]	luce-browser-foundation	web_unicode	segmenter_impl_for_each_boundary_utf16_view	Libraries/LibUnicode/Segmenter.cpp:134	dispatcher
-Unicode::SegmenterImpl::for_each_boundary [dispatch]	luce-browser-foundation	web_unicode	segmenter_impl_for_each_boundary_utf32_view	Libraries/LibUnicode/Segmenter.cpp:134	dispatcher
 Unicode::SegmenterImpl::is_current_boundary_word_like	luce-browser-foundation	web_unicode	segmenter_impl_is_current_boundary_word_like_impl	Libraries/LibUnicode/Segmenter.cpp:254	impl
 Unicode::SegmenterImpl::next_boundary	luce-browser-foundation	web_unicode	segmenter_impl_next_boundary_impl	Libraries/LibUnicode/Segmenter.cpp:197	impl
 Unicode::SegmenterImpl::previous_boundary	luce-browser-foundation	web_unicode	segmenter_impl_previous_boundary_impl	Libraries/LibUnicode/Segmenter.cpp:182	impl
