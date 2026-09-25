@@ -15,3 +15,7 @@
 pub struct IdAllocator:
     pub var m_allocated_ids: HashTable[i32, I32Traits]
     pub var m_minimum_value: i32  # C++ default: { 1 }
+
+## The non-zero default member initializers of AK::IDAllocator; the constructor runs them first.
+pub func id_allocator_init_fields(this: IdAllocator*):
+    this.m_minimum_value = 1

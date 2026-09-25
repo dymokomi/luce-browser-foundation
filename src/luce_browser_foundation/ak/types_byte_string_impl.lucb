@@ -20,6 +20,10 @@ pub struct EmptyByteStringImpl:
     pub var has_hash: bool  # C++ default: { false }
     pub var inline_buffer: u8[1]
 
+## The non-zero default member initializers of AK::EmptyByteStringImpl; the constructor runs them first.
+pub func empty_byte_string_impl_init_fields(this: EmptyByteStringImpl*):
+    this.ref_count = 1
+
 ## AK::ShouldChomp (AK/ByteStringImpl.h:17).
 pub enum ShouldChomp as u32:
     no_chomp = 0

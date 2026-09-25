@@ -15,15 +15,15 @@
 #==============================================================================================
 
 ## Ported from Libraries/LibUnicode/String.cpp:38 AK::String::to_lowercase.
-pub func string_to_lowercase(this: const String*, locale: StringView?) -> String!:
+pub func string_to_lowercase(this: const String*, locale: StringView? = none) -> String!:
     trap("unported: AK::String::to_lowercase")
 
 ## Ported from Libraries/LibUnicode/String.cpp:54 AK::String::to_uppercase.
-pub func string_to_uppercase(this: const String*, locale: StringView?) -> String!:
+pub func string_to_uppercase(this: const String*, locale: StringView? = none) -> String!:
     trap("unported: AK::String::to_uppercase")
 
 ## Ported from Libraries/LibUnicode/String.cpp:70 AK::String::to_titlecase.
-pub func string_to_titlecase(this: const String*, locale: StringView?, trailing_code_point_transformation: TrailingCodePointTransformation) -> String!:
+pub func string_to_titlecase(this: const String*, locale: StringView? = none, trailing_code_point_transformation: TrailingCodePointTransformation = TrailingCodePointTransformation.lowercase) -> String!:
     trap("unported: AK::String::to_titlecase")
 
 ## Ported from Libraries/LibUnicode/String.cpp:118 AK::String::to_casefold.
@@ -39,23 +39,23 @@ pub func string_equals_ignoring_case(this: const String*, other: String) -> bool
     trap("unported: AK::String::equals_ignoring_case")
 
 ## Ported from Libraries/LibUnicode/String.cpp:159 AK::String::trim_whitespace.
-pub func string_trim_whitespace(this: const String*, mode: TrimMode) -> String!:
+pub func string_trim_whitespace(this: const String*, mode: TrimMode = TrimMode.both) -> String!:
     trap("unported: AK::String::trim_whitespace")
 
 ## Ported from Libraries/LibUnicode/String.cpp:139 AK::String::find_byte_offset_ignoring_case.
-pub func string_find_byte_offset_ignoring_case(this: const String*, needle: StringView, from_byte_offset: usize) -> u64?:
+pub func string_find_byte_offset_ignoring_case(this: const String*, needle: StringView, from_byte_offset: usize = 0) -> u64?:
     trap("unported: AK::String::find_byte_offset_ignoring_case")
 
 ## Ported from Libraries/LibUnicode/Utf16String.cpp:18 AK::Utf16String::to_lowercase.
-pub func utf16_string_to_lowercase(this: const Utf16String*, locale: StringView?) -> Utf16String:
+pub func utf16_string_to_lowercase(this: const Utf16String*, locale: StringView? = none) -> Utf16String:
     trap("unported: AK::Utf16String::to_lowercase")
 
 ## Ported from Libraries/LibUnicode/Utf16String.cpp:33 AK::Utf16String::to_uppercase.
-pub func utf16_string_to_uppercase(this: const Utf16String*, locale: StringView?) -> Utf16String:
+pub func utf16_string_to_uppercase(this: const Utf16String*, locale: StringView? = none) -> Utf16String:
     trap("unported: AK::Utf16String::to_uppercase")
 
 ## Ported from Libraries/LibUnicode/Utf16String.cpp:48 AK::Utf16String::to_titlecase.
-pub func utf16_string_to_titlecase(this: const Utf16String*, locale: StringView?, trailing_code_point_transformation: TrailingCodePointTransformation) -> Utf16String:
+pub func utf16_string_to_titlecase(this: const Utf16String*, locale: StringView? = none, trailing_code_point_transformation: TrailingCodePointTransformation = TrailingCodePointTransformation.lowercase) -> Utf16String:
     trap("unported: AK::Utf16String::to_titlecase")
 
 ## Ported from Libraries/LibUnicode/Utf16String.cpp:66 AK::Utf16String::to_casefold.

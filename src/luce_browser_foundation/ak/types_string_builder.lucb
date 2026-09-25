@@ -17,6 +17,11 @@ pub struct StringBuilder:
     pub var m_mode: StringBuilderMode  # C++ default: { DEFAULT_MODE }
     pub var m_utf16_builder_is_ascii: bool  # C++ default: { true }
 
+## The non-zero default member initializers of AK::StringBuilder; the constructor runs them first.
+pub func string_builder_init_fields(this: StringBuilder*):
+    # m_mode: C++ default DEFAULT_MODE (not translated by the generator)
+    this.m_utf16_builder_is_ascii = true
+
 ## AK::StringBuilder::Mode (AK/StringBuilder.h:19).
 pub enum StringBuilderMode as i32:
     utf8 = 0

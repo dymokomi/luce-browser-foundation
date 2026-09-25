@@ -15,3 +15,7 @@
 pub struct Bitmap:
     pub var bitmap_view: BitmapView  # primary base
     pub var m_is_owning: bool  # C++ default: { true }
+
+## The non-zero default member initializers of AK::Bitmap; the constructor runs them first.
+pub func bitmap_init_fields(this: Bitmap*):
+    this.m_is_owning = true

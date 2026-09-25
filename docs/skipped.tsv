@@ -1,0 +1,113 @@
+# C++ functions of this package's regions the generator did not stub (port them by hand)
+# C++ name	file:line	reason
+AK::<deduction guide for Array>	AK/Array.h:150	deduction guide
+AK::<deduction guide for Tuple>	AK/Tuple.h:220	deduction guide
+AK::<deduction guide for Vector>	AK/Vector.h:1135	deduction guide
+AK::Bitmap::set_range	AK/Bitmap.h:104	non-type template parameter
+AK::BitmapView::find_first	AK/BitmapView.h:172	non-type template parameter
+AK::BitmapView::find_one_anywhere	AK/BitmapView.h:94	non-type template parameter
+AK::BufferedHelper::create_buffered	AK/BufferedStream.h:35	non-type template parameter
+AK::BufferedHelper::find_and_populate_until_any_of	AK/BufferedStream.h:170	non-type template parameter
+AK::BufferedHelper::read_until_any_of	AK/BufferedStream.h:79	non-type template parameter
+AK::BufferedHelper::read_until_any_of_with_resize	AK/BufferedStream.h:129	non-type template parameter
+AK::ByteString::create_and_overwrite	AK/ByteString.h:96	non-type template parameter
+AK::ByteString::formatted	AK/ByteString.h:280	parameter pack
+AK::ByteString::is_one_of	AK/ByteString.h:294	parameter pack
+AK::ByteString::is_one_of_ignoring_ascii_case	AK/ByteString.h:300	parameter pack
+AK::Checked::addition_would_overflow	AK/Checked.h:318	parameter pack
+AK::Detail::ByteBuffer::operator==	AK/ByteBuffer.h:112	non-type template parameter
+AK::Detail::ExtractIntrusiveListTypes::container	AK/IntrusiveList.h:25	parameter pack
+AK::Detail::ExtractIntrusiveListTypes::value	AK/IntrusiveList.h:23	parameter pack
+AK::Detail::ExtractIntrusiveRedBlackTreeTypes::container	AK/IntrusiveRedBlackTree.h:23	parameter pack
+AK::Detail::ExtractIntrusiveRedBlackTreeTypes::key	AK/IntrusiveRedBlackTree.h:19	parameter pack
+AK::Detail::ExtractIntrusiveRedBlackTreeTypes::value	AK/IntrusiveRedBlackTree.h:21	parameter pack
+AK::Detail::Span::Span<T>	AK/Span.h:31	non-type template parameter
+AK::Detail::Span::Span<T>	AK/Span.h:38	non-type template parameter
+AK::Detail::Span::Span<T>	AK/Span.h:46	non-type template parameter
+AK::Detail::UFixedBigInt::UFixedBigInt<bit_size, Storage>	AK/UFixedBigInt.h:112	non-type template parameter
+AK::Detail::Utf16StringBase::is_one_of	AK/Utf16StringBase.h:162	parameter pack
+AK::Detail::Utf16StringBase::is_one_of_ignoring_ascii_case	AK/Utf16StringBase.h:168	parameter pack
+AK::Detail::div_mod_internal	AK/UFixedBigInt.h:66	non-type template parameter
+AK::Detail::floor_div_by	AK/Time.h:97	non-type template parameter
+AK::Detail::get_storage_of	AK/UFixedBigInt.h:54	non-type template parameter
+AK::Detail::get_storage_of	AK/UFixedBigInt.h:57	non-type template parameter
+AK::Detail::integer_sequence_generate_array	AK/Array.h:155	non-type template parameter
+AK::Detail::mod_zeros_in_range	AK/Time.h:107	non-type template parameter
+AK::Detail::to_array_impl	AK/Array.h:172	non-type template parameter
+AK::Details::product_even	AK/Math.h:40	non-type template parameter
+AK::Details::product_odd	AK/Math.h:47	non-type template parameter
+AK::DoublyLinkedList::Node::Node	AK/DoublyLinkedList.h:46	parameter pack
+AK::DoublyLinkedList::append	AK/DoublyLinkedList.h:163	parameter pack
+AK::DoublyLinkedList::make_node	AK/DoublyLinkedList.h:284	parameter pack
+AK::DoublyLinkedList::try_append	AK/DoublyLinkedList.h:118	parameter pack
+AK::Error::from_string_literal	AK/Error.h:42	non-type template parameter
+AK::FixedPoint::FixedPoint<precision, Underlying>	AK/FixedPoint.h:53	non-type template parameter
+AK::FixedPoint::cast_to	AK/FixedPoint.h:422	non-type template parameter
+AK::FixedPoint::operator FixedPoint<value-parameter-1-0, type-parameter-1-1>	AK/FixedPoint.h:415	non-type template parameter
+AK::FlyString::is_one_of	AK/FlyString.h:86	parameter pack
+AK::FlyString::is_one_of_ignoring_ascii_case	AK/FlyString.h:92	parameter pack
+AK::Format::Detail::CheckedFormatString::CheckedFormatString<Args...>	AK/CheckedFormatString.h:139	non-type template parameter
+AK::Format::Detail::CheckedFormatString::check_format_parameter_consistency	AK/CheckedFormatString.h:159	non-type template parameter
+AK::Format::Detail::count_fmt_params	AK/CheckedFormatString.h:60	non-type template parameter
+AK::Format::Detail::extract_used_argument_index	AK/CheckedFormatString.h:36	non-type template parameter
+AK::Function::CallableWrapper::call	AK/Function.h:222	parameter pack
+AK::Function::CallableWrapperBase::call	AK/Function.h:206	parameter pack
+AK::HashMap::clone	AK/HashMap.h:305	non-type template parameter
+AK::HashTable::set_from	AK/HashTable.h:252	non-type template parameter
+AK::HashTable::try_set_from	AK/HashTable.h:245	non-type template parameter
+AK::InputBufferedSeekable::read_until_any_of	AK/BufferedStream.h:354	non-type template parameter
+AK::InputBufferedSeekable::read_until_any_of_with_resize	AK/BufferedStream.h:361	non-type template parameter
+AK::LexicalPath::join	AK/LexicalPath.h:55	parameter pack
+AK::OptionalBase::map	AK/Optional.h:144	non-type template parameter
+AK::Singleton::get	AK/Singleton.h:42	non-type template parameter
+AK::Stream::write_formatted	AK/Stream.h:109	parameter pack
+AK::String::formatted	AK/String.h:207	parameter pack
+AK::String::is_one_of	AK/String.h:179	parameter pack
+AK::StringBuilder::appendff	AK/StringBuilder.h:73	parameter pack
+AK::StringBuilder::try_appendff	AK/StringBuilder.h:51	parameter pack
+AK::StringView::is_one_of	AK/StringView.h:330	parameter pack
+AK::StringView::is_one_of_ignoring_ascii_case	AK/StringView.h:336	parameter pack
+AK::Utf16FlyString::is_one_of	AK/Utf16FlyString.h:115	parameter pack
+AK::Utf16FlyString::is_one_of_ignoring_ascii_case	AK/Utf16FlyString.h:121	parameter pack
+AK::Utf16String::formatted	AK/Utf16String.h:116	parameter pack
+AK::Utf16View::is_one_of	AK/Utf16View.h:311	parameter pack
+AK::Utf16View::is_one_of_ignoring_ascii_case	AK/Utf16View.h:317	parameter pack
+AK::VariadicFormatParams::VariadicFormatParams<allow_debug_formatters, Parameters...>	AK/Format.h:352	parameter pack
+AK::Variant::Visitor::Visitor<Fs...>	AK/Variant.h:500	parameter pack
+AK::Vector::Vector<T, inline_capacity, value-parameter-0-2>	AK/Vector.h:124	non-type template parameter
+AK::Vector::empend	AK/Vector.h:387	parameter pack
+AK::Vector::try_empend	AK/Vector.h:786	parameter pack
+AK::Vector::unchecked_empend	AK/Vector.h:394	parameter pack
+AK::array_size	AK/StdLibExtras.h:53	non-type template parameter
+AK::compiletime_fail	AK/StdLibExtras.h:33	parameter pack
+AK::dbg	AK/Format.h:730	parameter pack
+AK::dbgln	AK/Format.h:737	parameter pack
+AK::first_is_equal_to_all_of	AK/GenericShorthands.h:45	parameter pack
+AK::first_is_larger_or_equal_than_all_of	AK/GenericShorthands.h:69	parameter pack
+AK::first_is_larger_or_equal_than_one_of	AK/GenericShorthands.h:39	parameter pack
+AK::first_is_larger_than_all_of	AK/GenericShorthands.h:63	parameter pack
+AK::first_is_larger_than_one_of	AK/GenericShorthands.h:33	parameter pack
+AK::first_is_one_of	AK/GenericShorthands.h:15	parameter pack
+AK::first_is_smaller_or_equal_than_all_of	AK/GenericShorthands.h:57	parameter pack
+AK::first_is_smaller_or_equal_than_one_of	AK/GenericShorthands.h:27	parameter pack
+AK::first_is_smaller_than_all_of	AK/GenericShorthands.h:51	parameter pack
+AK::first_is_smaller_than_one_of	AK/GenericShorthands.h:21	parameter pack
+AK::iota_array	AK/Array.h:163	non-type template parameter
+AK::is_power_of	AK/IntegralMath.h:56	non-type template parameter
+AK::make	AK/NonnullOwnPtr.h:146	parameter pack
+AK::make_ref_counted	AK/NonnullRefPtr.h:268	parameter pack
+AK::out	AK/Format.h:623	parameter pack
+AK::out	AK/Format.h:640	parameter pack
+AK::outln	AK/Format.h:630	parameter pack
+AK::outln	AK/Format.h:646	parameter pack
+AK::to_array	AK/Array.h:180	non-type template parameter
+AK::try_make	AK/NonnullOwnPtr.h:161	parameter pack
+AK::try_make_ref_counted	AK/NonnullRefPtr.h:238	parameter pack
+AK::warn	AK/Format.h:651	parameter pack
+AK::warnln	AK/Format.h:657	parameter pack
+GC::<deduction guide for RootVector>	Libraries/LibGC/RootVector.h:100	deduction guide
+GC::<deduction guide for RootVector>	Libraries/LibGC/RootVector.h:103	deduction guide
+GC::<deduction guide for RootVector>	Libraries/LibGC/RootVector.h:106	deduction guide
+GC::Cell::Visitor::visit	Libraries/LibGC/Cell.h:129	non-type template parameter
+GC::Heap::allocate	Libraries/LibGC/Heap.h:47	parameter pack
+GC::HeapBlock::for_each_cell_in_state	Libraries/LibGC/HeapBlock.h:62	non-type template parameter

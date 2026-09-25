@@ -15,6 +15,10 @@
 pub struct RefCountedBase:
     pub var m_ref_count: u32  # C++ default: { 1 }
 
+## The non-zero default member initializers of AK::RefCountedBase; the constructor runs them first.
+pub func ref_counted_base_init_fields(this: RefCountedBase*):
+    this.m_ref_count = 1
+
 # mark: RefCounted ==============================================================================
 
 ## AK::RefCounted (AK/RefCounted.h:56): a generic struct.

@@ -9,6 +9,12 @@
 #
 #==============================================================================================
 
+## The error code of AK::Error (DESIGN.md §2.10): `ErrorOr<T>` is `T!` and fails with it.
+pub let ak_error: ErrorCode = ErrorCode.package(1)
+
+## The error code of AK::Error::from_errno; the errno is kept in a per-thread slot (DESIGN.md §2.10).
+pub let ak_errno_error: ErrorCode = ErrorCode.package(2)
+
 ## Class information of one class of a polymorphic hierarchy: name, pre-order class-id range,
 ## size and vtable (DESIGN.md §2.3).
 pub struct ClassInfo:
@@ -17,6 +23,8 @@ pub struct ClassInfo:
     pub let last_id: u16
     pub let size: usize
     pub let vtable: const void*
+    ## The engine's MixinOffsets of this class (DESIGN.md §2.5), or none.
+    pub let mixins: const void*? = none
 
 ## AK::Traits<K> (AK/Traits.h): AK's hash and equality for a key type, as an interface a one-byte
 ## traits struct implements (DESIGN.md §2.6).

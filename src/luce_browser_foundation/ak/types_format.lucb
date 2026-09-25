@@ -131,6 +131,11 @@ pub struct StandardFormatter:
     pub var m_width: u64?
     pub var m_precision: u64?
 
+## The non-zero default member initializers of AK::StandardFormatter; the constructor runs them first.
+pub func standard_formatter_init_fields(this: StandardFormatter*):
+    # m_fill: C++ default ' ' (not translated by the generator)
+    return
+
 ## AK::StandardFormatter::Mode (AK/Format.h:370).
 pub enum StandardFormatterMode as i32:
     default = 0

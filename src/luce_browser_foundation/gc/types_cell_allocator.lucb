@@ -25,6 +25,11 @@ pub struct CellAllocator:
     pub var m_overrides_must_survive_garbage_collection: bool  # C++ default: { false }
     pub var m_overrides_finalize: bool  # C++ default: { false }
 
+## The non-zero default member initializers of GC::CellAllocator; the constructor runs them first.
+pub func cell_allocator_init_fields(this: CellAllocator*):
+    # m_min_block_address: C++ default explode_byte ( 0xff ) (not translated by the generator)
+    return
+
 # mark: TypeIsolatingCellAllocator ==============================================================
 
 ## GC::TypeIsolatingCellAllocator (Libraries/LibGC/CellAllocator.h:82): a generic struct.

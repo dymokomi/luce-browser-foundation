@@ -20,6 +20,11 @@ pub struct Utf16CodePointIterator:
     pub var m_iterator: Utf16CodePointIteratorUnion  # C++ default: { . ascii = nullptr }
     pub var m_remaining_code_units: usize  # C++ default: { 0 }
 
+## The non-zero default member initializers of AK::Utf16CodePointIterator; the constructor runs them first.
+pub func utf16_code_point_iterator_init_fields(this: Utf16CodePointIterator*):
+    # m_iterator: C++ default . ascii = nullptr (not translated by the generator)
+    return
+
 # mark: Utf16CodePointIteratorUnion =============================================================
 
 ## AK::Utf16CodePointIterator::(anonymous union) (AK/Utf16View.h:140).
@@ -34,6 +39,12 @@ pub struct Utf16View:
     pub var m_string: Utf16ViewUnion  # C++ default: { . ascii = nullptr }
     pub var m_length_in_code_units: usize  # C++ default: { 0 }
     pub var m_length_in_code_points: usize  # C++ default: { NumericLimits < size_t > :: max ( ) }
+
+## The non-zero default member initializers of AK::Utf16View; the constructor runs them first.
+pub func utf16_view_init_fields(this: Utf16View*):
+    # m_string: C++ default . ascii = nullptr (not translated by the generator)
+    # m_length_in_code_points: C++ default NumericLimits < size_t > :: max ( ) (not translated by the generator)
+    return
 
 # mark: Utf16ViewUnion ==========================================================================
 

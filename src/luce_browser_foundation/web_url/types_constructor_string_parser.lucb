@@ -25,6 +25,10 @@ pub struct ConstructorStringParser:
     pub var m_protocol_matches_a_special_scheme: bool  # C++ default: { false }
     pub var m_state: ConstructorStringParserState  # C++ default: { State :: Initial }
 
+## The non-zero default member initializers of URL::Pattern::ConstructorStringParser; the constructor runs them first.
+pub func constructor_string_parser_init_fields(this: ConstructorStringParser*):
+    this.m_token_increment = 1
+
 ## URL::Pattern::ConstructorStringParser::State (Libraries/LibURL/Pattern/ConstructorStringParser.h:24).
 pub enum ConstructorStringParserState as i32:
     initial = 0

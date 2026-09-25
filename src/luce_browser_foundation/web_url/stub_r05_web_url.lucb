@@ -109,11 +109,11 @@ pub func origin_construct_origin_opaque_data(this: Origin*, opaque_data: OriginO
     return
 
 ## Ported from Libraries/LibURL/Origin.cpp:14 URL::Origin::create_opaque.
-pub func origin_create_opaque(type_: OriginOpaqueDataType) -> Origin:
+pub func origin_create_opaque(type_: OriginOpaqueDataType = OriginOpaqueDataType.standard) -> Origin:
     trap("unported: URL::Origin::create_opaque")
 
 ## Ported from Libraries/LibURL/Origin.cpp:19 URL::Origin::Origin.
-pub func origin_construct_optional_string(this: Origin*, scheme: ak.String?, host: Host, port: u16?, domain: ak.String?):
+pub func origin_construct_optional_string(this: Origin*, scheme: ak.String?, host: Host, port: u16?, domain: ak.String? = none):
     return
 
 ## Ported from Libraries/LibURL/Origin.h:41 URL::Origin::is_opaque.
@@ -193,11 +193,11 @@ pub func report_validation_error(location: ak.SourceLocation):
     trap("unported: URL::report_validation_error")
 
 ## Ported from Libraries/LibURL/Parser.cpp:709 URL::Parser::basic_parse.
-pub func parser_basic_parse(raw_input: ak.StringView, base_url: const Url*?, url: Url*?, state_override: ParserState?, encoding: ak.StringView?) -> Url?:
+pub func parser_basic_parse(raw_input: ak.StringView, base_url: const Url*? = none, url: Url*? = none, state_override: ParserState? = none, encoding: ak.StringView? = none) -> Url?:
     trap("unported: URL::Parser::basic_parse")
 
 ## Ported from Libraries/LibURL/Parser.cpp:643 URL::Parser::percent_encode_after_encoding.
-pub func parser_percent_encode_after_encoding(encoder: text_codec.Encoder*, input: ak.StringView, percent_encode_set: PercentEncodeSet, space_as_plus: bool) -> ak.String:
+pub func parser_percent_encode_after_encoding(encoder: text_codec.Encoder*, input: ak.StringView, percent_encode_set: PercentEncodeSet, space_as_plus: bool = false) -> ak.String:
     trap("unported: URL::Parser::percent_encode_after_encoding")
 
 ## Ported from Libraries/LibURL/Parser.cpp:65 URL::parse_opaque_host.
@@ -210,7 +210,7 @@ pub func parser_shorten_urls_path(url: Url*):
     trap("unported: URL::Parser::shorten_urls_path")
 
 ## Ported from Libraries/LibURL/Parser.cpp:534 URL::Parser::parse_host.
-pub func parser_parse_host(input: ak.StringView, is_opaque: bool) -> Host?:
+pub func parser_parse_host(input: ak.StringView, is_opaque: bool = false) -> Host?:
     trap("unported: URL::Parser::parse_host")
 
 ## Ported from Libraries/LibURL/Parser.cpp:90 URL::parse_ipv4_number.
@@ -294,7 +294,7 @@ pub func pattern_canonicalize_an_ipv6_hostname(value: ak.String) -> ak.String!:
     trap("unported: URL::Pattern::canonicalize_an_ipv6_hostname")
 
 ## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:128 URL::Pattern::canonicalize_a_port.
-pub func pattern_canonicalize_a_port(port_value: ak.String, protocol_value: ak.String?) -> ak.String!:
+pub func pattern_canonicalize_a_port(port_value: ak.String, protocol_value: ak.String? = none) -> ak.String!:
     trap("unported: URL::Pattern::canonicalize_a_port")
 
 ## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:158 URL::Pattern::canonicalize_a_pathname.
@@ -522,7 +522,7 @@ pub func pattern_hostname_pattern_is_an_ipv6_address(input: ak.String) -> bool:
     trap("unported: URL::Pattern::hostname_pattern_is_an_ipv6_address")
 
 ## Ported from Libraries/LibURL/Pattern/Pattern.cpp:42 URL::Pattern::Pattern::create.
-pub func pattern_create(input: Input, base_url: ak.String?, ignore_case: IgnoreCase) -> Pattern!:
+pub func pattern_create(input: Input, base_url: ak.String? = none, ignore_case: IgnoreCase = IgnoreCase.no) -> Pattern!:
     trap("unported: URL::Pattern::Pattern::create")
 
 ## Ported from Libraries/LibURL/Pattern/Pattern.cpp:167 URL::Pattern::Pattern::match.
@@ -682,7 +682,7 @@ pub func site_construct(this: Site*, value: OriginOrSchemeAndHost):
     return
 
 ## Ported from Libraries/LibURL/URL.cpp:449 URL::append_percent_encoded_if_necessary.
-pub func append_percent_encoded_if_necessary(builder: ak.StringBuilder*, code_point: u32, set: PercentEncodeSet):
+pub func append_percent_encoded_if_necessary(builder: ak.StringBuilder*, code_point: u32, set: PercentEncodeSet = PercentEncodeSet.userinfo):
     trap("unported: URL::append_percent_encoded_if_necessary")
 
 ## Ported from Libraries/LibURL/URL.cpp:404 URL::append_percent_encoded.
@@ -706,7 +706,7 @@ pub func is_special_scheme(scheme: ak.StringView) -> bool:
     trap("unported: URL::is_special_scheme")
 
 ## Ported from Libraries/LibURL/URL.cpp:457 URL::percent_encode.
-pub func percent_encode(input: ak.StringView, set: PercentEncodeSet, space_as_plus: SpaceAsPlus) -> ak.String:
+pub func percent_encode(input: ak.StringView, set: PercentEncodeSet = PercentEncodeSet.userinfo, space_as_plus: SpaceAsPlus = SpaceAsPlus.no) -> ak.String:
     trap("unported: URL::percent_encode")
 
 ## Ported from Libraries/LibURL/URL.cpp:479 URL::percent_decode.
@@ -838,7 +838,7 @@ pub func url_file_path(this: const Url*) -> ak.ByteString:
     trap("unported: URL::URL::file_path")
 
 ## Ported from Libraries/LibURL/URL.cpp:222 URL::URL::serialize.
-pub func url_serialize(this: const Url*, exclude_fragment: ExcludeFragment) -> ak.String:
+pub func url_serialize(this: const Url*, exclude_fragment: ExcludeFragment = ExcludeFragment.no) -> ak.String:
     trap("unported: URL::URL::serialize")
 
 ## Ported from Libraries/LibURL/URL.cpp:284 URL::URL::serialize_for_display.
@@ -858,7 +858,7 @@ pub func url_origin(this: const Url*) -> Origin:
     trap("unported: URL::URL::origin")
 
 ## Ported from Libraries/LibURL/URL.cpp:397 URL::URL::equals.
-pub func url_equals(this: const Url*, other: Url, exclude_fragments: ExcludeFragment) -> bool:
+pub func url_equals(this: const Url*, other: Url, exclude_fragments: ExcludeFragment = ExcludeFragment.no) -> bool:
     trap("unported: URL::URL::equals")
 
 ## Ported from Libraries/LibURL/URL.cpp:24 URL::URL::complete_url.
@@ -902,7 +902,7 @@ pub func create_with_file_scheme(path: ak.ByteString, fragment: ak.ByteString, h
     trap("unported: URL::create_with_file_scheme")
 
 ## Ported from Libraries/LibURL/URL.cpp:153 URL::create_with_data.
-pub func create_with_data(mime_type: ak.StringView, payload: ak.StringView, is_base64: bool) -> Url:
+pub func create_with_data(mime_type: ak.StringView, payload: ak.StringView, is_base64: bool = false) -> Url:
     trap("unported: URL::create_with_data")
 
 ## Ported from Libraries/LibURL/URL.cpp:513 URL::is_public_suffix.

@@ -22,6 +22,10 @@ pub struct WeakContainer: IsWeakContainer:
 
     func weak_container() -> WeakContainer*: return (WeakContainer*)&self
 
+## The non-zero default member initializers of GC::WeakContainer; the constructor runs them first.
+pub func weak_container_init_fields(this: WeakContainer*):
+    this.m_registered = true
+
 ## Upcast to GC::WeakContainer (implemented by every struct in its hierarchy).
 pub interface IsWeakContainer:
     func weak_container() -> WeakContainer*

@@ -42,6 +42,11 @@ pub struct Heap:
     pub var m_usable_weak_blocks: ak.IntrusiveList[WeakBlock, WeakBlock*?]
     pub var m_full_weak_blocks: ak.IntrusiveList[WeakBlock, WeakBlock*?]
 
+## The non-zero default member initializers of GC::Heap; the constructor runs them first.
+pub func heap_init_fields(this: Heap*):
+    # m_gc_bytes_threshold: C++ default GC_MIN_BYTES_THRESHOLD (not translated by the generator)
+    return
+
 ## GC::s_the (Libraries/LibGC/Heap.cpp:41).
 pub var s_the: Heap*?
 

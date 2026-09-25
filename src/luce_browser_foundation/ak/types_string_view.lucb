@@ -16,6 +16,11 @@ pub struct StringView:
     pub var m_characters: const u8*?  # C++ default: { "" }
     pub var m_length: usize  # C++ default: { 0 }
 
+## The non-zero default member initializers of AK::StringView; the constructor runs them first.
+pub func string_view_init_fields(this: StringView*):
+    # m_characters: C++ default "" (not translated by the generator)
+    return
+
 ## AK::StringView::ConsiderCarriageReturn (AK/StringView.h:228).
 pub enum StringViewConsiderCarriageReturn as i32:
     no = 0

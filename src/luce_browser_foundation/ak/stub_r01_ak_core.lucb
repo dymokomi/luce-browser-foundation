@@ -82,7 +82,7 @@ pub func empty_array_storage_to_type_parameter_0_0[T](this: const EmptyArrayStor
     return none
 
 ## Ported from AK/Assertions.cpp:46 dump_backtrace.
-pub func dump_backtrace(frames_to_skip: u32, max_depth: u32):
+pub func dump_backtrace(frames_to_skip: u32 = 1, max_depth: u32 = 100):
     trap("unported: dump_backtrace")
 
 ## Ported from AK/Assertions.cpp:109 ak_colorize_output.
@@ -128,79 +128,79 @@ pub func full_memory_barrier():
 ## Ported from AK/Atomic.h:32 AK::atomic_exchange.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_exchange_t[T](var_: void*?, desired: T, order: MemoryOrder) -> T:
+pub func atomic_exchange_t[T](var_: void*?, desired: T, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> T:
     trap("unported: AK::atomic_exchange")
 
 ## Ported from AK/Atomic.h:38 AK::atomic_exchange.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_exchange_v[T, V](var_: void*?, desired: V*?, order: MemoryOrder) -> V*?:
+pub func atomic_exchange_v[T, V](var_: void*?, desired: V*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> V*?:
     trap("unported: AK::atomic_exchange")
 
 ## Ported from AK/Atomic.h:44 AK::atomic_exchange.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_exchange_void[T, V](var_: void*?, arg1: void*?, order: MemoryOrder) -> V*?:
+pub func atomic_exchange_void[T, V](var_: void*?, arg1: void*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> V*?:
     trap("unported: AK::atomic_exchange")
 
 ## Ported from AK/Atomic.h:50 AK::atomic_compare_exchange_strong.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_compare_exchange_strong_t[T](var_: void*?, expected: T*, desired: T, order: MemoryOrder) -> bool:
+pub func atomic_compare_exchange_strong_t[T](var_: void*?, expected: T*, desired: T, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
     trap("unported: AK::atomic_compare_exchange_strong")
 
 ## Ported from AK/Atomic.h:58 AK::atomic_compare_exchange_strong.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_compare_exchange_strong_v_v[T, V](var_: void*?, expected: (V*?)*, desired: V*?, order: MemoryOrder) -> bool:
+pub func atomic_compare_exchange_strong_v_v[T, V](var_: void*?, expected: (V*?)*, desired: V*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
     trap("unported: AK::atomic_compare_exchange_strong")
 
 ## Ported from AK/Atomic.h:66 AK::atomic_compare_exchange_strong.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_compare_exchange_strong_v_void[T, V](var_: void*?, expected: (V*?)*, arg2: void*?, order: MemoryOrder) -> bool:
+pub func atomic_compare_exchange_strong_v_void[T, V](var_: void*?, expected: (V*?)*, arg2: void*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
     trap("unported: AK::atomic_compare_exchange_strong")
 
 ## Ported from AK/Atomic.h:74 AK::atomic_fetch_add.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_fetch_add[T](var_: void*?, val: T, order: MemoryOrder) -> T:
+pub func atomic_fetch_add[T](var_: void*?, val: T, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> T:
     trap("unported: AK::atomic_fetch_add")
 
 ## Ported from AK/Atomic.h:80 AK::atomic_fetch_sub.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_fetch_sub[T](var_: void*?, val: T, order: MemoryOrder) -> T:
+pub func atomic_fetch_sub[T](var_: void*?, val: T, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> T:
     trap("unported: AK::atomic_fetch_sub")
 
 ## Ported from AK/Atomic.h:86 AK::atomic_fetch_and.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_fetch_and[T](var_: void*?, val: T, order: MemoryOrder) -> T:
+pub func atomic_fetch_and[T](var_: void*?, val: T, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> T:
     trap("unported: AK::atomic_fetch_and")
 
 ## Ported from AK/Atomic.h:92 AK::atomic_fetch_or.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_fetch_or[T](var_: void*?, val: T, order: MemoryOrder) -> T:
+pub func atomic_fetch_or[T](var_: void*?, val: T, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> T:
     trap("unported: AK::atomic_fetch_or")
 
 ## Ported from AK/Atomic.h:98 AK::atomic_fetch_xor.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_fetch_xor[T](var_: void*?, val: T, order: MemoryOrder) -> T:
+pub func atomic_fetch_xor[T](var_: void*?, val: T, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> T:
     trap("unported: AK::atomic_fetch_xor")
 
 ## Ported from AK/Atomic.h:104 AK::atomic_load.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_load[T](var_: void*?, order: MemoryOrder) -> T:
+pub func atomic_load[T](var_: void*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> T:
     trap("unported: AK::atomic_load")
 
 ## Ported from AK/Atomic.h:110 AK::atomic_load.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_load_2[T, V](var_: void*?, order: MemoryOrder) -> V*?:
+pub func atomic_load_2[T, V](var_: void*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> V*?:
     trap("unported: AK::atomic_load")
 
 ## Ported from AK/Atomic.h:115 AK::atomic_pause.
@@ -211,19 +211,19 @@ pub func atomic_pause():
 ## Ported from AK/Atomic.h:125 AK::atomic_store.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_store_t[T](var_: void*?, desired: T, order: MemoryOrder):
+pub func atomic_store_t[T](var_: void*?, desired: T, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
     trap("unported: AK::atomic_store")
 
 ## Ported from AK/Atomic.h:131 AK::atomic_store.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_store_v[T, V](var_: void*?, desired: V*?, order: MemoryOrder):
+pub func atomic_store_v[T, V](var_: void*?, desired: V*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
     trap("unported: AK::atomic_store")
 
 ## Ported from AK/Atomic.h:137 AK::atomic_store.
 # unmapped: volatile T
 # internal linkage in C++: make it private when it is ported.
-pub func atomic_store_void[T, V](var_: void*?, arg1: void*?, order: MemoryOrder):
+pub func atomic_store_void[T, V](var_: void*?, arg1: void*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
     trap("unported: AK::atomic_store")
 
 ## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free.
@@ -347,7 +347,7 @@ pub func default_comparator_call[T, S](this: DefaultComparator*, lhs: T*, rhs: S
 
 ## Ported from AK/BinarySearch.h:29 AK::binary_search.
 # unmapped: decltype(&haystack[0])
-pub func binary_search[TContainer, TNeedle, TComparator](haystack: TContainer, needle: TNeedle, nearby_index: usize*?, comparator: TComparator) -> void*?:
+pub func binary_search[TContainer, TNeedle, TComparator](haystack: TContainer, needle: TNeedle, nearby_index: usize*? = none, comparator: TComparator) -> void*?:
     trap("unported: AK::binary_search")
 
 ## Ported from AK/BitCast.h:14 AK::bit_cast.
@@ -359,7 +359,7 @@ pub func bitmap_create(size: usize, default_value: bool) -> Bitmap!:
     trap("unported: AK::Bitmap::create")
 
 ## Ported from AK/Bitmap.h:38 AK::Bitmap::Bitmap.
-pub func bitmap_construct(this: Bitmap*, data: u8*?, size: usize, is_owning: bool):
+pub func bitmap_construct(this: Bitmap*, data: u8*?, size: usize, is_owning: bool = false):
     return
 
 ## Ported from AK/Bitmap.h:68 AK::Bitmap::view.
@@ -423,11 +423,11 @@ pub func bitmap_view_data(this: const BitmapView*) -> const u8*?:
     trap("unported: AK::BitmapView::data")
 
 ## Ported from AK/BitmapView.h:161 AK::BitmapView::find_one_anywhere_set.
-pub func bitmap_view_find_one_anywhere_set(this: const BitmapView*, hint: usize) -> u64?:
+pub func bitmap_view_find_one_anywhere_set(this: const BitmapView*, hint: usize = 0) -> u64?:
     trap("unported: AK::BitmapView::find_one_anywhere_set")
 
 ## Ported from AK/BitmapView.h:166 AK::BitmapView::find_one_anywhere_unset.
-pub func bitmap_view_find_one_anywhere_unset(this: const BitmapView*, hint: usize) -> u64?:
+pub func bitmap_view_find_one_anywhere_unset(this: const BitmapView*, hint: usize = 0) -> u64?:
     trap("unported: AK::BitmapView::find_one_anywhere_unset")
 
 ## Ported from AK/BitmapView.h:190 AK::BitmapView::find_first_set.
@@ -439,7 +439,7 @@ pub func bitmap_view_find_first_unset(this: const BitmapView*) -> u64?:
     trap("unported: AK::BitmapView::find_first_unset")
 
 ## Ported from AK/BitmapView.h:202 AK::BitmapView::find_next_range_of_unset_bits.
-pub func bitmap_view_find_next_range_of_unset_bits(this: const BitmapView*, from_: usize*, min_length: usize, max_length: usize) -> u64?:
+pub func bitmap_view_find_next_range_of_unset_bits(this: const BitmapView*, from_: usize*, min_length: usize = 1, max_length: usize) -> u64?:
     trap("unported: AK::BitmapView::find_next_range_of_unset_bits")
 
 ## Ported from AK/BitmapView.h:298 AK::BitmapView::find_longest_range_of_unset_bits.
@@ -523,7 +523,7 @@ pub func buffered_helper_populate_read_buffer[T](this: BufferedHelper[T]*) -> u6
     trap("unported: AK::BufferedHelper::populate_read_buffer")
 
 ## Ported from AK/BufferedStream.h:312 AK::InputBufferedSeekable::create.
-pub func input_buffered_seekable_create[T](stream: T*, buffer_size: usize) -> InputBufferedSeekable[T]*!:
+pub func input_buffered_seekable_create[T](stream: T*, buffer_size: usize = 16384) -> InputBufferedSeekable[T]*!:
     trap("unported: AK::InputBufferedSeekable::create")
 
 ## Ported from AK/BufferedStream.h:320 AK::InputBufferedSeekable::read_some.
@@ -715,7 +715,7 @@ pub func byte_buffer_clear(this: ByteBuffer*):
     trap("unported: AK::Detail::ByteBuffer::clear")
 
 ## Ported from AK/ByteBuffer.h:190 AK::Detail::ByteBuffer::resize.
-pub func byte_buffer_resize(this: ByteBuffer*, new_size: usize, zero_fill_new_elements: ZeroFillNewElements):
+pub func byte_buffer_resize(this: ByteBuffer*, new_size: usize, zero_fill_new_elements: ZeroFillNewElements = ZeroFillNewElements.no):
     trap("unported: AK::Detail::ByteBuffer::resize")
 
 ## Ported from AK/ByteBuffer.h:195 AK::Detail::ByteBuffer::trim.
@@ -727,11 +727,11 @@ pub func byte_buffer_ensure_capacity(this: ByteBuffer*, new_capacity: usize):
     trap("unported: AK::Detail::ByteBuffer::ensure_capacity")
 
 ## Ported from AK/ByteBuffer.h:208 AK::Detail::ByteBuffer::set_size.
-pub func byte_buffer_set_size(this: ByteBuffer*, new_size: usize, zero_fill_new_elements: ZeroFillNewElements):
+pub func byte_buffer_set_size(this: ByteBuffer*, new_size: usize, zero_fill_new_elements: ZeroFillNewElements = ZeroFillNewElements.no):
     trap("unported: AK::Detail::ByteBuffer::set_size")
 
 ## Ported from AK/ByteBuffer.h:219 AK::Detail::ByteBuffer::try_resize.
-pub func byte_buffer_try_resize(this: ByteBuffer*, new_size: usize, zero_fill_new_elements: ZeroFillNewElements) -> !:
+pub func byte_buffer_try_resize(this: ByteBuffer*, new_size: usize, zero_fill_new_elements: ZeroFillNewElements = ZeroFillNewElements.no) -> !:
     trap("unported: AK::Detail::ByteBuffer::try_resize")
 
 ## Ported from AK/ByteBuffer.h:232 AK::Detail::ByteBuffer::try_ensure_capacity.
@@ -1070,7 +1070,7 @@ pub func circular_buffer_seekback_limit(this: const CircularBuffer*) -> usize:
     return this.m_seekback_limit
 
 ## Ported from AK/CircularBuffer.cpp:67 AK::CircularBuffer::offset_of.
-pub func circular_buffer_offset_of(this: const CircularBuffer*, needle: StringView, from_: u64?, until: u64?) -> u64?:
+pub func circular_buffer_offset_of(this: const CircularBuffer*, needle: StringView, from_: u64? = none, until: u64? = none) -> u64?:
     trap("unported: AK::CircularBuffer::offset_of")
 
 ## Ported from AK/CircularBuffer.cpp:92 AK::CircularBuffer::clear.
@@ -1090,7 +1090,7 @@ pub func circular_buffer_next_write_span(this: CircularBuffer*) -> u8[]:
     trap("unported: AK::CircularBuffer::next_write_span")
 
 ## Ported from AK/CircularBuffer.cpp:106 AK::CircularBuffer::next_read_span.
-pub func circular_buffer_next_read_span(this: const CircularBuffer*, offset: usize) -> const u8[]:
+pub func circular_buffer_next_read_span(this: const CircularBuffer*, offset: usize = 0) -> const u8[]:
     trap("unported: AK::CircularBuffer::next_read_span")
 
 ## Ported from AK/CircularBuffer.cpp:122 AK::CircularBuffer::next_seekback_span.
@@ -1122,11 +1122,11 @@ pub func searchable_circular_buffer_flush_to_stream(this: SearchableCircularBuff
     trap("unported: AK::SearchableCircularBuffer::flush_to_stream")
 
 ## Ported from AK/CircularBuffer.cpp:327 AK::SearchableCircularBuffer::find_copy_in_seekback.
-pub func searchable_circular_buffer_find_copy_in_seekback_usize(this: SearchableCircularBuffer*, maximum_length: usize, minimum_length: usize) -> SearchableCircularBufferMatch?:
+pub func searchable_circular_buffer_find_copy_in_seekback_usize(this: SearchableCircularBuffer*, maximum_length: usize, minimum_length: usize = 2) -> SearchableCircularBufferMatch?:
     trap("unported: AK::SearchableCircularBuffer::find_copy_in_seekback")
 
 ## Ported from AK/CircularBuffer.cpp:469 AK::SearchableCircularBuffer::find_copy_in_seekback.
-pub func searchable_circular_buffer_find_copy_in_seekback_span_u64(this: const SearchableCircularBuffer*, distances: const u64[], maximum_length: usize, minimum_length: usize) -> SearchableCircularBufferMatch?:
+pub func searchable_circular_buffer_find_copy_in_seekback_span_u64(this: const SearchableCircularBuffer*, distances: const u64[], maximum_length: usize, minimum_length: usize = 2) -> SearchableCircularBufferMatch?:
     trap("unported: AK::SearchableCircularBuffer::find_copy_in_seekback")
 
 ## Ported from AK/CircularBuffer.cpp:133 AK::SearchableCircularBuffer::next_search_span.
@@ -1789,27 +1789,27 @@ pub func hash_map_clear_with_capacity[K, V, KT: Traits[K]](this: HashMap[K, V, K
     trap("unported: AK::HashMap::clear_with_capacity")
 
 ## Ported from AK/HashMap.h:61 AK::HashMap::set.
-pub func hash_map_set[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior) -> HashSetResult:
+pub func hash_map_set[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
     trap("unported: AK::HashMap::set")
 
 ## Ported from AK/HashMap.h:62 AK::HashMap::set.
-pub func hash_map_set_2[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior) -> HashSetResult:
+pub func hash_map_set_2[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
     trap("unported: AK::HashMap::set")
 
 ## Ported from AK/HashMap.h:63 AK::HashMap::set.
-pub func hash_map_set_3[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior) -> HashSetResult:
+pub func hash_map_set_3[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
     trap("unported: AK::HashMap::set")
 
 ## Ported from AK/HashMap.h:64 AK::HashMap::try_set.
-pub func hash_map_try_set[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior) -> HashSetResult!:
+pub func hash_map_try_set[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
     trap("unported: AK::HashMap::try_set")
 
 ## Ported from AK/HashMap.h:65 AK::HashMap::try_set.
-pub func hash_map_try_set_2[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior) -> HashSetResult!:
+pub func hash_map_try_set_2[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
     trap("unported: AK::HashMap::try_set")
 
 ## Ported from AK/HashMap.h:66 AK::HashMap::try_set.
-pub func hash_map_try_set_3[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior) -> HashSetResult!:
+pub func hash_map_try_set_3[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
     trap("unported: AK::HashMap::try_set")
 
 ## Ported from AK/HashMap.h:68 AK::HashMap::update.
@@ -1939,7 +1939,7 @@ pub func hash_map_take_first[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*) -> V
     trap("unported: AK::HashMap::take_first")
 
 ## Ported from AK/HashMap.h:269 AK::HashMap::ensure.
-pub func hash_map_ensure_t_callback[K, V, KT: Traits[K], TCallback](this: HashMap[K, V, KT]*, key: K, initialization_callback: TCallback, existing_entry_behavior: HashSetExistingEntryBehavior) -> V*:
+pub func hash_map_ensure_t_callback[K, V, KT: Traits[K], TCallback](this: HashMap[K, V, KT]*, key: K, initialization_callback: TCallback, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.keep) -> V*:
     trap("unported: AK::HashMap::ensure")
 
 ## Ported from AK/HashMap.h:274 AK::HashMap::ensure.
@@ -2139,15 +2139,15 @@ pub func hash_table_clear_with_capacity[T, TT: Traits[T]](this: HashTable[T, TT]
     trap("unported: AK::HashTable::clear_with_capacity")
 
 ## Ported from AK/HashTable.h:384 AK::HashTable::try_set.
-pub func hash_table_try_set[T, TT: Traits[T], U](this: HashTable[T, TT]*, value: U, existing_entry_behavior: HashSetExistingEntryBehavior) -> HashSetResult!:
+pub func hash_table_try_set[T, TT: Traits[T], U](this: HashTable[T, TT]*, value: U, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
     trap("unported: AK::HashTable::try_set")
 
 ## Ported from AK/HashTable.h:392 AK::HashTable::set.
-pub func hash_table_set[T, TT: Traits[T], U](this: HashTable[T, TT]*, value: U, existing_entry_behavior: HashSetExistingEntryBehavior) -> HashSetResult:
+pub func hash_table_set[T, TT: Traits[T], U](this: HashTable[T, TT]*, value: U, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
     trap("unported: AK::HashTable::set")
 
 ## Ported from AK/HashTable.h:398 AK::HashTable::ensure.
-pub func hash_table_ensure_u[T, TT: Traits[T], U](this: HashTable[T, TT]*, value: U, existing_entry_behavior: HashSetExistingEntryBehavior) -> T*:
+pub func hash_table_ensure_u[T, TT: Traits[T], U](this: HashTable[T, TT]*, value: U, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> T*:
     trap("unported: AK::HashTable::ensure")
 
 ## Ported from AK/HashTable.h:404 AK::HashTable::ensure.
@@ -2802,7 +2802,7 @@ pub func timing_safe_compare(b1: const void*?, b2: const void*?, len: usize) -> 
     trap("unported: AK::timing_safe_compare")
 
 ## Ported from AK/MemoryStream.cpp:14 AK::FixedMemoryStream::FixedMemoryStream.
-pub func fixed_memory_stream_construct_fixed_memory_stream_mode(this: FixedMemoryStream*, bytes: u8[], mode: FixedMemoryStreamMode):
+pub func fixed_memory_stream_construct_fixed_memory_stream_mode(this: FixedMemoryStream*, bytes: u8[], mode: FixedMemoryStreamMode = FixedMemoryStreamMode.read_write):
     return
 
 ## Ported from AK/MemoryStream.cpp:20 AK::FixedMemoryStream::FixedMemoryStream.
@@ -3917,7 +3917,7 @@ pub func stream_close_impl(this: Stream*):
     trap("pure virtual: AK::Stream::close")
 
 ## Ported from AK/Stream.cpp:20 AK::Stream::read_until_eof_impl.
-pub func stream_read_until_eof_impl_2(this: Stream*, block_size_: usize, expected_file_size: usize) -> ByteBuffer!:
+pub func stream_read_until_eof_impl_2(this: Stream*, block_size_: usize, expected_file_size: usize = 0) -> ByteBuffer!:
     trap("unported: AK::Stream::read_until_eof_impl")
 
 ## Ported from AK/Stream.cpp:79 AK::Stream::write_formatted_impl.
@@ -3945,11 +3945,11 @@ pub func seekable_stream_discard_impl(base: Stream*, discarded_bytes: usize) -> 
     trap("unported: AK::SeekableStream::discard")
 
 ## Ported from AK/StringHash.h:19 AK::string_hash.
-pub func string_hash[T](characters: const T*?, length: usize, seed: u32) -> u32:
+pub func string_hash[T](characters: const T*?, length: usize, seed: u32 = 0) -> u32:
     trap("unported: AK::string_hash")
 
 ## Ported from AK/StringHash.h:33 AK::case_insensitive_string_hash.
-pub func case_insensitive_string_hash(characters: const u8*?, length: usize, seed: u32) -> u32:
+pub func case_insensitive_string_hash(characters: const u8*?, length: usize, seed: u32 = 0) -> u32:
     trap("unported: AK::case_insensitive_string_hash")
 
 ## Ported from AK/TemporaryChange.h:17 AK::TemporaryChange::TemporaryChange<T>.
@@ -4210,19 +4210,19 @@ pub func unix_date_time_truncated_seconds_since_epoch(this: const UnixDateTime*)
     trap("unported: AK::UnixDateTime::truncated_seconds_since_epoch")
 
 ## Ported from AK/Time.cpp:649 AK::UnixDateTime::to_string.
-pub func unix_date_time_to_string(this: const UnixDateTime*, format_: StringView, local_time: UnixDateTimeLocalTime) -> String!:
+pub func unix_date_time_to_string(this: const UnixDateTime*, format_: StringView, local_time: UnixDateTimeLocalTime = UnixDateTimeLocalTime.yes) -> String!:
     trap("unported: AK::UnixDateTime::to_string")
 
 ## Ported from AK/Time.cpp:656 AK::UnixDateTime::to_utf16_string.
-pub func unix_date_time_to_utf16_string(this: const UnixDateTime*, format_: StringView, local_time: UnixDateTimeLocalTime) -> Utf16String:
+pub func unix_date_time_to_utf16_string(this: const UnixDateTime*, format_: StringView, local_time: UnixDateTimeLocalTime = UnixDateTimeLocalTime.yes) -> Utf16String:
     trap("unported: AK::UnixDateTime::to_utf16_string")
 
 ## Ported from AK/Time.cpp:663 AK::UnixDateTime::to_byte_string.
-pub func unix_date_time_to_byte_string(this: const UnixDateTime*, format_: StringView, local_time: UnixDateTimeLocalTime) -> ByteString:
+pub func unix_date_time_to_byte_string(this: const UnixDateTime*, format_: StringView, local_time: UnixDateTimeLocalTime = UnixDateTimeLocalTime.yes) -> ByteString:
     trap("unported: AK::UnixDateTime::to_byte_string")
 
 ## Ported from AK/Time.cpp:670 AK::UnixDateTime::parse.
-pub func unix_date_time_parse(format_: StringView, string: StringView, from_gmt: bool) -> UnixDateTime?:
+pub func unix_date_time_parse(format_: StringView, string: StringView, from_gmt: bool = false) -> UnixDateTime?:
     trap("unported: AK::UnixDateTime::parse")
 
 ## Ported from AK/Time.h:513 AK::UnixDateTime::operator+.
@@ -5067,7 +5067,7 @@ pub func vector_insert[T, U](this: Vector[T]*, index: usize, value: U):
     trap("unported: AK::Vector::insert")
 
 ## Ported from AK/Vector.h:316 AK::Vector::insert_before_matching.
-pub func vector_insert_before_matching[T, TTUnaryPredicate, U](this: Vector[T]*, value: U, predicate: TTUnaryPredicate, first_index: usize, inserted_index: usize*?):
+pub func vector_insert_before_matching[T, TTUnaryPredicate, U](this: Vector[T]*, value: U, predicate: TTUnaryPredicate, first_index: usize = 0, inserted_index: usize*? = none):
     trap("unported: AK::Vector::insert_before_matching")
 
 ## Ported from AK/Vector.h:322 AK::Vector::extend.
@@ -5173,7 +5173,7 @@ pub func vector_try_insert[T, U](this: Vector[T]*, index: usize, value: U) -> !:
     trap("unported: AK::Vector::try_insert")
 
 ## Ported from AK/Vector.h:715 AK::Vector::try_insert_before_matching.
-pub func vector_try_insert_before_matching[T, TTUnaryPredicate, U](this: Vector[T]*, value: U, predicate: TTUnaryPredicate, first_index: usize, inserted_index: usize*?) -> !:
+pub func vector_try_insert_before_matching[T, TTUnaryPredicate, U](this: Vector[T]*, value: U, predicate: TTUnaryPredicate, first_index: usize = 0, inserted_index: usize*? = none) -> !:
     trap("unported: AK::Vector::try_insert_before_matching")
 
 ## Ported from AK/Vector.h:732 AK::Vector::try_extend.
@@ -5222,7 +5222,7 @@ pub func vector_try_ensure_capacity[T](this: Vector[T]*, needed_capacity: usize)
     trap("unported: AK::Vector::try_ensure_capacity")
 
 ## Ported from AK/Vector.h:872 AK::Vector::try_resize.
-pub func vector_try_resize[T](this: Vector[T]*, new_size: usize, keep_capacity: bool) -> !:
+pub func vector_try_resize[T](this: Vector[T]*, new_size: usize, keep_capacity: bool = false) -> !:
     trap("unported: AK::Vector::try_resize")
 
 ## Ported from AK/Vector.h:895 AK::Vector::try_resize_with_default_value.
@@ -5242,7 +5242,7 @@ pub func vector_ensure_capacity[T](this: Vector[T]*, needed_capacity: usize):
     trap("unported: AK::Vector::ensure_capacity")
 
 ## Ported from AK/Vector.h:928 AK::Vector::shrink.
-pub func vector_shrink[T](this: Vector[T]*, new_size: usize, keep_capacity: bool):
+pub func vector_shrink[T](this: Vector[T]*, new_size: usize, keep_capacity: bool = false):
     trap("unported: AK::Vector::shrink")
 
 ## Ported from AK/Vector.h:950 AK::Vector::unsafe_shrink.
@@ -5250,7 +5250,7 @@ pub func vector_unsafe_shrink[T](this: Vector[T]*, new_size: usize):
     trap("unported: AK::Vector::unsafe_shrink")
 
 ## Ported from AK/Vector.h:961 AK::Vector::resize.
-pub func vector_resize[T](this: Vector[T]*, new_size: usize, keep_capacity: bool):
+pub func vector_resize[T](this: Vector[T]*, new_size: usize, keep_capacity: bool = false):
     trap("unported: AK::Vector::resize")
 
 ## Ported from AK/Vector.h:967 AK::Vector::resize_and_keep_capacity.
@@ -5262,7 +5262,7 @@ pub func vector_resize_with_default_value_and_keep_capacity[T](this: Vector[T]*,
     trap("unported: AK::Vector::resize_with_default_value_and_keep_capacity")
 
 ## Ported from AK/Vector.h:979 AK::Vector::resize_with_default_value.
-pub func vector_resize_with_default_value[T](this: Vector[T]*, new_size: usize, default_value: T, keep_capacity: bool):
+pub func vector_resize_with_default_value[T](this: Vector[T]*, new_size: usize, default_value: T, keep_capacity: bool = false):
     trap("unported: AK::Vector::resize_with_default_value")
 
 ## Ported from AK/Vector.h:985 AK::Vector::fill.

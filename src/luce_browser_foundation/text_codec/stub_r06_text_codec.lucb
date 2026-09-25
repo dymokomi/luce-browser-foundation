@@ -576,7 +576,7 @@ pub func big5_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byte: 
     trap("unported: TextCodec::Big5Encoder::process")
 
 ## Ported from Libraries/LibTextCodec/Encoder.cpp:550 TextCodec::GB18030Encoder::GB18030Encoder.
-pub func gb18030_encoder_construct(this: Gb18030Encoder*, is_gbk: Gb18030EncoderIsGbk):
+pub func gb18030_encoder_construct(this: Gb18030Encoder*, is_gbk: Gb18030EncoderIsGbk = Gb18030EncoderIsGbk.no):
     return
 
 ## Ported from Libraries/LibTextCodec/Encoder.cpp:556 TextCodec::GB18030Encoder::process (override).

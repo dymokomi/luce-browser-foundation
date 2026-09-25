@@ -63,11 +63,11 @@ pub func to_simdutf_last_chunk_handling(last_chunk_handling: LastChunkHandling) 
     trap("unported: AK::to_simdutf_last_chunk_handling")
 
 ## Ported from AK/Base64.cpp:101 AK::decode_base64.
-pub func decode_base64(input: StringView, last_chunk_handling: LastChunkHandling) -> ByteBuffer!:
+pub func decode_base64(input: StringView, last_chunk_handling: LastChunkHandling = LastChunkHandling.loose) -> ByteBuffer!:
     trap("unported: AK::decode_base64")
 
 ## Ported from AK/Base64.cpp:106 AK::decode_base64url.
-pub func decode_base64url(input: StringView, last_chunk_handling: LastChunkHandling) -> ByteBuffer!:
+pub func decode_base64url(input: StringView, last_chunk_handling: LastChunkHandling = LastChunkHandling.loose) -> ByteBuffer!:
     trap("unported: AK::decode_base64url")
 
 ## Ported from AK/Base64.cpp:33 AK::decode_base64_into_impl.
@@ -76,19 +76,19 @@ pub func decode_base64_into_impl(input: StringView, output: ByteBuffer*, last_ch
     trap("unported: AK::decode_base64_into_impl")
 
 ## Ported from AK/Base64.cpp:111 AK::decode_base64_into.
-pub func decode_base64_into(input: StringView, output: ByteBuffer*, last_chunk_handling: LastChunkHandling) -> u64!:
+pub func decode_base64_into(input: StringView, output: ByteBuffer*, last_chunk_handling: LastChunkHandling = LastChunkHandling.loose) -> u64!:
     trap("unported: AK::decode_base64_into")
 
 ## Ported from AK/Base64.cpp:116 AK::decode_base64url_into.
-pub func decode_base64url_into(input: StringView, output: ByteBuffer*, last_chunk_handling: LastChunkHandling) -> u64!:
+pub func decode_base64url_into(input: StringView, output: ByteBuffer*, last_chunk_handling: LastChunkHandling = LastChunkHandling.loose) -> u64!:
     trap("unported: AK::decode_base64url_into")
 
 ## Ported from AK/Base64.cpp:121 AK::encode_base64.
-pub func encode_base64(input: const u8[], omit_padding: OmitPadding) -> String!:
+pub func encode_base64(input: const u8[], omit_padding: OmitPadding = OmitPadding.no) -> String!:
     trap("unported: AK::encode_base64")
 
 ## Ported from AK/Base64.cpp:130 AK::encode_base64url.
-pub func encode_base64url(input: const u8[], omit_padding: OmitPadding) -> String!:
+pub func encode_base64url(input: const u8[], omit_padding: OmitPadding = OmitPadding.no) -> String!:
     trap("unported: AK::encode_base64url")
 
 ## Ported from AK/Base64.cpp:72 AK::decode_base64_impl.
@@ -110,15 +110,15 @@ pub func byte_string_construct_string_view(this: ByteString*, view: StringView):
     return
 
 ## Ported from AK/ByteString.h:64 AK::ByteString::ByteString.
-pub func byte_string_construct_u8_should_chomp(this: ByteString*, cstring: const u8*?, shouldChomp: ShouldChomp):
+pub func byte_string_construct_u8_should_chomp(this: ByteString*, cstring: const u8*?, shouldChomp: ShouldChomp = ShouldChomp.no_chomp):
     return
 
 ## Ported from AK/ByteString.h:69 AK::ByteString::ByteString.
-pub func byte_string_construct_u8_usize(this: ByteString*, cstring: const u8*?, length: usize, shouldChomp: ShouldChomp):
+pub func byte_string_construct_u8_usize(this: ByteString*, cstring: const u8*?, length: usize, shouldChomp: ShouldChomp = ShouldChomp.no_chomp):
     return
 
 ## Ported from AK/ByteString.h:74 AK::ByteString::ByteString.
-pub func byte_string_construct_span_u8(this: ByteString*, bytes: const u8[], shouldChomp: ShouldChomp):
+pub func byte_string_construct_span_u8(this: ByteString*, bytes: const u8[], shouldChomp: ShouldChomp = ShouldChomp.no_chomp):
     return
 
 ## Ported from AK/ByteString.h:79 AK::ByteString::ByteString.
@@ -146,11 +146,11 @@ pub func byte_string_join[TSeparatorType, TCollectionType](separator: TSeparator
     trap("unported: AK::ByteString::join")
 
 ## Ported from AK/ByteString.cpp:193 AK::ByteString::matches.
-pub func byte_string_matches_case_sensitivity(this: const ByteString*, mask: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func byte_string_matches_case_sensitivity(this: const ByteString*, mask: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_insensitive) -> bool:
     trap("unported: AK::ByteString::matches")
 
 ## Ported from AK/ByteString.cpp:188 AK::ByteString::matches.
-pub func byte_string_matches_vector(this: const ByteString*, mask: StringView, mask_spans: Vector[MaskSpan]*, case_sensitivity: CaseSensitivity) -> bool:
+pub func byte_string_matches_vector(this: const ByteString*, mask: StringView, mask_spans: Vector[MaskSpan]*, case_sensitivity: CaseSensitivity = CaseSensitivity.case_insensitive) -> bool:
     trap("unported: AK::ByteString::matches")
 
 ## Ported from AK/ByteString.h:123 AK::ByteString::number.
@@ -159,7 +159,7 @@ pub func byte_string_number[T](value: T) -> ByteString:
 
 ## Ported from AK/ByteString.h:129 AK::ByteString::to_number.
 # unmapped: Optional<T>
-pub func byte_string_to_number[T](this: const ByteString*, trim_whitespace: TrimWhitespace, base_: i32) -> void*?:
+pub func byte_string_to_number[T](this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
     trap("unported: AK::ByteString::to_number")
 
 ## Ported from AK/ByteString.cpp:245 AK::ByteString::to_lowercase.
@@ -179,11 +179,11 @@ pub func byte_string_is_whitespace(this: const ByteString*) -> bool:
     trap("unported: AK::ByteString::is_whitespace")
 
 ## Ported from AK/ByteString.h:140 AK::ByteString::trim.
-pub func byte_string_trim(this: const ByteString*, characters: StringView, mode: TrimMode) -> ByteString:
+pub func byte_string_trim(this: const ByteString*, characters: StringView, mode: TrimMode = TrimMode.both) -> ByteString:
     trap("unported: AK::ByteString::trim")
 
 ## Ported from AK/ByteString.h:148 AK::ByteString::trim_whitespace.
-pub func byte_string_trim_whitespace(this: const ByteString*, mode: TrimMode) -> ByteString:
+pub func byte_string_trim_whitespace(this: const ByteString*, mode: TrimMode = TrimMode.both) -> ByteString:
     trap("unported: AK::ByteString::trim_whitespace")
 
 ## Ported from AK/ByteString.cpp:208 AK::ByteString::equals_ignoring_ascii_case.
@@ -191,35 +191,35 @@ pub func byte_string_equals_ignoring_ascii_case(this: const ByteString*, other: 
     trap("unported: AK::ByteString::equals_ignoring_ascii_case")
 
 ## Ported from AK/ByteString.cpp:198 AK::ByteString::contains.
-pub func byte_string_contains_string_view(this: const ByteString*, needle: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func byte_string_contains_string_view(this: const ByteString*, needle: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::ByteString::contains")
 
 ## Ported from AK/ByteString.cpp:203 AK::ByteString::contains.
-pub func byte_string_contains_u8(this: const ByteString*, needle: u8, case_sensitivity: CaseSensitivity) -> bool:
+pub func byte_string_contains_u8(this: const ByteString*, needle: u8, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::ByteString::contains")
 
 ## Ported from AK/ByteString.cpp:84 AK::ByteString::split_limit.
-pub func byte_string_split_limit(this: const ByteString*, separator: u8, limit: usize, split_behavior: SplitBehavior) -> Vector[ByteString]:
+pub func byte_string_split_limit(this: const ByteString*, separator: u8, limit: usize, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[ByteString]:
     trap("unported: AK::ByteString::split_limit")
 
 ## Ported from AK/ByteString.cpp:79 AK::ByteString::split.
-pub func byte_string_split(this: const ByteString*, separator: u8, split_behavior: SplitBehavior) -> Vector[ByteString]:
+pub func byte_string_split(this: const ByteString*, separator: u8, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[ByteString]:
     trap("unported: AK::ByteString::split")
 
 ## Ported from AK/ByteString.cpp:132 AK::ByteString::split_view.
-pub func byte_string_split_view_u8(this: const ByteString*, separator: u8, split_behavior: SplitBehavior) -> Vector[StringView]:
+pub func byte_string_split_view_u8(this: const ByteString*, separator: u8, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[StringView]:
     trap("unported: AK::ByteString::split_view")
 
 ## Ported from AK/ByteString.cpp:108 AK::ByteString::split_view.
-pub func byte_string_split_view_function1(this: const ByteString*, separator: Function1[u8, bool], split_behavior: SplitBehavior) -> Vector[StringView]:
+pub func byte_string_split_view_function1(this: const ByteString*, separator: Function1[u8, bool], split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[StringView]:
     trap("unported: AK::ByteString::split_view")
 
 ## Ported from AK/ByteString.h:170 AK::ByteString::find.
-pub func byte_string_find_u8(this: const ByteString*, needle: u8, start: usize) -> u64?:
+pub func byte_string_find_u8(this: const ByteString*, needle: u8, start: usize = 0) -> u64?:
     trap("unported: AK::ByteString::find")
 
 ## Ported from AK/ByteString.h:171 AK::ByteString::find.
-pub func byte_string_find_string_view(this: const ByteString*, needle: StringView, start: usize) -> u64?:
+pub func byte_string_find_string_view(this: const ByteString*, needle: StringView, start: usize = 0) -> u64?:
     trap("unported: AK::ByteString::find")
 
 ## Ported from AK/ByteString.h:172 AK::ByteString::find_last.
@@ -235,7 +235,7 @@ pub func byte_string_find_all(this: const ByteString*, needle: StringView) -> Ve
     trap("unported: AK::ByteString::find_all")
 
 ## Ported from AK/ByteString.h:176 AK::ByteString::find_any_of.
-pub func byte_string_find_any_of(this: const ByteString*, needles: StringView, direction: SearchDirection) -> u64?:
+pub func byte_string_find_any_of(this: const ByteString*, needles: StringView, direction: SearchDirection = SearchDirection.forward) -> u64?:
     trap("unported: AK::ByteString::find_any_of")
 
 ## Ported from AK/ByteString.h:178 AK::ByteString::find_last_split_view.
@@ -295,11 +295,11 @@ pub func byte_string_end(this: const ByteString*) -> SimpleIterator[ByteString, 
     trap("unported: AK::ByteString::end")
 
 ## Ported from AK/ByteString.cpp:143 AK::ByteString::starts_with.
-pub func byte_string_starts_with_string_view(this: const ByteString*, str_: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func byte_string_starts_with_string_view(this: const ByteString*, str_: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::ByteString::starts_with")
 
 ## Ported from AK/ByteString.cpp:155 AK::ByteString::ends_with.
-pub func byte_string_ends_with_string_view(this: const ByteString*, str_: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func byte_string_ends_with_string_view(this: const ByteString*, str_: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::ByteString::ends_with")
 
 ## Ported from AK/ByteString.cpp:148 AK::ByteString::starts_with.
@@ -363,7 +363,7 @@ pub func byte_string_to_byte_buffer(this: const ByteString*) -> ByteBuffer:
     trap("unported: AK::ByteString::to_byte_buffer")
 
 ## Ported from AK/ByteString.h:270 AK::ByteString::copy.
-pub func byte_string_copy[TBufferType](buffer: TBufferType, should_chomp: ShouldChomp) -> ByteString:
+pub func byte_string_copy[TBufferType](buffer: TBufferType, should_chomp: ShouldChomp = ShouldChomp.no_chomp) -> ByteString:
     trap("unported: AK::ByteString::copy")
 
 ## Ported from AK/ByteString.cpp:286 AK::ByteString::vformatted.
@@ -375,7 +375,7 @@ pub func byte_string_view(this: const ByteString*) -> StringView:
     trap("unported: AK::ByteString::view")
 
 ## Ported from AK/ByteString.h:289 AK::ByteString::replace.
-pub func byte_string_replace(this: const ByteString*, needle: StringView, replacement: StringView, replace_mode: ReplaceMode) -> ByteString:
+pub func byte_string_replace(this: const ByteString*, needle: StringView, replacement: StringView, replace_mode: ReplaceMode = ReplaceMode.all) -> ByteString:
     trap("unported: AK::ByteString::replace")
 
 ## Ported from AK/ByteString.h:290 AK::ByteString::count.
@@ -407,15 +407,15 @@ pub func byte_string_impl_create_uninitialized(length: usize, buffer: (u8*?)*) -
     trap("unported: AK::ByteStringImpl::create_uninitialized")
 
 ## Ported from AK/ByteStringImpl.cpp:80 AK::ByteStringImpl::create.
-pub func byte_string_impl_create_u8_should_chomp(cstring: const u8*?, shouldChomp: ShouldChomp) -> const ByteStringImpl*:
+pub func byte_string_impl_create_u8_should_chomp(cstring: const u8*?, shouldChomp: ShouldChomp = ShouldChomp.no_chomp) -> const ByteStringImpl*:
     trap("unported: AK::ByteStringImpl::create")
 
 ## Ported from AK/ByteStringImpl.cpp:58 AK::ByteStringImpl::create.
-pub func byte_string_impl_create_u8_usize(cstring: const u8*?, length: usize, should_chomp: ShouldChomp) -> const ByteStringImpl*:
+pub func byte_string_impl_create_u8_usize(cstring: const u8*?, length: usize, should_chomp: ShouldChomp = ShouldChomp.no_chomp) -> const ByteStringImpl*:
     trap("unported: AK::ByteStringImpl::create")
 
 ## Ported from AK/ByteStringImpl.cpp:88 AK::ByteStringImpl::create.
-pub func byte_string_impl_create_span_u8(bytes: const u8[], shouldChomp: ShouldChomp) -> const ByteStringImpl*:
+pub func byte_string_impl_create_span_u8(bytes: const u8[], shouldChomp: ShouldChomp = ShouldChomp.no_chomp) -> const ByteStringImpl*:
     trap("unported: AK::ByteStringImpl::create")
 
 ## Ported from AK/ByteStringImpl.cpp:35 AK::ByteStringImpl::the_empty_stringimpl.
@@ -708,11 +708,11 @@ pub func fly_string_is_ascii(this: const FlyString*) -> bool:
     trap("unported: AK::FlyString::is_ascii")
 
 ## Ported from AK/FlyString.cpp:198 AK::FlyString::starts_with_bytes.
-pub func fly_string_starts_with_bytes(this: const FlyString*, bytes: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func fly_string_starts_with_bytes(this: const FlyString*, bytes: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::FlyString::starts_with_bytes")
 
 ## Ported from AK/FlyString.cpp:203 AK::FlyString::ends_with_bytes.
-pub func fly_string_ends_with_bytes(this: const FlyString*, bytes: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func fly_string_ends_with_bytes(this: const FlyString*, bytes: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::FlyString::ends_with_bytes")
 
 ## Ported from AK/FlyString.h:100 AK::FlyString::FlyString.
@@ -777,12 +777,12 @@ pub func generic_lexer_is_eof[TCharType](this: const GenericLexer[TCharType]*) -
     trap("unported: AK::Detail::GenericLexer::is_eof")
 
 ## Ported from AK/GenericLexer.h:60 AK::Detail::GenericLexer::peek.
-pub func generic_lexer_peek[TCharType](this: const GenericLexer[TCharType]*, offset: usize) -> TCharType:
+pub func generic_lexer_peek[TCharType](this: const GenericLexer[TCharType]*, offset: usize = 0) -> TCharType:
     trap("unported: AK::Detail::GenericLexer::peek")
 
 ## Ported from AK/GenericLexer.h:65 AK::Detail::GenericLexer::peek_string.
 # unmapped: Optional<ViewType>
-pub func generic_lexer_peek_string[TCharType](this: const GenericLexer[TCharType]*, length: usize, offset: usize) -> void*?:
+pub func generic_lexer_peek_string[TCharType](this: const GenericLexer[TCharType]*, length: usize, offset: usize = 0) -> void*?:
     trap("unported: AK::Detail::GenericLexer::peek_string")
 
 ## Ported from AK/GenericLexer.h:72 AK::Detail::GenericLexer::next_is.
@@ -875,11 +875,11 @@ pub func generic_lexer_consume_decimal_integer[TCharType, T](this: GenericLexer[
     trap("unported: AK::Detail::GenericLexer::consume_decimal_integer")
 
 ## Ported from AK/GenericLexer.h:311 AK::Detail::GenericLexer::consume_escaped_code_point.
-pub func generic_lexer_consume_escaped_code_point[TCharType](this: GenericLexer[TCharType]*, combine_surrogate_pairs: bool) -> Result[u32, UnicodeEscapeError]:
+pub func generic_lexer_consume_escaped_code_point[TCharType](this: GenericLexer[TCharType]*, combine_surrogate_pairs: bool = true) -> Result[u32, UnicodeEscapeError]:
     trap("unported: AK::Detail::GenericLexer::consume_escaped_code_point")
 
 ## Ported from AK/GenericLexer.h:321 AK::Detail::GenericLexer::ignore.
-pub func generic_lexer_ignore[TCharType](this: GenericLexer[TCharType]*, count: usize):
+pub func generic_lexer_ignore[TCharType](this: GenericLexer[TCharType]*, count: usize = 1):
     trap("unported: AK::Detail::GenericLexer::ignore")
 
 ## Ported from AK/GenericLexer.h:327 AK::Detail::GenericLexer::ignore_until.
@@ -921,7 +921,7 @@ pub func generic_lexer_decode_code_point[TCharType](this: GenericLexer[TCharType
     trap("unported: AK::Detail::GenericLexer::decode_code_point")
 
 ## Ported from AK/GenericLexer.h:430 AK::Detail::GenericLexer::decode_single_or_paired_surrogate.
-pub func generic_lexer_decode_single_or_paired_surrogate[TCharType](this: GenericLexer[TCharType]*, combine_surrogate_pairs: bool) -> Result[u32, UnicodeEscapeError]:
+pub func generic_lexer_decode_single_or_paired_surrogate[TCharType](this: GenericLexer[TCharType]*, combine_surrogate_pairs: bool = true) -> Result[u32, UnicodeEscapeError]:
     trap("unported: AK::Detail::GenericLexer::decode_single_or_paired_surrogate")
 
 ## Ported from AK/GenericLexer.h:470 AK::Detail::GenericLexer::input_length.
@@ -1089,7 +1089,7 @@ pub func lexical_path_dirname(this: const LexicalPath*) -> StringView:
     return this.m_dirname
 
 ## Ported from AK/LexicalPath.h:36 AK::LexicalPath::basename.
-pub func lexical_path_basename_lexical_path_strip_extension(this: const LexicalPath*, s: LexicalPathStripExtension) -> StringView:
+pub func lexical_path_basename_lexical_path_strip_extension(this: const LexicalPath*, s: LexicalPathStripExtension = LexicalPathStripExtension.no) -> StringView:
     trap("unported: AK::LexicalPath::basename")
 
 ## Ported from AK/LexicalPath.h:37 AK::LexicalPath::title.
@@ -1145,7 +1145,7 @@ pub func lexical_path_dirname_byte_string(path: ByteString) -> ByteString:
     trap("unported: AK::LexicalPath::dirname")
 
 ## Ported from AK/LexicalPath.h:71 AK::LexicalPath::basename.
-pub func lexical_path_basename_byte_string(path: ByteString, s: LexicalPathStripExtension) -> ByteString:
+pub func lexical_path_basename_byte_string(path: ByteString, s: LexicalPathStripExtension = LexicalPathStripExtension.no) -> ByteString:
     trap("unported: AK::LexicalPath::basename")
 
 ## Ported from AK/LexicalPath.h:77 AK::LexicalPath::title.
@@ -1181,7 +1181,7 @@ pub func string_from_utf8(view: StringView) -> String!:
     trap("unported: AK::String::from_utf8")
 
 ## Ported from AK/String.cpp:25 AK::String::from_utf8_with_replacement_character.
-pub func string_from_utf8_with_replacement_character(view: StringView, with_bom_handling: StringWithBomHandling) -> String:
+pub func string_from_utf8_with_replacement_character(view: StringView, with_bom_handling: StringWithBomHandling = StringWithBomHandling.yes) -> String:
     trap("unported: AK::String::from_utf8_with_replacement_character")
 
 ## Ported from AK/String.cpp:47 AK::String::from_utf8_without_validation.
@@ -1229,7 +1229,7 @@ pub func string_repeated_string(input: String, count: usize) -> String!:
     trap("unported: AK::String::repeated")
 
 ## Ported from AK/String.cpp:471 AK::String::bijective_base_from.
-pub func string_bijective_base_from(value: usize, target_case: StringCase, base_: u32, maybe_map: StringView?) -> String:
+pub func string_bijective_base_from(value: usize, target_case: StringCase, base_: u32 = 26, maybe_map: StringView? = none) -> String:
     trap("unported: AK::String::bijective_base_from")
 
 ## Ported from AK/String.cpp:501 AK::String::greek_letter_from.
@@ -1265,7 +1265,7 @@ pub func string_starts_with(this: const String*, code_point: u32) -> bool:
     trap("unported: AK::String::starts_with")
 
 ## Ported from AK/String.cpp:367 AK::String::starts_with_bytes.
-pub func string_starts_with_bytes(this: const String*, bytes: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func string_starts_with_bytes(this: const String*, bytes: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::String::starts_with_bytes")
 
 ## Ported from AK/String.cpp:372 AK::String::ends_with.
@@ -1273,7 +1273,7 @@ pub func string_ends_with(this: const String*, code_point: u32) -> bool:
     trap("unported: AK::String::ends_with")
 
 ## Ported from AK/String.cpp:389 AK::String::ends_with_bytes.
-pub func string_ends_with_bytes(this: const String*, bytes: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func string_ends_with_bytes(this: const String*, bytes: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::String::ends_with_bytes")
 
 ## Ported from AK/String.cpp:264 AK::String::substring_from_byte_offset.
@@ -1317,31 +1317,31 @@ pub func string_reverse(this: const String*) -> String!:
     trap("unported: AK::String::reverse")
 
 ## Ported from AK/String.cpp:332 AK::String::trim.
-pub func string_trim_utf8_view(this: const String*, code_points_to_trim: Utf8View, mode: TrimMode) -> String!:
+pub func string_trim_utf8_view(this: const String*, code_points_to_trim: Utf8View, mode: TrimMode = TrimMode.both) -> String!:
     trap("unported: AK::String::trim")
 
 ## Ported from AK/String.cpp:338 AK::String::trim.
-pub func string_trim_string_view(this: const String*, code_points_to_trim: StringView, mode: TrimMode) -> String!:
+pub func string_trim_string_view(this: const String*, code_points_to_trim: StringView, mode: TrimMode = TrimMode.both) -> String!:
     trap("unported: AK::String::trim")
 
 ## Ported from AK/String.cpp:343 AK::String::trim_ascii_whitespace.
-pub func string_trim_ascii_whitespace(this: const String*, mode: TrimMode) -> String!:
+pub func string_trim_ascii_whitespace(this: const String*, mode: TrimMode = TrimMode.both) -> String!:
     trap("unported: AK::String::trim_ascii_whitespace")
 
 ## Ported from AK/String.cpp:200 AK::String::split_limit.
-pub func string_split_limit(this: const String*, separator: u32, limit: usize, split_behavior: SplitBehavior) -> Vector[String]!:
+pub func string_split_limit(this: const String*, separator: u32, limit: usize, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[String]!:
     trap("unported: AK::String::split_limit")
 
 ## Ported from AK/String.cpp:195 AK::String::split.
-pub func string_split(this: const String*, separator: u32, split_behavior: SplitBehavior) -> Vector[String]!:
+pub func string_split(this: const String*, separator: u32, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[String]!:
     trap("unported: AK::String::split")
 
 ## Ported from AK/String.cpp:225 AK::String::find_byte_offset.
-pub func string_find_byte_offset_u32(this: const String*, code_point: u32, from_byte_offset: usize) -> u64?:
+pub func string_find_byte_offset_u32(this: const String*, code_point: u32, from_byte_offset: usize = 0) -> u64?:
     trap("unported: AK::String::find_byte_offset")
 
 ## Ported from AK/String.cpp:239 AK::String::find_byte_offset.
-pub func string_find_byte_offset_string_view(this: const String*, substring: StringView, from_byte_offset: usize) -> u64?:
+pub func string_find_byte_offset_string_view(this: const String*, substring: StringView, from_byte_offset: usize = 0) -> u64?:
     trap("unported: AK::String::find_byte_offset")
 
 ## Ported from AK/String.cpp:254 AK::String::operator==.
@@ -1361,11 +1361,11 @@ pub func string_cmp(this: const String*, other: String) -> i32:
     trap("unported: AK::String::operator<=>")
 
 ## Ported from AK/String.cpp:348 AK::String::contains.
-pub func string_contains_string_view(this: const String*, needle: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func string_contains_string_view(this: const String*, needle: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::String::contains")
 
 ## Ported from AK/String.cpp:353 AK::String::contains.
-pub func string_contains_u32(this: const String*, needle: u32, case_sensitivity: CaseSensitivity) -> bool:
+pub func string_contains_u32(this: const String*, needle: u32, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::String::contains")
 
 ## Ported from AK/String.cpp:293 AK::String::ascii_case_insensitive_hash.
@@ -1378,7 +1378,7 @@ pub func string_number[T](value: T) -> String:
 
 ## Ported from AK/String.h:199 AK::String::to_number.
 # unmapped: Optional<T>
-pub func string_to_number[T](this: const String*, trim_whitespace: TrimWhitespace, base_: i32) -> void*?:
+pub func string_to_number[T](this: const String*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
     trap("unported: AK::String::to_number")
 
 ## Ported from AK/String.cpp:188 AK::String::vformatted.
@@ -1751,27 +1751,27 @@ pub func string_builder_data_const(this: const StringBuilder*) -> const u8*?:
 
 ## Ported from AK/StringConversions.cpp:63 AK::parse_first_number.
 # unmapped: Optional<ParseFirstNumberResult<T>>
-pub func parse_first_number_string_view[T](string: StringView, trim_whitespace: TrimWhitespace, base_: i32) -> void*?:
+pub func parse_first_number_string_view[T](string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
     trap("unported: AK::parse_first_number")
 
 ## Ported from AK/StringConversions.cpp:72 AK::parse_first_number.
 # unmapped: Optional<ParseFirstNumberResult<T>>
-pub func parse_first_number_utf16_view[T](string: Utf16View, trim_whitespace: TrimWhitespace, base_: i32) -> void*?:
+pub func parse_first_number_utf16_view[T](string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
     trap("unported: AK::parse_first_number")
 
 ## Ported from AK/StringConversions.cpp:92 AK::parse_number.
 # unmapped: Optional<T>
-pub func parse_number_string_view[T](string: StringView, trim_whitespace: TrimWhitespace, base_: i32) -> void*?:
+pub func parse_number_string_view[T](string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
     trap("unported: AK::parse_number")
 
 ## Ported from AK/StringConversions.cpp:108 AK::parse_number.
 # unmapped: Optional<T>
-pub func parse_number_utf16_view[T](string: Utf16View, trim_whitespace: TrimWhitespace, base_: i32) -> void*?:
+pub func parse_number_utf16_view[T](string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
     trap("unported: AK::parse_number")
 
 ## Ported from AK/StringConversions.cpp:136 AK::parse_hexadecimal_number.
 # unmapped: Optional<T>
-pub func parse_hexadecimal_number_string_view[T](string: StringView, trim_whitespace: TrimWhitespace) -> void*?:
+pub func parse_hexadecimal_number_string_view[T](string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> void*?:
     trap("unported: AK::parse_hexadecimal_number")
 
 ## Ported from AK/StringConversions.cpp:37 AK::from_chars.
@@ -1782,7 +1782,7 @@ pub func from_chars[TCharType, TValueType](string: const TCharType*?, length: us
 
 ## Ported from AK/StringConversions.cpp:142 AK::parse_hexadecimal_number.
 # unmapped: Optional<T>
-pub func parse_hexadecimal_number_utf16_view[T](string: Utf16View, trim_whitespace: TrimWhitespace) -> void*?:
+pub func parse_hexadecimal_number_utf16_view[T](string: Utf16View, trim_whitespace: TrimWhitespace = TrimWhitespace.yes) -> void*?:
     trap("unported: AK::parse_hexadecimal_number")
 
 ## Ported from AK/StringConversions.cpp:158 AK::convert_to_decimal_exponential_form.
@@ -1894,7 +1894,7 @@ pub func mask_span_eq(this: const MaskSpan*, other: MaskSpan) -> bool:
     trap("unported: AK::MaskSpan::operator==")
 
 ## Ported from AK/StringUtils.cpp:25 AK::StringUtils::matches.
-pub func string_utils_matches(str_: StringView, mask: StringView, case_sensitivity: CaseSensitivity, match_spans: Vector[MaskSpan]*?) -> bool:
+pub func string_utils_matches(str_: StringView, mask: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_insensitive, match_spans: Vector[MaskSpan]*? = none) -> bool:
     trap("unported: AK::StringUtils::matches")
 
 ## Ported from AK/StringUtils.cpp:87 AK::StringUtils::equals_ignoring_ascii_case.
@@ -1926,11 +1926,11 @@ pub func string_utils_trim_whitespace(str_: StringView, mode: TrimMode) -> Strin
     trap("unported: AK::StringUtils::trim_whitespace")
 
 ## Ported from AK/StringUtils.cpp:213 AK::StringUtils::find.
-pub func string_utils_find_u8(haystack: StringView, needle: u8, start_offset: usize) -> u64?:
+pub func string_utils_find_u8(haystack: StringView, needle: u8, start_offset: usize = 0) -> u64?:
     trap("unported: AK::StringUtils::find")
 
 ## Ported from AK/StringUtils.cpp:228 AK::StringUtils::find.
-pub func string_utils_find_string_view(haystack: StringView, needle: StringView, start: usize) -> u64?:
+pub func string_utils_find_string_view(haystack: StringView, needle: StringView, start: usize = 0) -> u64?:
     trap("unported: AK::StringUtils::find")
 
 ## Ported from AK/StringUtils.cpp:238 AK::StringUtils::find_last.
@@ -2048,11 +2048,11 @@ pub func string_view_hash(this: const StringView*) -> u32:
     trap("unported: AK::StringView::hash")
 
 ## Ported from AK/StringView.cpp:139 AK::StringView::starts_with.
-pub func string_view_starts_with_string_view(this: const StringView*, str_: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func string_view_starts_with_string_view(this: const StringView*, str_: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::StringView::starts_with")
 
 ## Ported from AK/StringView.cpp:151 AK::StringView::ends_with.
-pub func string_view_ends_with_string_view(this: const StringView*, str_: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func string_view_ends_with_string_view(this: const StringView*, str_: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::StringView::ends_with")
 
 ## Ported from AK/StringView.cpp:132 AK::StringView::starts_with.
@@ -2064,11 +2064,11 @@ pub func string_view_ends_with_u8(this: const StringView*, ch: u8) -> bool:
     trap("unported: AK::StringView::ends_with")
 
 ## Ported from AK/StringView.cpp:161 AK::StringView::matches.
-pub func string_view_matches_case_sensitivity(this: const StringView*, mask: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func string_view_matches_case_sensitivity(this: const StringView*, mask: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_insensitive) -> bool:
     trap("unported: AK::StringView::matches")
 
 ## Ported from AK/StringView.cpp:156 AK::StringView::matches.
-pub func string_view_matches_vector(this: const StringView*, mask: StringView, mask_spans: Vector[MaskSpan]*, case_sensitivity: CaseSensitivity) -> bool:
+pub func string_view_matches_vector(this: const StringView*, mask: StringView, mask_spans: Vector[MaskSpan]*, case_sensitivity: CaseSensitivity = CaseSensitivity.case_insensitive) -> bool:
     trap("unported: AK::StringView::matches")
 
 ## Ported from AK/StringView.cpp:166 AK::StringView::contains.
@@ -2080,7 +2080,7 @@ pub func string_view_contains_u32(this: const StringView*, needle: u32) -> bool:
     trap("unported: AK::StringView::contains")
 
 ## Ported from AK/StringView.cpp:189 AK::StringView::contains.
-pub func string_view_contains_string_view(this: const StringView*, needle: StringView, case_sensitivity: CaseSensitivity) -> bool:
+pub func string_view_contains_string_view(this: const StringView*, needle: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
     trap("unported: AK::StringView::contains")
 
 ## Ported from AK/StringView.cpp:196 AK::StringView::equals_ignoring_ascii_case.
@@ -2092,11 +2092,11 @@ pub func string_view_is_ascii(this: const StringView*) -> bool:
     trap("unported: AK::StringView::is_ascii")
 
 ## Ported from AK/StringView.h:103 AK::StringView::trim.
-pub func string_view_trim(this: const StringView*, characters: StringView, mode: TrimMode) -> StringView:
+pub func string_view_trim(this: const StringView*, characters: StringView, mode: TrimMode = TrimMode.both) -> StringView:
     trap("unported: AK::StringView::trim")
 
 ## Ported from AK/StringView.h:104 AK::StringView::trim_whitespace.
-pub func string_view_trim_whitespace(this: const StringView*, mode: TrimMode) -> StringView:
+pub func string_view_trim_whitespace(this: const StringView*, mode: TrimMode = TrimMode.both) -> StringView:
     trap("unported: AK::StringView::trim_whitespace")
 
 ## Ported from AK/StringView.cpp:208 AK::StringView::to_ascii_lowercase_string.
@@ -2112,11 +2112,11 @@ pub func string_view_to_ascii_titlecase_string(this: const StringView*) -> Strin
     trap("unported: AK::StringView::to_ascii_titlecase_string")
 
 ## Ported from AK/StringView.h:110 AK::StringView::find.
-pub func string_view_find_u8(this: const StringView*, needle: u8, start: usize) -> u64?:
+pub func string_view_find_u8(this: const StringView*, needle: u8, start: usize = 0) -> u64?:
     trap("unported: AK::StringView::find")
 
 ## Ported from AK/StringView.h:111 AK::StringView::find.
-pub func string_view_find_string_view(this: const StringView*, needle: StringView, start: usize) -> u64?:
+pub func string_view_find_string_view(this: const StringView*, needle: StringView, start: usize = 0) -> u64?:
     trap("unported: AK::StringView::find")
 
 ## Ported from AK/StringView.h:112 AK::StringView::find_last.
@@ -2136,7 +2136,7 @@ pub func string_view_find_all(this: const StringView*, needle: StringView) -> Ve
     trap("unported: AK::StringView::find_all")
 
 ## Ported from AK/StringView.h:119 AK::StringView::find_any_of.
-pub func string_view_find_any_of(this: const StringView*, needles: StringView, direction: SearchDirection) -> u64?:
+pub func string_view_find_any_of(this: const StringView*, needles: StringView, direction: SearchDirection = SearchDirection.forward) -> u64?:
     trap("unported: AK::StringView::find_any_of")
 
 ## Ported from AK/StringView.h:121 AK::StringView::substring_view.
@@ -2148,15 +2148,15 @@ pub func string_view_substring_view(this: const StringView*, start: usize) -> St
     trap("unported: AK::StringView::substring_view")
 
 ## Ported from AK/StringView.cpp:47 AK::StringView::split_view.
-pub func string_view_split_view_u8(this: const StringView*, separator: u8, split_behavior: SplitBehavior) -> Vector[StringView]:
+pub func string_view_split_view_u8(this: const StringView*, separator: u8, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[StringView]:
     trap("unported: AK::StringView::split_view")
 
 ## Ported from AK/StringView.cpp:53 AK::StringView::split_view.
-pub func string_view_split_view_string_view(this: const StringView*, separator: StringView, split_behavior: SplitBehavior) -> Vector[StringView]:
+pub func string_view_split_view_string_view(this: const StringView*, separator: StringView, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[StringView]:
     trap("unported: AK::StringView::split_view")
 
 ## Ported from AK/StringView.cpp:290 AK::StringView::split_view_if.
-pub func string_view_split_view_if(this: const StringView*, predicate: Function1[u8, bool], split_behavior: SplitBehavior) -> Vector[StringView]:
+pub func string_view_split_view_if(this: const StringView*, predicate: Function1[u8, bool], split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[StringView]:
     trap("unported: AK::StringView::split_view_if")
 
 ## Ported from AK/StringView.h:142 AK::StringView::find_last_split_view.
@@ -2178,11 +2178,11 @@ pub func string_view_for_each_split_view_string_view[TCallback](this: const Stri
     trap("unported: AK::StringView::for_each_split_view")
 
 ## Ported from AK/StringView.cpp:104 AK::StringView::lines.
-pub func string_view_lines(this: const StringView*, consider_carriage_return: StringViewConsiderCarriageReturn) -> Vector[StringView]:
+pub func string_view_lines(this: const StringView*, consider_carriage_return: StringViewConsiderCarriageReturn = StringViewConsiderCarriageReturn.yes) -> Vector[StringView]:
     trap("unported: AK::StringView::lines")
 
 ## Ported from AK/StringView.cpp:118 AK::StringView::count_lines.
-pub func string_view_count_lines(this: const StringView*, consider_carriage_return: StringViewConsiderCarriageReturn) -> usize:
+pub func string_view_count_lines(this: const StringView*, consider_carriage_return: StringViewConsiderCarriageReturn = StringViewConsiderCarriageReturn.yes) -> usize:
     trap("unported: AK::StringView::count_lines")
 
 ## Ported from AK/StringView.cpp:243 AK::StringView::substring_view_starting_from_substring.
@@ -2259,7 +2259,7 @@ pub func string_view_count_u8(this: const StringView*, needle: u8) -> usize:
 
 ## Ported from AK/StringView.h:348 AK::StringView::to_number.
 # unmapped: Optional<T>
-pub func string_view_to_number[T](this: const StringView*, trim_whitespace: TrimWhitespace, base_: i32) -> void*?:
+pub func string_view_to_number[T](this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
     trap("unported: AK::StringView::to_number")
 
 ## Ported from AK/StringView.h:357 AK::StringView::StringView.
@@ -2398,7 +2398,7 @@ pub func utf16_fly_string_to_ascii_titlecase(this: const Utf16FlyString*) -> Utf
 
 ## Ported from AK/Utf16FlyString.h:86 AK::Utf16FlyString::to_number.
 # unmapped: Optional<T>
-pub func utf16_fly_string_to_number[T](this: const Utf16FlyString*, trim_whitespace: TrimWhitespace, base_: i32) -> void*?:
+pub func utf16_fly_string_to_number[T](this: const Utf16FlyString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
     trap("unported: AK::Utf16FlyString::to_number")
 
 ## Ported from AK/Utf16FlyString.h:97 AK::Utf16FlyString::operator==.
@@ -2522,7 +2522,7 @@ pub func utf16_string_from_utf8_fly_string(utf8_string: FlyString) -> Utf16Strin
     trap("unported: AK::Utf16String::from_utf8")
 
 ## Ported from AK/Utf16String.cpp:18 AK::Utf16String::from_utf8_with_replacement_character.
-pub func utf16_string_from_utf8_with_replacement_character(utf8_string: StringView, with_bom_handling: Utf16StringWithBomHandling) -> Utf16String:
+pub func utf16_string_from_utf8_with_replacement_character(utf8_string: StringView, with_bom_handling: Utf16StringWithBomHandling = Utf16StringWithBomHandling.yes) -> Utf16String:
     trap("unported: AK::Utf16String::from_utf8_with_replacement_character")
 
 ## Ported from AK/Utf16String.h:60 AK::Utf16String::try_from_utf8.
@@ -2602,11 +2602,11 @@ pub func utf16_string_replace_utf16_view(this: const Utf16String*, needle: Utf16
     trap("unported: AK::Utf16String::replace")
 
 ## Ported from AK/Utf16String.h:209 AK::Utf16String::trim.
-pub func utf16_string_trim(this: const Utf16String*, code_units: Utf16View, mode: TrimMode) -> Utf16String:
+pub func utf16_string_trim(this: const Utf16String*, code_units: Utf16View, mode: TrimMode = TrimMode.both) -> Utf16String:
     trap("unported: AK::Utf16String::trim")
 
 ## Ported from AK/Utf16String.h:227 AK::Utf16String::trim_ascii_whitespace.
-pub func utf16_string_trim_ascii_whitespace(this: const Utf16String*, mode: TrimMode) -> Utf16String:
+pub func utf16_string_trim_ascii_whitespace(this: const Utf16String*, mode: TrimMode = TrimMode.both) -> Utf16String:
     trap("unported: AK::Utf16String::trim_ascii_whitespace")
 
 ## Ported from AK/Utf16String.h:232 AK::Utf16String::escape_html_entities.
@@ -2658,15 +2658,15 @@ pub func utf16_string_base_to_utf16_view(this: const Utf16StringBase*) -> Utf16V
     trap("unported: AK::Detail::Utf16StringBase::operator Utf16View")
 
 ## Ported from AK/Utf16StringBase.h:60 AK::Detail::Utf16StringBase::to_utf8.
-pub func utf16_string_base_to_utf8(this: const Utf16StringBase*, allow_lonely_surrogates: AllowLonelySurrogates) -> String:
+pub func utf16_string_base_to_utf8(this: const Utf16StringBase*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> String:
     trap("unported: AK::Detail::Utf16StringBase::to_utf8")
 
 ## Ported from AK/Utf16StringBase.h:65 AK::Detail::Utf16StringBase::to_utf8_but_should_be_ported_to_utf16.
-pub func utf16_string_base_to_utf8_but_should_be_ported_to_utf16(this: const Utf16StringBase*, allow_lonely_surrogates: AllowLonelySurrogates) -> String:
+pub func utf16_string_base_to_utf8_but_should_be_ported_to_utf16(this: const Utf16StringBase*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> String:
     trap("unported: AK::Detail::Utf16StringBase::to_utf8_but_should_be_ported_to_utf16")
 
 ## Ported from AK/Utf16StringBase.h:70 AK::Detail::Utf16StringBase::to_byte_string.
-pub func utf16_string_base_to_byte_string(this: const Utf16StringBase*, allow_lonely_surrogates: AllowLonelySurrogates) -> ByteString:
+pub func utf16_string_base_to_byte_string(this: const Utf16StringBase*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> ByteString:
     trap("unported: AK::Detail::Utf16StringBase::to_byte_string")
 
 ## Ported from AK/Utf16StringBase.h:75 AK::Detail::Utf16StringBase::ascii_view.
@@ -2679,7 +2679,7 @@ pub func utf16_string_base_utf16_view(this: const Utf16StringBase*) -> Utf16View
 
 ## Ported from AK/Utf16StringBase.h:99 AK::Detail::Utf16StringBase::to_number.
 # unmapped: Optional<T>
-pub func utf16_string_base_to_number[T](this: const Utf16StringBase*, trim_whitespace: TrimWhitespace, base_: i32) -> void*?:
+pub func utf16_string_base_to_number[T](this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
     trap("unported: AK::Detail::Utf16StringBase::to_number")
 
 ## Ported from AK/Utf16StringBase.h:134 AK::Detail::Utf16StringBase::operator==.
@@ -2767,15 +2767,15 @@ pub func utf16_string_base_substring_view(this: const Utf16StringBase*, code_uni
     trap("unported: AK::Detail::Utf16StringBase::substring_view")
 
 ## Ported from AK/Utf16StringBase.h:237 AK::Detail::Utf16StringBase::find_code_unit_offset.
-pub func utf16_string_base_find_code_unit_offset_u16(this: const Utf16StringBase*, needle: u16, start_offset: usize) -> u64?:
+pub func utf16_string_base_find_code_unit_offset_u16(this: const Utf16StringBase*, needle: u16, start_offset: usize = 0) -> u64?:
     trap("unported: AK::Detail::Utf16StringBase::find_code_unit_offset")
 
 ## Ported from AK/Utf16StringBase.h:242 AK::Detail::Utf16StringBase::find_code_unit_offset.
-pub func utf16_string_base_find_code_unit_offset_utf16_view(this: const Utf16StringBase*, needle: Utf16View, start_offset: usize) -> u64?:
+pub func utf16_string_base_find_code_unit_offset_utf16_view(this: const Utf16StringBase*, needle: Utf16View, start_offset: usize = 0) -> u64?:
     trap("unported: AK::Detail::Utf16StringBase::find_code_unit_offset")
 
 ## Ported from AK/Utf16StringBase.h:247 AK::Detail::Utf16StringBase::find_code_unit_offset_ignoring_case.
-pub func utf16_string_base_find_code_unit_offset_ignoring_case(this: const Utf16StringBase*, needle: Utf16View, start_offset: usize) -> u64?:
+pub func utf16_string_base_find_code_unit_offset_ignoring_case(this: const Utf16StringBase*, needle: Utf16View, start_offset: usize = 0) -> u64?:
     trap("unported: AK::Detail::Utf16StringBase::find_code_unit_offset_ignoring_case")
 
 ## Ported from AK/Utf16StringBase.h:252 AK::Detail::Utf16StringBase::contains.
@@ -3035,15 +3035,15 @@ pub func utf16_view_construct_string_view(this: Utf16View*, string: StringView):
     trap("unported: AK::Utf16View::Utf16View")
 
 ## Ported from AK/Utf16View.cpp:27 AK::Utf16View::to_utf8.
-pub func utf16_view_to_utf8(this: const Utf16View*, allow_lonely_surrogates: AllowLonelySurrogates) -> String!:
+pub func utf16_view_to_utf8(this: const Utf16View*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> String!:
     trap("unported: AK::Utf16View::to_utf8")
 
 ## Ported from AK/Utf16View.cpp:55 AK::Utf16View::to_byte_string.
-pub func utf16_view_to_byte_string(this: const Utf16View*, allow_lonely_surrogates: AllowLonelySurrogates) -> ByteString!:
+pub func utf16_view_to_byte_string(this: const Utf16View*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> ByteString!:
     trap("unported: AK::Utf16View::to_byte_string")
 
 ## Ported from AK/Utf16View.h:178 AK::Utf16View::to_utf8_but_should_be_ported_to_utf16.
-pub func utf16_view_to_utf8_but_should_be_ported_to_utf16(this: const Utf16View*, allow_lonely_surrogates: AllowLonelySurrogates) -> String:
+pub func utf16_view_to_utf8_but_should_be_ported_to_utf16(this: const Utf16View*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> String:
     trap("unported: AK::Utf16View::to_utf8_but_should_be_ported_to_utf16")
 
 ## Ported from AK/Utf16View.cpp:60 AK::Utf16View::to_ascii_lowercase.
@@ -3076,7 +3076,7 @@ pub func utf16_view_utf16_span(this: const Utf16View*) -> const u16[]:
 
 ## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number.
 # unmapped: Optional<T>
-pub func utf16_view_to_number[T](this: const Utf16View*, trim_whitespace: TrimWhitespace, base_: i32) -> void*?:
+pub func utf16_view_to_number[T](this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
     trap("unported: AK::Utf16View::to_number")
 
 ## Ported from AK/Utf16View.h:215 AK::Utf16View::operator==.
@@ -3196,15 +3196,15 @@ pub func utf16_view_unicode_substring_view(this: const Utf16View*, code_point_of
     trap("unported: AK::Utf16View::unicode_substring_view")
 
 ## Ported from AK/Utf16View.h:455 AK::Utf16View::trim.
-pub func utf16_view_trim(this: const Utf16View*, code_units: Utf16View, mode: TrimMode) -> Utf16View:
+pub func utf16_view_trim(this: const Utf16View*, code_units: Utf16View, mode: TrimMode = TrimMode.both) -> Utf16View:
     trap("unported: AK::Utf16View::trim")
 
 ## Ported from AK/Utf16View.h:486 AK::Utf16View::trim_ascii_whitespace.
-pub func utf16_view_trim_ascii_whitespace(this: const Utf16View*, mode: TrimMode) -> Utf16View:
+pub func utf16_view_trim_ascii_whitespace(this: const Utf16View*, mode: TrimMode = TrimMode.both) -> Utf16View:
     trap("unported: AK::Utf16View::trim_ascii_whitespace")
 
 ## Ported from AK/Utf16View.cpp:246 AK::Utf16View::find_code_unit_offset.
-pub func utf16_view_find_code_unit_offset_u16(this: const Utf16View*, needle: u16, start_offset: usize) -> u64?:
+pub func utf16_view_find_code_unit_offset_u16(this: const Utf16View*, needle: u16, start_offset: usize = 0) -> u64?:
     trap("unported: AK::Utf16View::find_code_unit_offset")
 
 ## Ported from AK/Utf16View.cpp:267 AK::Utf16View::find_last_code_point_offset.
@@ -3212,11 +3212,11 @@ pub func utf16_view_find_last_code_point_offset(this: const Utf16View*, needle: 
     trap("unported: AK::Utf16View::find_last_code_point_offset")
 
 ## Ported from AK/Utf16View.h:494 AK::Utf16View::find_code_unit_offset.
-pub func utf16_view_find_code_unit_offset_utf16_view(this: const Utf16View*, needle: Utf16View, start_offset: usize) -> u64?:
+pub func utf16_view_find_code_unit_offset_utf16_view(this: const Utf16View*, needle: Utf16View, start_offset: usize = 0) -> u64?:
     trap("unported: AK::Utf16View::find_code_unit_offset")
 
 ## Ported from AK/Utf16View.h:520 AK::Utf16View::find_code_unit_offset_ignoring_case.
-pub func utf16_view_find_code_unit_offset_ignoring_case(this: const Utf16View*, needle: Utf16View, start_offset: usize) -> u64?:
+pub func utf16_view_find_code_unit_offset_ignoring_case(this: const Utf16View*, needle: Utf16View, start_offset: usize = 0) -> u64?:
     trap("unported: AK::Utf16View::find_code_unit_offset_ignoring_case")
 
 ## Ported from AK/Utf16View.h:542 AK::Utf16View::contains.
@@ -3300,7 +3300,7 @@ pub func utf32_code_point_iterator_deref(this: const Utf32CodePointIterator*) ->
     trap("unported: AK::Utf32CodePointIterator::operator*")
 
 ## Ported from AK/Utf32View.cpp:12 AK::Utf32CodePointIterator::peek.
-pub func utf32_code_point_iterator_peek(this: const Utf32CodePointIterator*, offset: usize) -> u32?:
+pub func utf32_code_point_iterator_peek(this: const Utf32CodePointIterator*, offset: usize = 0) -> u32?:
     trap("unported: AK::Utf32CodePointIterator::peek")
 
 ## Ported from AK/Utf32View.h:51 AK::Utf32CodePointIterator::code_point_length_in_bytes.
@@ -3392,7 +3392,7 @@ pub func utf8_code_point_iterator_deref(this: const Utf8CodePointIterator*) -> u
     trap("unported: AK::Utf8CodePointIterator::operator*")
 
 ## Ported from AK/Utf8View.cpp:206 AK::Utf8CodePointIterator::peek.
-pub func utf8_code_point_iterator_peek(this: const Utf8CodePointIterator*, offset: usize) -> u32?:
+pub func utf8_code_point_iterator_peek(this: const Utf8CodePointIterator*, offset: usize = 0) -> u32?:
     trap("unported: AK::Utf8CodePointIterator::peek")
 
 ## Ported from AK/Utf8View.h:37 AK::Utf8CodePointIterator::operator-.
@@ -3504,7 +3504,7 @@ pub func utf8_view_contains_any_of(this: const Utf8View*, needles: const u32[]) 
     trap("unported: AK::Utf8View::contains_any_of")
 
 ## Ported from AK/Utf8View.cpp:156 AK::Utf8View::trim.
-pub func utf8_view_trim(this: const Utf8View*, characters: Utf8View, mode: TrimMode) -> Utf8View:
+pub func utf8_view_trim(this: const Utf8View*, characters: Utf8View, mode: TrimMode = TrimMode.both) -> Utf8View:
     trap("unported: AK::Utf8View::trim")
 
 ## Ported from AK/Utf8View.h:119 AK::Utf8View::iterator_offset.
@@ -3516,11 +3516,11 @@ pub func utf8_view_length(this: const Utf8View*) -> usize:
     trap("unported: AK::Utf8View::length")
 
 ## Ported from AK/Utf8View.h:133 AK::Utf8View::validate.
-pub func utf8_view_validate_allow_lonely_surrogates(this: const Utf8View*, allow_lonely_surrogates: AllowLonelySurrogates) -> bool:
+pub func utf8_view_validate_allow_lonely_surrogates(this: const Utf8View*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> bool:
     trap("unported: AK::Utf8View::validate")
 
 ## Ported from AK/Utf8View.cpp:188 AK::Utf8View::validate.
-pub func utf8_view_validate_usize(this: const Utf8View*, valid_bytes: usize*, allow_lonely_surrogates: AllowLonelySurrogates) -> bool:
+pub func utf8_view_validate_usize(this: const Utf8View*, valid_bytes: usize*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> bool:
     trap("unported: AK::Utf8View::validate")
 
 ## Ported from AK/Utf8View.h:142 AK::Utf8View::for_each_split_view.

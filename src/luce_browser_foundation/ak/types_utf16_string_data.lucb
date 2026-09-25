@@ -19,6 +19,11 @@ pub struct Utf16StringData:
     pub var m_has_hash: bool  # C++ default: { false }
     pub var m_is_fly_string: bool  # C++ default: { false }
 
+## The non-zero default member initializers of AK::Detail::Utf16StringData; the constructor runs them first.
+pub func utf16_string_data_init_fields(this: Utf16StringData*):
+    # m_length_in_code_points: C++ default NumericLimits < size_t > :: max ( ) (not translated by the generator)
+    return
+
 ## AK::Detail::Utf16StringData::StorageType (AK/Utf16StringData.h:24).
 pub enum Utf16StringDataStorageType as u8:
     ascii = 0

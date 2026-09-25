@@ -18,6 +18,10 @@ pub struct Token:
     pub var index: u32  # C++ default: { 0 }
     pub var value: ak.String
 
+## The non-zero default member initializers of URL::Pattern::Token; the constructor runs them first.
+pub func token_init_fields(this: Token*):
+    this.type_ = TokenType.invalid_char
+
 ## URL::Pattern::Token::Type (Libraries/LibURL/Pattern/Tokenizer.h:18).
 pub enum TokenType as i32:
     open = 0

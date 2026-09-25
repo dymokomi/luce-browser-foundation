@@ -24,6 +24,10 @@ pub struct FixedMemoryStream: IsFixedMemoryStream, IsSeekableStream, IsStream:
 
     func stream() -> Stream*: return (Stream*)&self
 
+## The non-zero default member initializers of AK::FixedMemoryStream; the constructor runs them first.
+pub func fixed_memory_stream_init_fields(this: FixedMemoryStream*):
+    this.m_writing_enabled = true
+
 ## Upcast to AK::FixedMemoryStream (implemented by every struct in its hierarchy).
 pub interface IsFixedMemoryStream:
     func fixed_memory_stream() -> FixedMemoryStream*

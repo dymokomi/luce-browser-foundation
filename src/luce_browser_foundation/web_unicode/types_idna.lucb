@@ -56,3 +56,10 @@ pub struct ToAsciiOptions:
     pub var transitional_processing: TransitionalProcessing  # C++ default: { TransitionalProcessing :: No }
     pub var verify_dns_length: VerifyDnsLength  # C++ default: { VerifyDnsLength :: Yes }
     pub var ignore_invalid_punycode: IgnoreInvalidPunycode  # C++ default: { IgnoreInvalidPunycode :: No }
+
+## The non-zero default member initializers of Unicode::IDNA::ToAsciiOptions; the constructor runs them first.
+pub func to_ascii_options_init_fields(this: ToAsciiOptions*):
+    this.check_hyphens = CheckHyphens.yes
+    this.check_bidi = CheckBidi.yes
+    this.check_joiners = CheckJoiners.yes
+    this.verify_dns_length = VerifyDnsLength.yes

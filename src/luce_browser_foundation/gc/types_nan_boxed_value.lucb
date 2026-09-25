@@ -48,6 +48,11 @@ pub var shifted_is_cell_pattern: u64
 pub struct NanBoxedValue:
     pub var m_value: NanBoxedValueUnion  # C++ default: { . encoded = 0 }
 
+## The non-zero default member initializers of GC::NanBoxedValue; the constructor runs them first.
+pub func nan_boxed_value_init_fields(this: NanBoxedValue*):
+    # m_value: C++ default . encoded = 0 (not translated by the generator)
+    return
+
 # mark: NanBoxedValueUnion ======================================================================
 
 ## GC::NanBoxedValue::(anonymous union) (Libraries/LibGC/NanBoxedValue.h:108).

@@ -32,6 +32,7 @@ AK::ArmedScopeGuard::disarm	luce-browser-foundation	ak	armed_scope_guard_disarm	
 AK::AtomicRefCounted	luce-browser-foundation	ak	AtomicRefCounted	AK/AtomicRefCounted.h:67	generic struct
 AK::AtomicRefCounted::unref	luce-browser-foundation	ak	atomic_ref_counted_unref	AK/AtomicRefCounted.h:69	stub
 AK::AtomicRefCountedBase	luce-browser-foundation	ak	AtomicRefCountedBase	AK/AtomicRefCounted.h:17	struct
+AK::AtomicRefCountedBase [default member initializers]	luce-browser-foundation	ak	atomic_ref_counted_base_init_fields	AK/AtomicRefCounted.h:17	init fields
 AK::AtomicRefCountedBase::deref_base	luce-browser-foundation	ak	atomic_ref_counted_base_deref_base	AK/AtomicRefCounted.h:56	stub
 AK::AtomicRefCountedBase::ref	luce-browser-foundation	ak	atomic_ref_counted_base_ref	AK/AtomicRefCounted.h:25	stub
 AK::AtomicRefCountedBase::ref_count	luce-browser-foundation	ak	atomic_ref_counted_base_ref_count	AK/AtomicRefCounted.h:44	stub
@@ -67,6 +68,7 @@ AK::BinaryHeap::peek_min_key	luce-browser-foundation	ak	binary_heap_peek_min_key
 AK::BinaryHeap::pop_min	luce-browser-foundation	ak	binary_heap_pop_min	AK/BinaryHeap.h:143	stub
 AK::BinaryHeap::size	luce-browser-foundation	ak	binary_heap_size	AK/BinaryHeap.h:135	stub
 AK::Bitmap	luce-browser-foundation	ak	Bitmap	AK/Bitmap.h:19	struct
+AK::Bitmap [default member initializers]	luce-browser-foundation	ak	bitmap_init_fields	AK/Bitmap.h:19	init fields
 AK::Bitmap::Bitmap	luce-browser-foundation	ak	bitmap_construct	AK/Bitmap.h:38	construct
 AK::Bitmap::create	luce-browser-foundation	ak	bitmap_create	AK/Bitmap.h:23	stub
 AK::Bitmap::data	luce-browser-foundation	ak	bitmap_data	AK/Bitmap.h:80	stub
@@ -679,6 +681,7 @@ AK::Detail::Utf16StringBase::to_utf8	luce-browser-foundation	ak	utf16_string_bas
 AK::Detail::Utf16StringBase::to_utf8_but_should_be_ported_to_utf16	luce-browser-foundation	ak	utf16_string_base_to_utf8_but_should_be_ported_to_utf16	AK/Utf16StringBase.h:65	stub
 AK::Detail::Utf16StringBase::utf16_view	luce-browser-foundation	ak	utf16_string_base_utf16_view	AK/Utf16StringBase.h:85	stub
 AK::Detail::Utf16StringData	luce-browser-foundation	ak	Utf16StringData	AK/Utf16StringData.h:22	struct
+AK::Detail::Utf16StringData [default member initializers]	luce-browser-foundation	ak	utf16_string_data_init_fields	AK/Utf16StringData.h:22	init fields
 AK::Detail::Utf16StringData::(anonymous union)	luce-browser-foundation	ak	Utf16StringDataUnion	AK/Utf16StringData.h:154	struct
 AK::Detail::Utf16StringData::AllowASCIIStorage	luce-browser-foundation	ak	Utf16StringDataAllowAsciiStorage	AK/Utf16StringData.h:29	enum
 AK::Detail::Utf16StringData::StorageType	luce-browser-foundation	ak	Utf16StringDataStorageType	AK/Utf16StringData.h:24	enum
@@ -807,6 +810,7 @@ AK::Duration::to_truncated_seconds	luce-browser-foundation	ak	duration_to_trunca
 AK::Duration::zero	luce-browser-foundation	ak	duration_zero	AK/Time.h:252	stub
 AK::Empty	luce-browser-foundation	ak	Empty	AK/Variant.h:220	struct
 AK::EmptyByteStringImpl	luce-browser-foundation	ak	EmptyByteStringImpl	AK/ByteStringImpl.cpp:16	struct
+AK::EmptyByteStringImpl [default member initializers]	luce-browser-foundation	ak	empty_byte_string_impl_init_fields	AK/ByteStringImpl.cpp:16	init fields
 AK::Endianness	luce-browser-foundation	ak	Endianness	AK/Endian.h:21	enum
 AK::Error	luce-browser-foundation	ak	AkError	AK/Error.h:16	struct
 AK::Error::Error	luce-browser-foundation	ak	ak_error_construct_i32	AK/Error.h:88	construct
@@ -832,6 +836,7 @@ AK::Exponentials::log2	luce-browser-foundation	ak	exponentials_log2	AK/Math.h:74
 AK::FastLastAccess	luce-browser-foundation	ak	FastLastAccess	AK/Forward.h:168	enum
 AK::FixedBitmap	luce-browser-foundation	ak	FixedBitmap	AK/FixedBitmap.h:16	generic struct
 AK::FixedMemoryStream	luce-browser-foundation	ak	FixedMemoryStream	AK/MemoryStream.h:19	struct
+AK::FixedMemoryStream [default member initializers]	luce-browser-foundation	ak	fixed_memory_stream_init_fields	AK/MemoryStream.h:19	init fields
 AK::FixedMemoryStream::FixedMemoryStream	luce-browser-foundation	ak	fixed_memory_stream_construct	AK/MemoryStream.cpp:20	construct
 AK::FixedMemoryStream::FixedMemoryStream	luce-browser-foundation	ak	fixed_memory_stream_construct_fixed_memory_stream_mode	AK/MemoryStream.cpp:14	construct
 AK::FixedMemoryStream::Mode	luce-browser-foundation	ak	FixedMemoryStreamMode	AK/MemoryStream.h:21	enum
@@ -1104,6 +1109,7 @@ AK::Hyperbolic::cosh	luce-browser-foundation	ak	hyperbolic_cosh	AK/Math.h:946	st
 AK::Hyperbolic::sinh	luce-browser-foundation	ak	hyperbolic_sinh	AK/Math.h:937	stub
 AK::Hyperbolic::tanh	luce-browser-foundation	ak	hyperbolic_tanh	AK/Math.h:957	stub
 AK::IDAllocator	luce-browser-foundation	ak	IdAllocator	AK/IDAllocator.h:16	struct
+AK::IDAllocator [default member initializers]	luce-browser-foundation	ak	id_allocator_init_fields	AK/IDAllocator.h:16	init fields
 AK::IDAllocator::IDAllocator	luce-browser-foundation	ak	id_allocator_construct	AK/IDAllocator.h:21	construct
 AK::IDAllocator::allocate	luce-browser-foundation	ak	id_allocator_allocate	AK/IDAllocator.h:28	stub
 AK::IDAllocator::deallocate	luce-browser-foundation	ak	id_allocator_deallocate	AK/IDAllocator.h:42	stub
@@ -1475,6 +1481,7 @@ AK::RedBlackTreeIterator::operator->	luce-browser-foundation	ak	red_black_tree_i
 AK::RefCounted	luce-browser-foundation	ak	RefCounted	AK/RefCounted.h:56	generic struct
 AK::RefCounted::unref	luce-browser-foundation	ak	ref_counted_unref	AK/RefCounted.h:58	stub
 AK::RefCountedBase	luce-browser-foundation	ak	RefCountedBase	AK/RefCounted.h:17	struct
+AK::RefCountedBase [default member initializers]	luce-browser-foundation	ak	ref_counted_base_init_fields	AK/RefCounted.h:17	init fields
 AK::RefCountedBase::deref_base	luce-browser-foundation	ak	ref_counted_base_deref_base	AK/RefCounted.h:46	stub
 AK::RefCountedBase::ref	luce-browser-foundation	ak	ref_counted_base_ref	AK/RefCounted.h:25	stub
 AK::RefCountedBase::ref_count	luce-browser-foundation	ak	ref_counted_base_ref_count	AK/RefCounted.h:40	stub
@@ -1663,6 +1670,7 @@ AK::StackInfo::size	luce-browser-foundation	ak	stack_info_size	AK/StackInfo.h:19
 AK::StackInfo::size_free	luce-browser-foundation	ak	stack_info_size_free	AK/StackInfo.h:20	stub
 AK::StackInfo::top	luce-browser-foundation	ak	stack_info_top	AK/StackInfo.h:18	stub
 AK::StandardFormatter	luce-browser-foundation	ak	StandardFormatter	AK/Format.h:369	struct
+AK::StandardFormatter [default member initializers]	luce-browser-foundation	ak	standard_formatter_init_fields	AK/Format.h:369	init fields
 AK::StandardFormatter::Mode	luce-browser-foundation	ak	StandardFormatterMode	AK/Format.h:370	enum
 AK::StandardFormatter::parse	luce-browser-foundation	ak	standard_formatter_parse	AK/Format.cpp:826	stub
 AK::Stream	luce-browser-foundation	ak	Stream	AK/Stream.h:23	struct
@@ -1760,6 +1768,7 @@ AK::String::trim_ascii_whitespace	luce-browser-foundation	ak	string_trim_ascii_w
 AK::String::trim_whitespace	luce-browser-foundation	ak	string_trim_whitespace	Libraries/LibUnicode/String.cpp:159	stub
 AK::String::vformatted	luce-browser-foundation	ak	string_vformatted	AK/String.cpp:188	stub
 AK::StringBuilder	luce-browser-foundation	ak	StringBuilder	AK/StringBuilder.h:17	struct
+AK::StringBuilder [default member initializers]	luce-browser-foundation	ak	string_builder_init_fields	AK/StringBuilder.h:17	init fields
 AK::StringBuilder::DEFAULT_MODE	luce-browser-foundation	ak	string_builder_default_mode	AK/StringBuilder.h:24	variable
 AK::StringBuilder::Mode	luce-browser-foundation	ak	StringBuilderMode	AK/StringBuilder.h:19	enum
 AK::StringBuilder::StringBuilder	luce-browser-foundation	ak	string_builder_construct	AK/StringBuilder.cpp:45	construct
@@ -1840,6 +1849,7 @@ AK::StringUtils::to_titlecase	luce-browser-foundation	ak	string_utils_to_titleca
 AK::StringUtils::trim	luce-browser-foundation	ak	string_utils_trim	AK/StringUtils.cpp:179	stub
 AK::StringUtils::trim_whitespace	luce-browser-foundation	ak	string_utils_trim_whitespace	AK/StringUtils.cpp:208	stub
 AK::StringView	luce-browser-foundation	ak	StringView	AK/StringView.h:23	struct
+AK::StringView [default member initializers]	luce-browser-foundation	ak	string_view_init_fields	AK/StringView.h:23	init fields
 AK::StringView::ConsiderCarriageReturn	luce-browser-foundation	ak	StringViewConsiderCarriageReturn	AK/StringView.h:228	enum
 AK::StringView::StringView	luce-browser-foundation	ak	string_view_construct_byte_buffer	AK/StringView.cpp:40	construct
 AK::StringView::StringView	luce-browser-foundation	ak	string_view_construct_byte_string	AK/StringView.cpp:34	construct
@@ -2002,6 +2012,7 @@ AK::UnixDateTime::to_utf16_string	luce-browser-foundation	ak	unix_date_time_to_u
 AK::UnixDateTime::truncated_seconds_since_epoch	luce-browser-foundation	ak	unix_date_time_truncated_seconds_since_epoch	AK/Time.h:471	stub
 AK::UseThousandsSeparator	luce-browser-foundation	ak	UseThousandsSeparator	AK/NumberFormat.h:19	enum
 AK::Utf16CodePointIterator	luce-browser-foundation	ak	Utf16CodePointIterator	AK/Utf16View.h:37	struct
+AK::Utf16CodePointIterator [default member initializers]	luce-browser-foundation	ak	utf16_code_point_iterator_init_fields	AK/Utf16View.h:37	init fields
 AK::Utf16CodePointIterator::(anonymous union)	luce-browser-foundation	ak	Utf16CodePointIteratorUnion	AK/Utf16View.h:140	struct
 AK::Utf16CodePointIterator::Utf16CodePointIterator	luce-browser-foundation	ak	utf16_code_point_iterator_construct_u16	AK/Utf16View.h:130	construct
 AK::Utf16CodePointIterator::Utf16CodePointIterator	luce-browser-foundation	ak	utf16_code_point_iterator_construct_u8	AK/Utf16View.h:124	construct
@@ -2096,6 +2107,7 @@ AK::Utf16String::trim	luce-browser-foundation	ak	utf16_string_trim	AK/Utf16Strin
 AK::Utf16String::trim_ascii_whitespace	luce-browser-foundation	ak	utf16_string_trim_ascii_whitespace	AK/Utf16String.h:227	stub
 AK::Utf16String::try_from_utf8	luce-browser-foundation	ak	utf16_string_try_from_utf8	AK/Utf16String.h:60	stub
 AK::Utf16View	luce-browser-foundation	ak	Utf16View	AK/Utf16View.h:150	struct
+AK::Utf16View [default member initializers]	luce-browser-foundation	ak	utf16_view_init_fields	AK/Utf16View.h:150	init fields
 AK::Utf16View::(anonymous union)	luce-browser-foundation	ak	Utf16ViewUnion	AK/Utf16View.h:674	struct
 AK::Utf16View::Utf16View	luce-browser-foundation	ak	utf16_view_construct	AK/Utf16View.h:154	construct
 AK::Utf16View::Utf16View	luce-browser-foundation	ak	utf16_view_construct_string_view	AK/Utf16View.h:168	construct
@@ -2162,6 +2174,7 @@ AK::Utf16View::utf16_span	luce-browser-foundation	ak	utf16_view_utf16_span	AK/Ut
 AK::Utf16View::validate	luce-browser-foundation	ak	utf16_view_validate	AK/Utf16View.cpp:155	stub
 AK::Utf16View::validate	luce-browser-foundation	ak	utf16_view_validate_usize	AK/Utf16View.cpp:162	stub
 AK::Utf32CodePointIterator	luce-browser-foundation	ak	Utf32CodePointIterator	AK/Utf32View.h:20	struct
+AK::Utf32CodePointIterator [default member initializers]	luce-browser-foundation	ak	utf32_code_point_iterator_init_fields	AK/Utf32View.h:20	init fields
 AK::Utf32CodePointIterator::Utf32CodePointIterator	luce-browser-foundation	ak	utf32_code_point_iterator_construct	AK/Utf32View.h:55	construct
 AK::Utf32CodePointIterator::code_point_length_in_bytes	luce-browser-foundation	ak	utf32_code_point_iterator_code_point_length_in_bytes	AK/Utf32View.h:51	stub
 AK::Utf32CodePointIterator::done	luce-browser-foundation	ak	utf32_code_point_iterator_done	AK/Utf32View.h:52	stub
@@ -2683,6 +2696,7 @@ GC::Cell::state	luce-browser-foundation	gc	cell_state	Libraries/LibGC/Cell.h:59	
 GC::Cell::visit_edges	luce-browser-foundation	gc	cell_visit_edges_impl	Libraries/LibGC/Cell.h:202	impl
 GC::Cell::visit_edges [dispatch]	luce-browser-foundation	gc	cell_visit_edges	Libraries/LibGC/Cell.h:41	dispatcher
 GC::CellAllocator	luce-browser-foundation	gc	CellAllocator	Libraries/LibGC/CellAllocator.h:32	struct
+GC::CellAllocator [default member initializers]	luce-browser-foundation	gc	cell_allocator_init_fields	Libraries/LibGC/CellAllocator.h:32	init fields
 GC::CellAllocator::CellAllocator	luce-browser-foundation	gc	cell_allocator_construct	Libraries/LibGC/CellAllocator.cpp:15	construct
 GC::CellAllocator::allocate_cell	luce-browser-foundation	gc	cell_allocator_allocate_cell	Libraries/LibGC/CellAllocator.cpp:23	stub
 GC::CellAllocator::block_allocator	luce-browser-foundation	gc	cell_allocator_block_allocator	Libraries/LibGC/CellAllocator.h:62	stub
@@ -2708,6 +2722,7 @@ GC::GraphConstructorVisitor::visit_impl	luce-browser-foundation	gc	graph_constru
 GC::GraphConstructorVisitor::visit_impl	luce-browser-foundation	gc	graph_constructor_visitor_visit_impl_span_nan_boxed_value_impl	Libraries/LibGC/Heap.cpp:161	impl
 GC::GraphConstructorVisitor::visit_possible_values	luce-browser-foundation	gc	graph_constructor_visitor_visit_possible_values_impl	Libraries/LibGC/Heap.cpp:167	impl
 GC::Heap	luce-browser-foundation	gc	Heap	Libraries/LibGC/Heap.h:36	struct
+GC::Heap [default member initializers]	luce-browser-foundation	gc	heap_init_fields	Libraries/LibGC/Heap.h:36	init fields
 GC::Heap::CollectionType	luce-browser-foundation	gc	HeapCollectionType	Libraries/LibGC/Heap.h:56	enum
 GC::Heap::GC_MIN_BYTES_THRESHOLD	luce-browser-foundation	gc	heap_gc_min_bytes_threshold	Libraries/LibGC/Heap.h:158	variable
 GC::Heap::Heap	luce-browser-foundation	gc	heap_construct	Libraries/LibGC/Heap.cpp:48	construct
@@ -2785,6 +2800,7 @@ GC::MarkingVisitor::visit_impl	luce-browser-foundation	gc	marking_visitor_visit_
 GC::MarkingVisitor::visit_possible_values	luce-browser-foundation	gc	marking_visitor_visit_possible_values_impl	Libraries/LibGC/Heap.cpp:650	impl
 GC::NEGATIVE_INFINITY_BITS	luce-browser-foundation	gc	negative_infinity_bits	Libraries/LibGC/NanBoxedValue.h:29	variable
 GC::NanBoxedValue	luce-browser-foundation	gc	NanBoxedValue	Libraries/LibGC/NanBoxedValue.h:58	struct
+GC::NanBoxedValue [default member initializers]	luce-browser-foundation	gc	nan_boxed_value_init_fields	Libraries/LibGC/NanBoxedValue.h:58	init fields
 GC::NanBoxedValue::(anonymous union)	luce-browser-foundation	gc	NanBoxedValueUnion	Libraries/LibGC/NanBoxedValue.h:108	struct
 GC::NanBoxedValue::(anonymous union)::(anonymous struct)	luce-browser-foundation	gc	NanBoxedValueUnionStruct	Libraries/LibGC/NanBoxedValue.h:110	struct
 GC::NanBoxedValue::as_cell	luce-browser-foundation	gc	nan_boxed_value_as_cell	Libraries/LibGC/NanBoxedValue.h:90	stub
@@ -2825,6 +2841,7 @@ GC::WeakBlock::create	luce-browser-foundation	gc	weak_block_create	Libraries/Lib
 GC::WeakBlock::deallocate	luce-browser-foundation	gc	weak_block_deallocate	Libraries/LibGC/WeakBlock.cpp:55	stub
 GC::WeakBlock::sweep	luce-browser-foundation	gc	weak_block_sweep	Libraries/LibGC/WeakBlock.cpp:63	stub
 GC::WeakContainer	luce-browser-foundation	gc	WeakContainer	Libraries/LibGC/WeakContainer.h:14	struct
+GC::WeakContainer [default member initializers]	luce-browser-foundation	gc	weak_container_init_fields	Libraries/LibGC/WeakContainer.h:14	init fields
 GC::WeakContainer::WeakContainer	luce-browser-foundation	gc	weak_container_construct	Libraries/LibGC/WeakContainer.cpp:12	construct
 GC::WeakContainer::deregister	luce-browser-foundation	gc	weak_container_deregister	Libraries/LibGC/WeakContainer.cpp:23	stub
 GC::WeakContainer::remove_dead_cells	luce-browser-foundation	gc	weak_container_remove_dead_cells_impl	Libraries/LibGC/WeakContainer.h:19	impl
@@ -2984,6 +3001,7 @@ TextCodec::GB18030Decoder	luce-browser-foundation	text_codec	Gb18030Decoder	Libr
 TextCodec::GB18030Decoder::incomplete_tail_length	luce-browser-foundation	text_codec	gb18030_decoder_incomplete_tail_length_impl	Libraries/LibTextCodec/Decoder.cpp:436	impl
 TextCodec::GB18030Decoder::process	luce-browser-foundation	text_codec	gb18030_decoder_process_impl	Libraries/LibTextCodec/Decoder.cpp:909	impl
 TextCodec::GB18030Encoder	luce-browser-foundation	text_codec	Gb18030Encoder	Libraries/LibTextCodec/Encoder.h:63	struct
+TextCodec::GB18030Encoder [default member initializers]	luce-browser-foundation	text_codec	gb18030_encoder_init_fields	Libraries/LibTextCodec/Encoder.h:63	init fields
 TextCodec::GB18030Encoder::GB18030Encoder	luce-browser-foundation	text_codec	gb18030_encoder_construct	Libraries/LibTextCodec/Encoder.cpp:550	construct
 TextCodec::GB18030Encoder::IsGBK	luce-browser-foundation	text_codec	Gb18030EncoderIsGbk	Libraries/LibTextCodec/Encoder.h:65	enum
 TextCodec::GB18030Encoder::process	luce-browser-foundation	text_codec	gb18030_encoder_process_impl	Libraries/LibTextCodec/Encoder.cpp:556	impl
@@ -3224,6 +3242,7 @@ URL::Pattern::Component::create_match_result	luce-browser-foundation	web_url	com
 URL::Pattern::Component::execute	luce-browser-foundation	web_url	component_execute	Libraries/LibURL/Pattern/Component.cpp:272	stub
 URL::Pattern::Component::matches	luce-browser-foundation	web_url	component_matches	Libraries/LibURL/Pattern/Component.cpp:297	stub
 URL::Pattern::ConstructorStringParser	luce-browser-foundation	web_url	ConstructorStringParser	Libraries/LibURL/Pattern/ConstructorStringParser.h:16	struct
+URL::Pattern::ConstructorStringParser [default member initializers]	luce-browser-foundation	web_url	constructor_string_parser_init_fields	Libraries/LibURL/Pattern/ConstructorStringParser.h:16	init fields
 URL::Pattern::ConstructorStringParser::ConstructorStringParser	luce-browser-foundation	web_url	constructor_string_parser_construct	Libraries/LibURL/Pattern/ConstructorStringParser.cpp:44	construct
 URL::Pattern::ConstructorStringParser::State	luce-browser-foundation	web_url	ConstructorStringParserState	Libraries/LibURL/Pattern/ConstructorStringParser.h:24	enum
 URL::Pattern::ConstructorStringParser::change_state	luce-browser-foundation	web_url	constructor_string_parser_change_state	Libraries/LibURL/Pattern/ConstructorStringParser.cpp:459	stub
@@ -3290,6 +3309,7 @@ URL::Pattern::PatternProcessType	luce-browser-foundation	web_url	PatternProcessT
 URL::Pattern::RegularExpressionAndNameList	luce-browser-foundation	web_url	RegularExpressionAndNameList	Libraries/LibURL/Pattern/Component.cpp:35	struct
 URL::Pattern::Result	luce-browser-foundation	web_url	Result	Libraries/LibURL/Pattern/Pattern.h:24	struct
 URL::Pattern::Token	luce-browser-foundation	web_url	Token	Libraries/LibURL/Pattern/Tokenizer.h:16	struct
+URL::Pattern::Token [default member initializers]	luce-browser-foundation	web_url	token_init_fields	Libraries/LibURL/Pattern/Tokenizer.h:16	init fields
 URL::Pattern::Token::Type	luce-browser-foundation	web_url	TokenType	Libraries/LibURL/Pattern/Tokenizer.h:18	enum
 URL::Pattern::Token::to_string	luce-browser-foundation	web_url	token_to_string	Libraries/LibURL/Pattern/Tokenizer.cpp:40	stub
 URL::Pattern::Token::type_to_string	luce-browser-foundation	web_url	token_type_to_string	Libraries/LibURL/Pattern/Tokenizer.cpp:13	stub
@@ -3472,6 +3492,7 @@ Unicode::IDNA::CheckHyphens	luce-browser-foundation	web_unicode	CheckHyphens	Lib
 Unicode::IDNA::CheckJoiners	luce-browser-foundation	web_unicode	CheckJoiners	Libraries/LibUnicode/IDNA.h:25	enum
 Unicode::IDNA::IgnoreInvalidPunycode	luce-browser-foundation	web_unicode	IgnoreInvalidPunycode	Libraries/LibUnicode/IDNA.h:45	enum
 Unicode::IDNA::ToAsciiOptions	luce-browser-foundation	web_unicode	ToAsciiOptions	Libraries/LibUnicode/IDNA.h:50	struct
+Unicode::IDNA::ToAsciiOptions [default member initializers]	luce-browser-foundation	web_unicode	to_ascii_options_init_fields	Libraries/LibUnicode/IDNA.h:50	init fields
 Unicode::IDNA::TransitionalProcessing	luce-browser-foundation	web_unicode	TransitionalProcessing	Libraries/LibUnicode/IDNA.h:35	enum
 Unicode::IDNA::UseStd3AsciiRules	luce-browser-foundation	web_unicode	UseStd3AsciiRules	Libraries/LibUnicode/IDNA.h:30	enum
 Unicode::IDNA::VerifyDnsLength	luce-browser-foundation	web_unicode	VerifyDnsLength	Libraries/LibUnicode/IDNA.h:40	enum

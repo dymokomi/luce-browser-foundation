@@ -166,7 +166,7 @@ pub func cell_heap(this: Cell*) -> Heap*:
     trap("unported: GC::Cell::heap")
 
 ## Ported from Libraries/LibGC/CellAllocator.cpp:15 GC::CellAllocator::CellAllocator.
-pub func cell_allocator_construct(this: CellAllocator*, cell_size: usize, class_name: ak.StringView?, overrides_must_survive_garbage_collection: bool, overrides_finalize: bool):
+pub func cell_allocator_construct(this: CellAllocator*, cell_size: usize, class_name: ak.StringView? = none, overrides_must_survive_garbage_collection: bool = false, overrides_finalize: bool = false):
     return
 
 ## Ported from Libraries/LibGC/CellAllocator.h:37 GC::CellAllocator::class_name.
@@ -236,7 +236,7 @@ pub func heap_the() -> Heap*:
     trap("unported: GC::Heap::the")
 
 ## Ported from Libraries/LibGC/Heap.cpp:296 GC::Heap::collect_garbage.
-pub func heap_collect_garbage(this: Heap*, collection_type: HeapCollectionType, print_report: bool):
+pub func heap_collect_garbage(this: Heap*, collection_type: HeapCollectionType = HeapCollectionType.collect_garbage, print_report: bool = false):
     trap("unported: GC::Heap::collect_garbage")
 
 ## Ported from Libraries/LibGC/Heap.cpp:272 GC::Heap::dump_graph.
@@ -354,11 +354,11 @@ pub func heap_find_min_and_max_block_addresses(this: Heap*, min_address: usize*,
     trap("unported: GC::Heap::find_min_and_max_block_addresses")
 
 ## Ported from Libraries/LibGC/Heap.cpp:413 GC::Heap::gather_roots.
-pub func heap_gather_roots(this: Heap*, roots: ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*, all_live_heap_blocks: ak.HashTable[HeapBlock*?, ak.PtrTraits[HeapBlock]]*, out_stack_frames: ak.Vector[StackFrameInfo]*?):
+pub func heap_gather_roots(this: Heap*, roots: ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*, all_live_heap_blocks: ak.HashTable[HeapBlock*?, ak.PtrTraits[HeapBlock]]*, out_stack_frames: ak.Vector[StackFrameInfo]*? = none):
     trap("unported: GC::Heap::gather_roots")
 
 ## Ported from Libraries/LibGC/Heap.cpp:477 GC::Heap::gather_conservative_roots.
-pub func heap_gather_conservative_roots(this: Heap*, roots: ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*, all_live_heap_blocks: ak.HashTable[HeapBlock*?, ak.PtrTraits[HeapBlock]], out_stack_frames: ak.Vector[StackFrameInfo]*?):
+pub func heap_gather_conservative_roots(this: Heap*, roots: ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*, all_live_heap_blocks: ak.HashTable[HeapBlock*?, ak.PtrTraits[HeapBlock]], out_stack_frames: ak.Vector[StackFrameInfo]*? = none):
     trap("unported: GC::Heap::gather_conservative_roots")
 
 ## Ported from Libraries/LibGC/Heap.cpp:131 GC::GraphConstructorVisitor::GraphConstructorVisitor.

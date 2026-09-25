@@ -26,7 +26,7 @@ pub func general_category_from_string(general_category: ak.StringView) -> u32?:
     trap("unported: Unicode::general_category_from_string")
 
 ## Ported from Libraries/LibUnicode/CharacterTypes.cpp:115 Unicode::code_point_has_general_category.
-pub func code_point_has_general_category(code_point: u32, general_category: u32, case_sensitivity: ak.CaseSensitivity) -> bool:
+pub func code_point_has_general_category(code_point: u32, general_category: u32, case_sensitivity: ak.CaseSensitivity = ak.CaseSensitivity.case_sensitive) -> bool:
     trap("unported: Unicode::code_point_has_general_category")
 
 ## Ported from Libraries/LibUnicode/CharacterTypes.cpp:138 Unicode::code_point_is_printable.
@@ -70,7 +70,7 @@ pub func property_from_string(property: ak.StringView) -> u32?:
     trap("unported: Unicode::property_from_string")
 
 ## Ported from Libraries/LibUnicode/CharacterTypes.cpp:216 Unicode::code_point_has_property.
-pub func code_point_has_property(code_point: u32, property: u32, case_sensitivity: ak.CaseSensitivity) -> bool:
+pub func code_point_has_property(code_point: u32, property: u32, case_sensitivity: ak.CaseSensitivity = ak.CaseSensitivity.case_sensitive) -> bool:
     trap("unported: Unicode::code_point_has_property")
 
 ## Ported from Libraries/LibUnicode/CharacterTypes.cpp:246 Unicode::code_point_has_emoji_property.
@@ -282,7 +282,7 @@ pub func locale_id_to_string(this: const LocaleId*) -> ak.String:
 
 ## Ported from Libraries/LibUnicode/Locale.cpp:62 Unicode::consume_next_segment.
 # internal linkage in C++: make it private when it is ported.
-pub func consume_next_segment(lexer: ak.GenericLexer[u8]*, with_separator: bool) -> ak.StringView?:
+pub func consume_next_segment(lexer: ak.GenericLexer[u8]*, with_separator: bool = true) -> ak.StringView?:
     trap("unported: Unicode::consume_next_segment")
 
 ## Ported from Libraries/LibUnicode/Locale.h:62 Unicode::LocaleID::remove_extension_type.

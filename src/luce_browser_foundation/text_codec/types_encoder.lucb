@@ -429,6 +429,10 @@ pub struct Gb18030Encoder: IsGb18030Encoder, IsEncoder:
 
     func encoder() -> Encoder*: return (Encoder*)&self
 
+## The non-zero default member initializers of TextCodec::GB18030Encoder; the constructor runs them first.
+pub func gb18030_encoder_init_fields(this: Gb18030Encoder*):
+    this.m_is_gbk = Gb18030EncoderIsGbk.no
+
 ## Upcast to TextCodec::GB18030Encoder (implemented by every struct in its hierarchy).
 pub interface IsGb18030Encoder:
     func gb18030_encoder() -> Gb18030Encoder*

@@ -16,6 +16,10 @@ pub struct Utf32CodePointIterator:
     pub var m_ptr: const u32*?  # C++ default: { nullptr }
     pub var m_length: isize  # C++ default: { - 1 }
 
+## The non-zero default member initializers of AK::Utf32CodePointIterator; the constructor runs them first.
+pub func utf32_code_point_iterator_init_fields(this: Utf32CodePointIterator*):
+    this.m_length = -1
+
 # mark: Utf32View ===============================================================================
 
 ## AK::Utf32View (AK/Utf32View.h:64).
