@@ -1,0 +1,38 @@
+#==============================================================================================
+#
+#   root_hash_map - RootHashMapBase: a hash map whose values are roots
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/RootHashMap.cpp (lines 1-34) and RootHashMap.h (lines 1-65).
+#       The base registers itself with its heap; the template RootHashMap<K, V> (base plus an
+#       AK::HashMap) is spelled by its users as a struct that embeds the base first and reports
+#       its values in the gather_roots slot of its vtable.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/RootHashMap.h:19 GC::RootHashMapBase::gather_roots (virtual).
+pub func root_hash_map_base_gather_roots_impl(this: RootHashMapBase*, arg0: GcHashMap[HeapRoot]*):
+    trap("pure virtual: GC::RootHashMapBase::gather_roots")
+
+## Ported from Libraries/LibGC/RootHashMap.cpp:12 GC::RootHashMapBase::RootHashMapBase.
+pub func root_hash_map_base_construct(this: RootHashMapBase*, heap: Heap*):
+    this.m_heap = heap
+    heap_did_create_root_hash_map(heap, this)
+
+## Ported from Libraries/LibGC/RootHashMap.cpp:18 GC::RootHashMapBase::~RootHashMapBase (the C++ destructor).
+pub func root_hash_map_base_destroy(this: RootHashMapBase*):
+    heap_did_destroy_root_hash_map(this.m_heap else trap("root hash map without a heap"), this)
+
+## Ported from Libraries/LibGC/RootHashMap.cpp:23 GC::RootHashMapBase::assign_heap.
+pub func root_hash_map_base_assign_heap(this: RootHashMapBase*, heap: Heap*?):
+    if this.m_heap == heap:
+        return
+
+    this.m_heap = heap
+
+    # NOTE: IntrusiveList will remove this RootHashMap from the old heap it was part of.
+    heap_did_create_root_hash_map(this.m_heap else trap("assign_heap to no heap"), this)
+
+## The RootHashMapBase whose m_list_node is `node` (IntrusiveList's container_of).
+func root_hash_map_base_from_list_node(node: ListNode*) -> RootHashMapBase*:
+    return (RootHashMapBase*)((u8*)node - offsetof(RootHashMapBase, m_list_node))

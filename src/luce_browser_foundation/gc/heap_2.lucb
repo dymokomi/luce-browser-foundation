@@ -1,0 +1,496 @@
+#==============================================================================================
+#
+#   heap_2 - Heap: the graph dump, collect_garbage, and gathering the roots
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/Heap.cpp (lines 129-609): GraphConstructorVisitor and
+#       dump_graph, collect_garbage, run_post_gc_tasks, dump_allocators, the post-GC tasks and
+#       sweep callbacks, gather_roots and gather_conservative_roots. The registers are spilled by
+#       `asm` where the C++ calls setjmp, and the stack is scanned from the current stack pointer
+#       to the top the heap read when it was constructed (DESIGN.md §3.4). The frame annotation
+#       of the stack roots needs cpptrace in C++ and is left out (out_stack_frames stays empty).
+#
+#==============================================================================================
+
+# AK/Debug.h HEAP_DEBUG (off in the reference build).
+let heap_debug: bool = false
+
+# mark: GraphConstructorVisitor =================================================================
+
+## Ported from Libraries/LibGC/Heap.cpp:131 GC::GraphConstructorVisitor::GraphConstructorVisitor.
+pub func graph_constructor_visitor_construct(this: GraphConstructorVisitor*, heap: Heap*, roots: const GcHashMap[HeapRoot]*):
+    this.visitor.vtable = (const CellVisitorVTable*)&graph_constructor_visitor_vtable
+    this.visitor.class_id = graph_constructor_visitor_class.first_id
+    this.m_node_being_visited = none
+    this.m_heap = heap
+    heap_find_min_and_max_block_addresses(this.m_heap, &this.m_min_block_address, &this.m_max_block_address)
+    for block in heap_for_each_block(this.m_heap):
+        gc_hash_map_set(&this.m_all_live_heap_blocks, (usize)block, 1)
+    gc_vector_ensure_capacity(&this.m_work_queue, gc_hash_map_size(roots))
+
+    for root in gc_hash_map_keys(roots):
+        let root_origin = *(gc_hash_map_get(roots, root) else trap("root without an origin"))
+        let root_as_cell = (Cell*?)root else trap("null root")
+        let graph_node = graph_constructor_visitor_ensure_node(this, root)
+        graph_node.class_name = cell_class_name(root_as_cell)
+        graph_node.root_origin = root_origin
+
+        gc_vector_append(&this.m_work_queue, root_as_cell)
+
+## m_graph.ensure(key): the graph node of the cell at `key`, created empty the first time.
+func graph_constructor_visitor_ensure_node(this: GraphConstructorVisitor*, key: usize) -> GraphConstructorVisitorGraphNode*:
+    if let node = gc_hash_map_get(&this.m_graph, key):
+        return node
+    gc_hash_map_set(&this.m_graph, key, GraphConstructorVisitorGraphNode(root_origin = none, class_name = sv(""), edges = GcHashMap[u8]()))
+    return gc_hash_map_get(&this.m_graph, key) else trap("graph node vanished")
+
+## Ported from Libraries/LibGC/Heap.cpp:150 GC::GraphConstructorVisitor::visit_impl (override).
+pub func graph_constructor_visitor_visit_impl_cell_impl(base: CellVisitor*, cell: Cell*):
+    let this = (GraphConstructorVisitor*)base
+    if let node = this.m_node_being_visited:
+        gc_hash_map_set(&node.edges, (usize)cell, 1)
+
+    if gc_hash_map_get(&this.m_graph, (usize)cell) != none:
+        return
+
+    gc_vector_append(&this.m_work_queue, cell)
+
+## Ported from Libraries/LibGC/Heap.cpp:161 GC::GraphConstructorVisitor::visit_impl (override).
+pub func graph_constructor_visitor_visit_impl_span_nan_boxed_value_impl(base: CellVisitor*, values: const NanBoxedValue[]):
+    for value in values:
+        cell_visitor_visit_nan_boxed_value(base, value)
+
+## Ported from Libraries/LibGC/Heap.cpp:167 GC::GraphConstructorVisitor::visit_possible_values (override).
+pub func graph_constructor_visitor_visit_possible_values_impl(base: CellVisitor*, bytes: const u8[]):
+    let this = (GraphConstructorVisitor*)base
+    var possible_pointers: GcHashMap[HeapRoot]
+    defer gc_hash_map_clear(&possible_pointers)
+
+    let raw_pointer_sized_values = (const usize*)bytes.data
+    for i in 0..<(bytes.length // sizeof(usize)):
+        add_possible_value(&possible_pointers, raw_pointer_sized_values[i], HeapRoot(type_ = HeapRootType.heap_function_captured_pointer), this.m_min_block_address, this.m_max_block_address)
+
+    for found in for_each_cell_among_possible_pointers(this.m_heap, &this.m_all_live_heap_blocks, &possible_pointers):
+        let cell = found.0
+        if cell_state(cell) != CellState.live:
+            continue
+
+        if let node = this.m_node_being_visited:
+            gc_hash_map_set(&node.edges, (usize)cell, 1)
+
+        if gc_hash_map_get(&this.m_graph, (usize)cell) != none:
+            continue
+        gc_vector_append(&this.m_work_queue, cell)
+
+## Ported from Libraries/LibGC/Heap.cpp:188 GC::GraphConstructorVisitor::visit_all_cells.
+pub func graph_constructor_visitor_visit_all_cells(this: GraphConstructorVisitor*):
+    while not gc_vector_is_empty(&this.m_work_queue):
+        let cell = gc_vector_take_last(&this.m_work_queue)
+        let node = graph_constructor_visitor_ensure_node(this, (usize)cell)
+        node.class_name = cell_class_name(cell)
+        this.m_node_being_visited = node
+        cell_visit_edges(cell, &this.visitor)
+        this.m_node_being_visited = none
+
+## Ported from Libraries/LibGC/Heap.cpp:199 GC::GraphConstructorVisitor::dump.
+pub func graph_constructor_visitor_dump(this: GraphConstructorVisitor*) -> ak.JsonObject:
+    var graph: ak.JsonObject = ---
+    ak.json_object_construct(&graph)
+    for key in gc_hash_map_keys(&this.m_graph):
+        let it_value = gc_hash_map_get(&this.m_graph, key) else trap("graph node vanished")
+        var edges: ak.JsonArray = ---
+        ak.json_array_construct(&edges, 0)
+        for value in gc_hash_map_keys(&it_value.edges):
+            ak.json_array_must_append(&edges, json_string(ak.string_number(value)))
+
+        var node: ak.JsonObject = ---
+        ak.json_object_construct(&node)
+        if let root_origin = it_value.root_origin:
+            let type_ = root_origin.type_
+            match type_:
+                .conservative_vector:
+                    ak.json_object_set_string_view(&node, sv("root"), json_string_view(sv("ConservativeVector")))
+                .heap_function_captured_pointer:
+                    ak.json_object_set_string_view(&node, sv("root"), json_string_view(sv("HeapFunctionCapturedPointer")))
+                .must_survive_gc:
+                    ak.json_object_set_string_view(&node, sv("root"), json_string_view(sv("MustSurviveGC")))
+                .root:
+                    let location = root_origin.location else trap("a Root without its source location")
+                    var label: ak.StringBuilder = ---
+                    ak.string_builder_construct(&label)
+                    ak.string_builder_append_string_view(&label, sv("Root "))
+                    ak.string_builder_append_string_view(&label, ak.source_location_function_name(location))
+                    ak.string_builder_append_string_view(&label, sv(" "))
+                    ak.string_builder_append_string_view(&label, ak.source_location_filename(location))
+                    ak.string_builder_append_string_view(&label, sv(":"))
+                    var digits: u8[16]
+                    let line_number = format(digits, f"{ak.source_location_line_number(location)}") else ""
+                    ak.string_builder_append_string_view(&label, sv(line_number))
+                    ak.json_object_set_string_view(&node, sv("root"), json_string(ak.string_builder_to_string(&label) else trap("MUST: String::formatted")))
+                .root_vector:
+                    ak.json_object_set_string_view(&node, sv("root"), json_string_view(sv("RootVector")))
+                .root_hash_map:
+                    ak.json_object_set_string_view(&node, sv("root"), json_string_view(sv("RootHashMap")))
+                .register_pointer:
+                    ak.json_object_set_string_view(&node, sv("root"), json_string_view(sv("RegisterPointer")))
+                    if let index = root_origin.stack_frame_index:
+                        ak.json_object_set_string_view(&node, sv("stack_frame_index"), json_u32(index))
+                .stack_pointer:
+                    ak.json_object_set_string_view(&node, sv("root"), json_string_view(sv("StackPointer")))
+                    if let index = root_origin.stack_frame_index:
+                        ak.json_object_set_string_view(&node, sv("stack_frame_index"), json_u32(index))
+                .vm:
+                    ak.json_object_set_string_view(&node, sv("root"), json_string_view(sv("VM")))
+                _:
+                    trap("VERIFY(node.has(\"root\"sv))")
+            assert(ak.json_object_has(&node, sv("root")))
+        ak.json_object_set_string_view(&node, sv("class_name"), json_string_view(it_value.class_name))
+        ak.json_object_set_string_view(&node, sv("edges"), json_array(edges))
+        ak.json_object_set_string(&graph, ak.string_from_byte_string(ak.byte_string_number(key)) else trap("MUST: ByteString::number"), json_object(node))
+
+    return graph
+
+## JsonValue(String).
+func json_string(value: ak.String) -> ak.JsonValue2:
+    var json: ak.JsonValue2 = ---
+    ak.json_value2_construct_string(&json, value)
+    return json
+
+## JsonValue(StringView).
+func json_string_view(value: ak.StringView) -> ak.JsonValue2:
+    var json: ak.JsonValue2 = ---
+    ak.json_value2_construct_string_view(&json, value)
+    return json
+
+## JsonValue(u32).
+func json_u32(value: u32) -> ak.JsonValue2:
+    var json: ak.JsonValue2 = ---
+    ak.json_value2_construct_u32(&json, value)
+    return json
+
+## JsonValue(u64): sizes.
+func json_u64(value: u64) -> ak.JsonValue2:
+    var json: ak.JsonValue2 = ---
+    ak.json_value2_construct_u64(&json, value)
+    return json
+
+## JsonValue(JsonArray).
+func json_array(value: ak.JsonArray) -> ak.JsonValue2:
+    var json: ak.JsonValue2 = ---
+    ak.json_value2_construct_json_array(&json, value)
+    return json
+
+## JsonValue(JsonObject).
+func json_object(value: ak.JsonObject) -> ak.JsonValue2:
+    var json: ak.JsonValue2 = ---
+    ak.json_value2_construct_json_object(&json, value)
+    return json
+
+## Ported from Libraries/LibGC/Heap.cpp:272 GC::Heap::dump_graph.
+pub func heap_dump_graph(this: Heap*) -> ak.JsonObject:
+    var roots: GcHashMap[HeapRoot]
+    defer gc_hash_map_clear(&roots)
+    var all_live_heap_blocks: GcHashMap[u8]
+    defer gc_hash_map_clear(&all_live_heap_blocks)
+    var stack_frames: GcVector[StackFrameInfo]
+    defer gc_vector_clear(&stack_frames)
+    # The mutator's roots, taken here rather than in gather_conservative_roots (see there): its
+    # registers, and the stack from this frame's stack pointer up.
+    spill_callee_saved_registers(this.m_mutator_registers)
+    asm arm64 (out("x0") this.m_stack_scan_start):
+        mov x0, sp
+    asm x86_64 (out("rax") this.m_stack_scan_start):
+        mov %rsp, %rax
+    heap_gather_roots(this, &roots, &all_live_heap_blocks, &stack_frames)
+    this.m_stack_scan_start = 0
+    var visitor: GraphConstructorVisitor = ---
+    memory.set(u8[]((u8*)&visitor, sizeof(GraphConstructorVisitor)), 0)
+    graph_constructor_visitor_construct(&visitor, this, &roots)
+    defer graph_constructor_visitor_destroy(&visitor)
+    graph_constructor_visitor_visit_all_cells(&visitor)
+    var graph = graph_constructor_visitor_dump(&visitor)
+
+    if not gc_vector_is_empty(&stack_frames):
+        var stack_frames_array: ak.JsonArray = ---
+        ak.json_array_construct(&stack_frames_array, 0)
+        for frame in gc_vector_span(&stack_frames):
+            var frame_object: ak.JsonObject = ---
+            ak.json_object_construct(&frame_object)
+            ak.json_object_set_string_view(&frame_object, sv("label"), json_string(frame.label))
+            ak.json_object_set_string_view(&frame_object, sv("size"), json_u64((u64)frame.size_bytes))
+            ak.json_array_must_append(&stack_frames_array, json_object(frame_object))
+        ak.json_object_set_string_view(&graph, sv("stack_frames"), json_array(stack_frames_array))
+
+    return graph
+
+## The storage of a GraphConstructorVisitor's containers, given back (its C++ destructor).
+func graph_constructor_visitor_destroy(this: GraphConstructorVisitor*):
+    for key in gc_hash_map_keys(&this.m_graph):
+        let node = gc_hash_map_get(&this.m_graph, key) else trap("graph node vanished")
+        gc_hash_map_clear(&node.edges)
+    gc_hash_map_clear(&this.m_graph)
+    gc_vector_clear(&this.m_work_queue)
+    gc_hash_map_clear(&this.m_all_live_heap_blocks)
+
+# mark: Collection ==============================================================================
+
+## Ported from Libraries/LibGC/Heap.cpp:296 GC::Heap::collect_garbage.
+pub func heap_collect_garbage(this: Heap*, collection_type: HeapCollectionType = HeapCollectionType.collect_garbage, print_report: bool = false):
+    assert(not this.m_collecting_garbage)
+    # The mutator's roots, taken here rather than in gather_conservative_roots (see there): its
+    # registers, and the stack from this frame's stack pointer up.
+    spill_callee_saved_registers(this.m_mutator_registers)
+    asm arm64 (out("x0") this.m_stack_scan_start):
+        mov x0, sp
+    asm x86_64 (out("rax") this.m_stack_scan_start):
+        mov %rsp, %rax
+
+    # TemporaryChange change(m_collecting_garbage, true): restored where the C++ scope ends
+    this.m_collecting_garbage = true
+
+    var collection_measurement_start: u64 = 0  # Core::ElapsedTimer
+    if print_report:
+        collection_measurement_start = time.now()
+
+    if collection_type == HeapCollectionType.collect_garbage:
+        if this.m_gc_deferrals != 0:
+            this.m_should_gc_when_deferral_ends = true
+            this.m_collecting_garbage = false
+            this.m_stack_scan_start = 0
+            return
+        var roots: GcHashMap[HeapRoot]
+        defer gc_hash_map_clear(&roots)
+        var all_live_heap_blocks: GcHashMap[u8]
+        defer gc_hash_map_clear(&all_live_heap_blocks)
+        heap_clear_weak_references(this)
+        heap_gather_roots(this, &roots, &all_live_heap_blocks)
+        heap_mark_live_cells(this, &roots, &all_live_heap_blocks)
+    heap_finalize_unmarked_cells(this)
+    heap_sweep_weak_blocks(this)
+    heap_sweep_dead_cells(this, print_report, collection_measurement_start)
+
+    if print_report:
+        heap_dump_allocators(this)
+
+    this.m_collecting_garbage = false
+
+    this.m_stack_scan_start = 0
+
+    heap_run_post_gc_tasks(this)
+
+## Ported from Libraries/LibGC/Heap.cpp:328 GC::Heap::run_post_gc_tasks.
+pub func heap_run_post_gc_tasks(this: Heap*):
+    var tasks = this.m_post_gc_tasks
+    this.m_post_gc_tasks = GcVector[ak.Function0[unit]]()
+    defer gc_vector_clear(&tasks)
+    for task in gc_vector_span(&tasks):
+        call_function0(task)
+
+## Ported from Libraries/LibGC/Heap.cpp:335 GC::Heap::dump_allocators.
+pub func heap_dump_allocators(this: Heap*):
+    var total_in_committed_blocks: usize = 0
+    var total_waste: usize = 0
+    for node in list_nodes(&this.m_all_cell_allocators):
+        let allocator = cell_allocator_from_list_node(node)
+        var blocks: GcVector[HeapDumpAllocatorsBlockStats]
+        defer gc_vector_clear(&blocks)
+
+        var total_live_cells: usize = 0
+        var total_dead_cells: usize = 0
+        let cell_count = (heap_block_base_block_size - heap_block_storage_offset) // cell_allocator_cell_size(allocator)
+
+        for heap_block in cell_allocator_for_each_block(allocator):
+            var block = HeapDumpAllocatorsBlockStats(block = heap_block, live_cells = 0, dead_cells = 0, total_cells = 0)
+
+            for cell in heap_block_for_each_cell(heap_block):
+                if cell_state(cell) == CellState.live:
+                    block.live_cells += 1
+                elif cell_state(cell) == CellState.dead:
+                    block.dead_cells += 1
+                else:
+                    trap("VERIFY_NOT_REACHED")
+            total_live_cells += block.live_cells
+            total_dead_cells += block.dead_cells
+
+            gc_vector_append(&blocks, block)
+
+        if gc_vector_is_empty(&blocks):
+            continue
+
+        total_in_committed_blocks += gc_vector_size(&blocks) * heap_block_base_block_size
+
+        let name = string_view_text(cell_allocator_class_name(allocator) else sv("generic"))
+        let cost = gc_vector_size(&blocks) * heap_block_base_block_size // 1024
+        let reserved = gc_vector_size(block_allocator_blocks(cell_allocator_block_allocator(allocator))) * heap_block_base_block_size // 1024
+        let total_dead_bytes = ((gc_vector_size(&blocks) * cell_count) - total_live_cells) * cell_allocator_cell_size(allocator)
+        if total_dead_bytes != 0:
+            dbgln(f"{name} ({cell_allocator_cell_size(allocator)}b) x {total_live_cells}, cost: {cost} KiB, reserved: {reserved} KiB, waste: {total_dead_bytes // 1024} KiB")
+            total_waste += total_dead_bytes
+        else:
+            dbgln(f"{name} ({cell_allocator_cell_size(allocator)}b) x {total_live_cells}, cost: {cost} KiB, reserved: {reserved} KiB")
+
+        for block in gc_vector_span(&blocks):
+            dbgln(f"  block at 0x{hex((usize)block.block)}: live {block.live_cells} / dead {block.dead_cells} / total {heap_block_cell_count(block.block)} cells")
+    dbgln(f"Total allocated: {total_in_committed_blocks // 1024} KiB")
+    dbgln(f"Total wasted on fragmentation: {total_waste // 1024} KiB")
+
+## The BlockStats of dump_allocators.
+struct HeapDumpAllocatorsBlockStats:
+    var block: HeapBlock*
+    var live_cells: usize
+    var dead_cells: usize
+    var total_cells: usize
+
+## Ported from Libraries/LibGC/Heap.cpp:403 GC::Heap::enqueue_post_gc_task.
+pub func heap_enqueue_post_gc_task(this: Heap*, task: ak.Function0[unit]):
+    gc_vector_append(&this.m_post_gc_tasks, task)
+
+## Ported from Libraries/LibGC/Heap.cpp:408 GC::Heap::register_sweep_callback.
+pub func heap_register_sweep_callback(this: Heap*, callback: ak.Function0[unit]):
+    gc_vector_append(&this.m_sweep_callbacks, callback)
+
+# mark: Roots ===================================================================================
+
+## Ported from Libraries/LibGC/Heap.cpp:413 GC::Heap::gather_roots.
+pub func heap_gather_roots(this: Heap*, roots: GcHashMap[HeapRoot]*, all_live_heap_blocks: GcHashMap[u8]*, out_stack_frames: GcVector[StackFrameInfo]*? = none):
+    for block in heap_for_each_block(this):
+        gc_hash_map_set(all_live_heap_blocks, (usize)block, 1)
+
+        if heap_block_overrides_must_survive_garbage_collection(block):
+            for cell in heap_block_for_each_cell_in_state(block, CellState.live):
+                if cell_must_survive_garbage_collection(cell):
+                    gc_hash_map_set(roots, (usize)cell, HeapRoot(type_ = HeapRootType.must_survive_gc))
+    heap_gather_large_object_must_survive_roots(this, roots)
+
+    call_function1(this.m_gather_embedder_roots, roots)
+    heap_gather_conservative_roots(this, roots, all_live_heap_blocks, out_stack_frames)
+
+    for node in list_nodes(&this.m_roots):
+        let root = root_impl_from_list_node(node)
+        let cell = root_impl_cell(root) else continue
+        gc_hash_map_set(roots, (usize)cell, HeapRoot(type_ = HeapRootType.root, location = &root.m_location))
+
+    for node in list_nodes(&this.m_root_vectors):
+        root_vector_base_gather_roots(root_vector_base_from_list_node(node), roots)
+
+    for node in list_nodes(&this.m_root_hash_maps):
+        root_hash_map_base_gather_roots(root_hash_map_base_from_list_node(node), roots)
+
+    if heap_debug:
+        dbgln("gather_roots:")
+        for root in gc_hash_map_keys(roots):
+            dbgln(f"  + 0x{hex(root)}")
+
+## Ported from Libraries/LibGC/Heap.cpp:472 GC::Heap::gather_asan_fake_stack_roots (the build
+## without the address sanitizer, which the port has no counterpart of).
+pub func heap_gather_asan_fake_stack_roots(this: Heap*, arg0: GcHashMap[HeapRoot]*, arg1: usize, min_block_address: usize, max_block_address: usize, stack_reference: usize, stack_top: usize):
+    return
+
+## Ported from Libraries/LibGC/Heap.cpp:477 GC::Heap::gather_conservative_roots.
+pub func heap_gather_conservative_roots(this: Heap*, roots: GcHashMap[HeapRoot]*, all_live_heap_blocks: const GcHashMap[u8]*, out_stack_frames: GcVector[StackFrameInfo]*? = none):
+    if heap_debug:
+        dbgln("gather_conservative_roots:")
+
+    # jmp_buf buf; setjmp(buf): the callee-saved registers, where a caller's pointers may live.
+    # C++ spills them here and scans the stack from this frame up. luce-base's backend keeps the
+    # collector's own values in callee-saved registers and in stack slots that later frames do
+    # not overwrite, so a scan from here finds cells the collector itself just looked at (the
+    # must-survive candidates of gather_roots, a large object it walked) and keeps them alive.
+    # collect_garbage and dump_graph therefore take the mutator's registers and stack pointer as
+    # their first statement (m_mutator_registers, m_stack_scan_start); what their prologue saved
+    # of the mutator's registers is in their frame, which the scan covers.
+    var registers: usize[16]
+    if this.m_stack_scan_start != 0:
+        registers = this.m_mutator_registers
+    else:
+        spill_callee_saved_registers(registers)
+
+    var possible_pointers: GcHashMap[HeapRoot]
+    defer gc_hash_map_clear(&possible_pointers)
+
+    var min_block_address: usize = 0
+    var max_block_address: usize = 0
+    heap_find_min_and_max_block_addresses(this, &min_block_address, &max_block_address)
+
+    for value in registers:
+        heap_note_possible_weak_reference(this, value)
+        add_possible_value(&possible_pointers, value, HeapRoot(type_ = HeapRootType.register_pointer), min_block_address, max_block_address)
+
+    # &dummy: the frame of collect_garbage or dump_graph (see above), or else this one
+    let stack_reference = this.m_stack_scan_start if this.m_stack_scan_start != 0 else current_stack_pointer()
+    let stack_top = this.m_stack_info.m_top
+    assert(stack_reference < stack_top, "the heap is used on another thread than its own")
+
+    # Frame boundaries for the stack_frame_index annotation (and out_stack_frames) come from
+    # cpptrace in C++ (the build option LIBGC_HAS_CPPTRACE); without it every stack root has no
+    # frame index and out_stack_frames stays empty, as in a build without cpptrace.
+
+    let stack = (const usize*?)stack_reference else trap("no stack")
+    for i in 0..<((stack_top - stack_reference) // sizeof(usize)):
+        let data = stack[i]
+        heap_note_possible_weak_reference(this, data)
+        add_possible_value(&possible_pointers, data, HeapRoot(type_ = HeapRootType.stack_pointer), min_block_address, max_block_address)
+        heap_gather_asan_fake_stack_roots(this, &possible_pointers, data, min_block_address, max_block_address, stack_reference, stack_top)
+
+    for node in list_nodes(&this.m_conservative_vectors):
+        for possible_value in conservative_vector_base_possible_values(conservative_vector_base_from_list_node(node)):
+            heap_note_possible_weak_reference(this, (usize)possible_value)
+            add_possible_value(&possible_pointers, (usize)possible_value, HeapRoot(type_ = HeapRootType.conservative_vector), min_block_address, max_block_address)
+
+    # Addition: the capture contexts of the AK::Functions the heap stores (the embedder's root
+    # callback, post-GC tasks, sweep callbacks) live in managed memory in the port; the heap's own
+    # vectors are not scanned, so their contexts are roots for as long as the heap holds them.
+    heap_add_function_contexts(this, &possible_pointers, min_block_address, max_block_address)
+
+    for found in for_each_cell_among_possible_pointers(this, all_live_heap_blocks, &possible_pointers):
+        let (cell, possible_pointer) = found
+        if cell_state(cell) == CellState.live:
+            if heap_debug:
+                dbgln(f"  ?-> 0x{hex((usize)cell)}")
+            gc_hash_map_set(roots, (usize)cell, *(gc_hash_map_get(&possible_pointers, possible_pointer) else trap("possible pointer without an origin")))
+        else:
+            if heap_debug:
+                dbgln(f"  #-> 0x{hex((usize)cell)}")
+
+## Addition: the AK::Function contexts the heap holds, as possible pointers (see above).
+func heap_add_function_contexts(this: Heap*, possible_pointers: GcHashMap[HeapRoot]*, min_block_address: usize, max_block_address: usize):
+    let origin = HeapRoot(type_ = HeapRootType.heap_function_captured_pointer)
+    if let context = this.m_gather_embedder_roots.context:
+        add_possible_value(possible_pointers, (usize)context, origin, min_block_address, max_block_address)
+    for task in gc_vector_span(&this.m_post_gc_tasks):
+        if let context = task.context:
+            add_possible_value(possible_pointers, (usize)context, origin, min_block_address, max_block_address)
+    for callback in gc_vector_span(&this.m_sweep_callbacks):
+        if let context = callback.context:
+            add_possible_value(possible_pointers, (usize)context, origin, min_block_address, max_block_address)
+
+## The stack pointer of the caller's frame (DESIGN.md §3.4).
+noinline func current_stack_pointer() -> usize:
+    var sp: usize = 0
+    asm arm64 (out("x0") sp):
+        mov x0, sp
+    asm x86_64 (out("rax") sp):
+        mov %rsp, %rax
+    return sp
+
+## setjmp's part in gather_conservative_roots (DESIGN.md §3.4): store the callee-saved registers,
+## which may hold a caller's pointers, where the conservative scan reads them. Windows x64 also
+## keeps rdi and rsi callee-saved.
+noinline func spill_callee_saved_registers(buffer: usize[]):
+    assert(buffer.length >= 16)
+    asm arm64 (in("x0") buffer.data, options(nostack)):
+        stp x19, x20, [x0, #0]
+        stp x21, x22, [x0, #16]
+        stp x23, x24, [x0, #32]
+        stp x25, x26, [x0, #48]
+        stp x27, x28, [x0, #64]
+        stp x29, x30, [x0, #80]
+    asm x86_64 (in("rax") buffer.data, options(nostack)):
+        movq %rbx, 0(%rax)
+        movq %rbp, 8(%rax)
+        movq %r12, 16(%rax)
+        movq %r13, 24(%rax)
+        movq %r14, 32(%rax)
+        movq %r15, 40(%rax)
+        movq %rdi, 48(%rax)
+        movq %rsi, 56(%rax)

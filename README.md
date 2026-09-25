@@ -28,7 +28,7 @@ of this repository.
 
 ## Testing
 
-`./test.sh` type-checks every module.
+`./test.sh` type-checks every module and runs the unit tests of the ported ones (`gc`).
 
 ## License
 

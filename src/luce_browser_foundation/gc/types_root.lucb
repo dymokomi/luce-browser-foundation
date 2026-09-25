@@ -16,4 +16,12 @@
 pub struct RootImpl:
     pub var m_cell: Cell*?
     pub var m_location: ak.SourceLocation
-    pub var m_list_node: ak.IntrusiveListNode[RootImpl, RootImpl*?]
+    pub var m_list_node: ListNode
+
+# mark: Root ====================================================================================
+
+## GC::Root<T> (Libraries/LibGC/Root.h:47): a handle that keeps its cell alive, for pointers kept
+## outside managed memory (DESIGN.md §2.6, §3.3 rule 4). Copies share one RootImpl; the owner
+## releases it once with root_release (C++ counts the references and releases on the last).
+pub struct Root[T]:
+    pub var m_impl: RootImpl*?

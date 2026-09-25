@@ -1,0 +1,22 @@
+#==============================================================================================
+#
+#   internals - HeapBlockBase: what a cell's address says about its heap
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/Internals.h (lines 1-38). Every heap block (and, in the port,
+#       every large object) begins with a HeapBlockBase at a BLOCK_SIZE-aligned address, so the
+#       heap of any cell is one mask and one load away.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/Internals.h:22 GC::HeapBlockBase::from_cell.
+pub func heap_block_base_from_cell(cell: const Cell*) -> HeapBlockBase*:
+    return (HeapBlockBase*?)((usize)cell & ~(heap_block_base_block_size - 1)) else trap("a cell below the first block")
+
+## Ported from Libraries/LibGC/Internals.h:27 GC::HeapBlockBase::heap.
+pub func heap_block_base_heap(this: HeapBlockBase*) -> Heap*:
+    return this.m_heap
+
+## Ported from Libraries/LibGC/Internals.h:30 GC::HeapBlockBase::HeapBlockBase.
+pub func heap_block_base_construct(this: HeapBlockBase*, heap: Heap*):
+    this.m_heap = heap

@@ -1,0 +1,283 @@
+#==============================================================================================
+#
+#   heap_1 - Heap: construction, cell allocation, registration of roots, possible pointers
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/Heap.cpp (lines 1-127: the heap, will_allocate,
+#       add_possible_value, find_min_and_max_block_addresses, for_each_cell_among_possible_pointers)
+#       and of Heap.h's inline functions (lines 1-254). `Heap::allocate<T>(args...)` is
+#       heap_allocate_cell followed by the caller's construction under DeferGC (DESIGN.md §2.3);
+#       Base cannot ask T for its allocator, so the caller passes its type-isolating allocator,
+#       or none for a size-based one. Cells come back zeroed with a live Cell header.
+#
+#==============================================================================================
+
+assert(heap_block_min_possible_cell_size <= 32, "Heap Cell tracking uses too much data!")
+
+# mark: The heap ================================================================================
+
+## Ported from Libraries/LibGC/Heap.cpp:43 GC::Heap::the.
+pub func heap_the() -> Heap*:
+    return s_the else trap("GC::Heap::the: no heap")
+
+## Ported from Libraries/LibGC/Heap.cpp:48 GC::Heap::Heap. The heap belongs to the thread that
+## constructs it: its stack is the one gather_conservative_roots scans.
+pub func heap_construct(this: Heap*, gather_embedder_roots: ak.Function1[GcHashMap[HeapRoot]*, unit]):
+    heap_init_fields(this)
+    this.m_stack_info = current_stack_info()
+    this.m_gather_embedder_roots = gather_embedder_roots
+    s_the = this
+    for cell_size in cell_size_classes:
+        let allocator = (new CellAllocator in memory.heap) else trap("out of memory")
+        cell_allocator_construct(allocator, cell_size)
+        gc_vector_append(&this.m_size_based_cell_allocators, allocator)
+    heap_construct_blob_allocators(this)
+
+## The size classes of the size-based cell allocators (and of the blobs).
+let cell_size_classes: usize[7] = [64, 96, 128, 256, 512, 1024, 3072]
+
+## Ported from Libraries/LibGC/Heap.cpp:62 GC::Heap::~Heap: collect everything, then what the
+## members' destructors do: the size-based allocators give their cached blocks back to the OS.
+## Type-isolating allocators outlive the heap, as in C++ (they are static there); they are
+## unlinked so that they register with the next heap. Weak blocks are leaked, as in C++.
+pub func heap_destroy(this: Heap*):
+    heap_collect_garbage(this, HeapCollectionType.collect_everything)
+
+    while let node = list_first(&this.m_all_cell_allocators):
+        list_node_remove(node)
+    for allocator in gc_vector_span(&this.m_size_based_cell_allocators):
+        block_allocator_destroy(&allocator.m_block_allocator)
+        free(allocator) in memory.heap
+    gc_vector_clear(&this.m_size_based_cell_allocators)
+    heap_destroy_blob_allocators(this)
+    gc_vector_clear(&this.m_uprooted_cells)
+    gc_vector_clear(&this.m_post_gc_tasks)
+    gc_vector_clear(&this.m_sweep_callbacks)
+    gc_hash_map_clear(&this.m_weak_blocks)
+    if s_the == this:
+        s_the = none
+
+# mark: Heap.h ==================================================================================
+
+## Ported from Libraries/LibGC/Heap.h:64 GC::Heap::should_collect_on_every_allocation.
+pub func heap_should_collect_on_every_allocation(this: const Heap*) -> bool:
+    return this.m_should_collect_on_every_allocation
+
+## Ported from Libraries/LibGC/Heap.h:65 GC::Heap::set_should_collect_on_every_allocation.
+pub func heap_set_should_collect_on_every_allocation(this: Heap*, b: bool):
+    this.m_should_collect_on_every_allocation = b
+
+## Ported from Libraries/LibGC/Heap.h:189 GC::Heap::did_create_root.
+pub func heap_did_create_root(this: Heap*, impl: RootImpl*):
+    assert(not list_contains(&this.m_roots, &impl.m_list_node))
+    list_append(&this.m_roots, &impl.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:195 GC::Heap::did_destroy_root.
+pub func heap_did_destroy_root(this: Heap*, impl: RootImpl*):
+    assert(list_contains(&this.m_roots, &impl.m_list_node))
+    list_remove(&this.m_roots, &impl.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:201 GC::Heap::did_create_root_vector.
+pub func heap_did_create_root_vector(this: Heap*, vector: RootVectorBase*):
+    assert(not list_contains(&this.m_root_vectors, &vector.m_list_node))
+    list_append(&this.m_root_vectors, &vector.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:207 GC::Heap::did_destroy_root_vector.
+pub func heap_did_destroy_root_vector(this: Heap*, vector: RootVectorBase*):
+    assert(list_contains(&this.m_root_vectors, &vector.m_list_node))
+    list_remove(&this.m_root_vectors, &vector.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:213 GC::Heap::did_create_root_hash_map.
+pub func heap_did_create_root_hash_map(this: Heap*, hash_map: RootHashMapBase*):
+    assert(not list_contains(&this.m_root_hash_maps, &hash_map.m_list_node))
+    list_append(&this.m_root_hash_maps, &hash_map.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:219 GC::Heap::did_destroy_root_hash_map.
+pub func heap_did_destroy_root_hash_map(this: Heap*, hash_map: RootHashMapBase*):
+    assert(list_contains(&this.m_root_hash_maps, &hash_map.m_list_node))
+    list_remove(&this.m_root_hash_maps, &hash_map.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:225 GC::Heap::did_create_conservative_vector.
+pub func heap_did_create_conservative_vector(this: Heap*, vector: ConservativeVectorBase*):
+    assert(not list_contains(&this.m_conservative_vectors, &vector.m_list_node))
+    list_append(&this.m_conservative_vectors, &vector.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:231 GC::Heap::did_destroy_conservative_vector.
+pub func heap_did_destroy_conservative_vector(this: Heap*, vector: ConservativeVectorBase*):
+    assert(list_contains(&this.m_conservative_vectors, &vector.m_list_node))
+    list_remove(&this.m_conservative_vectors, &vector.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:237 GC::Heap::did_create_weak_container.
+pub func heap_did_create_weak_container(this: Heap*, set: WeakContainer*):
+    assert(not list_contains(&this.m_weak_containers, &set.m_list_node))
+    list_append(&this.m_weak_containers, &set.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:243 GC::Heap::did_destroy_weak_container.
+pub func heap_did_destroy_weak_container(this: Heap*, set: WeakContainer*):
+    assert(list_contains(&this.m_weak_containers, &set.m_list_node))
+    list_remove(&this.m_weak_containers, &set.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:249 GC::Heap::register_cell_allocator.
+pub func heap_register_cell_allocator(this: Heap*, allocator: CellAllocator*):
+    list_append(&this.m_all_cell_allocators, &allocator.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.h:88 GC::Heap::is_gc_deferred.
+pub func heap_is_gc_deferred(this: const Heap*) -> bool:
+    return this.m_gc_deferrals > 0
+
+## Ported from Libraries/LibGC/Heap.h:113 GC::Heap::allocate_cell: a zeroed live cell of
+## `sizeof(T)` from `allocator` (T's GC_DECLARE_ALLOCATOR), or from the size-based allocator of
+## its size when `allocator` is none (GC_DECLARE_SIZE_BASED_ALLOCATOR). The compile-time check
+## has_own_gc_allocator_marker<T>() has no counterpart: the allocator is an argument.
+pub func heap_allocate_cell[T](this: Heap*, allocator: CellAllocator*?) -> Cell*:
+    return heap_allocate_cell_of_size(this, sizeof(T), allocator)
+
+## heap_allocate_cell for a size known at run time (a ClassInfo's size): the allocation seam of
+## the engine's creation helpers (DESIGN.md §2.3). A cell too large for a heap block goes to the
+## large-object space (addition, heap_blobs.lucb).
+pub func heap_allocate_cell_of_size(this: Heap*, cell_size: usize, allocator: CellAllocator*?) -> Cell*:
+    if cell_size > heap_block_base_block_size - heap_block_storage_offset:
+        return heap_allocate_large_cell(this, cell_size, allocator)
+    heap_will_allocate(this, cell_size)
+    var cell: Cell* = ---
+    if let type_allocator = allocator:
+        assert(type_allocator.m_cell_size >= cell_size)
+        cell = cell_allocator_allocate_cell(type_allocator, this)
+    else:
+        cell = cell_allocator_allocate_cell(heap_allocator_for_size(this, cell_size), this)
+    let block = heap_block_from_cell(cell)
+    cell_initialize_header(cell, heap_block_cell_size(block))
+    return cell
+
+## A freshly allocated cell's memory: zeroed (DESIGN.md §2.3: constructors assume zeroed memory)
+## and a live, unmarked header whose vtable is Cell's own until the constructor sets its class's.
+func cell_initialize_header(cell: Cell*, cell_size: usize):
+    memory.set(u8[]((u8*)cell, cell_size), 0)
+    cell.vtable = &cell_vtable
+    cell.class_id = 0
+    cell.m_mark = false
+    cell.m_state = CellState.live
+
+## Ported from Libraries/LibGC/Heap.h:138 GC::Heap::allocator_for_size.
+pub func heap_allocator_for_size(this: Heap*, cell_size: usize) -> CellAllocator*:
+    # FIXME: Use binary search?
+    for allocator in gc_vector_span(&this.m_size_based_cell_allocators):
+        if cell_allocator_cell_size(allocator) >= cell_size:
+            return allocator
+    dbgln(f"Cannot get CellAllocator for cell size {cell_size}, largest available is {cell_allocator_cell_size(gc_vector_at(&this.m_size_based_cell_allocators, gc_vector_size(&this.m_size_based_cell_allocators) - 1))}!")
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibGC/Heap.h:150 GC::Heap::for_each_block: every block of every
+## registered allocator (`for block in heap_for_each_block(heap)`; Break is `break`).
+pub func heap_for_each_block(this: Heap*) -> HeapBlocks:
+    return HeapBlocks(heap = this)
+
+## The blocks of a heap: for_each_block as a loop.
+pub struct HeapBlocks: luce.Iterable[HeapBlock*, HeapBlockIterator]:
+    pub var heap: Heap*
+
+    func iterator() -> HeapBlockIterator:
+        return HeapBlockIterator(next_allocator = self.heap.m_all_cell_allocators.m_first, blocks = none)
+
+## The iterator of HeapBlocks: the blocks of one allocator, then of the next.
+pub struct HeapBlockIterator: luce.Iterator[HeapBlock*]:
+    pub var next_allocator: ListNode*?
+    pub var blocks: CellAllocatorBlockIterator?
+
+    mutating func next() -> HeapBlock*?:
+        while true:
+            if let current = self.blocks:
+                var iterator = current
+                let block = iterator.next()
+                self.blocks = iterator
+                if let found = block:
+                    return found
+            let node = self.next_allocator else return none
+            self.next_allocator = node.m_next
+            let allocator = cell_allocator_from_list_node(node)
+            self.blocks = cell_allocator_for_each_block(allocator).iterator()
+
+## The CellAllocator whose m_list_node is `node` (IntrusiveList's container_of).
+func cell_allocator_from_list_node(node: ListNode*) -> CellAllocator*:
+    return (CellAllocator*)((u8*)node - offsetof(CellAllocator, m_list_node))
+
+# mark: Heap.cpp ================================================================================
+
+## Ported from Libraries/LibGC/Heap.cpp:67 GC::Heap::will_allocate.
+pub func heap_will_allocate(this: Heap*, size: usize):
+    if heap_should_collect_on_every_allocation(this):
+        this.m_allocated_bytes_since_last_gc = 0
+        heap_collect_garbage(this)
+    elif this.m_allocated_bytes_since_last_gc + size > this.m_gc_bytes_threshold:
+        this.m_allocated_bytes_since_last_gc = 0
+        heap_collect_garbage(this)
+
+    this.m_allocated_bytes_since_last_gc += size
+
+## Ported from Libraries/LibGC/Heap.cpp:80 GC::add_possible_value.
+func add_possible_value(possible_pointers: GcHashMap[HeapRoot]*, data: usize, origin: HeapRoot, min_block_address: usize, max_block_address: usize):
+    # sizeof(FlatPtr*) == sizeof(NanBoxedValue) on every target of the port.
+    # Because NanBoxedValue stores pointers in non-canonical form we have to check if the top bytes
+    # match any pointer-backed tag, in that case we have to extract the pointer to its
+    # canonical form and add that as a possible pointer.
+    var possible_pointer: usize = 0
+    if ((u64)data & shifted_is_cell_pattern) == shifted_is_cell_pattern:
+        possible_pointer = nan_boxed_value_extract_pointer_bits((u64)data)
+    else:
+        possible_pointer = data
+    if possible_pointer < min_block_address or possible_pointer > max_block_address:
+        return
+    gc_hash_map_set(possible_pointers, possible_pointer, origin)
+
+## Ported from Libraries/LibGC/Heap.cpp:104 GC::Heap::find_min_and_max_block_addresses. The
+## range also covers the large-object space (addition), so that pointers into large objects pass
+## add_possible_value's filter.
+pub func heap_find_min_and_max_block_addresses(this: Heap*, min_address: usize*, max_address: usize*):
+    *min_address = ~(usize)0  # explode_byte(0xff)
+    *max_address = 0
+    for node in list_nodes(&this.m_all_cell_allocators):
+        let allocator = cell_allocator_from_list_node(node)
+        let allocator_min = cell_allocator_min_block_address(allocator)
+        let allocator_max = cell_allocator_max_block_address(allocator) +% heap_block_base_block_size
+        if allocator_min < *min_address:
+            *min_address = allocator_min
+        if allocator_max > *max_address:
+            *max_address = allocator_max
+    heap_extend_block_address_range_with_large_objects(this, min_address, max_address)
+
+## Ported from Libraries/LibGC/Heap.cpp:115 GC::for_each_cell_among_possible_pointers: the cells
+## the possible pointers point into, each with the pointer that found it (`for found in ...`, a
+## (cell, pointer) pair). The heap is passed to look up large objects too (addition).
+func for_each_cell_among_possible_pointers(heap: Heap*, all_live_heap_blocks: const GcHashMap[u8]*, possible_pointers: const GcHashMap[HeapRoot]*) -> PossibleCells:
+    return PossibleCells(heap = heap, all_live_heap_blocks = all_live_heap_blocks, possible_pointers = possible_pointers)
+
+## The cells among a set of possible pointers.
+struct PossibleCells: luce.Iterable[(Cell*, usize), PossibleCellIterator]:
+    var heap: Heap*
+    var all_live_heap_blocks: const GcHashMap[u8]*
+    var possible_pointers: const GcHashMap[HeapRoot]*
+
+    func iterator() -> PossibleCellIterator:
+        return PossibleCellIterator(heap = self.heap, all_live_heap_blocks = self.all_live_heap_blocks, keys = gc_hash_map_keys(self.possible_pointers).iterator())
+
+## The iterator of PossibleCells.
+struct PossibleCellIterator: luce.Iterator[(Cell*, usize)]:
+    var heap: Heap*
+    var all_live_heap_blocks: const GcHashMap[u8]*
+    var keys: GcHashMapKeyIterator[HeapRoot]
+
+    mutating func next() -> (Cell*, usize)?:
+        while let possible_pointer = self.keys.next():
+            if possible_pointer == 0:
+                continue
+            if let cell = heap_cell_from_possible_pointer(self.heap, self.all_live_heap_blocks, possible_pointer):
+                return (cell, possible_pointer)
+        return none
+
+## The body of for_each_cell_among_possible_pointers's loop for one pointer: the live heap block
+## it points into and the cell there, or else (addition) the large object it points into.
+func heap_cell_from_possible_pointer(heap: Heap*, all_live_heap_blocks: const GcHashMap[u8]*, possible_pointer: usize) -> Cell*?:
+    if let possible_heap_block = heap_block_from_cell_address(possible_pointer):
+        if gc_hash_map_contains(all_live_heap_blocks, (usize)possible_heap_block):
+            return heap_block_cell_from_possible_pointer(possible_heap_block, possible_pointer)
+    return heap_large_cell_from_possible_pointer(heap, possible_pointer)

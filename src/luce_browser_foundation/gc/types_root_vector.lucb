@@ -17,7 +17,7 @@ pub struct RootVectorBase: IsRootVectorBase:
     pub var vtable: const RootVectorBaseVTable*
     pub var class_id: u16
     pub var m_heap: Heap*?  # C++ default: { nullptr }
-    pub var m_list_node: ak.IntrusiveListNode[RootVectorBase, RootVectorBase*?]
+    pub var m_list_node: ListNode
 
     func root_vector_base() -> RootVectorBase*: return (RootVectorBase*)&self
 
@@ -28,10 +28,10 @@ pub interface IsRootVectorBase:
 ## Virtual functions introduced by GC::RootVectorBase.
 pub struct RootVectorBaseVTable:
     pub let class_info: const ak.ClassInfo*
-    pub let gather_roots: func(RootVectorBase*, ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*) -> unit = root_vector_base_gather_roots_impl
+    pub let gather_roots: func(RootVectorBase*, GcHashMap[HeapRoot]*) -> unit = root_vector_base_gather_roots_impl
 
 ## Virtual: GC::RootVectorBase::gather_roots.
-pub func root_vector_base_gather_roots(this: RootVectorBase*, arg0: ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*):
+pub func root_vector_base_gather_roots(this: RootVectorBase*, arg0: GcHashMap[HeapRoot]*):
     ((const RootVectorBaseVTable*)this.vtable).gather_roots(this, arg0)
 
 ## The vtable of GC::RootVectorBase.

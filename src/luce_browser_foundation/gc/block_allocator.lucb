@@ -1,0 +1,114 @@
+#==============================================================================================
+#
+#   block_allocator - BlockAllocator: 16 KiB heap blocks from the OS, and a cache of free ones
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/BlockAllocator.cpp (lines 1-128) and BlockAllocator.h (lines
+#       1-28). A block is BLOCK_SIZE bytes aligned to BLOCK_SIZE, so the heap block of a cell is
+#       its address rounded down (HeapBlockBase::from_cell). macOS maps blocks with mach_vm_map
+#       and an alignment mask, Windows with VirtualAlloc (64 KiB granularity), and the other
+#       targets use posix_memalign, exactly as the C++ does. The address-sanitizer and
+#       leak-sanitizer annotations have no counterpart and are left out.
+#
+#==============================================================================================
+
+extern var mach_task_self_: u32
+extern func mach_vm_map(target_task: u32, address: u64*, size: u64, mask: u64, flags: i32, object: u32, offset: u64, copy: i32, cur_protection: i32, max_protection: i32, inheritance: u32) -> i32
+extern func mach_vm_deallocate(target_task: u32, address: u64, size: u64) -> i32
+extern func madvise(address: void*, length: usize, advice: i32) -> i32
+extern func posix_memalign(memptr: void*?*, alignment: usize, size: usize) -> i32
+extern func c_free as "free"(block: void*)
+extern func VirtualAlloc(address: void*?, size: usize, kind: u32, protection: u32) -> void*?
+extern func VirtualFree(address: void*, size: usize, kind: u32) -> i32
+extern func DiscardVirtualMemory(address: void*, size: usize) -> u32
+
+# <mach/vm_statistics.h>, <mach/vm_prot.h>, <mach/vm_inherit.h>, <sys/mman.h>, <memoryapi.h>
+let vm_flags_anywhere: i32 = 1
+let vm_prot_read_write: i32 = 3
+let vm_inherit_default: u32 = 1
+let madv_dontneed: i32 = 4
+let madv_free_reusable: i32 = 7
+let madv_free_reuse: i32 = 8
+let mem_commit: u32 = 0x1000
+let mem_release: u32 = 0x8000
+let page_readwrite: u32 = 4
+
+# mark: Blocks ==================================================================================
+
+## Ported from Libraries/LibGC/BlockAllocator.cpp:32 GC::BlockAllocator::~BlockAllocator: give
+## every cached block back to the OS. (The C++ destructor; Base has none, so the heap calls it.)
+pub func block_allocator_destroy(this: BlockAllocator*):
+    for block in gc_vector_span(&this.m_blocks):
+        if os.macos:
+            let kr = mach_vm_deallocate(mach_task_self_, (u64)(usize)block, (u64)heap_block_base_block_size)
+            assert(kr == 0)
+        elif os.windows:
+            if VirtualFree(block, 0, mem_release) == 0:
+                trap("VirtualFree failed")
+        else:
+            c_free(block)
+    gc_vector_clear(&this.m_blocks)
+
+## Ported from Libraries/LibGC/BlockAllocator.cpp:51 GC::BlockAllocator::allocate_block.
+pub func block_allocator_allocate_block(this: BlockAllocator*, name: const u8*?) -> void*:
+    if not gc_vector_is_empty(&this.m_blocks):
+        # To reduce predictability, take a random block from the cache.
+        let random_index = (usize)random_uniform((u32)gc_vector_size(&this.m_blocks))
+        let block = gc_vector_unstable_take(&this.m_blocks, random_index)
+        if os.macos:
+            # MADV_FREE_REUSE and MADV_FREE_REUSABLE exist on macOS only
+            if madvise(block, heap_block_base_block_size, madv_free_reuse) < 0:
+                trap("madvise(MADV_FREE_REUSE)")
+        return block
+
+    return map_aligned_block(heap_block_base_block_size)
+
+## Ported from Libraries/LibGC/BlockAllocator.cpp:96 GC::BlockAllocator::deallocate_block.
+pub func block_allocator_deallocate_block(this: BlockAllocator*, block: void*):
+    if os.windows:
+        let ret = DiscardVirtualMemory(block, heap_block_base_block_size)
+        if ret != 0:
+            trap("DiscardVirtualMemory failed")
+    elif os.macos:
+        if madvise(block, heap_block_base_block_size, madv_free_reusable) < 0:
+            trap("madvise(MADV_FREE_REUSABLE)")
+    else:
+        # MADV_FREE is not in every Linux libc's headers; MADV_DONTNEED is, as the C++ falls back to
+        if madvise(block, heap_block_base_block_size, madv_dontneed) < 0:
+            trap("madvise(MADV_DONTNEED)")
+
+    gc_vector_append(&this.m_blocks, block)
+
+## Ported from Libraries/LibGC/BlockAllocator.h:22 GC::BlockAllocator::blocks.
+pub func block_allocator_blocks(this: const BlockAllocator*) -> const GcVector[void*]*:
+    return &this.m_blocks
+
+# mark: Mapping =================================================================================
+
+## `size` bytes (a multiple of BLOCK_SIZE) aligned to BLOCK_SIZE, from the OS: the mapping half of
+## allocate_block, shared with the large-object space (heap_blobs.lucb), which needs the same
+## alignment so that HeapBlockBase::from_cell finds the heap of a large cell.
+func map_aligned_block(size: usize) -> void*:
+    if os.macos:
+        var address: u64 = 0
+        let kr = mach_vm_map(mach_task_self_, &address, (u64)size, (u64)(heap_block_base_block_size - 1), vm_flags_anywhere, 0, 0, 0, vm_prot_read_write, vm_prot_read_write, vm_inherit_default)
+        assert(kr == 0)
+        return (void*?)(usize)address else trap("mach_vm_map returned no address")
+    elif os.windows:
+        return VirtualAlloc(none, size, mem_commit, page_readwrite) else trap("VirtualAlloc failed")
+    else:
+        var block: void*? = none
+        let rc = posix_memalign(&block, heap_block_base_block_size, size)
+        assert(rc == 0)
+        return block else trap("posix_memalign returned no block")
+
+## Give a mapping from map_aligned_block back to the OS.
+func unmap_aligned_block(block: void*, size: usize):
+    if os.macos:
+        let kr = mach_vm_deallocate(mach_task_self_, (u64)(usize)block, (u64)size)
+        assert(kr == 0)
+    elif os.windows:
+        if VirtualFree(block, 0, mem_release) == 0:
+            trap("VirtualFree failed")
+    else:
+        c_free(block)

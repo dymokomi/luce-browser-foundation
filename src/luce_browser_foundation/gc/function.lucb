@@ -1,0 +1,109 @@
+#==============================================================================================
+#
+#   function - GC::Function: an escaping callback held by a cell
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/Function.h (lines 1-54). A GC::Function<T> is a cell around an
+#       AK::Function (a call pointer and its capture context, DESIGN.md §2.7); visit_edges scans
+#       the function's words conservatively, which marks the capture blob, which is scanned in
+#       turn: exactly LibGC's visit_possible_values(m_function.raw_capture_range()). Every
+#       arity has the same layout, so one vtable and one type-isolating allocator serve all of
+#       them (C++ instantiates GC_DEFINE_ALLOCATOR per T). create_function<Callable> is one
+#       function per arity, create_function0 to create_function8.
+#
+#==============================================================================================
+
+## The allocator of GC::Function cells (GC_DECLARE_ALLOCATOR(Function)), constructed on first use.
+var function_cell_allocator: TypeIsolatingCellAllocator[Function0[unit]]
+
+## The vtable of GC::Function (GC_CELL(Function, Cell)).
+pub let function_vtable: CellVTable = CellVTable(class_info = &function_class, class_name = function_class_name_impl, visit_edges = function_visit_edges_impl)
+
+## Class information of GC::Function.
+pub let function_class: ak.ClassInfo = ak.ClassInfo(name = "Function", first_id = 0, last_id = 0, size = sizeof(Function0[unit]), vtable = (const void*)&function_vtable)
+
+assert(sizeof(Function8[u8, u8, u8, u8, u8, u8, u8, u8, u8]) == sizeof(Function0[unit]))
+
+## GC_CELL(Function, Cell): the class name.
+func function_class_name_impl(this: Cell*) -> ak.StringView:
+    return sv("Function")
+
+## Ported from Libraries/LibGC/Function.h:36 GC::Function::visit_edges (override).
+func function_visit_edges_impl(this: Cell*, visitor: CellVisitor*):
+    cell_visit_edges_impl(this, visitor)
+    let function = (u8*)this + offsetof(Function0[unit], function)
+    cell_visitor_visit_possible_values(visitor, u8[](function, sizeof(ak.Function0[unit])))
+
+## Ported from Libraries/LibGC/Function.h:22 GC::Function::create, up to the construction:
+## heap.allocate<Function>(...) allocates the cell and holds DeferGC while the caller stores the
+## function; the caller undefers.
+func function_allocate(heap: Heap*) -> Cell*:
+    if function_cell_allocator.allocator.m_cell_size == 0:
+        type_isolating_cell_allocator_construct(&function_cell_allocator, sv("Function"), false, false)
+    let cell = heap_allocate_cell[Function0[unit]](heap, &function_cell_allocator.allocator)
+    heap_defer_gc(heap)
+    cell.vtable = &function_vtable
+    return cell
+
+## Ported from Libraries/LibGC/Function.h:46 GC::create_function (GC::Function<R()>).
+pub func create_function0[R](heap: Heap*, function: ak.Function0[R]) -> Function0[R]*:
+    let this = (Function0[R]*)function_allocate(heap)
+    this.function = function
+    heap_undefer_gc(heap)
+    return this
+
+## Ported from Libraries/LibGC/Function.h:46 GC::create_function (GC::Function<R(A1)>).
+pub func create_function1[A1, R](heap: Heap*, function: ak.Function1[A1, R]) -> Function1[A1, R]*:
+    let this = (Function1[A1, R]*)function_allocate(heap)
+    this.function = function
+    heap_undefer_gc(heap)
+    return this
+
+## Ported from Libraries/LibGC/Function.h:46 GC::create_function (GC::Function<R(A1, A2)>).
+pub func create_function2[A1, A2, R](heap: Heap*, function: ak.Function2[A1, A2, R]) -> Function2[A1, A2, R]*:
+    let this = (Function2[A1, A2, R]*)function_allocate(heap)
+    this.function = function
+    heap_undefer_gc(heap)
+    return this
+
+## Ported from Libraries/LibGC/Function.h:46 GC::create_function (GC::Function<R(A1, A2, A3)>).
+pub func create_function3[A1, A2, A3, R](heap: Heap*, function: ak.Function3[A1, A2, A3, R]) -> Function3[A1, A2, A3, R]*:
+    let this = (Function3[A1, A2, A3, R]*)function_allocate(heap)
+    this.function = function
+    heap_undefer_gc(heap)
+    return this
+
+## Ported from Libraries/LibGC/Function.h:46 GC::create_function (GC::Function<R(A1, A2, A3, A4)>).
+pub func create_function4[A1, A2, A3, A4, R](heap: Heap*, function: ak.Function4[A1, A2, A3, A4, R]) -> Function4[A1, A2, A3, A4, R]*:
+    let this = (Function4[A1, A2, A3, A4, R]*)function_allocate(heap)
+    this.function = function
+    heap_undefer_gc(heap)
+    return this
+
+## Ported from Libraries/LibGC/Function.h:46 GC::create_function (GC::Function<R(A1, A2, A3, A4, A5)>).
+pub func create_function5[A1, A2, A3, A4, A5, R](heap: Heap*, function: ak.Function5[A1, A2, A3, A4, A5, R]) -> Function5[A1, A2, A3, A4, A5, R]*:
+    let this = (Function5[A1, A2, A3, A4, A5, R]*)function_allocate(heap)
+    this.function = function
+    heap_undefer_gc(heap)
+    return this
+
+## Ported from Libraries/LibGC/Function.h:46 GC::create_function (GC::Function<R(A1, A2, A3, A4, A5, A6)>).
+pub func create_function6[A1, A2, A3, A4, A5, A6, R](heap: Heap*, function: ak.Function6[A1, A2, A3, A4, A5, A6, R]) -> Function6[A1, A2, A3, A4, A5, A6, R]*:
+    let this = (Function6[A1, A2, A3, A4, A5, A6, R]*)function_allocate(heap)
+    this.function = function
+    heap_undefer_gc(heap)
+    return this
+
+## Ported from Libraries/LibGC/Function.h:46 GC::create_function (GC::Function<R(A1, A2, A3, A4, A5, A6, A7)>).
+pub func create_function7[A1, A2, A3, A4, A5, A6, A7, R](heap: Heap*, function: ak.Function7[A1, A2, A3, A4, A5, A6, A7, R]) -> Function7[A1, A2, A3, A4, A5, A6, A7, R]*:
+    let this = (Function7[A1, A2, A3, A4, A5, A6, A7, R]*)function_allocate(heap)
+    this.function = function
+    heap_undefer_gc(heap)
+    return this
+
+## Ported from Libraries/LibGC/Function.h:46 GC::create_function (GC::Function<R(A1, A2, A3, A4, A5, A6, A7, A8)>).
+pub func create_function8[A1, A2, A3, A4, A5, A6, A7, A8, R](heap: Heap*, function: ak.Function8[A1, A2, A3, A4, A5, A6, A7, A8, R]) -> Function8[A1, A2, A3, A4, A5, A6, A7, A8, R]*:
+    let this = (Function8[A1, A2, A3, A4, A5, A6, A7, A8, R]*)function_allocate(heap)
+    this.function = function
+    heap_undefer_gc(heap)
+    return this

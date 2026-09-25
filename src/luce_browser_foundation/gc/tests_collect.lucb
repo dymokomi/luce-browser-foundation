@@ -1,0 +1,345 @@
+#==============================================================================================
+#
+#   tests_collect - collection: roots, precise edges, finalization, deferral, callbacks
+#
+#   DESCRIPTION:
+#       LibGC has no unit tests of its own in the donor (Tests/ has none for LibGC); these pin
+#       the C++ behaviour, with the expected counts taken from a local driver over the
+#       reference build's liblagom-gc (the scenario of `collect_garbage finalizes the garbage`
+#       gives 1000, 0 and 1 finalized cells there as here).
+#
+#==============================================================================================
+
+# mark: Collection ==============================================================================
+
+test "a new heap has the size-based allocators and no blocks":
+    clobber_stack()
+    run_new_heap()
+
+noinline func run_new_heap():
+    let heap = create_test_heap()
+    assert(gc_vector_size(&heap.m_size_based_cell_allocators) == 7)
+    assert(cell_allocator_cell_size(heap_allocator_for_size(heap, 1)) == 64)
+    assert(cell_allocator_cell_size(heap_allocator_for_size(heap, 64)) == 64)
+    assert(cell_allocator_cell_size(heap_allocator_for_size(heap, 65)) == 96)
+    assert(cell_allocator_cell_size(heap_allocator_for_size(heap, 257)) == 512)
+    assert(cell_allocator_cell_size(heap_allocator_for_size(heap, 3072)) == 3072)
+    assert(heap_the() == heap)
+    assert(live_cell_count(heap) == 0)
+    assert(not heap_is_gc_deferred(heap))
+    destroy_test_heap(heap)
+
+test "collect_garbage finalizes the garbage and keeps what is reachable":
+    clobber_stack()
+    run_finalizes_garbage()
+
+noinline func run_finalizes_garbage():
+    let heap = create_test_heap()
+    var root = root_create[TestCell](new_test_cell(heap, 1))
+    let first = root_cell(&root) else trap("no root cell")
+    first.left = new_test_cell(heap, 2)
+    let second = first.left else trap("no left")
+    second.right = new_test_cell(heap, 3)
+    make_garbage(heap, 1000)
+    discard(new_test_cell(heap, -5))  # must survive garbage collection
+
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(finalized_count == 1000)
+    assert(live_test_cell_count(heap) == 4)
+
+    finalized_count = 0
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(finalized_count == 0)
+
+    second.right = none
+    finalized_count = 0
+    finalized_id_sum = 0
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(finalized_count == 1)
+    assert(finalized_id_sum == 3)
+    assert(live_test_cell_count(heap) == 3)
+
+    root_release(&root)
+    destroy_test_heap(heap)
+
+test "a cell reachable only through an unvisited field dies":
+    clobber_stack()
+    run_unvisited_field_dies()
+
+noinline func run_unvisited_field_dies():
+    let heap = create_test_heap()
+    var root = root_create[TestCell](new_test_cell(heap, 1))
+    let first = root_cell(&root) else trap("no root cell")
+    let weak = make_unreferenced_cell(heap, 7)
+    first.hidden = weak_ptr(&weak)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not alive(&weak))
+    assert(finalized_id_sum == 7)
+    root_release(&root)
+    destroy_test_heap(heap)
+
+# mark: Roots ===================================================================================
+
+test "roots: Root handles, the embedder's roots, uprooted cells":
+    clobber_stack()
+    run_explicit_roots()
+
+noinline func run_explicit_roots():
+    let heap = create_test_heap()
+    let weak_rooted = make_unreferenced_cell(heap, 10)
+    var root = root_of_weak[TestCell](&weak_rooted)
+    let weak_embedder = make_unreferenced_cell(heap, 11)
+    embedder_roots[0] = weak_ptr(&weak_embedder)
+    let weak_free = make_unreferenced_cell(heap, 12)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(alive(&weak_rooted))
+    assert(alive(&weak_embedder))
+    assert(not alive(&weak_free))
+
+    # A rooted cell that is uprooted is unmarked after marking, so it dies with the garbage.
+    heap_uproot_cell(heap, (weak_ptr(&weak_embedder) else trap("dead")).cell())
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not alive(&weak_embedder))
+    embedder_roots[0] = none
+    assert(gc_vector_is_empty(&heap.m_uprooted_cells))
+
+    root_release(&root)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not alive(&weak_rooted))
+    assert(list_is_empty(&heap.m_roots))
+    destroy_test_heap(heap)
+
+test "must_survive_garbage_collection keeps a cell and what it reaches":
+    clobber_stack()
+    run_must_survive()
+
+noinline func run_must_survive():
+    let heap = create_test_heap()
+    let weak_survivor = make_unreferenced_cell(heap, -1)
+    let weak_child = make_unreferenced_cell(heap, 20)
+    link_left(&weak_survivor, &weak_child)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(alive(&weak_survivor))
+    assert(alive(&weak_child))
+    assert(finalized_count == 0)
+    set_id(&weak_survivor, 1)  # no longer must survive
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not alive(&weak_survivor))
+    assert(not alive(&weak_child))
+    assert(finalized_count == 2)
+    destroy_test_heap(heap)
+
+## A RootVector<TestCell>: a RootVectorBase first, then its cells (on the C heap, which no scan sees).
+struct TestRootVector:
+    var base: RootVectorBase
+    var cells: GcVector[TestCell*]
+
+let test_root_vector_vtable: RootVectorBaseVTable = RootVectorBaseVTable(class_info = &root_vector_base_class, gather_roots = test_root_vector_gather_roots_impl)
+
+func test_root_vector_gather_roots_impl(this: RootVectorBase*, roots: GcHashMap[HeapRoot]*):
+    let vector = (TestRootVector*)this
+    for cell in gc_vector_span(&vector.cells):
+        gc_hash_map_set(roots, (usize)cell, HeapRoot(type_ = HeapRootType.root_vector))
+
+## A RootHashMap<i64, TestCell>: its values are roots.
+struct TestRootHashMap:
+    var base: RootHashMapBase
+    var values: GcHashMap[TestCell*]
+
+let test_root_hash_map_vtable: RootHashMapBaseVTable = RootHashMapBaseVTable(class_info = &root_hash_map_base_class, gather_roots = test_root_hash_map_gather_roots_impl)
+
+func test_root_hash_map_gather_roots_impl(this: RootHashMapBase*, roots: GcHashMap[HeapRoot]*):
+    let map = (TestRootHashMap*)this
+    for key in gc_hash_map_keys(&map.values):
+        let value = *(gc_hash_map_get(&map.values, key) else trap("no value"))
+        gc_hash_map_set(roots, (usize)value, HeapRoot(type_ = HeapRootType.root_hash_map))
+
+## A ConservativeVector<FlatPtr>: its words are possible pointers.
+struct TestConservativeVector:
+    var base: ConservativeVectorBase
+    var words: GcVector[u64]
+
+let test_conservative_vector_vtable: ConservativeVectorBaseVTable = ConservativeVectorBaseVTable(class_info = &conservative_vector_base_class, possible_values = test_conservative_vector_possible_values_impl)
+
+func test_conservative_vector_possible_values_impl(this: ConservativeVectorBase*) -> const u64[]:
+    let vector = (TestConservativeVector*)this
+    return gc_vector_span(&vector.words)
+
+test "roots: root vectors, root hash maps, conservative vectors":
+    clobber_stack()
+    run_root_containers()
+
+noinline func run_root_containers():
+    let heap = create_test_heap()
+    let vector = (new TestRootVector(base = RootVectorBase(vtable = &test_root_vector_vtable, class_id = 0, m_heap = none, m_list_node = ListNode()), cells = GcVector[TestCell*]()) in memory.heap) else trap("out of memory")
+    root_vector_base_construct(&vector.base, heap)
+    let map = (new TestRootHashMap(base = RootHashMapBase(vtable = &test_root_hash_map_vtable, class_id = 0, m_heap = none, m_list_node = ListNode()), values = GcHashMap[TestCell*]()) in memory.heap) else trap("out of memory")
+    root_hash_map_base_construct(&map.base, heap)
+    let conservative = (new TestConservativeVector(base = ConservativeVectorBase(vtable = &test_conservative_vector_vtable, class_id = 0, m_heap = none, m_list_node = ListNode()), words = GcVector[u64]()) in memory.heap) else trap("out of memory")
+    conservative_vector_base_construct(&conservative.base, heap)
+
+    let weak_in_vector = make_unreferenced_cell(heap, 30)
+    gc_vector_append(&vector.cells, weak_ptr(&weak_in_vector) else trap("dead"))
+    let weak_in_map = make_unreferenced_cell(heap, 31)
+    gc_hash_map_set(&map.values, 42, weak_ptr(&weak_in_map) else trap("dead"))
+    let weak_in_conservative = make_unreferenced_cell(heap, 32)
+    # an interior pointer, NaN-boxed as LibJS stores cells in Values
+    let cell_address = (u64)(usize)(weak_ptr(&weak_in_conservative) else trap("dead")) + 8
+    gc_vector_append(&conservative.words, cell_address | shifted_is_cell_pattern)
+    let weak_free = make_unreferenced_cell(heap, 33)
+
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(alive(&weak_in_vector))
+    assert(alive(&weak_in_map))
+    assert(alive(&weak_in_conservative))
+    assert(not alive(&weak_free))
+
+    root_vector_base_destroy(&vector.base)
+    root_hash_map_base_destroy(&map.base)
+    conservative_vector_base_destroy(&conservative.base)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not alive(&weak_in_vector))
+    assert(not alive(&weak_in_map))
+    assert(not alive(&weak_in_conservative))
+    gc_vector_clear(&vector.cells)
+    gc_hash_map_clear(&map.values)
+    gc_vector_clear(&conservative.words)
+    free(vector) in memory.heap
+    free(map) in memory.heap
+    free(conservative) in memory.heap
+    destroy_test_heap(heap)
+
+# mark: Deferral, tasks, callbacks, weak containers =============================================
+
+test "DeferGC postpones a collection until the deferral ends":
+    clobber_stack()
+    run_defer_gc()
+
+noinline func run_defer_gc():
+    let heap = create_test_heap()
+    make_garbage(heap, 10)
+    var defer_gc: DeferGc = DeferGc(m_heap = heap)
+    defer_gc_construct(&defer_gc, heap)
+    assert(heap_is_gc_deferred(heap))
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(finalized_count == 0)
+    assert(heap.m_should_gc_when_deferral_ends)
+    clobber_stack()
+    defer_gc_destroy(&defer_gc)
+    assert(finalized_count == 10)
+    assert(not heap.m_should_gc_when_deferral_ends)
+    destroy_test_heap(heap)
+
+var post_gc_task_runs: i64
+var sweep_callback_runs: i64
+
+func count_post_gc_task(context: void*?):
+    post_gc_task_runs += 1
+
+func count_sweep_callback(context: void*?):
+    sweep_callback_runs += 1
+
+test "post-GC tasks run once after a collection, sweep callbacks every sweep":
+    clobber_stack()
+    run_post_gc_tasks()
+
+noinline func run_post_gc_tasks():
+    let heap = create_test_heap()
+    post_gc_task_runs = 0
+    sweep_callback_runs = 0
+    heap_enqueue_post_gc_task(heap, ak.Function0[unit](call = count_post_gc_task, context = none))
+    heap_register_sweep_callback(heap, ak.Function0[unit](call = count_sweep_callback, context = none))
+    clobber_stack()
+    heap_collect_garbage(heap)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(post_gc_task_runs == 1)
+    assert(sweep_callback_runs == 2)
+    destroy_test_heap(heap)
+
+## A WeakContainer: a list of TestCells that drops the dead ones when told.
+struct TestWeakContainer:
+    var base: WeakContainer
+    var cells: GcVector[TestCell*]
+    var calls: i64
+
+let test_weak_container_vtable: WeakContainerVTable = WeakContainerVTable(class_info = &weak_container_class, remove_dead_cells = test_weak_container_remove_dead_cells_impl)
+
+func test_weak_container_remove_dead_cells_impl(this: WeakContainer*):
+    let container = (TestWeakContainer*)this
+    container.calls += 1
+    var i: usize = 0
+    while i < gc_vector_size(&container.cells):
+        if cell_state(gc_vector_at(&container.cells, i).cell()) != CellState.live:
+            discard(gc_vector_unstable_take(&container.cells, i))
+        else:
+            i += 1
+
+test "weak containers remove their dead cells after each sweep":
+    clobber_stack()
+    run_weak_containers()
+
+noinline func run_weak_containers():
+    let heap = create_test_heap()
+    let container = (new TestWeakContainer(base = WeakContainer(vtable = &test_weak_container_vtable, class_id = 0, m_registered = false, m_heap = heap, m_list_node = ListNode()), cells = GcVector[TestCell*](), calls = 0) in memory.heap) else trap("out of memory")
+    weak_container_construct(&container.base, heap)
+    var root = root_create[TestCell](new_test_cell(heap, 1))
+    gc_vector_append(&container.cells, root_cell(&root) else trap("no cell"))
+    let weak = make_unreferenced_cell(heap, 2)
+    gc_vector_append(&container.cells, weak_ptr(&weak) else trap("dead"))
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(container.calls == 1)
+    assert(gc_vector_size(&container.cells) == 1)
+    weak_container_destroy(&container.base)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(container.calls == 1)
+    root_release(&root)
+    gc_vector_clear(&container.cells)
+    free(container) in memory.heap
+    destroy_test_heap(heap)
+
+# mark: Thresholds and heap destruction =========================================================
+
+test "the threshold follows the live bytes and collects on allocation":
+    clobber_stack()
+    run_threshold()
+
+noinline func run_threshold():
+    let heap = create_test_heap()
+    assert(heap.m_gc_bytes_threshold == heap_gc_min_bytes_threshold)
+    # 4 MiB of garbage: the allocations past the threshold collect by themselves
+    make_garbage(heap, (i64)(heap_gc_min_bytes_threshold // sizeof(TestCell)) + 100)
+    assert(finalized_count > 0)
+    assert(heap.m_allocated_bytes_since_last_gc < heap_gc_min_bytes_threshold)
+    destroy_test_heap(heap)
+
+test "heap destruction collects everything":
+    clobber_stack()
+    run_collect_everything()
+
+noinline func run_collect_everything():
+    let heap = create_test_heap()
+    var root = root_create[TestCell](new_test_cell(heap, 1))
+    make_garbage(heap, 50)
+    heap_collect_garbage(heap, HeapCollectionType.collect_everything)
+    assert(finalized_count == 51)
+    assert(live_test_cell_count(heap) == 0)
+    # the rooted cell is gone with everything else; its RootImpl is unlinked and given back by hand
+    let impl = root.m_impl else trap("no impl")
+    list_node_remove(&impl.m_list_node)
+    free(impl) in memory.heap
+    destroy_test_heap(heap)

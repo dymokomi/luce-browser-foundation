@@ -13,13 +13,14 @@
 # mark: CellAllocator ===========================================================================
 
 ## GC::CellAllocator (Libraries/LibGC/CellAllocator.h:32).
+## The lists are gc's own intrusive lists (fixed by hand, containers.lucb).
 pub struct CellAllocator:
-    pub var m_list_node: ak.IntrusiveListNode[CellAllocator, CellAllocator*?]
+    pub var m_list_node: ListNode
     pub var m_class_name: ak.StringView?
     pub var m_cell_size: usize
     pub var m_block_allocator: BlockAllocator
-    pub var m_full_blocks: ak.IntrusiveList[HeapBlock, HeapBlock*?]
-    pub var m_usable_blocks: ak.IntrusiveList[HeapBlock, HeapBlock*?]
+    pub var m_full_blocks: List
+    pub var m_usable_blocks: List
     pub var m_min_block_address: usize  # C++ default: { explode_byte ( 0xff ) }
     pub var m_max_block_address: usize  # C++ default: { 0 }
     pub var m_overrides_must_survive_garbage_collection: bool  # C++ default: { false }
@@ -27,8 +28,7 @@ pub struct CellAllocator:
 
 ## The non-zero default member initializers of GC::CellAllocator; the constructor runs them first.
 pub func cell_allocator_init_fields(this: CellAllocator*):
-    # m_min_block_address: C++ default explode_byte ( 0xff ) (not translated by the generator)
-    return
+    this.m_min_block_address = ~(usize)0  # explode_byte(0xff)
 
 # mark: TypeIsolatingCellAllocator ==============================================================
 

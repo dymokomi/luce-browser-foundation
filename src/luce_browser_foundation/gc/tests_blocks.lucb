@@ -1,0 +1,191 @@
+#==============================================================================================
+#
+#   tests_blocks - heap blocks, weak blocks, NaN-boxed values and the collector's containers
+#
+#   DESCRIPTION:
+#       The expected values come from a local driver over the reference build's liblagom-gc
+#       (sizeof(HeapBlock) 64, cell counts per size class, the freelist order after
+#       deallocating cells 3, 7 and 5, the WeakImpl freelist, extract_pointer_bits on arm64).
+#
+#==============================================================================================
+
+# mark: Blocks ==================================================================================
+
+test "layout matches LibGC's: header, cell, freelist entry, weak block":
+    assert(heap_block_storage_offset == 64)
+    assert(sizeof(Cell) == 16)
+    assert(heap_block_min_possible_cell_size == 24)
+    assert(sizeof(WeakImpl) == 24)
+    assert(weak_block_impl_count == 681)
+    assert(sizeof(RootImpl) <= 64)
+
+test "cell counts per size class":
+    let heap = create_test_heap()
+    let expected: usize[7] = [255, 170, 127, 63, 31, 15, 5]
+    for (index, cell_size) in cell_size_classes.indexed():
+        var allocator: CellAllocator
+        cell_allocator_construct(&allocator, cell_size)
+        let block = heap_block_create_with_cell_size(heap, &allocator, cell_size, false, false)
+        assert(heap_block_cell_count(block) == expected[index])
+        block_allocator_deallocate_block(&allocator.m_block_allocator, block)
+        block_allocator_destroy(&allocator.m_block_allocator)
+    destroy_test_heap(heap)
+
+test "a heap block hands out cells in order, then its freelist last-in first-out":
+    let heap = create_test_heap()
+    var allocator: CellAllocator
+    cell_allocator_construct(&allocator, 64)
+    let block = heap_block_create_with_cell_size(heap, &allocator, 64, false, false)
+    assert((usize)block % heap_block_base_block_size == 0)
+    assert(not heap_block_is_full(block))
+    var cells: (Cell*?)[255]
+    for i in 0..<heap_block_cell_count(block):
+        let cell = heap_block_allocate(block) else trap("no cell")
+        cell.m_state = CellState.live
+        cell.m_mark = false
+        cells[i] = cell
+    assert(heap_block_is_full(block))
+    assert(heap_block_allocate(block) == none)
+    let first = cells[0] else trap("no cell")
+    assert((usize)(cells[1] else trap("no cell")) - (usize)first == 64)
+    assert((usize)first - (usize)block == 64)
+    assert(heap_block_from_cell(first) == block)
+
+    for i in [3, 7, 5]:
+        heap_block_deallocate(block, cells[i] else trap("no cell"))
+        assert(cell_state(cells[i] else trap("no cell")) == CellState.dead)
+    assert(not heap_block_is_full(block))
+    var reallocated: usize[3]
+    for i in 0..<3:
+        let cell = heap_block_allocate(block) else trap("no cell")
+        assert(cell_state(cell) == CellState.dead)  # a FreelistEntry until constructed
+        cell.m_state = CellState.live
+        reallocated[i] = ((usize)cell - (usize)first) // 64
+    assert(reallocated[0] == 5 and reallocated[1] == 7 and reallocated[2] == 3)
+
+    let tenth = cells[10] else trap("no cell")
+    assert(heap_block_cell_from_possible_pointer(block, (usize)tenth + 13) == tenth)
+    assert(heap_block_cell_from_possible_pointer(block, (usize)block + 8) == none)
+    assert(heap_block_is_valid_cell_pointer(block, tenth))
+
+    var dead: usize = 0
+    for _ in heap_block_for_each_cell_in_state(block, CellState.dead):
+        dead += 1
+    assert(dead == 0)
+    block_allocator_deallocate_block(&allocator.m_block_allocator, block)
+    block_allocator_destroy(&allocator.m_block_allocator)
+    destroy_test_heap(heap)
+
+test "the block allocator caches freed blocks and hands them out again":
+    var allocator: BlockAllocator
+    let a = block_allocator_allocate_block(&allocator, none)
+    let b = block_allocator_allocate_block(&allocator, none)
+    assert(a != b)
+    block_allocator_deallocate_block(&allocator, a)
+    block_allocator_deallocate_block(&allocator, b)
+    assert(gc_vector_size(block_allocator_blocks(&allocator)) == 2)
+    let c = block_allocator_allocate_block(&allocator, none)
+    assert(c == a or c == b)
+    assert(gc_vector_size(block_allocator_blocks(&allocator)) == 1)
+    block_allocator_deallocate_block(&allocator, c)
+    block_allocator_destroy(&allocator)
+    assert(gc_vector_is_empty(block_allocator_blocks(&allocator)))
+
+test "random_uniform stays below its bound":
+    for bound: u32 in 1..=17:
+        for _ in 0..<50:
+            assert(random_uniform(bound) < bound)
+
+test "a weak block's freelist is last-in first-out":
+    let block = weak_block_create()
+    let marker = (Cell*?)(usize)0x10000 else trap("no marker")
+    let i1 = weak_block_allocate(block, marker) else trap("no impl")
+    let i2 = weak_block_allocate(block, marker) else trap("no impl")
+    assert(i1 == &block.m_impls[0])
+    assert(i2 == &block.m_impls[1])
+    weak_block_deallocate(block, i1)
+    let i3 = weak_block_allocate(block, none) else trap("no impl")
+    assert(i3 == &block.m_impls[0])
+    assert(weak_impl_state(i3) == WeakImplState.allocated)
+    assert(weak_block_can_allocate(block))
+    for _ in 2..<weak_block_impl_count:
+        discard(weak_block_allocate(block, none))
+    assert(not weak_block_can_allocate(block))
+    assert(weak_block_allocate(block, none) == none)
+    unmap_aligned_block(block, weak_block_block_size)
+
+# mark: NaN-boxed values ========================================================================
+
+test "NaN-boxed values: cells, NaN and the pointer bits":
+    let samples: u64[5] = [0xfffa000012345678, 0x7ff8000000000000, 0xfff8800000001000, 0x4000000000000000, 0xfff9fffffffffff0]
+    let expect_cell: bool[5] = [true, false, true, false, true]
+    let expect_nan: bool[5] = [false, true, false, false, false]
+    for (i, sample) in samples.indexed():
+        var value: NanBoxedValue
+        value.m_value.encoded = sample
+        assert(nan_boxed_value_is_cell(&value) == expect_cell[i])
+        assert(nan_boxed_value_is_nan(&value) == expect_nan[i])
+    if os.arm64:
+        assert(nan_boxed_value_extract_pointer_bits(0xfffa000012345678) == 0x12345678)
+        assert(nan_boxed_value_extract_pointer_bits(0xfff8800000001000) == 0x800000001000)
+        assert(nan_boxed_value_extract_pointer_bits(0xfff9fffffffffff0) == 0xfffffffffff0)
+    else:
+        assert(nan_boxed_value_extract_pointer_bits(0xfff8800000001000) == 0xffff800000001000)
+    assert(canon_nan_bits == 0x7FF8000000000000)
+    assert(shifted_is_cell_pattern == 0xfff8000000000000)
+    assert(is_cell_bit == 0xfff8)
+
+# mark: The collector's containers ==============================================================
+
+test "GcVector: append, insert, remove, unstable_take, take_last":
+    var vector: GcVector[i64]
+    for i in 0..<100:
+        gc_vector_append(&vector, i)
+    assert(gc_vector_size(&vector) == 100)
+    gc_vector_insert(&vector, 0, -1)
+    assert(gc_vector_at(&vector, 0) == -1 and gc_vector_at(&vector, 1) == 0)
+    gc_vector_remove(&vector, 0)
+    assert(gc_vector_at(&vector, 0) == 0)
+    assert(gc_vector_unstable_take(&vector, 10) == 10)
+    assert(gc_vector_at(&vector, 10) == 99)
+    assert(gc_vector_take_last(&vector) == 98)
+    assert(gc_vector_size(&vector) == 98)
+    gc_vector_clear(&vector)
+    assert(gc_vector_is_empty(&vector) and vector.m_data == none)
+
+test "GcHashMap: set, replace, get, grow, keys":
+    var map: GcHashMap[i64]
+    for i: usize in 1..=1000:
+        gc_hash_map_set(&map, i * 16, (i64)i)
+    gc_hash_map_set(&map, 16, -1)
+    assert(gc_hash_map_size(&map) == 1000)
+    assert(*(gc_hash_map_get(&map, 16) else trap("missing")) == -1)
+    assert(*(gc_hash_map_get(&map, 16000) else trap("missing")) == 1000)
+    assert(gc_hash_map_get(&map, 8) == none)
+    assert(not gc_hash_map_contains(&map, 16016))
+    var sum: usize = 0
+    for key in gc_hash_map_keys(&map):
+        sum += key
+    assert(sum == 16 * 1000 * 1001 // 2)
+    gc_hash_map_clear(&map)
+    assert(gc_hash_map_size(&map) == 0 and gc_hash_map_get(&map, 16) == none)
+
+test "intrusive lists: append moves a node between lists":
+    var a: List
+    var b: List
+    var nodes: ListNode[3]
+    for i in 0..<3:
+        list_append(&a, &nodes[i])
+    assert(list_contains(&a, &nodes[1]))
+    list_append(&b, &nodes[1])
+    assert(not list_contains(&a, &nodes[1]) and list_contains(&b, &nodes[1]))
+    var count: usize = 0
+    for node in list_nodes(&a):
+        assert(node == &nodes[0] or node == &nodes[2])
+        count += 1
+    assert(count == 2)
+    list_remove(&a, &nodes[0])
+    assert(list_first(&a) == &nodes[2] and list_last(&a) == &nodes[2])
+    list_node_remove(&nodes[2])
+    assert(list_is_empty(&a))
+    assert(not list_node_is_in_list(&nodes[2]))

@@ -1,0 +1,39 @@
+#==============================================================================================
+#
+#   root_vector - RootVectorBase: a vector whose elements are roots
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/RootVector.cpp (lines 1-35) and RootVector.h (lines 1-108).
+#       The base registers itself with its heap; the template RootVector<T> (base plus an
+#       AK::Vector) is spelled by its users as a struct that embeds the base first and reports
+#       its elements in the gather_roots slot of its vtable. In managed memory a RootVector<T> is
+#       a plain Vector[T*] (DESIGN.md §2.6): the conservative scans keep its cells alive.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/RootVector.h:21 GC::RootVectorBase::gather_roots (virtual).
+pub func root_vector_base_gather_roots_impl(this: RootVectorBase*, arg0: GcHashMap[HeapRoot]*):
+    trap("pure virtual: GC::RootVectorBase::gather_roots")
+
+## Ported from Libraries/LibGC/RootVector.cpp:13 GC::RootVectorBase::RootVectorBase.
+pub func root_vector_base_construct(this: RootVectorBase*, heap: Heap*):
+    this.m_heap = heap
+    heap_did_create_root_vector(heap, this)
+
+## Ported from Libraries/LibGC/RootVector.cpp:19 GC::RootVectorBase::~RootVectorBase (the C++ destructor).
+pub func root_vector_base_destroy(this: RootVectorBase*):
+    heap_did_destroy_root_vector(this.m_heap else trap("root vector without a heap"), this)
+
+## Ported from Libraries/LibGC/RootVector.cpp:24 GC::RootVectorBase::assign_heap.
+pub func root_vector_base_assign_heap(this: RootVectorBase*, heap: Heap*?):
+    if this.m_heap == heap:
+        return
+
+    this.m_heap = heap
+
+    # NOTE: IntrusiveList will remove this RootVectorBase from the old heap it was part of.
+    heap_did_create_root_vector(this.m_heap else trap("assign_heap to no heap"), this)
+
+## The RootVectorBase whose m_list_node is `node` (IntrusiveList's container_of).
+func root_vector_base_from_list_node(node: ListNode*) -> RootVectorBase*:
+    return (RootVectorBase*)((u8*)node - offsetof(RootVectorBase, m_list_node))

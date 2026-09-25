@@ -1,0 +1,66 @@
+#==============================================================================================
+#
+#   weak_block - WeakBlock: a block of WeakImpls
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/WeakBlock.cpp (lines 1-77) and WeakBlock.h (lines 1-45). A
+#       block's free impls form a freelist threaded through their pointers. The port maps each
+#       block at a BLOCK_SIZE-aligned address (C++ uses mmap's page alignment), so that a word
+#       the collector scans finds its block by masking (the tracing of heap_blobs.lucb).
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/WeakBlock.cpp:20 GC::WeakBlock::create.
+pub func weak_block_create() -> WeakBlock*:
+    let block = (WeakBlock*)map_aligned_block(weak_block_block_size)
+    weak_block_construct(block)
+    return block
+
+## Ported from Libraries/LibGC/WeakBlock.cpp:32 GC::WeakBlock::WeakBlock.
+pub func weak_block_construct(this: WeakBlock*):
+    this.m_list_node = ListNode()
+    for i in 0..<weak_block_impl_count:
+        let next: void*? = &this.m_impls[i + 1] if i + 1 < weak_block_impl_count else none
+        this.m_impls[i].m_ref_count = 0
+        weak_impl_set_ptr(&this.m_impls[i], next)
+        weak_impl_set_state(&this.m_impls[i], WeakImplState.freelist)
+    this.m_freelist = &this.m_impls[0]
+
+## Ported from Libraries/LibGC/WeakBlock.cpp:43 GC::WeakBlock::allocate.
+pub func weak_block_allocate(this: WeakBlock*, cell: Cell*?) -> WeakImpl*?:
+    let impl = this.m_freelist else return none
+    assert(weak_impl_ref_count(impl) == 0)
+    this.m_freelist = (WeakImpl*?)weak_impl_ptr(impl)
+    weak_impl_set_ptr(impl, cell)
+    weak_impl_set_state(impl, WeakImplState.allocated)
+    return impl
+
+## Ported from Libraries/LibGC/WeakBlock.cpp:55 GC::WeakBlock::deallocate.
+pub func weak_block_deallocate(this: WeakBlock*, impl: WeakImpl*):
+    assert(weak_impl_ref_count(impl) == 0)
+    weak_impl_set_ptr(impl, this.m_freelist)
+    weak_impl_set_state(impl, WeakImplState.freelist)
+    this.m_freelist = impl
+
+## Ported from Libraries/LibGC/WeakBlock.h:24 GC::WeakBlock::can_allocate.
+pub func weak_block_can_allocate(this: const WeakBlock*) -> bool:
+    return this.m_freelist != none
+
+## Ported from Libraries/LibGC/WeakBlock.cpp:63 GC::WeakBlock::sweep.
+pub func weak_block_sweep(this: WeakBlock*):
+    for i in 0..<weak_block_impl_count:
+        let impl = &this.m_impls[i]
+        if weak_impl_state(impl) == WeakImplState.freelist:
+            continue
+        let cell = (Cell*?)weak_impl_ptr(impl)
+        var dead = true
+        if let c = cell:
+            dead = not cell_is_marked(c)
+        if dead:
+            weak_impl_set_ptr(impl, none)
+        if weak_impl_ref_count(impl) == 0:
+            weak_block_deallocate(this, impl)
+
+## The WeakBlock whose m_list_node is `node` (IntrusiveList's container_of).
+func weak_block_from_list_node(node: ListNode*) -> WeakBlock*:
+    return (WeakBlock*)((u8*)node - offsetof(WeakBlock, m_list_node))

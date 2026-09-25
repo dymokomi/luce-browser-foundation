@@ -1,0 +1,97 @@
+#==============================================================================================
+#
+#   root - RootImpl and Root<T>: explicit roots
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/Root.cpp (lines 1-25) and Root.h (lines 1-189). A RootImpl
+#       registers its cell with the heap's root list while it lives. In the port a GC::Root<T>
+#       held in managed memory or on the stack is simply `T*` (DESIGN.md §2.6): the conservative
+#       scans keep the cell alive, so make_root answers the cell. gc.Root[T] is the handle for
+#       pointers kept where no scan looks (C-heap memory, another heap, OS callbacks): its
+#       RootImpl lives on the C heap and root_release gives it back, where C++'s reference
+#       count reaches zero.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/Root.h:26 GC::RootImpl::cell.
+pub func root_impl_cell(this: RootImpl*) -> Cell*?:
+    return this.m_cell
+
+## Ported from Libraries/LibGC/Root.h:27 GC::RootImpl::cell (const).
+pub func root_impl_cell_const(this: const RootImpl*) -> Cell*?:
+    return this.m_cell
+
+## Ported from Libraries/LibGC/Root.h:29 GC::RootImpl::source_location.
+pub func root_impl_source_location(this: const RootImpl*) -> ak.SourceLocation:
+    return this.m_location
+
+## Ported from Libraries/LibGC/Root.cpp:13 GC::RootImpl::RootImpl.
+pub func root_impl_construct(this: RootImpl*, cell: Cell*?, location: ak.SourceLocation):
+    this.m_cell = cell
+    this.m_location = location
+    heap_did_create_root(cell_heap(this.m_cell else trap("a root of no cell")), this)
+
+## Ported from Libraries/LibGC/Root.cpp:19 GC::RootImpl::~RootImpl (the C++ destructor).
+pub func root_impl_destroy(this: RootImpl*):
+    heap_did_destroy_root(cell_heap(this.m_cell else trap("a root of no cell")), this)
+
+## The RootImpl whose m_list_node is `node` (IntrusiveList's container_of).
+func root_impl_from_list_node(node: ListNode*) -> RootImpl*:
+    return (RootImpl*)((u8*)node - offsetof(RootImpl, m_list_node))
+
+## Ported from Libraries/LibGC/Root.h:52 GC::Root::create / Root(T*): a root of `cell`, or a null
+## root when `cell` is none. `at` is where the root is made (SourceLocation::current()).
+pub func root_create[T: IsCell](cell: T*?, at: io.Location = luce.location) -> Root[T]:
+    let c = cell else return Root[T](m_impl = none)
+    let impl = (new RootImpl(m_cell = none, m_location = ak.SourceLocation(), m_list_node = ListNode()) in memory.heap) else trap("out of memory")
+    root_impl_construct(impl, c.cell(), source_location_of(at))
+    return Root[T](m_impl = impl)
+
+## An ak.SourceLocation for a io.Location (both name static text, NUL-terminated).
+func source_location_of(at: io.Location) -> ak.SourceLocation:
+    return ak.SourceLocation(m_function = at.function.bytes.data, m_file = at.file.bytes.data, m_line = at.line)
+
+## Ported from Libraries/LibGC/Root.h:79 GC::Root::cell.
+pub func root_cell[T](this: const Root[T]*) -> T*?:
+    let impl = this.m_impl else return none
+    return (T*?)root_impl_cell(impl)
+
+## Ported from Libraries/LibGC/Root.h:86 GC::Root::ptr.
+pub func root_ptr[T](this: const Root[T]*) -> T*?:
+    return root_cell(this)
+
+## Ported from Libraries/LibGC/Root.h:91 GC::Root::is_null.
+pub func root_is_null[T](this: const Root[T]*) -> bool:
+    return this.m_impl == none
+
+## The release of a Root's RootImpl: C++ destroys it when the last Root referring to it goes.
+pub func root_release[T](this: Root[T]*):
+    let impl = this.m_impl else return
+    root_impl_destroy(impl)
+    free(impl) in memory.heap
+    this.m_impl = none
+
+## Ported from Libraries/LibGC/Root.h:124 GC::operator== (Root<T>, Root<T>): the cells compared.
+pub func eq_t_t[T](lhs: T*?, rhs: T*?) -> bool:
+    return lhs == rhs
+
+## Ported from Libraries/LibGC/Root.h:130 GC::operator!= (Root<T>, Root<T>).
+pub func ne[T](lhs: T*?, rhs: T*?) -> bool:
+    return lhs != rhs
+
+## Ported from Libraries/LibGC/Root.h:136 GC::make_root (T*). In managed memory a Root<T> is the
+## cell pointer itself (see the header); gc.root_create makes a handle for unmanaged memory.
+pub func make_root[T](cell: T*?, location: ak.SourceLocation) -> T*?:
+    return cell
+
+## Ported from Libraries/LibGC/Root.h:144 GC::make_root (T&).
+pub func make_root_2[T](cell: T*, location: ak.SourceLocation) -> T*?:
+    return cell
+
+## Ported from Libraries/LibGC/Root.h:150 GC::make_root (Ptr<T>).
+pub func make_root_3[T](cell: T*?, location: ak.SourceLocation) -> T*?:
+    return cell
+
+## Ported from Libraries/LibGC/Root.h:158 GC::make_root (Ref<T>).
+pub func make_root_4[T](cell: T*, location: ak.SourceLocation) -> T*?:
+    return cell

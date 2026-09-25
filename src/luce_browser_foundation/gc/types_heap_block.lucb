@@ -13,21 +13,34 @@
 # mark: HeapBlock ===============================================================================
 
 ## GC::HeapBlock (Libraries/LibGC/HeapBlock.h:23).
+## The cells follow the header at `heap_block_storage_offset` (C++'s flexible array member
+## `alignas(__BIGGEST_ALIGNMENT__) u8 m_storage[]`, fixed by hand: Base has no flexible arrays).
 pub struct HeapBlock:
     pub var heap_block_base: HeapBlockBase  # primary base
-    pub var m_list_node: ak.IntrusiveListNode[HeapBlock, HeapBlock*?]
+    pub var m_list_node: ListNode
     pub var m_cell_allocator: CellAllocator*
     pub var m_cell_size: u32  # C++ default: { 0 }
     pub var m_next_lazy_freelist_index: u32  # C++ default: { 0 }
     pub var m_overrides_must_survive_garbage_collection: bool  # C++ default: { false }
     pub var m_overrides_finalize: bool  # C++ default: { false }
     pub var m_freelist: HeapBlockFreelistEntry*?
-    pub var m_storage: u8*?
 
-## GC::HeapBlock::FreelistEntry (Libraries/LibGC/HeapBlock.h:103): opaque in this phase (not in the phase-1 closure).
-pub struct HeapBlockFreelistEntry:
-    pub var opaque_: u8
+## sizeof(HeapBlock) in C++: the header rounded up to __BIGGEST_ALIGNMENT__ (16), where
+## `m_storage` begins (64 bytes on 64-bit targets, as in C++).
+pub let heap_block_storage_offset: usize = (sizeof(HeapBlock) + 15) // 16 * 16
+
+## GC::HeapBlock::FreelistEntry (Libraries/LibGC/HeapBlock.h:103): a dead cell on the freelist.
+pub struct HeapBlockFreelistEntry: IsCell:
+    pub var cell_base: Cell  # primary base
+    pub var next: HeapBlockFreelistEntry*?
+
+    func cell() -> Cell*: return (Cell*)&self
+
+## The vtable of GC::HeapBlock::FreelistEntry (GC_CELL(FreelistEntry, Cell)).
+pub let heap_block_freelist_entry_vtable: CellVTable = CellVTable(class_info = &heap_block_freelist_entry_class, class_name = heap_block_freelist_entry_class_name_impl)
+
+## Class information of GC::HeapBlock::FreelistEntry.
+pub let heap_block_freelist_entry_class: ak.ClassInfo = ak.ClassInfo(name = "FreelistEntry", first_id = 0, last_id = 0, size = sizeof(HeapBlockFreelistEntry), vtable = (const void*)&heap_block_freelist_entry_vtable)
 
 ## GC::HeapBlock::min_possible_cell_size (Libraries/LibGC/HeapBlock.h:125).
-# C++ initializer: sizeof ( FreelistEntry )
-pub var heap_block_min_possible_cell_size: usize
+pub let heap_block_min_possible_cell_size: usize = sizeof(HeapBlockFreelistEntry)

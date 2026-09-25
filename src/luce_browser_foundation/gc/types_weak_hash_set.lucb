@@ -14,13 +14,29 @@
 
 ## GC::WeakHashSet (Libraries/LibGC/WeakHashSet.h:15): a generic struct.
 pub struct WeakHashSet[T]:
-    pub var m_table: ak.HashTable[Weak[T], ak.DefaultTraits[Weak[T]]]
+    pub var m_table: ak.HashTable[Weak[T], WeakHashSetInternalTraits[T]]
     pub var m_mutations_since_last_prune: usize  # C++ default: { 0 }
 
-## GC::WeakHashSet::Iterator (Libraries/LibGC/WeakHashSet.h:61): opaque in this phase (not in the phase-1 closure).
-pub struct Iterator:
-    pub var opaque_: u8
+## GC::WeakHashSet::InternalTraits (Libraries/LibGC/WeakHashSet.h:16): an entry hashes as the
+## pointer it refers to (Traits<T*>::hash(value.ptr())) and compares by that pointer (fixed by
+## hand: the generator gave the table DefaultTraits).
+pub struct WeakHashSetInternalTraits[T]: ak.Traits[Weak[T]]:
+    var empty_: u8
 
-## GC::WeakHashSet::ConstIterator (Libraries/LibGC/WeakHashSet.h:98): opaque in this phase (not in the phase-1 closure).
-pub struct ConstIterator:
-    pub var opaque_: u8
+    func hash_of(key: const Weak[T]*) -> u32: return ak.ptr_hash_void(weak_ptr(key))
+
+    func equals(a: const Weak[T]*, b: const Weak[T]*) -> bool: return weak_ptr(a) == weak_ptr(b)
+
+## GC::WeakHashSet::Iterator (Libraries/LibGC/WeakHashSet.h:61): the live entries of the table, as
+## an iterator of the cells (dead entries skipped, as skip_dead does).
+pub struct WeakHashSetIterator[T]: luce.Iterator[T*]:
+    pub var m_table: const ak.HashTable[Weak[T], WeakHashSetInternalTraits[T]]*
+    pub var m_index: usize
+
+    mutating func next() -> T*?: return weak_hash_set_iterator_next(&self)
+
+## `for value in weak_hash_set_values(&set)`: GC::WeakHashSet's begin()/end() as a loop.
+pub struct WeakHashSetValues[T]: luce.Iterable[T*, WeakHashSetIterator[T]]:
+    pub var m_set: const WeakHashSet[T]*
+
+    func iterator() -> WeakHashSetIterator[T]: return WeakHashSetIterator[T](m_table = &self.m_set.m_table, m_index = 0)

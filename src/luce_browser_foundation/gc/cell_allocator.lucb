@@ -1,0 +1,103 @@
+#==============================================================================================
+#
+#   cell_allocator - CellAllocator: the heap blocks of one cell size (or one cell type)
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/CellAllocator.cpp (lines 1-60) and CellAllocator.h (lines
+#       1-94). An allocator hands out cells from its usable blocks, asks for a new block when
+#       none is usable, and moves blocks between its full and usable lists as the heap sweeps.
+#       GC_DECLARE_ALLOCATOR's TypeIsolatingCellAllocator<T> is a module `var` of the cell's class
+#       that the embedder constructs once with type_isolating_cell_allocator_construct and passes
+#       to heap_allocate_cell. `for_each_block(callback)` is an iterator (DESIGN.md §2.9).
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/CellAllocator.cpp:15 GC::CellAllocator::CellAllocator.
+pub func cell_allocator_construct(this: CellAllocator*, cell_size: usize, class_name: ak.StringView? = none, overrides_must_survive_garbage_collection: bool = false, overrides_finalize: bool = false):
+    cell_allocator_init_fields(this)
+    this.m_class_name = class_name
+    this.m_cell_size = cell_size
+    this.m_overrides_must_survive_garbage_collection = overrides_must_survive_garbage_collection
+    this.m_overrides_finalize = overrides_finalize
+
+## Ported from Libraries/LibGC/CellAllocator.h:37 GC::CellAllocator::class_name.
+pub func cell_allocator_class_name(this: const CellAllocator*) -> ak.StringView?:
+    return this.m_class_name
+
+## Ported from Libraries/LibGC/CellAllocator.h:38 GC::CellAllocator::cell_size.
+pub func cell_allocator_cell_size(this: const CellAllocator*) -> usize:
+    return this.m_cell_size
+
+## Ported from Libraries/LibGC/CellAllocator.cpp:23 GC::CellAllocator::allocate_cell.
+pub func cell_allocator_allocate_cell(this: CellAllocator*, heap: Heap*) -> Cell*:
+    if not list_node_is_in_list(&this.m_list_node):
+        heap_register_cell_allocator(heap, this)
+
+    if list_is_empty(&this.m_usable_blocks):
+        let block = heap_block_create_with_cell_size(heap, this, this.m_cell_size, this.m_overrides_must_survive_garbage_collection, this.m_overrides_finalize)
+        let block_ptr = (usize)block
+        if this.m_min_block_address > block_ptr:
+            this.m_min_block_address = block_ptr
+        if this.m_max_block_address < block_ptr:
+            this.m_max_block_address = block_ptr
+        list_append(&this.m_usable_blocks, &block.m_list_node)
+
+    let block = heap_block_from_list_node(list_last(&this.m_usable_blocks) else trap("no usable block"))
+    let cell = heap_block_allocate(block) else trap("VERIFY(cell)")
+    if heap_block_is_full(block):
+        list_append(&this.m_full_blocks, list_last(&this.m_usable_blocks) else trap("no usable block"))
+    return cell
+
+## Ported from Libraries/LibGC/CellAllocator.h:43 GC::CellAllocator::for_each_block: the full
+## blocks, then the usable ones (`for block in cell_allocator_for_each_block(allocator)`;
+## IterationDecision::Break is `break`).
+pub func cell_allocator_for_each_block(this: CellAllocator*) -> CellAllocatorBlocks:
+    return CellAllocatorBlocks(allocator = this)
+
+## The blocks of a CellAllocator: for_each_block as a loop.
+pub struct CellAllocatorBlocks: luce.Iterable[HeapBlock*, CellAllocatorBlockIterator]:
+    pub var allocator: CellAllocator*
+
+    func iterator() -> CellAllocatorBlockIterator:
+        return CellAllocatorBlockIterator(allocator = self.allocator, next_node = self.allocator.m_full_blocks.m_first, in_usable = false)
+
+## The iterator of CellAllocatorBlocks.
+pub struct CellAllocatorBlockIterator: luce.Iterator[HeapBlock*]:
+    pub var allocator: CellAllocator*
+    pub var next_node: ListNode*?
+    pub var in_usable: bool
+
+    mutating func next() -> HeapBlock*?:
+        while self.next_node == none and not self.in_usable:
+            self.in_usable = true
+            self.next_node = self.allocator.m_usable_blocks.m_first
+        let node = self.next_node else return none
+        self.next_node = node.m_next
+        return heap_block_from_list_node(node)
+
+## Ported from Libraries/LibGC/CellAllocator.cpp:46 GC::CellAllocator::block_did_become_empty.
+pub func cell_allocator_block_did_become_empty(this: CellAllocator*, block: HeapBlock*):
+    list_node_remove(&block.m_list_node)
+    # NOTE: HeapBlocks are managed by the BlockAllocator, so we don't want to `delete` the block here.
+    block_allocator_deallocate_block(&this.m_block_allocator, block)
+
+## Ported from Libraries/LibGC/CellAllocator.cpp:54 GC::CellAllocator::block_did_become_usable.
+pub func cell_allocator_block_did_become_usable(this: CellAllocator*, block: HeapBlock*):
+    assert(not heap_block_is_full(block))
+    list_append(&this.m_usable_blocks, &block.m_list_node)
+
+## Ported from Libraries/LibGC/CellAllocator.h:62 GC::CellAllocator::block_allocator.
+pub func cell_allocator_block_allocator(this: CellAllocator*) -> BlockAllocator*:
+    return &this.m_block_allocator
+
+## Ported from Libraries/LibGC/CellAllocator.h:63 GC::CellAllocator::min_block_address.
+pub func cell_allocator_min_block_address(this: const CellAllocator*) -> usize:
+    return this.m_min_block_address
+
+## Ported from Libraries/LibGC/CellAllocator.h:64 GC::CellAllocator::max_block_address.
+pub func cell_allocator_max_block_address(this: const CellAllocator*) -> usize:
+    return this.m_max_block_address
+
+## Ported from Libraries/LibGC/CellAllocator.h:86 GC::TypeIsolatingCellAllocator::TypeIsolatingCellAllocator<T>.
+pub func type_isolating_cell_allocator_construct[T](this: TypeIsolatingCellAllocator[T]*, class_name: ak.StringView, overrides_must_survive_garbage_collection: bool, overrides_finalize: bool):
+    cell_allocator_construct(&this.allocator, sizeof(T), class_name, overrides_must_survive_garbage_collection, overrides_finalize)

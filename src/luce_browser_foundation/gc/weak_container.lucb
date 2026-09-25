@@ -1,0 +1,34 @@
+#==============================================================================================
+#
+#   weak_container - WeakContainer: a container told when its cells die
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/WeakContainer.cpp (lines 1-31) and WeakContainer.h (lines
+#       1-34). While registered, the heap calls remove_dead_cells after every sweep.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/WeakContainer.cpp:12 GC::WeakContainer::WeakContainer.
+pub func weak_container_construct(this: WeakContainer*, heap: Heap*):
+    weak_container_init_fields(this)
+    this.m_heap = heap
+    heap_did_create_weak_container(this.m_heap, this)
+
+## Ported from Libraries/LibGC/WeakContainer.cpp:18 GC::WeakContainer::~WeakContainer (the C++ destructor).
+pub func weak_container_destroy(this: WeakContainer*):
+    weak_container_deregister(this)
+
+## Ported from Libraries/LibGC/WeakContainer.h:19 GC::WeakContainer::remove_dead_cells (virtual).
+pub func weak_container_remove_dead_cells_impl(this: WeakContainer*):
+    trap("pure virtual: GC::WeakContainer::remove_dead_cells")
+
+## Ported from Libraries/LibGC/WeakContainer.cpp:23 GC::WeakContainer::deregister.
+pub func weak_container_deregister(this: WeakContainer*):
+    if not this.m_registered:
+        return
+    heap_did_destroy_weak_container(this.m_heap, this)
+    this.m_registered = false
+
+## The WeakContainer whose m_list_node is `node` (IntrusiveList's container_of).
+func weak_container_from_list_node(node: ListNode*) -> WeakContainer*:
+    return (WeakContainer*)((u8*)node - offsetof(WeakContainer, m_list_node))

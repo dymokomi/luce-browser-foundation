@@ -1,0 +1,307 @@
+#==============================================================================================
+#
+#   containers - the collector's own vectors, hash maps and intrusive lists
+#
+#   DESCRIPTION:
+#       Addition to LibGC (DESIGN.md §3.2-§3.3). LibGC keeps its bookkeeping (the block caches,
+#       the root set, the possible-pointer set, the mark stack, the lists of allocators, roots,
+#       root vectors and weak blocks) in AK's Vector, HashMap, HashTable and IntrusiveList, which
+#       allocate with malloc. In the port AK's containers allocate from the current allocator,
+#       and that is the collected heap itself (§3.3): the collector's own data must never live in
+#       the heap it collects. These are the same shapes over the C heap (`memory.heap`), with
+#       AK's behaviour where the collector depends on it (IntrusiveList::append unlinks the node
+#       from the list it was in; Vector::unstable_take moves the last element into the hole).
+#
+#==============================================================================================
+
+# mark: GcVector ================================================================================
+
+## A growable array on the C heap: the shape of AK::Vector<T> the collector uses for its own
+## data (block caches, the mark stack, post-GC tasks).
+pub struct GcVector[T]:
+    pub var m_data: T*?
+    pub var m_size: usize
+    pub var m_capacity: usize
+
+## Vector::size.
+pub func gc_vector_size[T](this: const GcVector[T]*) -> usize:
+    return this.m_size
+
+## Vector::is_empty.
+pub func gc_vector_is_empty[T](this: const GcVector[T]*) -> bool:
+    return this.m_size == 0
+
+## Vector::at: the element at `index` (checked).
+pub func gc_vector_at[T](this: const GcVector[T]*, index: usize) -> T:
+    assert(index < this.m_size)
+    let data = this.m_data else trap("GcVector: no storage")
+    return data[index]
+
+## Vector::ensure_capacity: room for `capacity` elements without another allocation.
+pub func gc_vector_ensure_capacity[T](this: GcVector[T]*, capacity: usize):
+    if capacity <= this.m_capacity:
+        return
+    var new_capacity = this.m_capacity * 2 if this.m_capacity > 0 else 8
+    if new_capacity < capacity:
+        new_capacity = capacity
+    let fresh = (alloc T[new_capacity] in memory.heap) else trap("out of memory")
+    if let old = this.m_data:
+        memory.copy(fresh, T[](old, this.m_size), this.m_size)
+        free(T[](old, this.m_capacity)) in memory.heap
+    this.m_data = fresh.data
+    this.m_capacity = new_capacity
+
+## Vector::append.
+pub func gc_vector_append[T](this: GcVector[T]*, value: T):
+    gc_vector_ensure_capacity(this, this.m_size + 1)
+    let data = this.m_data else trap("GcVector: no storage")
+    data[this.m_size] = value
+    this.m_size += 1
+
+## Vector::insert: `value` before the element at `index`.
+pub func gc_vector_insert[T](this: GcVector[T]*, index: usize, value: T):
+    assert(index <= this.m_size)
+    gc_vector_ensure_capacity(this, this.m_size + 1)
+    let data = this.m_data else trap("GcVector: no storage")
+    var i = this.m_size
+    while i > index:
+        data[i] = data[i - 1]
+        i -= 1
+    data[index] = value
+    this.m_size += 1
+
+## Vector::remove: drop the element at `index`, keeping the order of the rest.
+pub func gc_vector_remove[T](this: GcVector[T]*, index: usize):
+    assert(index < this.m_size)
+    let data = this.m_data else trap("GcVector: no storage")
+    for i in index + 1..<this.m_size:
+        data[i - 1] = data[i]
+    this.m_size -= 1
+
+## Vector::take_last.
+pub func gc_vector_take_last[T](this: GcVector[T]*) -> T:
+    assert(this.m_size > 0)
+    let data = this.m_data else trap("GcVector: no storage")
+    this.m_size -= 1
+    return data[this.m_size]
+
+## Vector::unstable_take: the element at `index`, the last element moved into its place.
+pub func gc_vector_unstable_take[T](this: GcVector[T]*, index: usize) -> T:
+    assert(index < this.m_size)
+    let data = this.m_data else trap("GcVector: no storage")
+    let value = data[index]
+    data[index] = data[this.m_size - 1]
+    this.m_size -= 1
+    return value
+
+## Vector::clear: no elements and no storage.
+pub func gc_vector_clear[T](this: GcVector[T]*):
+    if let old = this.m_data:
+        free(T[](old, this.m_capacity)) in memory.heap
+    this.m_data = none
+    this.m_size = 0
+    this.m_capacity = 0
+
+## The elements as a span (valid until the next append).
+pub func gc_vector_span[T](this: const GcVector[T]*) -> T[]:
+    let data = this.m_data else return T[]((T*)8, 0)
+    return T[](data, this.m_size)
+
+# mark: GcHashMap ===============================================================================
+
+## A hash map from nonzero addresses to `V` on the C heap (open addressing, linear probing, no
+## removal): the shape of AK's HashMap<Cell*, HeapRoot>, HashMap<FlatPtr, HeapRoot> and
+## HashTable<HeapBlock*> in the collector. Iteration order is the slot order; nothing in LibGC
+## depends on the order of these tables.
+pub struct GcHashMap[V]:
+    pub var m_keys: usize*?
+    pub var m_values: V*?
+    pub var m_size: usize
+    pub var m_capacity: usize
+
+## HashMap::size.
+pub func gc_hash_map_size[V](this: const GcHashMap[V]*) -> usize:
+    return this.m_size
+
+## The slot of `key` (probing from its hash), holding the key or empty (0).
+func gc_hash_map_slot[V](this: const GcHashMap[V]*, key: usize) -> usize:
+    let keys = this.m_keys else trap("GcHashMap: no storage")
+    let mask = this.m_capacity - 1
+    var index = (usize)(((u64)key >> 4) *% 0x9E3779B97F4A7C15 >> 17) & mask
+    while keys[index] != 0 and keys[index] != key:
+        index = (index + 1) & mask
+    return index
+
+## HashMap::ensure_capacity: room for `capacity` keys below the load factor.
+pub func gc_hash_map_ensure_capacity[V](this: GcHashMap[V]*, capacity: usize):
+    if (capacity + 1) * 4 <= this.m_capacity * 3:
+        return
+    var new_capacity = this.m_capacity * 2 if this.m_capacity > 0 else 16
+    while (capacity + 1) * 4 > new_capacity * 3:
+        new_capacity *= 2
+    let old_keys = this.m_keys
+    let old_values = this.m_values
+    let old_capacity = this.m_capacity
+    let keys = (new usize[new_capacity] in memory.heap) else trap("out of memory")
+    let values = (alloc V[new_capacity] in memory.heap) else trap("out of memory")
+    this.m_keys = keys.data
+    this.m_values = values.data
+    this.m_capacity = new_capacity
+    if let ok = old_keys:
+        let ov = old_values else trap("GcHashMap: no values")
+        for i in 0..<old_capacity:
+            if ok[i] != 0:
+                let slot = gc_hash_map_slot(this, ok[i])
+                keys[slot] = ok[i]
+                values[slot] = ov[i]
+        free(usize[](ok, old_capacity)) in memory.heap
+        free(V[](ov, old_capacity)) in memory.heap
+
+## HashMap::set: `key` maps to `value` (replacing an existing value).
+pub func gc_hash_map_set[V](this: GcHashMap[V]*, key: usize, value: V):
+    assert(key != 0)
+    gc_hash_map_ensure_capacity(this, this.m_size + 1)
+    let keys = this.m_keys else trap("GcHashMap: no storage")
+    let values = this.m_values else trap("GcHashMap: no values")
+    let slot = gc_hash_map_slot(this, key)
+    if keys[slot] == 0:
+        keys[slot] = key
+        this.m_size += 1
+    values[slot] = value
+
+## HashMap::get: the value of `key`, or none.
+pub func gc_hash_map_get[V](this: const GcHashMap[V]*, key: usize) -> V*?:
+    if this.m_size == 0 or key == 0:
+        return none
+    let keys = this.m_keys else return none
+    let values = this.m_values else return none
+    let slot = gc_hash_map_slot(this, key)
+    if keys[slot] == 0:
+        return none
+    return &values[slot]
+
+## HashMap::contains.
+pub func gc_hash_map_contains[V](this: const GcHashMap[V]*, key: usize) -> bool:
+    return gc_hash_map_get(this, key) != none
+
+## HashMap::clear: no keys and no storage.
+pub func gc_hash_map_clear[V](this: GcHashMap[V]*):
+    if let keys = this.m_keys:
+        free(usize[](keys, this.m_capacity)) in memory.heap
+    if let values = this.m_values:
+        free(V[](values, this.m_capacity)) in memory.heap
+    this.m_keys = none
+    this.m_values = none
+    this.m_size = 0
+    this.m_capacity = 0
+
+## `for key in gc_hash_map_keys(&map)`: HashMap::keys() as a loop.
+pub func gc_hash_map_keys[V](this: const GcHashMap[V]*) -> GcHashMapKeys[V]:
+    return GcHashMapKeys[V](map = this)
+
+## The keys of a GcHashMap, in slot order.
+pub struct GcHashMapKeys[V]: luce.Iterable[usize, GcHashMapKeyIterator[V]]:
+    pub var map: const GcHashMap[V]*
+
+    func iterator() -> GcHashMapKeyIterator[V]:
+        return GcHashMapKeyIterator[V](map = self.map, index = 0)
+
+## The iterator of GcHashMapKeys.
+pub struct GcHashMapKeyIterator[V]: luce.Iterator[usize]:
+    pub var map: const GcHashMap[V]*
+    pub var index: usize
+
+    mutating func next() -> usize?:
+        let keys = self.map.m_keys else return none
+        while self.index < self.map.m_capacity:
+            let key = keys[self.index]
+            self.index += 1
+            if key != 0:
+                return key
+        return none
+
+# mark: Intrusive lists =========================================================================
+
+## AK::IntrusiveListNode: the links a listed object embeds, and the list it is on.
+pub struct ListNode:
+    pub var m_list: List*?
+    pub var m_next: ListNode*?
+    pub var m_prev: ListNode*?
+
+## AK::IntrusiveList: a doubly linked list of embedded ListNodes. The owner of a node is found
+## from the node by the offset of the node in it (`container_of`).
+pub struct List:
+    pub var m_first: ListNode*?
+    pub var m_last: ListNode*?
+
+## IntrusiveList::is_empty.
+pub func list_is_empty(this: const List*) -> bool:
+    return this.m_first == none
+
+## IntrusiveListNode::is_in_list.
+pub func list_node_is_in_list(this: const ListNode*) -> bool:
+    return this.m_list != none
+
+## IntrusiveListNode::remove: unlink the node from the list it is on, if any.
+pub func list_node_remove(this: ListNode*):
+    let list = this.m_list else return
+    if let prev = this.m_prev:
+        prev.m_next = this.m_next
+    else:
+        list.m_first = this.m_next
+    if let next = this.m_next:
+        next.m_prev = this.m_prev
+    else:
+        list.m_last = this.m_prev
+    this.m_list = none
+    this.m_next = none
+    this.m_prev = none
+
+## IntrusiveList::append: `node` last, unlinked first from the list it was on (as AK does).
+pub func list_append(this: List*, node: ListNode*):
+    list_node_remove(node)
+    node.m_list = this
+    node.m_prev = this.m_last
+    node.m_next = none
+    if let last = this.m_last:
+        last.m_next = node
+    else:
+        this.m_first = node
+    this.m_last = node
+
+## IntrusiveList::remove.
+pub func list_remove(this: List*, node: ListNode*):
+    assert(node.m_list == this)
+    list_node_remove(node)
+
+## IntrusiveList::contains.
+pub func list_contains(this: const List*, node: const ListNode*) -> bool:
+    return node.m_list == (List*)this
+
+## IntrusiveList::first.
+pub func list_first(this: const List*) -> ListNode*?:
+    return this.m_first
+
+## IntrusiveList::last.
+pub func list_last(this: const List*) -> ListNode*?:
+    return this.m_last
+
+## `for node in list_nodes(&list)`: the nodes first to last (the list must not change meanwhile).
+pub func list_nodes(this: const List*) -> ListNodes:
+    return ListNodes(list = this)
+
+## The nodes of a List.
+pub struct ListNodes: luce.Iterable[ListNode*, ListNodeIterator]:
+    pub var list: const List*
+
+    func iterator() -> ListNodeIterator:
+        return ListNodeIterator(next_node = self.list.m_first)
+
+## The iterator of ListNodes.
+pub struct ListNodeIterator: luce.Iterator[ListNode*]:
+    pub var next_node: ListNode*?
+
+    mutating func next() -> ListNode*?:
+        let node = self.next_node else return none
+        self.next_node = node.m_next
+        return node

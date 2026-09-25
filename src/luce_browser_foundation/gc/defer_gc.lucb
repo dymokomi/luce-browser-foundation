@@ -1,0 +1,19 @@
+#==============================================================================================
+#
+#   defer_gc - DeferGC: no collection while it lives
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/DeferGC.h (lines 1-30). Ported code usually spells a DeferGC
+#       scope as `heap_defer_gc(heap)` with `defer heap_undefer_gc(heap)` (DESIGN.md §2.6); the
+#       struct is kept for code that stores one.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/DeferGC.h:15 GC::DeferGC::DeferGC.
+pub func defer_gc_construct(this: DeferGc*, heap: Heap*):
+    this.m_heap = heap
+    heap_defer_gc(this.m_heap)
+
+## Ported from Libraries/LibGC/DeferGC.h:21 GC::DeferGC::~DeferGC (the C++ destructor).
+pub func defer_gc_destroy(this: DeferGc*):
+    heap_undefer_gc(this.m_heap)

@@ -1,0 +1,102 @@
+#==============================================================================================
+#
+#   tests_conservative - conservative roots: the stack, interior and NaN-boxed pointers, registers
+#
+#   DESCRIPTION:
+#       What gather_conservative_roots finds (DESIGN.md §3.4): a word on the stack between the
+#       stack pointer and the stack's top that points into a live cell (anywhere in it, or
+#       NaN-boxed as LibJS stores cells) roots that cell; the callee-saved registers are spilled
+#       where the scan reads them. Each test body runs right after the stack was clobbered.
+#
+#==============================================================================================
+
+test "a cell referenced only from the stack survives":
+    clobber_stack()
+    run_stack_reference_survives()
+
+noinline func run_stack_reference_survives():
+    let heap = create_test_heap()
+    let cell = new_test_cell(heap, 1)
+    let weak = make_weak[TestCell](cell)
+    let garbage = make_unreferenced_cell(heap, 2)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(alive(&weak))
+    assert(not alive(&garbage))
+    assert(cell.id == 1)
+    destroy_test_heap(heap)
+
+## The address `offset` bytes into the cell of `weak`, as an integer.
+noinline func interior_address(weak: const Weak[TestCell]*, offset: usize) -> usize:
+    return (usize)(weak_ptr(weak) else trap("dead")) + offset
+
+test "an interior pointer on the stack keeps its cell":
+    clobber_stack()
+    run_interior_pointer_survives()
+
+noinline func run_interior_pointer_survives():
+    let heap = create_test_heap()
+    let weak = make_unreferenced_cell(heap, 1)
+    let inner = interior_address(&weak, sizeof(TestCell) - 8)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(alive(&weak))
+    assert(inner != 0)
+    destroy_test_heap(heap)
+
+test "a NaN-boxed pointer on the stack keeps its cell":
+    clobber_stack()
+    run_nan_boxed_pointer_survives()
+
+noinline func run_nan_boxed_pointer_survives():
+    let heap = create_test_heap()
+    let weak = make_unreferenced_cell(heap, 1)
+    let boxed = (u64)interior_address(&weak, 0) | shifted_is_cell_pattern
+    let other = make_unreferenced_cell(heap, 2)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(alive(&weak))
+    assert(not alive(&other))
+    var value: NanBoxedValue
+    value.m_value.encoded = boxed
+    assert(nan_boxed_value_is_cell(&value))
+    destroy_test_heap(heap)
+
+test "an address past the cells handed out, or outside the heap, roots nothing":
+    clobber_stack()
+    run_stray_addresses()
+
+noinline func run_stray_addresses():
+    let heap = create_test_heap()
+    let weak = make_unreferenced_cell(heap, 1)
+    # the next cell of the block has not been handed out yet (the lazy freelist), and the block
+    # header holds no cell
+    let past = interior_address(&weak, sizeof(TestCell) + 8) + test_cell_allocator.allocator.m_cell_size
+    let header = interior_address(&weak, 0) & ~(heap_block_base_block_size - 1)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not alive(&weak))
+    assert(past != 0 and header != 0)
+    destroy_test_heap(heap)
+
+test "the callee-saved registers are spilled where the scan reads them":
+    # workaround: compiler-issues/asm_callee_saved_clobber (an asm block cannot set a marker in
+    # x19 for the spill to find): the spilled frame pointer (x29, rbp) must be the spilling
+    # function's, inside the live stack, and the spilled link register (arm64) nonzero.
+    let heap = create_test_heap()
+    var buffer: usize[16]
+    spill_callee_saved_registers(buffer)
+    let sp = current_stack_pointer()
+    let frame_pointer = buffer[10] if os.arm64 else buffer[1]
+    assert(frame_pointer > sp - 4096 and frame_pointer < heap.m_stack_info.m_top)
+    if os.arm64:
+        assert(buffer[11] != 0)
+    destroy_test_heap(heap)
+
+test "the stack top is above the stack pointer":
+    let heap = create_test_heap()
+    let sp = current_stack_pointer()
+    assert(sp < heap.m_stack_info.m_top)
+    assert(heap.m_stack_info.m_top - sp < heap.m_stack_info.m_size)
+    assert(heap.m_stack_info.m_base < sp)
+    destroy_test_heap(heap)

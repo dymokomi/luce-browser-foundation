@@ -1,0 +1,211 @@
+#==============================================================================================
+#
+#   cell - Cell: the header of every garbage-collected object, and Cell::Visitor
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/Cell.h (lines 1-232) and Cell.cpp (lines 1-18). A cell's
+#       virtuals (class_name, visit_edges, finalize, must_survive_garbage_collection) are slots of
+#       its CellVTable (DESIGN.md §2.3); the Visitor's overload set of `visit(...)` is a family of
+#       named functions (§3.2), the container overloads reading AK's containers in place. Where
+#       C++ visits a container "if the element is visitable", the port has one function per shape
+#       of element: cell pointers (GC::Ref, `T*`), nullable ones (GC::Ptr, `T*?`), NanBoxedValues.
+#
+#==============================================================================================
+
+# mark: Cell ====================================================================================
+
+## Ported from Libraries/LibGC/Cell.h:51 GC::Cell::is_marked.
+pub func cell_is_marked(this: Cell*) -> bool:
+    return this.m_mark
+
+## Ported from Libraries/LibGC/Cell.h:52 GC::Cell::set_marked.
+pub func cell_set_marked(this: Cell*, b: bool):
+    this.m_mark = b
+
+## Ported from Libraries/LibGC/Cell.h:59 GC::Cell::state.
+pub func cell_state(this: Cell*) -> CellState:
+    return this.m_state
+
+## Ported from Libraries/LibGC/Cell.h:60 GC::Cell::set_state.
+pub func cell_set_state(this: Cell*, state: CellState):
+    this.m_state = state
+
+## Ported from Libraries/LibGC/Cell.h:62 GC::Cell::class_name (virtual).
+pub func cell_class_name_impl(this: Cell*) -> ak.StringView:
+    trap("pure virtual: GC::Cell::class_name")
+
+# mark: Visitor =================================================================================
+
+## Ported from Libraries/LibGC/Cell.h:66 GC::Cell::Visitor::visit (Cell*).
+pub func cell_visitor_visit_cell(this: CellVisitor*, cell: Cell*?):
+    if let c = cell:
+        cell_visitor_visit_impl_cell(this, c)
+
+## Ported from Libraries/LibGC/Cell.h:72 GC::Cell::Visitor::visit (Cell&).
+pub func cell_visitor_visit_cell_2(this: CellVisitor*, cell: Cell*):
+    cell_visitor_visit_impl_cell(this, cell)
+
+## Ported from Libraries/LibGC/Cell.h:77 GC::Cell::Visitor::visit (Cell const*).
+pub func cell_visitor_visit_cell_3(this: CellVisitor*, cell: Cell*?):
+    cell_visitor_visit_cell(this, cell)
+
+## Ported from Libraries/LibGC/Cell.h:82 GC::Cell::Visitor::visit (Cell const&).
+pub func cell_visitor_visit_cell_4(this: CellVisitor*, cell: Cell*):
+    cell_visitor_visit_cell_2(this, cell)
+
+## Ported from Libraries/LibGC/Cell.h:88 GC::Cell::Visitor::visit (Ptr<T>): a nullable cell pointer
+## of any cell class.
+pub func cell_visitor_visit_t[T: IsCell](this: CellVisitor*, cell: T*?):
+    if let c = cell:
+        cell_visitor_visit_impl_cell(this, c.cell())
+
+## Ported from Libraries/LibGC/Cell.h:95 GC::Cell::Visitor::visit (Ref<T>): a cell pointer of any
+## cell class.
+pub func cell_visitor_visit_t_2[T: IsCell](this: CellVisitor*, cell: T*):
+    cell_visitor_visit_impl_cell(this, cell.cell())
+
+## Ported from Libraries/LibGC/Cell.h:101 GC::Cell::Visitor::visit (ReadonlySpan<T>): a span of
+## cell pointers (GC::Ref<T>).
+pub func cell_visitor_visit_opaque[T: IsCell](this: CellVisitor*, span: const (T*)[]):
+    for value in span:
+        cell_visitor_visit_t_2(this, value)
+
+## Ported from Libraries/LibGC/Cell.h:108 GC::Cell::Visitor::visit (ReadonlySpan<T> of
+## NanBoxedValue): the whole span to visit_impl at once.
+pub func cell_visitor_visit_span_nan_boxed_value(this: CellVisitor*, span: const NanBoxedValue[]):
+    cell_visitor_visit_impl_span_nan_boxed_value(this, span)
+
+## Ported from Libraries/LibGC/Cell.h:115 GC::Cell::Visitor::visit (Span<T>): a span of nullable
+## cell pointers (GC::Ptr<T>).
+pub func cell_visitor_visit_span[T: IsCell](this: CellVisitor*, span: const (T*?)[]):
+    for value in span:
+        cell_visitor_visit_t(this, value)
+
+## Ported from Libraries/LibGC/Cell.h:129 GC::Cell::Visitor::visit (Vector<T> const&): a vector of
+## cell pointers (GC::Ref<T>). Reads AK::Vector's buffer in place.
+pub func cell_visitor_visit_vector[T: IsCell](this: CellVisitor*, vector: const ak.Vector[T*]*):
+    let buffer = vector.m_outline_buffer else return
+    for i in 0..<vector.m_size:
+        cell_visitor_visit_t_2(this, buffer[i])
+
+## Ported from Libraries/LibGC/Cell.h:129 GC::Cell::Visitor::visit (Vector<T> const&): a vector of
+## nullable cell pointers (GC::Ptr<T>).
+pub func cell_visitor_visit_vector_nullable[T: IsCell](this: CellVisitor*, vector: const ak.Vector[T*?]*):
+    let buffer = vector.m_outline_buffer else return
+    for i in 0..<vector.m_size:
+        cell_visitor_visit_t(this, buffer[i])
+
+## Ported from Libraries/LibGC/Cell.h:136 GC::Cell::Visitor::visit (Vector<T> const& of
+## NanBoxedValue): the whole buffer to visit_impl at once.
+pub func cell_visitor_visit_vector_nan_boxed_value(this: CellVisitor*, vector: const ak.Vector[NanBoxedValue]*):
+    let buffer = vector.m_outline_buffer else return
+    cell_visitor_visit_impl_span_nan_boxed_value(this, NanBoxedValue[]((NanBoxedValue*)buffer, vector.m_size))
+
+## Ported from Libraries/LibGC/Cell.h:143 GC::Cell::Visitor::visit (HashTable<T> const&): a table
+## of cell pointers. Walks AK::HashTable's buckets in place (a bucket is used when its state is
+## not BucketState::Free, AK/HashTable.h); the order of the visits does not matter.
+pub func cell_visitor_visit_hash_table[T: IsCell, TT: ak.Traits[T*]](this: CellVisitor*, table: const ak.HashTable[T*, TT]*):
+    let buckets = table.m_buckets else return
+    for i in 0..<table.m_capacity:
+        if buckets[i].state != 0:
+            cell_visitor_visit_t_2(this, buckets[i].storage)
+
+## Ported from Libraries/LibGC/Cell.h:143 GC::Cell::Visitor::visit (HashTable<T> const&): a table
+## of nullable cell pointers (GC::Ptr<T>).
+pub func cell_visitor_visit_hash_table_nullable[T: IsCell, TT: ak.Traits[T*?]](this: CellVisitor*, table: const ak.HashTable[T*?, TT]*):
+    let buckets = table.m_buckets else return
+    for i in 0..<table.m_capacity:
+        if buckets[i].state != 0:
+            cell_visitor_visit_t(this, buckets[i].storage)
+
+## Ported from Libraries/LibGC/Cell.h:150 GC::Cell::Visitor::visit (OrderedHashTable<T> const&): an
+## ordered table of cell pointers, visited through its bucket array like a HashTable.
+pub func cell_visitor_visit_opaque_2[T: IsCell, TT: ak.Traits[T*]](this: CellVisitor*, table: const ak.OrderedHashTable[T*, TT]*):
+    let buckets = table.m_buckets else return
+    for i in 0..<table.m_capacity:
+        if buckets[i].state != 0:
+            cell_visitor_visit_t_2(this, buckets[i].storage)
+
+## Ported from Libraries/LibGC/Cell.h:157 GC::Cell::Visitor::visit (HashMap<K, V, T> const&), for a
+## map whose values are cells and whose keys are not: every value.
+pub func cell_visitor_visit_hash_map[K, V: IsCell, KT: ak.Traits[K]](this: CellVisitor*, map: const ak.HashMap[K, V*, KT]*):
+    let buckets = map.m_table.m_buckets else return
+    for i in 0..<map.m_table.m_capacity:
+        if buckets[i].state != 0:
+            cell_visitor_visit_t_2(this, buckets[i].storage.value)
+
+## GC::Cell::Visitor::visit (HashMap<K, V, T> const&), for a map whose keys are cells and whose
+## values are not: every key.
+pub func cell_visitor_visit_hash_map_keys[K: IsCell, V, KT: ak.Traits[K*]](this: CellVisitor*, map: const ak.HashMap[K*, V, KT]*):
+    let buckets = map.m_table.m_buckets else return
+    for i in 0..<map.m_table.m_capacity:
+        if buckets[i].state != 0:
+            cell_visitor_visit_t_2(this, buckets[i].storage.key)
+
+## GC::Cell::Visitor::visit (HashMap<K, V, T> const&), for a map whose keys and values are both
+## cells: every key and every value.
+pub func cell_visitor_visit_hash_map_keys_and_values[K: IsCell, V: IsCell, KT: ak.Traits[K*]](this: CellVisitor*, map: const ak.HashMap[K*, V*, KT]*):
+    let buckets = map.m_table.m_buckets else return
+    for i in 0..<map.m_table.m_capacity:
+        if buckets[i].state != 0:
+            cell_visitor_visit_t_2(this, buckets[i].storage.key)
+            cell_visitor_visit_t_2(this, buckets[i].storage.value)
+
+## Ported from Libraries/LibGC/Cell.h:168 GC::Cell::Visitor::visit (OrderedHashMap<K, V, T> const&),
+## for a map whose values are cells: every value.
+pub func cell_visitor_visit_opaque_3[K, V: IsCell, KT: ak.Traits[K]](this: CellVisitor*, map: const ak.OrderedHashMap[K, V*, KT]*):
+    let buckets = map.m_table.m_buckets else return
+    for i in 0..<map.m_table.m_capacity:
+        if buckets[i].state != 0:
+            cell_visitor_visit_t_2(this, buckets[i].storage.value)
+
+## Ported from Libraries/LibGC/Cell.h:179 GC::Cell::Visitor::visit (Optional<T> const&): an
+## optional cell pointer (Optional<GC::Ref<T>> is `T*?`).
+pub func cell_visitor_visit_opaque_4[T: IsCell](this: CellVisitor*, optional: T*?):
+    if let value = optional:
+        cell_visitor_visit_t_2(this, value)
+
+## Ported from Libraries/LibGC/Cell.cpp:12 GC::Cell::Visitor::visit (NanBoxedValue const&).
+pub func cell_visitor_visit_nan_boxed_value(this: CellVisitor*, value: NanBoxedValue):
+    if nan_boxed_value_is_cell(&value):
+        cell_visitor_visit_impl_cell(this, nan_boxed_value_as_cell_const(&value))
+
+## Ported from Libraries/LibGC/Cell.h:190 GC::Cell::Visitor::ignore.
+# Allow explicitly ignoring a GC-allocated member in a visit_edges implementation instead
+# of just not using it.
+pub func cell_visitor_ignore[T](this: CellVisitor*, arg0: T):
+    return
+
+## Ported from Libraries/LibGC/Cell.h:194 GC::Cell::Visitor::visit_possible_values (virtual).
+pub func cell_visitor_visit_possible_values_impl(this: CellVisitor*, arg0: const u8[]):
+    trap("pure virtual: GC::Cell::Visitor::visit_possible_values")
+
+## Ported from Libraries/LibGC/Cell.h:197 GC::Cell::Visitor::visit_impl (virtual).
+pub func cell_visitor_visit_impl_cell_impl(this: CellVisitor*, arg0: Cell*):
+    trap("pure virtual: GC::Cell::Visitor::visit_impl")
+
+## Ported from Libraries/LibGC/Cell.h:198 GC::Cell::Visitor::visit_impl (virtual).
+pub func cell_visitor_visit_impl_span_nan_boxed_value_impl(this: CellVisitor*, arg0: const NanBoxedValue[]):
+    trap("pure virtual: GC::Cell::Visitor::visit_impl")
+
+# mark: Cell virtuals ===========================================================================
+
+## Ported from Libraries/LibGC/Cell.h:202 GC::Cell::visit_edges (virtual).
+pub func cell_visit_edges_impl(this: Cell*, arg0: CellVisitor*):
+    return
+
+## Ported from Libraries/LibGC/Cell.h:205 GC::Cell::finalize (virtual).
+# This will be called on unmarked objects by the garbage collector in a separate pass before destruction.
+pub func cell_finalize_impl(this: Cell*):
+    return
+
+## Ported from Libraries/LibGC/Cell.h:210 GC::Cell::must_survive_garbage_collection (virtual).
+# This allows cells to survive GC by choice, even if nothing points to them.
+# It's used to implement special rules in the web platform.
+# NOTE: Cell types must have OVERRIDES_MUST_SURVIVE_GARBAGE_COLLECTION set for this to be called.
+pub func cell_must_survive_garbage_collection_impl(this: Cell*) -> bool:
+    return false
+
+## Ported from Libraries/LibGC/Cell.h:212 GC::Cell::heap.
+pub func cell_heap(this: Cell*) -> Heap*:
+    return heap_block_base_heap(heap_block_base_from_cell(this))

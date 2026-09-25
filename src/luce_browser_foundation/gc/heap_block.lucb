@@ -1,0 +1,165 @@
+#==============================================================================================
+#
+#   heap_block - HeapBlock: one 16 KiB block of equally sized cells
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/HeapBlock.cpp (lines 1-63) and HeapBlock.h (lines 1-128). The
+#       cells follow the header; a block hands out never-used cells in order (the lazy
+#       freelist) and then the cells on its freelist, where deallocate puts a dead cell as a
+#       FreelistEntry. `for_each_cell(callback)` and `for_each_cell_in_state<state>(callback)` are
+#       iterators (DESIGN.md §2.9). The address-sanitizer poisoning has no counterpart.
+#
+#==============================================================================================
+
+# mark: Construction and allocation =============================================================
+
+## Ported from Libraries/LibGC/HeapBlock.cpp:20 GC::HeapBlock::create_with_cell_size.
+pub func heap_block_create_with_cell_size(heap: Heap*, cell_allocator: CellAllocator*, cell_size: usize, overrides_must_survive_garbage_collection: bool, overrides_finalize: bool) -> HeapBlock*:
+    let name: const u8*? = none
+    let block = (HeapBlock*)block_allocator_allocate_block(cell_allocator_block_allocator(cell_allocator), name)
+    heap_block_construct(block, heap, cell_allocator, cell_size, overrides_must_survive_garbage_collection, overrides_finalize)
+    return block
+
+## Ported from Libraries/LibGC/HeapBlock.cpp:28 GC::HeapBlock::HeapBlock.
+pub func heap_block_construct(this: HeapBlock*, heap: Heap*, cell_allocator: CellAllocator*, cell_size: usize, overrides_must_survive_garbage_collection: bool, overrides_finalize: bool):
+    *this = HeapBlock(heap_block_base = HeapBlockBase(m_heap = heap), m_list_node = ListNode(), m_cell_allocator = cell_allocator, m_cell_size = u32(cell_size), m_next_lazy_freelist_index = 0, m_overrides_must_survive_garbage_collection = overrides_must_survive_garbage_collection, m_overrides_finalize = overrides_finalize, m_freelist = none)
+    assert(cell_size >= sizeof(HeapBlockFreelistEntry))
+
+## Ported from Libraries/LibGC/HeapBlock.h:31 GC::HeapBlock::cell_size.
+pub func heap_block_cell_size(this: const HeapBlock*) -> usize:
+    return (usize)this.m_cell_size
+
+## Ported from Libraries/LibGC/HeapBlock.h:32 GC::HeapBlock::cell_count.
+pub func heap_block_cell_count(this: const HeapBlock*) -> usize:
+    return (heap_block_base_block_size - heap_block_storage_offset) // (usize)this.m_cell_size
+
+## Ported from Libraries/LibGC/HeapBlock.h:33 GC::HeapBlock::is_full.
+pub func heap_block_is_full(this: const HeapBlock*) -> bool:
+    return not heap_block_has_lazy_freelist(this) and this.m_freelist == none
+
+## Ported from Libraries/LibGC/HeapBlock.h:35 GC::HeapBlock::allocate.
+pub func heap_block_allocate(this: HeapBlock*) -> Cell*?:
+    var allocated_cell: Cell*? = none
+    if let freelist = this.m_freelist:
+        assert(heap_block_is_valid_cell_pointer(this, &freelist.cell_base))
+        allocated_cell = &freelist.cell_base
+        this.m_freelist = freelist.next
+    elif heap_block_has_lazy_freelist(this):
+        allocated_cell = heap_block_cell(this, (usize)this.m_next_lazy_freelist_index)
+        this.m_next_lazy_freelist_index += 1
+
+    return allocated_cell
+
+## Ported from Libraries/LibGC/HeapBlock.cpp:39 GC::HeapBlock::deallocate.
+pub func heap_block_deallocate(this: HeapBlock*, cell: Cell*):
+    assert(heap_block_is_valid_cell_pointer(this, cell))
+    if let freelist = this.m_freelist:
+        assert(heap_block_is_valid_cell_pointer(this, &freelist.cell_base))
+    assert(cell_state(cell) == CellState.live)
+    assert(not cell_is_marked(cell))
+
+    # cell->~Cell(); new (cell) FreelistEntry();
+    let freelist_entry = (HeapBlockFreelistEntry*)cell
+    freelist_entry.cell_base = Cell(vtable = &heap_block_freelist_entry_vtable, class_id = heap_block_freelist_entry_class.first_id, m_mark = false, m_state = CellState.live)
+    cell_set_state(&freelist_entry.cell_base, CellState.dead)
+    freelist_entry.next = this.m_freelist
+    this.m_freelist = freelist_entry
+
+# mark: Iteration and lookup ====================================================================
+
+## Ported from Libraries/LibGC/HeapBlock.h:54 GC::HeapBlock::for_each_cell: every cell handed out
+## so far (`for cell in heap_block_for_each_cell(block)`), whatever its state.
+pub func heap_block_for_each_cell(this: HeapBlock*) -> HeapBlockCells:
+    let end = (usize)this.m_next_lazy_freelist_index if heap_block_has_lazy_freelist(this) else heap_block_cell_count(this)
+    return HeapBlockCells(block = this, end = end, state = none)
+
+## Ported from Libraries/LibGC/HeapBlock.h:62 GC::HeapBlock::for_each_cell_in_state: the cells
+## handed out so far that are in `state`.
+pub func heap_block_for_each_cell_in_state(this: HeapBlock*, state: CellState) -> HeapBlockCells:
+    let end = (usize)this.m_next_lazy_freelist_index if heap_block_has_lazy_freelist(this) else heap_block_cell_count(this)
+    return HeapBlockCells(block = this, end = end, state = state)
+
+## The cells of a block: for_each_cell and for_each_cell_in_state as loops. The end is fixed when
+## the loop starts, as in C++.
+pub struct HeapBlockCells: luce.Iterable[Cell*, HeapBlockCellIterator]:
+    pub var block: HeapBlock*
+    pub var end: usize
+    pub var state: CellState?
+
+    func iterator() -> HeapBlockCellIterator:
+        return HeapBlockCellIterator(block = self.block, index = 0, end = self.end, state = self.state)
+
+## The iterator of HeapBlockCells.
+pub struct HeapBlockCellIterator: luce.Iterator[Cell*]:
+    pub var block: HeapBlock*
+    pub var index: usize
+    pub var end: usize
+    pub var state: CellState?
+
+    mutating func next() -> Cell*?:
+        while self.index < self.end:
+            let cell = heap_block_cell(self.block, self.index)
+            self.index += 1
+            if let wanted = self.state:
+                if cell_state(cell) != wanted:
+                    continue
+            return cell
+        return none
+
+## Ported from Libraries/LibGC/HeapBlock.h:70 GC::HeapBlock::from_cell.
+pub func heap_block_from_cell(cell: const Cell*) -> HeapBlock*:
+    return (HeapBlock*)heap_block_base_from_cell(cell)
+
+## HeapBlock::from_cell(reinterpret_cast<Cell const*>(address)) for an address from a
+## conservative scan: the block the address would be in, or none below the first block.
+func heap_block_from_cell_address(address: usize) -> HeapBlock*?:
+    return (HeapBlock*?)(address & ~(heap_block_base_block_size - 1))
+
+## Ported from Libraries/LibGC/HeapBlock.h:75 GC::HeapBlock::cell_from_possible_pointer.
+pub func heap_block_cell_from_possible_pointer(this: HeapBlock*, pointer: usize) -> Cell*?:
+    let storage = (usize)heap_block_storage(this)
+    if pointer < storage:
+        return none
+    let cell_index = (pointer - storage) // (usize)this.m_cell_size
+    let end = (usize)this.m_next_lazy_freelist_index if heap_block_has_lazy_freelist(this) else heap_block_cell_count(this)
+    if cell_index >= end:
+        return none
+    return heap_block_cell(this, cell_index)
+
+## Ported from Libraries/LibGC/HeapBlock.h:86 GC::HeapBlock::is_valid_cell_pointer.
+pub func heap_block_is_valid_cell_pointer(this: HeapBlock*, cell: const Cell*) -> bool:
+    return heap_block_cell_from_possible_pointer(this, (usize)cell) != none
+
+# mark: Accessors ===============================================================================
+
+## Ported from Libraries/LibGC/HeapBlock.h:93 GC::HeapBlock::cell_allocator.
+pub func heap_block_cell_allocator(this: HeapBlock*) -> CellAllocator*:
+    return this.m_cell_allocator
+
+## Ported from Libraries/LibGC/HeapBlock.h:95 GC::HeapBlock::overrides_must_survive_garbage_collection.
+pub func heap_block_overrides_must_survive_garbage_collection(this: const HeapBlock*) -> bool:
+    return this.m_overrides_must_survive_garbage_collection
+
+## Ported from Libraries/LibGC/HeapBlock.h:96 GC::HeapBlock::overrides_finalize.
+pub func heap_block_overrides_finalize(this: const HeapBlock*) -> bool:
+    return this.m_overrides_finalize
+
+## Ported from Libraries/LibGC/HeapBlock.h:101 GC::HeapBlock::has_lazy_freelist.
+pub func heap_block_has_lazy_freelist(this: const HeapBlock*) -> bool:
+    return (usize)this.m_next_lazy_freelist_index < heap_block_cell_count(this)
+
+## Ported from Libraries/LibGC/HeapBlock.h:103 GC::HeapBlock::FreelistEntry (GC_CELL(FreelistEntry, Cell)).
+func heap_block_freelist_entry_class_name_impl(this: Cell*) -> ak.StringView:
+    return sv("FreelistEntry")
+
+## Ported from Libraries/LibGC/HeapBlock.h:109 GC::HeapBlock::cell.
+pub func heap_block_cell(this: HeapBlock*, index: usize) -> Cell*:
+    return (Cell*)(heap_block_storage(this) + index * heap_block_cell_size(this))
+
+## `m_storage`: where the block's cells begin.
+pub func heap_block_storage(this: const HeapBlock*) -> u8*:
+    return (u8*)this + heap_block_storage_offset
+
+## The HeapBlock whose m_list_node is `node` (IntrusiveList's container_of).
+func heap_block_from_list_node(node: ListNode*) -> HeapBlock*:
+    return (HeapBlock*)((u8*)node - offsetof(HeapBlock, m_list_node))

@@ -1,0 +1,122 @@
+#==============================================================================================
+#
+#   ak_support - the AK operations LibGC uses that ak cannot serve yet
+#
+#   DESCRIPTION:
+#       LibGC leans on a few AK templates and platform wrappers that ak's generated stubs give no
+#       callable signature for yet (dbgln with a message, the ""sv literal, calling an
+#       AK::Function), or whose port the collector cannot wait for because the collector runs
+#       under every test of the family (AK::StackInfo's constructor, AK::get_random_uniform).
+#       Each helper does what the AK code does and says which ak function replaces it once
+#       regions r01-r03 settle it.
+#
+#==============================================================================================
+
+extern func pthread_self() -> usize
+extern func pthread_get_stackaddr_np(thread: usize) -> usize
+extern func pthread_get_stacksize_np(thread: usize) -> usize
+extern func pthread_main_np() -> i32
+extern func getrlimit(resource: i32, limit: u64*) -> i32
+extern func pthread_getattr_np(thread: usize, attr: void*) -> i32
+extern func pthread_attr_getstack(attr: void*, base: usize*, size: usize*) -> i32
+extern func pthread_attr_destroy(attr: void*) -> i32
+extern func GetCurrentThreadStackLimits(low: usize*, high: usize*)
+extern func arc4random_buf(buffer: void*, size: usize)
+extern func getrandom(buffer: void*, size: usize, flags: u32) -> isize
+
+## "text"sv: a StringView of a string literal (AK/StringView.h operator""sv). The literal lives
+## in static data, so the view is built in place; ak.literalsv_u8 replaces it once r02 lands.
+func sv(text: str) -> ak.StringView:
+    return ak.StringView(m_characters = text.bytes.data, m_length = text.length)
+
+## A StringView's bytes as text for debug output: AK's formatter writes the bytes as they are;
+## bytes that are not UTF-8 print as a marker here.
+func string_view_text(view: ak.StringView) -> str:
+    let characters = view.m_characters else return ""
+    return str(u8[]((u8*)characters, view.m_length)) else "<not UTF-8>"
+
+## AK::dbgln(fmt, ...) (AK/Format.h:743): one line of debug output on standard error.
+## ak.dbgln's generated stub takes no message yet; switch to it once region r03 ports it.
+func dbgln(message: fmt):
+    discard(io.stderr().write(f"{message}\n") else 0)
+
+## AK::Function<void()>::operator() (AK/Function.h): call the function with its capture context.
+func call_function0(function: ak.Function0[unit]):
+    let call = function.call else trap("VERIFY: calling an empty AK::Function")
+    call(function.context)
+
+## AK::Function<void(A)>::operator() (AK/Function.h): call the function with its capture context.
+func call_function1[A](function: ak.Function1[A, unit], argument: A):
+    let call = function.call else trap("VERIFY: calling an empty AK::Function")
+    call(function.context, argument)
+
+## AK::StackInfo::StackInfo (AK/StackInfo.cpp): the bounds of the current thread's stack, which the
+## heap reads to scan the stack conservatively (DESIGN.md §3.4). ak's StackInfo constructor is
+## region r01's; the collector computes the same fields here so that it runs before r01 lands.
+func current_stack_info() -> ak.StackInfo:
+    if os.macos:
+        # NOTE: !! On MacOS, pthread_get_stackaddr_np gives the TOP of the stack, not the bottom!
+        let thread = pthread_self()
+        let top_of_stack = pthread_get_stackaddr_np(thread)
+        var size = pthread_get_stacksize_np(thread)
+        # MacOS seems inconsistent on what stack size is given for the main thread.
+        if pthread_main_np() == 1:
+            # Apparently the main thread's stack size is not reported correctly on macOS
+            # but we can use getrlimit to get the correct value.
+            var limit: u64[2]
+            discard(getrlimit(3, &limit[0]))  # RLIMIT_STACK
+            if limit[0] == 0x7fffffffffffffff:  # RLIM_INFINITY
+                size = 8 * 1024 * 1024
+            else:
+                size = (usize)limit[0]
+        return ak.StackInfo(m_base = top_of_stack - size, m_top = top_of_stack, m_size = size)
+    elif os.windows:
+        var low: usize = 0
+        var high: usize = 0
+        GetCurrentThreadStackLimits(&low, &high)
+        return ak.StackInfo(m_base = low, m_top = high, m_size = high - low)
+    else:
+        var attr: u64[16]  # pthread_attr_t: 56 bytes on x86-64 glibc, 64 on arm64
+        let rc = pthread_getattr_np(pthread_self(), &attr[0])
+        if rc != 0:
+            trap("pthread_getattr_np failed")
+        var base: usize = 0
+        var size: usize = 0
+        if pthread_attr_getstack(&attr[0], &base, &size) != 0:
+            trap("pthread_attr_getstack failed")
+        discard(pthread_attr_destroy(&attr[0]))
+        return ak.StackInfo(m_base = base, m_top = base + size, m_size = size)
+
+## AK::get_random_uniform (AK/Random.cpp:61) over the OS's CSPRNG, as AK's csprng does it. The
+## block cache is on the collector's allocation path, which runs under every test of the family;
+## ak.get_random_uniform replaces it once region r01 lands.
+func random_uniform(max_bounds: u32) -> u32:
+    # If we try to divide all 2**32 numbers into groups of "max_bounds" numbers, we may end up
+    # with a group around 2**32-1 that is a bit too small. For this reason, the implementation
+    # `arc4random() % max_bounds` would be insufficient. Here we compute the last number of the
+    # last "full group". Note that if max_bounds is a divisor of UINT32_MAX,
+    # then we end up with UINT32_MAX:
+    let max_usable = (u32)(0xffffffff - (0x100000000 % (u64)max_bounds))
+    var random_value = random_u32()
+    var i = 0
+    while i < 20 and random_value > max_usable:
+        # By chance we picked a value from the incomplete group. Note that this group has size at
+        # most 2**31-1, so picking this group has a chance of less than 50%.
+        random_value = random_u32()
+        i += 1
+    return random_value % max_bounds
+
+## AK::get_random<u32>: four bytes from the OS's CSPRNG (arc4random_buf on macOS, getrandom on
+## Linux, the Windows PRNG through luce-std).
+func random_u32() -> u32:
+    var value: u32 = 0
+    if os.macos:
+        arc4random_buf(&value, sizeof(u32))
+    elif os.linux:
+        while getrandom(&value, sizeof(u32), 0) != 4:
+            continue
+    else:
+        var bytes: u8[4]
+        os.random_bytes(bytes) else trap("no random bytes")
+        value = (u32)bytes[0] | ((u32)bytes[1] << 8) | ((u32)bytes[2] << 16) | ((u32)bytes[3] << 24)
+    return value

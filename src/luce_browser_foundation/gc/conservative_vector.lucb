@@ -1,0 +1,30 @@
+#==============================================================================================
+#
+#   conservative_vector - ConservativeVectorBase: a vector whose words are conservative roots
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/ConservativeVector.cpp (lines 1-23) and ConservativeVector.h
+#       (lines 1-81). The base registers itself with its heap for as long as it lives; the heap
+#       reads every word of its possible_values() during gather_conservative_roots. The template
+#       ConservativeVector<T> (base plus an AK::Vector) is spelled by its users as a struct that
+#       embeds the base first and implements possible_values in its vtable.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/ConservativeVector.h:19 GC::ConservativeVectorBase::possible_values (virtual).
+pub func conservative_vector_base_possible_values_impl(this: ConservativeVectorBase*) -> const u64[]:
+    trap("pure virtual: GC::ConservativeVectorBase::possible_values")
+
+## Ported from Libraries/LibGC/ConservativeVector.cpp:12 GC::ConservativeVectorBase::ConservativeVectorBase.
+pub func conservative_vector_base_construct(this: ConservativeVectorBase*, heap: Heap*):
+    this.m_heap = heap
+    heap_did_create_conservative_vector(heap, this)
+
+## Ported from Libraries/LibGC/ConservativeVector.cpp:18 GC::ConservativeVectorBase::~ConservativeVectorBase
+## (the C++ destructor; the owner calls it where the C++ vector goes out of scope).
+pub func conservative_vector_base_destroy(this: ConservativeVectorBase*):
+    heap_did_destroy_conservative_vector(this.m_heap else trap("conservative vector without a heap"), this)
+
+## The ConservativeVectorBase whose m_list_node is `node` (IntrusiveList's container_of).
+func conservative_vector_base_from_list_node(node: ListNode*) -> ConservativeVectorBase*:
+    return (ConservativeVectorBase*)((u8*)node - offsetof(ConservativeVectorBase, m_list_node))
