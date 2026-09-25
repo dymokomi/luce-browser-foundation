@@ -1,0 +1,21 @@
+#==============================================================================================
+#
+#   types_utf16_string - declarations of AK/Utf16String.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Utf16String.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Utf16String =============================================================================
+
+## AK::Utf16String (AK/Utf16String.h:29).
+pub struct Utf16String:
+    pub var utf16_string_base: Utf16StringBase  # primary base
+
+## AK::Utf16String::WithBOMHandling (AK/Utf16String.h:54).
+pub enum Utf16StringWithBomHandling as i32:
+    no = 0
+    yes = 1

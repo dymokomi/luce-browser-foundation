@@ -1,0 +1,59 @@
+#==============================================================================================
+#
+#   types_time - declarations of AK/Time.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Time.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::ms_per_day (AK/Time.h:32).
+# C++ initializer: 86'400'000
+pub var ms_per_day: f64
+
+## AK::seconds_per_day (AK/Time.h:33).
+# C++ initializer: 86'400
+pub var seconds_per_day: f64
+
+## AK::seconds_per_year (AK/Time.h:34).
+# C++ initializer: 60.0 * 60.0 * 24.0 * 365.2425
+pub var seconds_per_year: f64
+
+## AK::seconds_per_hour (AK/Time.h:35).
+# C++ initializer: 3'600
+pub var seconds_per_hour: i32
+
+## AK::seconds_per_minute (AK/Time.h:36).
+pub let seconds_per_minute: i32 = 60
+
+# mark: Duration ================================================================================
+
+## AK::Duration (AK/Time.h:167).
+pub struct Duration:
+    pub var m_seconds: i64  # C++ default: { 0 }
+    pub var m_nanoseconds: u32  # C++ default: { 0 }
+
+# mark: UnawareTime =============================================================================
+
+## AK::Detail::UnawareTime (AK/Time.h:383).
+pub struct UnawareTime:
+    pub var m_offset: Duration  # C++ default: { }
+
+# mark: UnixDateTime ============================================================================
+
+## AK::UnixDateTime (AK/Time.h:407).
+pub struct UnixDateTime:
+    pub var unaware_time: UnawareTime  # primary base
+
+## AK::UnixDateTime::LocalTime (AK/Time.h:473).
+pub enum UnixDateTimeLocalTime as i32:
+    yes = 0
+    no = 1
+
+# mark: MonotonicTime ===========================================================================
+
+## AK::MonotonicTime (AK/Time.h:549).
+pub struct MonotonicTime:
+    pub var unaware_time: UnawareTime  # primary base

@@ -1,0 +1,46 @@
+#==============================================================================================
+#
+#   types_byte_string_impl - declarations of AK/ByteStringImpl.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/ByteStringImpl.cpp, AK/ByteStringImpl.h (Ladybird 47c82b38d0) by the skeleton
+#       generator (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the
+#       generator could not map.
+#
+#==============================================================================================
+
+# mark: EmptyByteStringImpl =====================================================================
+
+## AK::EmptyByteStringImpl (AK/ByteStringImpl.cpp:16).
+pub struct EmptyByteStringImpl:
+    pub var ref_count: u32  # C++ default: { 1 }
+    pub var length: usize  # C++ default: { 0 }
+    pub var hash: u32  # C++ default: { 0 }
+    pub var has_hash: bool  # C++ default: { false }
+    pub var inline_buffer: u8[1]
+
+## AK::ShouldChomp (AK/ByteStringImpl.h:17).
+pub enum ShouldChomp as u32:
+    no_chomp = 0
+    chomp = 1
+
+# mark: ByteStringImpl ==========================================================================
+
+## AK::ByteStringImpl (AK/ByteStringImpl.h:24).
+pub struct ByteStringImpl:
+    pub var m_length: usize  # C++ default: { 0 }
+    pub var m_hash: u32  # C++ default: { 0 }
+    pub var m_has_hash: bool  # C++ default: { false }
+    pub var m_inline_buffer: u8*?
+
+## AK::s_the_empty_stringimpl (AK/ByteStringImpl.cpp:33).
+pub var s_the_empty_stringimpl: EmptyByteStringImpl
+
+## AK::ByteStringImpl::ConstructTheEmptyStringImplTag (AK/ByteStringImpl.h:77).
+pub enum ByteStringImplConstructTheEmptyStringImplTag as u32:
+    construct_the_empty_string_impl = 0
+
+## AK::ByteStringImpl::ConstructWithInlineBufferTag (AK/ByteStringImpl.h:84).
+pub enum ByteStringImplConstructWithInlineBufferTag as u32:
+    construct_with_inline_buffer = 0

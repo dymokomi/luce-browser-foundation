@@ -1,0 +1,19 @@
+#==============================================================================================
+#
+#   types_character_types - declarations of Libraries/LibWeb/Infra/CharacterTypes.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibWeb/Infra/CharacterTypes.h (Ladybird 47c82b38d0) by the skeleton
+#       generator (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the
+#       generator could not map.
+#
+#==============================================================================================
+
+## Web::Infra::ASCII_WHITESPACE (Libraries/LibWeb/Infra/CharacterTypes.h:14).
+# C++ initializer: "\t\n\f\r "sv
+pub var ascii_whitespace: ak.StringView
+
+## Web::Infra::ASCII_WHITESPACE_CODE_POINTS (Libraries/LibWeb/Infra/CharacterTypes.h:15).
+# C++ initializer: to_array < u32 > ( { '\t' , '\n' , '\f' , '\r' , ' ' } )
+pub var ascii_whitespace_code_points: u32[5]

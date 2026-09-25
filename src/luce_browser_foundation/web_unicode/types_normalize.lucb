@@ -1,0 +1,18 @@
+#==============================================================================================
+#
+#   types_normalize - declarations of Libraries/LibUnicode/Normalize.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibUnicode/Normalize.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+## Unicode::NormalizationForm (Libraries/LibUnicode/Normalize.h:15).
+pub enum NormalizationForm as i32:
+    nfd = 0
+    nfc = 1
+    nfkd = 2
+    nfkc = 3

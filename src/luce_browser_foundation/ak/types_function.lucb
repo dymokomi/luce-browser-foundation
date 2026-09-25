@@ -1,0 +1,75 @@
+#==============================================================================================
+#
+#   types_function - declarations of AK/Function.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Function.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::Detail::HaveObjcArc (AK/Function.h:63).
+pub let have_objc_arc: bool = false
+
+## AK::Detail::block_layout_size (AK/Function.h:67).
+pub let block_layout_size: usize = 32
+
+# mark: CallableWrapperBase =====================================================================
+
+## AK::Function::CallableWrapperBase (AK/Function.h:202).
+pub struct CallableWrapperBase: IsCallableWrapperBase:
+    pub var vtable: const CallableWrapperBaseVTable*
+    pub var class_id: u16
+
+    func callable_wrapper_base() -> CallableWrapperBase*: return (CallableWrapperBase*)&self
+
+## Upcast to AK::Function::CallableWrapperBase (implemented by every struct in its hierarchy).
+pub interface IsCallableWrapperBase:
+    func callable_wrapper_base() -> CallableWrapperBase*
+
+## Virtual functions introduced by AK::Function::CallableWrapperBase.
+pub struct CallableWrapperBaseVTable:
+    pub let class_info: const ClassInfo*
+    pub let call: func(CallableWrapperBase*, void*?) -> void*? = callable_wrapper_base_call_impl
+    pub let init_and_swap: func(CallableWrapperBase*, u8*?, usize) -> unit = callable_wrapper_base_init_and_swap_impl
+    pub let raw_callable: func(CallableWrapperBase*) -> const void*? = callable_wrapper_base_raw_callable_impl
+
+## Virtual: AK::Function::CallableWrapperBase::call.
+pub func callable_wrapper_base_call(this: CallableWrapperBase*, arg0: void*?) -> void*?:
+    return ((const CallableWrapperBaseVTable*)this.vtable).call(this, arg0)
+
+## Virtual: AK::Function::CallableWrapperBase::init_and_swap.
+pub func callable_wrapper_base_init_and_swap(this: CallableWrapperBase*, arg0: u8*?, arg1: usize):
+    ((const CallableWrapperBaseVTable*)this.vtable).init_and_swap(this, arg0, arg1)
+
+## Virtual: AK::Function::CallableWrapperBase::raw_callable.
+pub func callable_wrapper_base_raw_callable(this: CallableWrapperBase*) -> const void*?:
+    return ((const CallableWrapperBaseVTable*)this.vtable).raw_callable(this)
+
+## The vtable of AK::Function::CallableWrapperBase.
+pub let callable_wrapper_base_vtable: CallableWrapperBaseVTable = CallableWrapperBaseVTable(class_info = &callable_wrapper_base_class)
+
+## Class information of AK::Function::CallableWrapperBase: name, class-id range (pre-order), size, vtable.
+pub let callable_wrapper_base_class: ClassInfo = ClassInfo(name = "CallableWrapperBase", first_id = 0, last_id = 0, size = sizeof(CallableWrapperBase), vtable = (const void*)&callable_wrapper_base_vtable)
+
+## is<AK::Function::CallableWrapperBase>: the class-id range test.
+pub func is_callable_wrapper_base[P: IsCallableWrapperBase](p: P*) -> bool:
+    let id = p.callable_wrapper_base().class_id
+    return id >= callable_wrapper_base_class.first_id and id <= callable_wrapper_base_class.last_id
+
+## as_if<AK::Function::CallableWrapperBase>.
+pub func as_if_callable_wrapper_base[P: IsCallableWrapperBase](p: P*) -> CallableWrapperBase*?:
+    if is_callable_wrapper_base(p): return (CallableWrapperBase*)p
+    return none
+
+## as<AK::Function::CallableWrapperBase> (verify_cast).
+pub func as_callable_wrapper_base[P: IsCallableWrapperBase](p: P*) -> CallableWrapperBase*:
+    return as_if_callable_wrapper_base(p) else trap("as<AK::Function::CallableWrapperBase> failed")
+
+# mark: CallableWrapper =========================================================================
+
+## AK::Function::CallableWrapper (AK/Function.h:212): a generic struct.
+pub struct CallableWrapper[TCallableType]:
+    pub var callable_wrapper_base: CallableWrapperBase
+    pub var m_callable: TCallableType

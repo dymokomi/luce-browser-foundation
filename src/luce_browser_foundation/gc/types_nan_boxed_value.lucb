@@ -1,0 +1,63 @@
+#==============================================================================================
+#
+#   types_nan_boxed_value - declarations of Libraries/LibGC/NanBoxedValue.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/NanBoxedValue.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+## GC::CANON_NAN_BITS (Libraries/LibGC/NanBoxedValue.h:21).
+# C++ initializer: bit_cast < u64 > ( __builtin_nan ( "" ) )
+pub var canon_nan_bits: u64
+
+## GC::POSITIVE_INFINITY_BITS (Libraries/LibGC/NanBoxedValue.h:28).
+# C++ initializer: bit_cast < u64 > ( __builtin_huge_val ( ) )
+pub var positive_infinity_bits: u64
+
+## GC::NEGATIVE_INFINITY_BITS (Libraries/LibGC/NanBoxedValue.h:29).
+# C++ initializer: bit_cast < u64 > ( - __builtin_huge_val ( ) )
+pub var negative_infinity_bits: u64
+
+## GC::BASE_TAG (Libraries/LibGC/NanBoxedValue.h:40).
+pub let base_tag: u64 = 0x7ff8
+
+## GC::IS_CELL_BIT (Libraries/LibGC/NanBoxedValue.h:46).
+# C++ initializer: 0x8000 | BASE_TAG
+pub var is_cell_bit: u64
+
+## GC::IS_CELL_PATTERN (Libraries/LibGC/NanBoxedValue.h:53).
+pub let is_cell_pattern: u64 = 0xfff8
+
+## GC::TAG_SHIFT (Libraries/LibGC/NanBoxedValue.h:54).
+pub let tag_shift: u64 = 48
+
+## GC::TAG_EXTRACTION (Libraries/LibGC/NanBoxedValue.h:55).
+pub let tag_extraction: u64 = 0xffff000000000000
+
+## GC::SHIFTED_IS_CELL_PATTERN (Libraries/LibGC/NanBoxedValue.h:56).
+# C++ initializer: IS_CELL_PATTERN << TAG_SHIFT
+pub var shifted_is_cell_pattern: u64
+
+# mark: NanBoxedValue ===========================================================================
+
+## GC::NanBoxedValue (Libraries/LibGC/NanBoxedValue.h:58).
+pub struct NanBoxedValue:
+    pub var m_value: NanBoxedValueUnion  # C++ default: { . encoded = 0 }
+
+# mark: NanBoxedValueUnion ======================================================================
+
+## GC::NanBoxedValue::(anonymous union) (Libraries/LibGC/NanBoxedValue.h:108).
+pub union NanBoxedValueUnion:
+    pub as_double: f64
+    pub encoded: u64
+
+# mark: NanBoxedValueUnionStruct ================================================================
+
+## GC::NanBoxedValue::(anonymous union)::(anonymous struct) (Libraries/LibGC/NanBoxedValue.h:110).
+pub struct NanBoxedValueUnionStruct:
+    pub var payload: u64  # bit-field : 48
+    pub var tag: u64  # bit-field : 16

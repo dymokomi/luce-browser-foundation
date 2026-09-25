@@ -1,0 +1,36 @@
+#==============================================================================================
+#
+#   types_string_base - declarations of AK/StringBase.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/StringBase.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: ShortString =============================================================================
+
+## AK::Detail::ShortString (AK/StringBase.h:16).
+pub struct ShortString:
+    pub var byte_count_and_short_string_flag: u8  # C++ default: { 0 }
+    pub var storage: u8[7]  # C++ default: { 0 }
+
+# mark: StringBase ==============================================================================
+
+## AK::Detail::StringBase (AK/StringBase.h:35).
+pub struct StringBase:
+    pub var m_impl: StringBaseUnion
+
+## AK::Detail::StringBase::SHORT_STRING_FLAG (AK/StringBase.h:38).
+pub let string_base_short_string_flag: usize = 1
+
+## AK::Detail::StringBase::SHORT_STRING_BYTE_COUNT_SHIFT_COUNT (AK/StringBase.h:39).
+pub let string_base_short_string_byte_count_shift_count: u32 = 2
+
+# mark: StringBaseUnion =========================================================================
+
+## AK::Detail::StringBase::(anonymous union) (AK/StringBase.h:182).
+pub union StringBaseUnion:
+    pub short_string: ShortString
+    pub data: const StringData*?

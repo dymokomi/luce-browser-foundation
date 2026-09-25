@@ -1,0 +1,54 @@
+#==============================================================================================
+#
+#   types_string_utils - declarations of AK/StringUtils.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/StringUtils.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::CaseSensitivity (AK/StringUtils.h:23).
+pub enum CaseSensitivity as i32:
+    case_insensitive = 0
+    case_sensitive = 1
+
+## AK::ReplaceMode (AK/StringUtils.h:28).
+pub enum ReplaceMode as i32:
+    all = 0
+    first_only = 1
+
+## AK::TrimMode (AK/StringUtils.h:33).
+pub enum TrimMode as i32:
+    left = 0
+    right = 1
+    both = 2
+
+## AK::TrimWhitespace (AK/StringUtils.h:39).
+pub enum TrimWhitespace as i32:
+    yes = 0
+    no = 1
+
+## AK::SplitBehavior (AK/StringUtils.h:44).
+pub enum SplitBehavior as u32:
+    nothing = 0
+    keep_empty = 1
+    keep_trailing_separator = 2
+
+## AK::TrailingCodePointTransformation (AK/StringUtils.h:59).
+pub enum TrailingCodePointTransformation as u8:
+    lowercase = 0
+    preserve_existing = 1
+
+# mark: MaskSpan ================================================================================
+
+## AK::MaskSpan (AK/StringUtils.h:66).
+pub struct MaskSpan:
+    pub var start: usize
+    pub var length: usize
+
+## AK::StringUtils::SearchDirection (AK/StringUtils.h:93).
+pub enum SearchDirection as i32:
+    forward = 0
+    backward = 1

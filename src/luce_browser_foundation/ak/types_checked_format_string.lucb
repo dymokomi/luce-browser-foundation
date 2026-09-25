@@ -1,0 +1,23 @@
+#==============================================================================================
+#
+#   types_checked_format_string - declarations of AK/CheckedFormatString.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/CheckedFormatString.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: Array ===================================================================================
+
+## AK::Format::Detail::Array (AK/CheckedFormatString.h:19): a generic struct.
+pub struct Array[T]:
+    pub var __data: T*?
+
+# mark: CheckedFormatString =====================================================================
+
+## AK::Format::Detail::CheckedFormatString (AK/CheckedFormatString.h:137): a generic struct.
+pub struct CheckedFormatString[TArgs]:
+    pub var m_string: StringView

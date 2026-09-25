@@ -1,0 +1,17 @@
+#==============================================================================================
+#
+#   types_span - declarations of AK/Span.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Span.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Span ====================================================================================
+
+## AK::Detail::Span (AK/Span.h:20): a generic struct.
+pub struct Span[T]:
+    pub var m_values: T*?  # C++ default: { nullptr }
+    pub var m_size: usize  # C++ default: { 0 }

@@ -1,0 +1,40 @@
+#==============================================================================================
+#
+#   types_constructor_string_parser - declarations of Libraries/LibURL/Pattern/ConstructorStringParser.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Pattern/ConstructorStringParser.h (Ladybird 47c82b38d0) by the
+#       skeleton generator (DESIGN.md §4.4). Regenerate rather than edit, except to fill a
+#       field the generator could not map.
+#
+#==============================================================================================
+
+# mark: ConstructorStringParser =================================================================
+
+## URL::Pattern::ConstructorStringParser (Libraries/LibURL/Pattern/ConstructorStringParser.h:16).
+pub struct ConstructorStringParser:
+    pub var m_input: ak.Utf8View
+    pub var m_token_list: ak.Vector[Token]
+    pub var m_result: Init
+    pub var m_component_start: u32  # C++ default: { 0 }
+    pub var m_token_index: u32  # C++ default: { 0 }
+    pub var m_token_increment: u32  # C++ default: { 1 }
+    pub var m_group_depth: u32  # C++ default: { 0 }
+    pub var m_hostname_ipv6_bracket_depth: u32  # C++ default: { 0 }
+    pub var m_protocol_matches_a_special_scheme: bool  # C++ default: { false }
+    pub var m_state: ConstructorStringParserState  # C++ default: { State :: Initial }
+
+## URL::Pattern::ConstructorStringParser::State (Libraries/LibURL/Pattern/ConstructorStringParser.h:24).
+pub enum ConstructorStringParserState as i32:
+    initial = 0
+    protocol = 1
+    authority = 2
+    username = 3
+    password = 4
+    hostname = 5
+    port = 6
+    pathname = 7
+    search = 8
+    hash_ = 9
+    done = 10

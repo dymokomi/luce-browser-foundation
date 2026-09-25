@@ -1,0 +1,46 @@
+#==============================================================================================
+#
+#   types_variant - declarations of AK/Variant.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Variant.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: VariantNoClearTag =======================================================================
+
+## AK::Detail::VariantNoClearTag (AK/Variant.h:125).
+pub struct VariantNoClearTag:
+    pub var empty_: u8
+
+# mark: VariantConstructTag =====================================================================
+
+## AK::Detail::VariantConstructTag (AK/Variant.h:128).
+pub struct VariantConstructTag:
+    pub var empty_: u8
+
+# mark: VariantConstructors =====================================================================
+
+## AK::Detail::VariantConstructors (AK/Variant.h:133): a generic struct.
+pub struct VariantConstructors[T, TBase]:
+    pub var empty_: u8
+
+# mark: ParameterPackTag ========================================================================
+
+## AK::Detail::ParameterPackTag (AK/Variant.h:162).
+pub struct ParameterPackTag:
+    pub var empty_: u8
+
+# mark: Empty ===================================================================================
+
+## AK::Empty (AK/Variant.h:220).
+pub struct Empty:
+    pub var empty_: u8
+
+# mark: Visitor =================================================================================
+
+## AK::Variant::Visitor (AK/Variant.h:497): a generic struct.
+pub struct Visitor[TFs]:
+    pub var empty_: u8

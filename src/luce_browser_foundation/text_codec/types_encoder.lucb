@@ -1,0 +1,470 @@
+#==============================================================================================
+#
+#   types_encoder - declarations of Libraries/LibTextCodec/Encoder.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibTextCodec/Encoder.cpp, Libraries/LibTextCodec/Encoder.h (Ladybird
+#       47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather than edit,
+#       except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Encoder =================================================================================
+
+## TextCodec::Encoder (Libraries/LibTextCodec/Encoder.h:16).
+pub struct Encoder: IsEncoder:
+    pub var vtable: const EncoderVTable*
+    pub var class_id: u16
+
+    func encoder() -> Encoder*: return (Encoder*)&self
+
+## Upcast to TextCodec::Encoder (implemented by every struct in its hierarchy).
+pub interface IsEncoder:
+    func encoder() -> Encoder*
+
+## Virtual functions introduced by TextCodec::Encoder.
+pub struct EncoderVTable:
+    pub let class_info: const ak.ClassInfo*
+    pub let process: func(Encoder*, ak.Utf8View, ak.Function1[u8, unit], ak.Function1[u32, unit]) -> unit! = encoder_process_impl
+
+## Virtual: TextCodec::Encoder::process.
+pub func encoder_process(this: Encoder*, arg0: ak.Utf8View, on_byte: ak.Function1[u8, unit], on_error: ak.Function1[u32, unit]) -> !:
+    try ((const EncoderVTable*)this.vtable).process(this, arg0, on_byte, on_error)
+
+## The vtable of TextCodec::Encoder.
+pub let encoder_vtable: EncoderVTable = EncoderVTable(class_info = &encoder_class)
+
+## Class information of TextCodec::Encoder: name, class-id range (pre-order), size, vtable.
+pub let encoder_class: ak.ClassInfo = ak.ClassInfo(name = "Encoder", first_id = 0, last_id = 7, size = sizeof(Encoder), vtable = (const void*)&encoder_vtable)
+
+## is<TextCodec::Encoder>: the class-id range test.
+pub func is_encoder[P: IsEncoder](p: P*) -> bool:
+    let id = p.encoder().class_id
+    return id >= encoder_class.first_id and id <= encoder_class.last_id
+
+## as_if<TextCodec::Encoder>.
+pub func as_if_encoder[P: IsEncoder](p: P*) -> Encoder*?:
+    if is_encoder(p): return (Encoder*)p
+    return none
+
+## as<TextCodec::Encoder> (verify_cast).
+pub func as_encoder[P: IsEncoder](p: P*) -> Encoder*:
+    return as_if_encoder(p) else trap("as<TextCodec::Encoder> failed")
+
+## TextCodec::(anonymous)::s_utf8_encoder (Libraries/LibTextCodec/Encoder.cpp:18).
+pub var s_utf8_encoder: Utf8Encoder?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_gb18030_encoder (Libraries/LibTextCodec/Encoder.cpp:19).
+pub var s_gb18030_encoder: Gb18030Encoder?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_gbk_encoder (Libraries/LibTextCodec/Encoder.cpp:20).
+pub var s_gbk_encoder: Gb18030Encoder?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_big5_encoder (Libraries/LibTextCodec/Encoder.cpp:21).
+pub var s_big5_encoder: Big5Encoder?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_euc_jp_encoder (Libraries/LibTextCodec/Encoder.cpp:22).
+pub var s_euc_jp_encoder: EucjpEncoder?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_iso_2022_jp_encoder (Libraries/LibTextCodec/Encoder.cpp:23).
+pub var s_iso_2022_jp_encoder: Iso2022JpEncoder?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_shift_jis_encoder (Libraries/LibTextCodec/Encoder.cpp:24).
+pub var s_shift_jis_encoder: ShiftJisEncoder?  # not zeroable in Luce: optional until initialized
+
+# mark: Utf8Encoder =============================================================================
+
+## TextCodec::UTF8Encoder (Libraries/LibTextCodec/Encoder.h:24).
+pub struct Utf8Encoder: IsUtf8Encoder, IsEncoder:
+    pub var encoder_base: Encoder  # primary base
+
+    func utf8_encoder() -> Utf8Encoder*: return (Utf8Encoder*)&self
+
+    func encoder() -> Encoder*: return (Encoder*)&self
+
+## Upcast to TextCodec::UTF8Encoder (implemented by every struct in its hierarchy).
+pub interface IsUtf8Encoder:
+    func utf8_encoder() -> Utf8Encoder*
+
+## Virtual functions introduced by TextCodec::UTF8Encoder.
+pub struct Utf8EncoderVTable:
+    pub let encoder_vtable: EncoderVTable
+
+## The vtable of TextCodec::UTF8Encoder.
+pub let utf8_encoder_vtable: Utf8EncoderVTable = Utf8EncoderVTable(encoder_vtable = EncoderVTable(class_info = &utf8_encoder_class, process = utf8_encoder_process_impl))
+
+## Class information of TextCodec::UTF8Encoder: name, class-id range (pre-order), size, vtable.
+pub let utf8_encoder_class: ak.ClassInfo = ak.ClassInfo(name = "UTF8Encoder", first_id = 7, last_id = 7, size = sizeof(Utf8Encoder), vtable = (const void*)&utf8_encoder_vtable)
+
+## is<TextCodec::UTF8Encoder>: the class-id range test.
+pub func is_utf8_encoder[P: IsEncoder](p: P*) -> bool:
+    let id = p.encoder().class_id
+    return id >= utf8_encoder_class.first_id and id <= utf8_encoder_class.last_id
+
+## as_if<TextCodec::UTF8Encoder>.
+pub func as_if_utf8_encoder[P: IsEncoder](p: P*) -> Utf8Encoder*?:
+    if is_utf8_encoder(p): return (Utf8Encoder*)p
+    return none
+
+## as<TextCodec::UTF8Encoder> (verify_cast).
+pub func as_utf8_encoder[P: IsEncoder](p: P*) -> Utf8Encoder*:
+    return as_if_utf8_encoder(p) else trap("as<TextCodec::UTF8Encoder> failed")
+
+## TextCodec::(anonymous)::s_euc_kr_encoder (Libraries/LibTextCodec/Encoder.cpp:25).
+pub var s_euc_kr_encoder: EuckrEncoder?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_ibm866_encoder (Libraries/LibTextCodec/Encoder.cpp:29).
+# C++ initializer: { s_ibm866_index }
+pub var s_ibm866_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+# mark: EucjpEncoder ============================================================================
+
+## TextCodec::EUCJPEncoder (Libraries/LibTextCodec/Encoder.h:29).
+pub struct EucjpEncoder: IsEucjpEncoder, IsEncoder:
+    pub var encoder_base: Encoder  # primary base
+
+    func eucjp_encoder() -> EucjpEncoder*: return (EucjpEncoder*)&self
+
+    func encoder() -> Encoder*: return (Encoder*)&self
+
+## Upcast to TextCodec::EUCJPEncoder (implemented by every struct in its hierarchy).
+pub interface IsEucjpEncoder:
+    func eucjp_encoder() -> EucjpEncoder*
+
+## Virtual functions introduced by TextCodec::EUCJPEncoder.
+pub struct EucjpEncoderVTable:
+    pub let encoder_vtable: EncoderVTable
+
+## The vtable of TextCodec::EUCJPEncoder.
+pub let eucjp_encoder_vtable: EucjpEncoderVTable = EucjpEncoderVTable(encoder_vtable = EncoderVTable(class_info = &eucjp_encoder_class, process = eucjp_encoder_process_impl))
+
+## Class information of TextCodec::EUCJPEncoder: name, class-id range (pre-order), size, vtable.
+pub let eucjp_encoder_class: ak.ClassInfo = ak.ClassInfo(name = "EUCJPEncoder", first_id = 2, last_id = 2, size = sizeof(EucjpEncoder), vtable = (const void*)&eucjp_encoder_vtable)
+
+## is<TextCodec::EUCJPEncoder>: the class-id range test.
+pub func is_eucjp_encoder[P: IsEncoder](p: P*) -> bool:
+    let id = p.encoder().class_id
+    return id >= eucjp_encoder_class.first_id and id <= eucjp_encoder_class.last_id
+
+## as_if<TextCodec::EUCJPEncoder>.
+pub func as_if_eucjp_encoder[P: IsEncoder](p: P*) -> EucjpEncoder*?:
+    if is_eucjp_encoder(p): return (EucjpEncoder*)p
+    return none
+
+## as<TextCodec::EUCJPEncoder> (verify_cast).
+pub func as_eucjp_encoder[P: IsEncoder](p: P*) -> EucjpEncoder*:
+    return as_if_eucjp_encoder(p) else trap("as<TextCodec::EUCJPEncoder> failed")
+
+## TextCodec::(anonymous)::s_latin2_encoder (Libraries/LibTextCodec/Encoder.cpp:30).
+# C++ initializer: { s_iso_8859_2_index }
+pub var s_latin2_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_latin3_encoder (Libraries/LibTextCodec/Encoder.cpp:31).
+# C++ initializer: { s_iso_8859_3_index }
+pub var s_latin3_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_latin4_encoder (Libraries/LibTextCodec/Encoder.cpp:32).
+# C++ initializer: { s_iso_8859_4_index }
+pub var s_latin4_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_latin_cyrillic_encoder (Libraries/LibTextCodec/Encoder.cpp:33).
+# C++ initializer: { s_iso_8859_5_index }
+pub var s_latin_cyrillic_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_latin_arabic_encoder (Libraries/LibTextCodec/Encoder.cpp:34).
+# C++ initializer: { s_iso_8859_6_index }
+pub var s_latin_arabic_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+# mark: Iso2022JpEncoder ========================================================================
+
+## TextCodec::ISO2022JPEncoder (Libraries/LibTextCodec/Encoder.h:34).
+pub struct Iso2022JpEncoder: IsIso2022JpEncoder, IsEncoder:
+    pub var encoder_base: Encoder  # primary base
+
+    func iso2022_jp_encoder() -> Iso2022JpEncoder*: return (Iso2022JpEncoder*)&self
+
+    func encoder() -> Encoder*: return (Encoder*)&self
+
+## Upcast to TextCodec::ISO2022JPEncoder (implemented by every struct in its hierarchy).
+pub interface IsIso2022JpEncoder:
+    func iso2022_jp_encoder() -> Iso2022JpEncoder*
+
+## Virtual functions introduced by TextCodec::ISO2022JPEncoder.
+pub struct Iso2022JpEncoderVTable:
+    pub let encoder_vtable: EncoderVTable
+
+## The vtable of TextCodec::ISO2022JPEncoder.
+pub let iso2022_jp_encoder_vtable: Iso2022JpEncoderVTable = Iso2022JpEncoderVTable(encoder_vtable = EncoderVTable(class_info = &iso2022_jp_encoder_class, process = iso2022_jp_encoder_process_impl))
+
+## Class information of TextCodec::ISO2022JPEncoder: name, class-id range (pre-order), size, vtable.
+pub let iso2022_jp_encoder_class: ak.ClassInfo = ak.ClassInfo(name = "ISO2022JPEncoder", first_id = 5, last_id = 5, size = sizeof(Iso2022JpEncoder), vtable = (const void*)&iso2022_jp_encoder_vtable)
+
+## is<TextCodec::ISO2022JPEncoder>: the class-id range test.
+pub func is_iso2022_jp_encoder[P: IsEncoder](p: P*) -> bool:
+    let id = p.encoder().class_id
+    return id >= iso2022_jp_encoder_class.first_id and id <= iso2022_jp_encoder_class.last_id
+
+## as_if<TextCodec::ISO2022JPEncoder>.
+pub func as_if_iso2022_jp_encoder[P: IsEncoder](p: P*) -> Iso2022JpEncoder*?:
+    if is_iso2022_jp_encoder(p): return (Iso2022JpEncoder*)p
+    return none
+
+## as<TextCodec::ISO2022JPEncoder> (verify_cast).
+pub func as_iso2022_jp_encoder[P: IsEncoder](p: P*) -> Iso2022JpEncoder*:
+    return as_if_iso2022_jp_encoder(p) else trap("as<TextCodec::ISO2022JPEncoder> failed")
+
+## TextCodec::(anonymous)::s_latin_greek_encoder (Libraries/LibTextCodec/Encoder.cpp:35).
+# C++ initializer: { s_iso_8859_7_index }
+pub var s_latin_greek_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_latin_hebrew_encoder (Libraries/LibTextCodec/Encoder.cpp:36).
+# C++ initializer: { s_iso_8859_8_index }
+pub var s_latin_hebrew_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_latin6_encoder (Libraries/LibTextCodec/Encoder.cpp:37).
+# C++ initializer: { s_iso_8859_10_index }
+pub var s_latin6_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_latin7_encoder (Libraries/LibTextCodec/Encoder.cpp:38).
+# C++ initializer: { s_iso_8859_13_index }
+pub var s_latin7_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_latin8_encoder (Libraries/LibTextCodec/Encoder.cpp:39).
+# C++ initializer: { s_iso_8859_14_index }
+pub var s_latin8_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::ISO2022JPEncoder::State (Libraries/LibTextCodec/Encoder.h:39).
+pub enum Iso2022JpEncoderState as i32:
+    ascii = 0
+    roman = 1
+    jis0208 = 2
+
+## TextCodec::(anonymous)::s_latin9_encoder (Libraries/LibTextCodec/Encoder.cpp:40).
+# C++ initializer: { s_iso_8859_15_index }
+pub var s_latin9_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_latin10_encoder (Libraries/LibTextCodec/Encoder.cpp:41).
+# C++ initializer: { s_iso_8859_16_index }
+pub var s_latin10_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_centraleurope_encoder (Libraries/LibTextCodec/Encoder.cpp:42).
+# C++ initializer: { s_windows_1250_index }
+pub var s_centraleurope_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_cyrillic_encoder (Libraries/LibTextCodec/Encoder.cpp:43).
+# C++ initializer: { s_windows_1251_index }
+pub var s_cyrillic_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_hebrew_encoder (Libraries/LibTextCodec/Encoder.cpp:44).
+# C++ initializer: { s_windows_1255_index }
+pub var s_hebrew_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_koi8r_encoder (Libraries/LibTextCodec/Encoder.cpp:45).
+# C++ initializer: { s_koi8_r_index }
+pub var s_koi8r_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_koi8u_encoder (Libraries/LibTextCodec/Encoder.cpp:46).
+# C++ initializer: { s_koi8_u_index }
+pub var s_koi8u_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_mac_roman_encoder (Libraries/LibTextCodec/Encoder.cpp:47).
+# C++ initializer: { s_macintosh_index }
+pub var s_mac_roman_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_windows874_encoder (Libraries/LibTextCodec/Encoder.cpp:48).
+# C++ initializer: { s_windows_874_index }
+pub var s_windows874_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+# mark: ShiftJisEncoder =========================================================================
+
+## TextCodec::ShiftJISEncoder (Libraries/LibTextCodec/Encoder.h:48).
+pub struct ShiftJisEncoder: IsShiftJisEncoder, IsEncoder:
+    pub var encoder_base: Encoder  # primary base
+
+    func shift_jis_encoder() -> ShiftJisEncoder*: return (ShiftJisEncoder*)&self
+
+    func encoder() -> Encoder*: return (Encoder*)&self
+
+## Upcast to TextCodec::ShiftJISEncoder (implemented by every struct in its hierarchy).
+pub interface IsShiftJisEncoder:
+    func shift_jis_encoder() -> ShiftJisEncoder*
+
+## Virtual functions introduced by TextCodec::ShiftJISEncoder.
+pub struct ShiftJisEncoderVTable:
+    pub let encoder_vtable: EncoderVTable
+
+## The vtable of TextCodec::ShiftJISEncoder.
+pub let shift_jis_encoder_vtable: ShiftJisEncoderVTable = ShiftJisEncoderVTable(encoder_vtable = EncoderVTable(class_info = &shift_jis_encoder_class, process = shift_jis_encoder_process_impl))
+
+## Class information of TextCodec::ShiftJISEncoder: name, class-id range (pre-order), size, vtable.
+pub let shift_jis_encoder_class: ak.ClassInfo = ak.ClassInfo(name = "ShiftJISEncoder", first_id = 6, last_id = 6, size = sizeof(ShiftJisEncoder), vtable = (const void*)&shift_jis_encoder_vtable)
+
+## is<TextCodec::ShiftJISEncoder>: the class-id range test.
+pub func is_shift_jis_encoder[P: IsEncoder](p: P*) -> bool:
+    let id = p.encoder().class_id
+    return id >= shift_jis_encoder_class.first_id and id <= shift_jis_encoder_class.last_id
+
+## as_if<TextCodec::ShiftJISEncoder>.
+pub func as_if_shift_jis_encoder[P: IsEncoder](p: P*) -> ShiftJisEncoder*?:
+    if is_shift_jis_encoder(p): return (ShiftJisEncoder*)p
+    return none
+
+## as<TextCodec::ShiftJISEncoder> (verify_cast).
+pub func as_shift_jis_encoder[P: IsEncoder](p: P*) -> ShiftJisEncoder*:
+    return as_if_shift_jis_encoder(p) else trap("as<TextCodec::ShiftJISEncoder> failed")
+
+## TextCodec::(anonymous)::s_windows1252_encoder (Libraries/LibTextCodec/Encoder.cpp:49).
+# C++ initializer: { s_windows_1252_index }
+pub var s_windows1252_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_windows1253_encoder (Libraries/LibTextCodec/Encoder.cpp:50).
+# C++ initializer: { s_windows_1253_index }
+pub var s_windows1253_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_turkish_encoder (Libraries/LibTextCodec/Encoder.cpp:51).
+# C++ initializer: { s_windows_1254_index }
+pub var s_turkish_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_windows1256_encoder (Libraries/LibTextCodec/Encoder.cpp:52).
+# C++ initializer: { s_windows_1256_index }
+pub var s_windows1256_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_windows1257_encoder (Libraries/LibTextCodec/Encoder.cpp:53).
+# C++ initializer: { s_windows_1257_index }
+pub var s_windows1257_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+# mark: EuckrEncoder ============================================================================
+
+## TextCodec::EUCKREncoder (Libraries/LibTextCodec/Encoder.h:53).
+pub struct EuckrEncoder: IsEuckrEncoder, IsEncoder:
+    pub var encoder_base: Encoder  # primary base
+
+    func euckr_encoder() -> EuckrEncoder*: return (EuckrEncoder*)&self
+
+    func encoder() -> Encoder*: return (Encoder*)&self
+
+## Upcast to TextCodec::EUCKREncoder (implemented by every struct in its hierarchy).
+pub interface IsEuckrEncoder:
+    func euckr_encoder() -> EuckrEncoder*
+
+## Virtual functions introduced by TextCodec::EUCKREncoder.
+pub struct EuckrEncoderVTable:
+    pub let encoder_vtable: EncoderVTable
+
+## The vtable of TextCodec::EUCKREncoder.
+pub let euckr_encoder_vtable: EuckrEncoderVTable = EuckrEncoderVTable(encoder_vtable = EncoderVTable(class_info = &euckr_encoder_class, process = euckr_encoder_process_impl))
+
+## Class information of TextCodec::EUCKREncoder: name, class-id range (pre-order), size, vtable.
+pub let euckr_encoder_class: ak.ClassInfo = ak.ClassInfo(name = "EUCKREncoder", first_id = 3, last_id = 3, size = sizeof(EuckrEncoder), vtable = (const void*)&euckr_encoder_vtable)
+
+## is<TextCodec::EUCKREncoder>: the class-id range test.
+pub func is_euckr_encoder[P: IsEncoder](p: P*) -> bool:
+    let id = p.encoder().class_id
+    return id >= euckr_encoder_class.first_id and id <= euckr_encoder_class.last_id
+
+## as_if<TextCodec::EUCKREncoder>.
+pub func as_if_euckr_encoder[P: IsEncoder](p: P*) -> EuckrEncoder*?:
+    if is_euckr_encoder(p): return (EuckrEncoder*)p
+    return none
+
+## as<TextCodec::EUCKREncoder> (verify_cast).
+pub func as_euckr_encoder[P: IsEncoder](p: P*) -> EuckrEncoder*:
+    return as_if_euckr_encoder(p) else trap("as<TextCodec::EUCKREncoder> failed")
+
+## TextCodec::(anonymous)::s_windows1258_encoder (Libraries/LibTextCodec/Encoder.cpp:54).
+# C++ initializer: { s_windows_1258_index }
+pub var s_windows1258_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+## TextCodec::(anonymous)::s_mac_cyrillic_encoder (Libraries/LibTextCodec/Encoder.cpp:55).
+# C++ initializer: { s_x_mac_cyrillic_index }
+pub var s_mac_cyrillic_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
+
+# mark: Big5Encoder =============================================================================
+
+## TextCodec::Big5Encoder (Libraries/LibTextCodec/Encoder.h:58).
+pub struct Big5Encoder: IsBig5Encoder, IsEncoder:
+    pub var encoder_base: Encoder  # primary base
+
+    func big5_encoder() -> Big5Encoder*: return (Big5Encoder*)&self
+
+    func encoder() -> Encoder*: return (Encoder*)&self
+
+## Upcast to TextCodec::Big5Encoder (implemented by every struct in its hierarchy).
+pub interface IsBig5Encoder:
+    func big5_encoder() -> Big5Encoder*
+
+## Virtual functions introduced by TextCodec::Big5Encoder.
+pub struct Big5EncoderVTable:
+    pub let encoder_vtable: EncoderVTable
+
+## The vtable of TextCodec::Big5Encoder.
+pub let big5_encoder_vtable: Big5EncoderVTable = Big5EncoderVTable(encoder_vtable = EncoderVTable(class_info = &big5_encoder_class, process = big5_encoder_process_impl))
+
+## Class information of TextCodec::Big5Encoder: name, class-id range (pre-order), size, vtable.
+pub let big5_encoder_class: ak.ClassInfo = ak.ClassInfo(name = "Big5Encoder", first_id = 1, last_id = 1, size = sizeof(Big5Encoder), vtable = (const void*)&big5_encoder_vtable)
+
+## is<TextCodec::Big5Encoder>: the class-id range test.
+pub func is_big5_encoder[P: IsEncoder](p: P*) -> bool:
+    let id = p.encoder().class_id
+    return id >= big5_encoder_class.first_id and id <= big5_encoder_class.last_id
+
+## as_if<TextCodec::Big5Encoder>.
+pub func as_if_big5_encoder[P: IsEncoder](p: P*) -> Big5Encoder*?:
+    if is_big5_encoder(p): return (Big5Encoder*)p
+    return none
+
+## as<TextCodec::Big5Encoder> (verify_cast).
+pub func as_big5_encoder[P: IsEncoder](p: P*) -> Big5Encoder*:
+    return as_if_big5_encoder(p) else trap("as<TextCodec::Big5Encoder> failed")
+
+# mark: Gb18030Encoder ==========================================================================
+
+## TextCodec::GB18030Encoder (Libraries/LibTextCodec/Encoder.h:63).
+pub struct Gb18030Encoder: IsGb18030Encoder, IsEncoder:
+    pub var encoder_base: Encoder  # primary base
+    pub var m_is_gbk: Gb18030EncoderIsGbk  # C++ default: { IsGBK :: No }
+
+    func gb18030_encoder() -> Gb18030Encoder*: return (Gb18030Encoder*)&self
+
+    func encoder() -> Encoder*: return (Encoder*)&self
+
+## Upcast to TextCodec::GB18030Encoder (implemented by every struct in its hierarchy).
+pub interface IsGb18030Encoder:
+    func gb18030_encoder() -> Gb18030Encoder*
+
+## Virtual functions introduced by TextCodec::GB18030Encoder.
+pub struct Gb18030EncoderVTable:
+    pub let encoder_vtable: EncoderVTable
+
+## The vtable of TextCodec::GB18030Encoder.
+pub let gb18030_encoder_vtable: Gb18030EncoderVTable = Gb18030EncoderVTable(encoder_vtable = EncoderVTable(class_info = &gb18030_encoder_class, process = gb18030_encoder_process_impl))
+
+## Class information of TextCodec::GB18030Encoder: name, class-id range (pre-order), size, vtable.
+pub let gb18030_encoder_class: ak.ClassInfo = ak.ClassInfo(name = "GB18030Encoder", first_id = 4, last_id = 4, size = sizeof(Gb18030Encoder), vtable = (const void*)&gb18030_encoder_vtable)
+
+## is<TextCodec::GB18030Encoder>: the class-id range test.
+pub func is_gb18030_encoder[P: IsEncoder](p: P*) -> bool:
+    let id = p.encoder().class_id
+    return id >= gb18030_encoder_class.first_id and id <= gb18030_encoder_class.last_id
+
+## as_if<TextCodec::GB18030Encoder>.
+pub func as_if_gb18030_encoder[P: IsEncoder](p: P*) -> Gb18030Encoder*?:
+    if is_gb18030_encoder(p): return (Gb18030Encoder*)p
+    return none
+
+## as<TextCodec::GB18030Encoder> (verify_cast).
+pub func as_gb18030_encoder[P: IsEncoder](p: P*) -> Gb18030Encoder*:
+    return as_if_gb18030_encoder(p) else trap("as<TextCodec::GB18030Encoder> failed")
+
+## TextCodec::GB18030Encoder::IsGBK (Libraries/LibTextCodec/Encoder.h:65).
+pub enum Gb18030EncoderIsGbk as i32:
+    yes = 0
+    no = 1
+
+# mark: SingleByteEncoder =======================================================================
+
+## TextCodec::SingleByteEncoder (Libraries/LibTextCodec/Encoder.h:78): a generic struct.
+pub struct SingleByteEncoder[TArrayType]:
+    pub var encoder: Encoder
+    pub var m_translation_table: TArrayType[]

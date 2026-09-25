@@ -1,0 +1,18 @@
+#==============================================================================================
+#
+#   types_stack_info - declarations of AK/StackInfo.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/StackInfo.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: StackInfo ===============================================================================
+
+## AK::StackInfo (AK/StackInfo.h:13).
+pub struct StackInfo:
+    pub var m_base: usize
+    pub var m_top: usize
+    pub var m_size: usize

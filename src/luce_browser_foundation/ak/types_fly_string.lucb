@@ -1,0 +1,37 @@
+#==============================================================================================
+#
+#   types_fly_string - declarations of AK/FlyString.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/FlyString.cpp, AK/FlyString.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: FlyStringTableHashTraits ================================================================
+
+## AK::FlyStringTableHashTraits (AK/FlyString.cpp:17).
+pub struct FlyStringTableHashTraits: Traits[const StringData*?]:
+    pub var empty_: u8
+
+    func hash_of(key: const (const StringData*?)*) -> u32: trap("unported: AK::FlyStringTableHashTraits::hash")
+
+    func equals(a: const (const StringData*?)*, b: const (const StringData*?)*) -> bool: trap("unported: AK::FlyStringTableHashTraits::equals")
+
+# mark: FlyString ===============================================================================
+
+## AK::FlyString (AK/FlyString.h:20).
+pub struct FlyString:
+    pub var m_data: StringBase
+
+# mark: AsciiCaseInsensitiveFlyStringTraits =====================================================
+
+## AK::ASCIICaseInsensitiveFlyStringTraits (AK/FlyString.h:138).
+pub struct AsciiCaseInsensitiveFlyStringTraits: Traits[FlyString]:
+    pub var empty_: u8
+
+    func hash_of(key: const FlyString*) -> u32: trap("unported: AK::ASCIICaseInsensitiveFlyStringTraits::hash")
+
+    func equals(a: const FlyString*, b: const FlyString*) -> bool: trap("unported: AK::ASCIICaseInsensitiveFlyStringTraits::equals")

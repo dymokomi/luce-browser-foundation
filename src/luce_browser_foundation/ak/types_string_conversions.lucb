@@ -1,0 +1,26 @@
+#==============================================================================================
+#
+#   types_string_conversions - declarations of AK/StringConversions.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/StringConversions.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: ParseFirstNumberResult ==================================================================
+
+## AK::ParseFirstNumberResult (AK/StringConversions.h:17): a generic struct.
+pub struct ParseFirstNumberResult[T]:
+    pub var value: T  # C++ default: { 0 }
+    pub var characters_parsed: usize  # C++ default: { 0 }
+
+# mark: DecimalExponentialForm ==================================================================
+
+## AK::DecimalExponentialForm (AK/StringConversions.h:40).
+pub struct DecimalExponentialForm:
+    pub var sign: bool  # C++ default: { false }
+    pub var fraction: u64  # C++ default: { 0 }
+    pub var exponent: i32  # C++ default: { 0 }

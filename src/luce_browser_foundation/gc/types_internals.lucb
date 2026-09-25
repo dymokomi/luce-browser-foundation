@@ -1,0 +1,21 @@
+#==============================================================================================
+#
+#   types_internals - declarations of Libraries/LibGC/Internals.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/Internals.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: HeapBlockBase ===========================================================================
+
+## GC::HeapBlockBase (Libraries/LibGC/Internals.h:16).
+pub struct HeapBlockBase:
+    pub var m_heap: Heap*
+
+## GC::HeapBlockBase::BLOCK_SIZE (Libraries/LibGC/Internals.h:21).
+# C++ initializer: 16 * KiB
+pub var heap_block_base_block_size: usize

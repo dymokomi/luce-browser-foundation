@@ -1,0 +1,108 @@
+#==============================================================================================
+#
+#   types_memory_stream - declarations of AK/MemoryStream.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/MemoryStream.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: FixedMemoryStream =======================================================================
+
+## AK::FixedMemoryStream (AK/MemoryStream.h:19).
+pub struct FixedMemoryStream: IsFixedMemoryStream, IsSeekableStream, IsStream:
+    pub var seekable_stream_base: SeekableStream  # primary base
+    pub var m_bytes: u8[]
+    pub var m_offset: usize  # C++ default: { 0 }
+    pub var m_writing_enabled: bool  # C++ default: { true }
+
+    func fixed_memory_stream() -> FixedMemoryStream*: return (FixedMemoryStream*)&self
+
+    func seekable_stream() -> SeekableStream*: return (SeekableStream*)&self
+
+    func stream() -> Stream*: return (Stream*)&self
+
+## Upcast to AK::FixedMemoryStream (implemented by every struct in its hierarchy).
+pub interface IsFixedMemoryStream:
+    func fixed_memory_stream() -> FixedMemoryStream*
+
+## Virtual functions introduced by AK::FixedMemoryStream.
+pub struct FixedMemoryStreamVTable:
+    pub let seekable_stream_vtable: SeekableStreamVTable
+
+## The vtable of AK::FixedMemoryStream.
+pub let fixed_memory_stream_vtable: FixedMemoryStreamVTable = FixedMemoryStreamVTable(seekable_stream_vtable = SeekableStreamVTable(stream_vtable = StreamVTable(class_info = &fixed_memory_stream_class, read_some = fixed_memory_stream_read_some_impl, read_until_filled = fixed_memory_stream_read_until_filled_impl, discard = seekable_stream_discard_impl, write_some = fixed_memory_stream_write_some_impl, write_until_depleted_span_u8 = fixed_memory_stream_write_until_depleted_span_u8_impl, is_eof = fixed_memory_stream_is_eof_impl, is_open = fixed_memory_stream_is_open_impl, close = fixed_memory_stream_close_impl), seek = fixed_memory_stream_seek_impl, truncate = fixed_memory_stream_truncate_impl))
+
+## Class information of AK::FixedMemoryStream: name, class-id range (pre-order), size, vtable.
+pub let fixed_memory_stream_class: ClassInfo = ClassInfo(name = "FixedMemoryStream", first_id = 3, last_id = 3, size = sizeof(FixedMemoryStream), vtable = (const void*)&fixed_memory_stream_vtable)
+
+## is<AK::FixedMemoryStream>: the class-id range test.
+pub func is_fixed_memory_stream[P: IsStream](p: P*) -> bool:
+    let id = p.stream().class_id
+    return id >= fixed_memory_stream_class.first_id and id <= fixed_memory_stream_class.last_id
+
+## as_if<AK::FixedMemoryStream>.
+pub func as_if_fixed_memory_stream[P: IsStream](p: P*) -> FixedMemoryStream*?:
+    if is_fixed_memory_stream(p): return (FixedMemoryStream*)p
+    return none
+
+## as<AK::FixedMemoryStream> (verify_cast).
+pub func as_fixed_memory_stream[P: IsStream](p: P*) -> FixedMemoryStream*:
+    return as_if_fixed_memory_stream(p) else trap("as<AK::FixedMemoryStream> failed")
+
+## AK::FixedMemoryStream::Mode (AK/MemoryStream.h:21).
+pub enum FixedMemoryStreamMode as i32:
+    read_only = 0
+    read_write = 1
+
+# mark: AllocatingMemoryStream ==================================================================
+
+## AK::AllocatingMemoryStream (AK/MemoryStream.h:93).
+pub struct AllocatingMemoryStream: IsAllocatingMemoryStream, IsStream:
+    pub var stream_base: Stream  # primary base
+    pub var m_head: AllocatingMemoryStreamChunk*?
+    pub var m_tail: AllocatingMemoryStreamChunk*?  # C++ default: { nullptr }
+    pub var m_head_read_offset: usize  # C++ default: { 0 }
+    pub var m_tail_write_offset: usize  # C++ default: { 0 }
+    pub var m_used_buffer_size: usize  # C++ default: { 0 }
+
+    func allocating_memory_stream() -> AllocatingMemoryStream*: return (AllocatingMemoryStream*)&self
+
+    func stream() -> Stream*: return (Stream*)&self
+
+## Upcast to AK::AllocatingMemoryStream (implemented by every struct in its hierarchy).
+pub interface IsAllocatingMemoryStream:
+    func allocating_memory_stream() -> AllocatingMemoryStream*
+
+## Virtual functions introduced by AK::AllocatingMemoryStream.
+pub struct AllocatingMemoryStreamVTable:
+    pub let stream_vtable: StreamVTable
+
+## The vtable of AK::AllocatingMemoryStream.
+pub let allocating_memory_stream_vtable: AllocatingMemoryStreamVTable = AllocatingMemoryStreamVTable(stream_vtable = StreamVTable(class_info = &allocating_memory_stream_class, read_some = allocating_memory_stream_read_some_impl, discard = allocating_memory_stream_discard_impl, write_some = allocating_memory_stream_write_some_impl, is_eof = allocating_memory_stream_is_eof_impl, is_open = allocating_memory_stream_is_open_impl, close = allocating_memory_stream_close_impl))
+
+## Class information of AK::AllocatingMemoryStream: name, class-id range (pre-order), size, vtable.
+pub let allocating_memory_stream_class: ClassInfo = ClassInfo(name = "AllocatingMemoryStream", first_id = 1, last_id = 1, size = sizeof(AllocatingMemoryStream), vtable = (const void*)&allocating_memory_stream_vtable)
+
+## is<AK::AllocatingMemoryStream>: the class-id range test.
+pub func is_allocating_memory_stream[P: IsStream](p: P*) -> bool:
+    let id = p.stream().class_id
+    return id >= allocating_memory_stream_class.first_id and id <= allocating_memory_stream_class.last_id
+
+## as_if<AK::AllocatingMemoryStream>.
+pub func as_if_allocating_memory_stream[P: IsStream](p: P*) -> AllocatingMemoryStream*?:
+    if is_allocating_memory_stream(p): return (AllocatingMemoryStream*)p
+    return none
+
+## as<AK::AllocatingMemoryStream> (verify_cast).
+pub func as_allocating_memory_stream[P: IsStream](p: P*) -> AllocatingMemoryStream*:
+    return as_if_allocating_memory_stream(p) else trap("as<AK::AllocatingMemoryStream> failed")
+
+## AK::AllocatingMemoryStream::CHUNK_SIZE (AK/MemoryStream.h:95).
+pub let allocating_memory_stream_chunk_size: usize = 4096
+
+## AK::AllocatingMemoryStream::Chunk (AK/MemoryStream.h:115): opaque in this phase (not in the phase-1 closure).
+pub struct AllocatingMemoryStreamChunk:
+    pub var opaque_: u8

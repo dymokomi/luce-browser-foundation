@@ -1,0 +1,55 @@
+#==============================================================================================
+#
+#   types_root_vector - declarations of Libraries/LibGC/RootVector.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/RootVector.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: RootVectorBase ==========================================================================
+
+## GC::RootVectorBase (Libraries/LibGC/RootVector.h:19).
+pub struct RootVectorBase: IsRootVectorBase:
+    pub var vtable: const RootVectorBaseVTable*
+    pub var class_id: u16
+    pub var m_heap: Heap*?  # C++ default: { nullptr }
+    pub var m_list_node: ak.IntrusiveListNode[RootVectorBase, RootVectorBase*?]
+
+    func root_vector_base() -> RootVectorBase*: return (RootVectorBase*)&self
+
+## Upcast to GC::RootVectorBase (implemented by every struct in its hierarchy).
+pub interface IsRootVectorBase:
+    func root_vector_base() -> RootVectorBase*
+
+## Virtual functions introduced by GC::RootVectorBase.
+pub struct RootVectorBaseVTable:
+    pub let class_info: const ak.ClassInfo*
+    pub let gather_roots: func(RootVectorBase*, ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*) -> unit = root_vector_base_gather_roots_impl
+
+## Virtual: GC::RootVectorBase::gather_roots.
+pub func root_vector_base_gather_roots(this: RootVectorBase*, arg0: ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*):
+    ((const RootVectorBaseVTable*)this.vtable).gather_roots(this, arg0)
+
+## The vtable of GC::RootVectorBase.
+pub let root_vector_base_vtable: RootVectorBaseVTable = RootVectorBaseVTable(class_info = &root_vector_base_class)
+
+## Class information of GC::RootVectorBase: name, class-id range (pre-order), size, vtable.
+pub let root_vector_base_class: ak.ClassInfo = ak.ClassInfo(name = "RootVectorBase", first_id = 0, last_id = 0, size = sizeof(RootVectorBase), vtable = (const void*)&root_vector_base_vtable)
+
+## is<GC::RootVectorBase>: the class-id range test.
+pub func is_root_vector_base[P: IsRootVectorBase](p: P*) -> bool:
+    let id = p.root_vector_base().class_id
+    return id >= root_vector_base_class.first_id and id <= root_vector_base_class.last_id
+
+## as_if<GC::RootVectorBase>.
+pub func as_if_root_vector_base[P: IsRootVectorBase](p: P*) -> RootVectorBase*?:
+    if is_root_vector_base(p): return (RootVectorBase*)p
+    return none
+
+## as<GC::RootVectorBase> (verify_cast).
+pub func as_root_vector_base[P: IsRootVectorBase](p: P*) -> RootVectorBase*:
+    return as_if_root_vector_base(p) else trap("as<GC::RootVectorBase> failed")

@@ -1,0 +1,17 @@
+#==============================================================================================
+#
+#   types_random - declarations of AK/Random.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Random.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: XorShift128PlusRng ======================================================================
+
+## AK::XorShift128PlusRNG (AK/Random.h:37).
+pub struct XorShift128PlusRng:
+    pub var m_low: u64  # C++ default: { 0 }
+    pub var m_high: u64  # C++ default: { 0 }

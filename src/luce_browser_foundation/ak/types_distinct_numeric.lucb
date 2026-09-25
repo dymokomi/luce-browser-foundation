@@ -1,0 +1,31 @@
+#==============================================================================================
+#
+#   types_distinct_numeric - declarations of AK/DistinctNumeric.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/DistinctNumeric.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::DistinctNumericFeature::Arithmetic (AK/DistinctNumeric.h:50).
+pub type Arithmetic = u32
+
+## AK::DistinctNumericFeature::CastToBool (AK/DistinctNumeric.h:51).
+pub type CastToBool = u32
+
+## AK::DistinctNumericFeature::CastToUnderlying (AK/DistinctNumeric.h:52).
+pub type CastToUnderlying = u32
+
+## AK::DistinctNumericFeature::Comparison (AK/DistinctNumeric.h:53).
+pub type Comparison = u32
+
+## AK::DistinctNumericFeature::Flags (AK/DistinctNumeric.h:54).
+pub type Flags = u32
+
+## AK::DistinctNumericFeature::Increment (AK/DistinctNumeric.h:55).
+pub type Increment = u32
+
+## AK::DistinctNumericFeature::Shift (AK/DistinctNumeric.h:56).
+pub type Shift = u32

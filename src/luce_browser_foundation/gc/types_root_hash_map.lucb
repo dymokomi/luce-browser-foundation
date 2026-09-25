@@ -1,0 +1,55 @@
+#==============================================================================================
+#
+#   types_root_hash_map - declarations of Libraries/LibGC/RootHashMap.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/RootHashMap.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: RootHashMapBase =========================================================================
+
+## GC::RootHashMapBase (Libraries/LibGC/RootHashMap.h:17).
+pub struct RootHashMapBase: IsRootHashMapBase:
+    pub var vtable: const RootHashMapBaseVTable*
+    pub var class_id: u16
+    pub var m_heap: Heap*?  # C++ default: { nullptr }
+    pub var m_list_node: ak.IntrusiveListNode[RootHashMapBase, RootHashMapBase*?]
+
+    func root_hash_map_base() -> RootHashMapBase*: return (RootHashMapBase*)&self
+
+## Upcast to GC::RootHashMapBase (implemented by every struct in its hierarchy).
+pub interface IsRootHashMapBase:
+    func root_hash_map_base() -> RootHashMapBase*
+
+## Virtual functions introduced by GC::RootHashMapBase.
+pub struct RootHashMapBaseVTable:
+    pub let class_info: const ak.ClassInfo*
+    pub let gather_roots: func(RootHashMapBase*, ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*) -> unit = root_hash_map_base_gather_roots_impl
+
+## Virtual: GC::RootHashMapBase::gather_roots.
+pub func root_hash_map_base_gather_roots(this: RootHashMapBase*, arg0: ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*):
+    ((const RootHashMapBaseVTable*)this.vtable).gather_roots(this, arg0)
+
+## The vtable of GC::RootHashMapBase.
+pub let root_hash_map_base_vtable: RootHashMapBaseVTable = RootHashMapBaseVTable(class_info = &root_hash_map_base_class)
+
+## Class information of GC::RootHashMapBase: name, class-id range (pre-order), size, vtable.
+pub let root_hash_map_base_class: ak.ClassInfo = ak.ClassInfo(name = "RootHashMapBase", first_id = 0, last_id = 0, size = sizeof(RootHashMapBase), vtable = (const void*)&root_hash_map_base_vtable)
+
+## is<GC::RootHashMapBase>: the class-id range test.
+pub func is_root_hash_map_base[P: IsRootHashMapBase](p: P*) -> bool:
+    let id = p.root_hash_map_base().class_id
+    return id >= root_hash_map_base_class.first_id and id <= root_hash_map_base_class.last_id
+
+## as_if<GC::RootHashMapBase>.
+pub func as_if_root_hash_map_base[P: IsRootHashMapBase](p: P*) -> RootHashMapBase*?:
+    if is_root_hash_map_base(p): return (RootHashMapBase*)p
+    return none
+
+## as<GC::RootHashMapBase> (verify_cast).
+pub func as_root_hash_map_base[P: IsRootHashMapBase](p: P*) -> RootHashMapBase*:
+    return as_if_root_hash_map_base(p) else trap("as<GC::RootHashMapBase> failed")

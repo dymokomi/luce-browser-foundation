@@ -1,0 +1,30 @@
+#==============================================================================================
+#
+#   types_string_builder - declarations of AK/StringBuilder.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/StringBuilder.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: StringBuilder ===========================================================================
+
+## AK::StringBuilder (AK/StringBuilder.h:17).
+pub struct StringBuilder:
+    pub var m_buffer: ByteBuffer
+    pub var m_mode: StringBuilderMode  # C++ default: { DEFAULT_MODE }
+    pub var m_utf16_builder_is_ascii: bool  # C++ default: { true }
+
+## AK::StringBuilder::Mode (AK/StringBuilder.h:19).
+pub enum StringBuilderMode as i32:
+    utf8 = 0
+    utf16 = 1
+
+## AK::StringBuilder::DEFAULT_MODE (AK/StringBuilder.h:24).
+# C++ initializer: Mode :: UTF8
+pub var string_builder_default_mode: StringBuilderMode
+
+## AK::StringBuilder::inline_capacity (AK/StringBuilder.h:25).
+pub let string_builder_inline_capacity: usize = 256

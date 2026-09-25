@@ -1,0 +1,29 @@
+#==============================================================================================
+#
+#   types_forward - declarations of Libraries/LibUnicode/Forward.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibUnicode/Forward.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: GeneralCategoryDecl =====================================================================
+
+## Unicode::GeneralCategory_decl (Libraries/LibUnicode/Forward.h:38).
+pub struct GeneralCategoryDecl:
+    pub var empty_: u8
+
+# mark: PropertyDecl ============================================================================
+
+## Unicode::Property_decl (Libraries/LibUnicode/Forward.h:39).
+pub struct PropertyDecl:
+    pub var empty_: u8
+
+# mark: ScriptDecl ==============================================================================
+
+## Unicode::Script_decl (Libraries/LibUnicode/Forward.h:40).
+pub struct ScriptDecl:
+    pub var empty_: u8

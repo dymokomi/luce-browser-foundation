@@ -1,0 +1,23 @@
+#==============================================================================================
+#
+#   types_pattern_parser - declarations of Libraries/LibURL/Pattern/PatternParser.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Pattern/PatternParser.h (Ladybird 47c82b38d0) by the skeleton
+#       generator (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the
+#       generator could not map.
+#
+#==============================================================================================
+
+# mark: PatternParser ===========================================================================
+
+## URL::Pattern::PatternParser (Libraries/LibURL/Pattern/PatternParser.h:18).
+pub struct PatternParser:
+    pub var m_token_list: ak.Vector[Token]
+    pub var m_encoding_callback: ak.Function1[const ak.String*, ak.String]
+    pub var m_segment_wildcard_regexp: ak.String
+    pub var m_part_list: ak.Vector[Part]
+    pub var m_pending_fixed_value: ak.StringBuilder
+    pub var m_index: usize  # C++ default: { 0 }
+    pub var m_next_numeric_name: usize  # C++ default: { 0 }

@@ -1,0 +1,16 @@
+#==============================================================================================
+#
+#   types_i_pv6_address - declarations of AK/IPv6Address.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/IPv6Address.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: IPv6Address =============================================================================
+
+## AK::IPv6Address (AK/IPv6Address.h:22).
+pub struct IPv6Address:
+    pub var m_data: u8[16]  # C++ default: { }

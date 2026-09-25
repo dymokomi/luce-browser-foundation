@@ -1,0 +1,28 @@
+#==============================================================================================
+#
+#   types_string_view - declarations of AK/StringView.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/StringView.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: StringView ==============================================================================
+
+## AK::StringView (AK/StringView.h:23).
+pub struct StringView:
+    pub var m_characters: const u8*?  # C++ default: { "" }
+    pub var m_length: usize  # C++ default: { 0 }
+
+## AK::StringView::ConsiderCarriageReturn (AK/StringView.h:228).
+pub enum StringViewConsiderCarriageReturn as i32:
+    no = 0
+    yes = 1
+
+# mark: CaseInsensitiveAsciiStringViewTraits ====================================================
+
+## AK::CaseInsensitiveASCIIStringViewTraits (AK/StringView.h:386).
+pub struct CaseInsensitiveAsciiStringViewTraits:
+    pub var empty_: u8

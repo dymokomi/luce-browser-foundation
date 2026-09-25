@@ -1,0 +1,17 @@
+#==============================================================================================
+#
+#   types_generated_public_suffix_data - declarations of Build/Libraries/LibURL/PublicSuffixData.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Build/Libraries/LibURL/PublicSuffixData.h (Ladybird 47c82b38d0) by the skeleton
+#       generator (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the
+#       generator could not map.
+#
+#==============================================================================================
+
+# mark: PublicSuffixData ========================================================================
+
+## URL::PublicSuffixData (Build/Libraries/LibURL/PublicSuffixData.h:9).
+pub struct PublicSuffixData:
+    pub var empty_: u8

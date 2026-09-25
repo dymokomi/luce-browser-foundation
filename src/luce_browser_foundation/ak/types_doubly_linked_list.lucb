@@ -1,0 +1,30 @@
+#==============================================================================================
+#
+#   types_doubly_linked_list - declarations of AK/DoublyLinkedList.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/DoublyLinkedList.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: DoublyLinkedListIterator ================================================================
+
+## AK::DoublyLinkedListIterator (AK/DoublyLinkedList.h:17): a generic struct.
+pub struct DoublyLinkedListIterator[TListType, TElementType]:
+    pub var m_node: void*?  # unmapped: typename ListType::Node
+
+# mark: DoublyLinkedList ========================================================================
+
+## AK::DoublyLinkedList (AK/DoublyLinkedList.h:41): a generic struct.
+pub struct DoublyLinkedList[T]:
+    pub var m_head: DoublyLinkedListNode*?  # C++ default: { nullptr }
+    pub var m_tail: DoublyLinkedListNode*?  # C++ default: { nullptr }
+    pub var m_size: usize  # C++ default: { 0 }
+    pub var m_node_cache: void*?  # unmapped: Conditional<(node_cache_size > 0), NonemptyNodeCache, Empty>
+
+## AK::DoublyLinkedList::Node (AK/DoublyLinkedList.h:43): opaque in this phase (not in the phase-1 closure).
+pub struct DoublyLinkedListNode:
+    pub var opaque_: u8

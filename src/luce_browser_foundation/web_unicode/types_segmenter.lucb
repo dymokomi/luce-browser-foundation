@@ -1,0 +1,221 @@
+#==============================================================================================
+#
+#   types_segmenter - declarations of Libraries/LibUnicode/Segmenter.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibUnicode/Segmenter.cpp, Libraries/LibUnicode/Segmenter.h (Ladybird
+#       47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather than edit,
+#       except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## Unicode::SegmenterGranularity (Libraries/LibUnicode/Segmenter.h:16).
+pub enum SegmenterGranularity as i32:
+    grapheme = 0
+    line = 1
+    sentence = 2
+    word = 3
+
+# mark: Segmenter ===============================================================================
+
+## Unicode::Segmenter (Libraries/LibUnicode/Segmenter.h:25).
+pub struct Segmenter: IsSegmenter:
+    pub var vtable: const SegmenterVTable*
+    pub var class_id: u16
+    pub var m_segmenter_granularity: SegmenterGranularity  # C++ default: { SegmenterGranularity :: Grapheme }
+
+    func segmenter() -> Segmenter*: return (Segmenter*)&self
+
+## Upcast to Unicode::Segmenter (implemented by every struct in its hierarchy).
+pub interface IsSegmenter:
+    func segmenter() -> Segmenter*
+
+## Virtual functions introduced by Unicode::Segmenter.
+pub struct SegmenterVTable:
+    pub let class_info: const ak.ClassInfo*
+    pub let clone: func(Segmenter*) -> Segmenter* = segmenter_clone_impl
+    pub let set_segmented_text_string: func(Segmenter*, ak.String) -> unit = segmenter_set_segmented_text_string_impl
+    pub let set_segmented_text_utf16_view: func(Segmenter*, ak.Utf16View) -> unit = segmenter_set_segmented_text_utf16_view_impl
+    pub let current_boundary: func(Segmenter*) -> usize = segmenter_current_boundary_impl
+    pub let previous_boundary: func(Segmenter*, usize, SegmenterInclusive) -> u64? = segmenter_previous_boundary_impl
+    pub let next_boundary: func(Segmenter*, usize, SegmenterInclusive) -> u64? = segmenter_next_boundary_impl
+    pub let for_each_boundary_string: func(Segmenter*, ak.String, ak.Function1[u64, ak.IterationDecision]) -> unit = segmenter_for_each_boundary_string_impl
+    pub let for_each_boundary_utf16_view: func(Segmenter*, ak.Utf16View, ak.Function1[u64, ak.IterationDecision]) -> unit = segmenter_for_each_boundary_utf16_view_impl
+    pub let for_each_boundary_utf32_view: func(Segmenter*, ak.Utf32View, ak.Function1[u64, ak.IterationDecision]) -> unit = segmenter_for_each_boundary_utf32_view_impl
+    pub let is_current_boundary_word_like: func(Segmenter*) -> bool = segmenter_is_current_boundary_word_like_impl
+
+## Virtual: Unicode::Segmenter::clone.
+pub func segmenter_clone(this: Segmenter*) -> Segmenter*:
+    return ((const SegmenterVTable*)this.vtable).clone(this)
+
+## Virtual: Unicode::Segmenter::set_segmented_text.
+pub func segmenter_set_segmented_text_string(this: Segmenter*, arg0: ak.String):
+    ((const SegmenterVTable*)this.vtable).set_segmented_text_string(this, arg0)
+
+## Virtual: Unicode::Segmenter::set_segmented_text.
+pub func segmenter_set_segmented_text_utf16_view(this: Segmenter*, arg0: ak.Utf16View):
+    ((const SegmenterVTable*)this.vtable).set_segmented_text_utf16_view(this, arg0)
+
+## Virtual: Unicode::Segmenter::current_boundary.
+pub func segmenter_current_boundary(this: Segmenter*) -> usize:
+    return ((const SegmenterVTable*)this.vtable).current_boundary(this)
+
+## Virtual: Unicode::Segmenter::previous_boundary.
+pub func segmenter_previous_boundary(this: Segmenter*, index: usize, arg1: SegmenterInclusive) -> u64?:
+    return ((const SegmenterVTable*)this.vtable).previous_boundary(this, index, arg1)
+
+## Virtual: Unicode::Segmenter::next_boundary.
+pub func segmenter_next_boundary(this: Segmenter*, index: usize, arg1: SegmenterInclusive) -> u64?:
+    return ((const SegmenterVTable*)this.vtable).next_boundary(this, index, arg1)
+
+## Virtual: Unicode::Segmenter::for_each_boundary.
+pub func segmenter_for_each_boundary_string(this: Segmenter*, arg0: ak.String, arg1: ak.Function1[u64, ak.IterationDecision]):
+    ((const SegmenterVTable*)this.vtable).for_each_boundary_string(this, arg0, arg1)
+
+## Virtual: Unicode::Segmenter::for_each_boundary.
+pub func segmenter_for_each_boundary_utf16_view(this: Segmenter*, arg0: ak.Utf16View, arg1: ak.Function1[u64, ak.IterationDecision]):
+    ((const SegmenterVTable*)this.vtable).for_each_boundary_utf16_view(this, arg0, arg1)
+
+## Virtual: Unicode::Segmenter::for_each_boundary.
+pub func segmenter_for_each_boundary_utf32_view(this: Segmenter*, arg0: ak.Utf32View, arg1: ak.Function1[u64, ak.IterationDecision]):
+    ((const SegmenterVTable*)this.vtable).for_each_boundary_utf32_view(this, arg0, arg1)
+
+## Virtual: Unicode::Segmenter::is_current_boundary_word_like.
+pub func segmenter_is_current_boundary_word_like(this: Segmenter*) -> bool:
+    return ((const SegmenterVTable*)this.vtable).is_current_boundary_word_like(this)
+
+## The vtable of Unicode::Segmenter.
+pub let segmenter_vtable: SegmenterVTable = SegmenterVTable(class_info = &segmenter_class)
+
+## Class information of Unicode::Segmenter: name, class-id range (pre-order), size, vtable.
+pub let segmenter_class: ak.ClassInfo = ak.ClassInfo(name = "Segmenter", first_id = 0, last_id = 2, size = sizeof(Segmenter), vtable = (const void*)&segmenter_vtable)
+
+## is<Unicode::Segmenter>: the class-id range test.
+pub func is_segmenter[P: IsSegmenter](p: P*) -> bool:
+    let id = p.segmenter().class_id
+    return id >= segmenter_class.first_id and id <= segmenter_class.last_id
+
+## as_if<Unicode::Segmenter>.
+pub func as_if_segmenter[P: IsSegmenter](p: P*) -> Segmenter*?:
+    if is_segmenter(p): return (Segmenter*)p
+    return none
+
+## as<Unicode::Segmenter> (verify_cast).
+pub func as_segmenter[P: IsSegmenter](p: P*) -> Segmenter*:
+    return as_if_segmenter(p) else trap("as<Unicode::Segmenter> failed")
+
+## Unicode::Segmenter::Inclusive (Libraries/LibUnicode/Segmenter.h:43).
+pub enum SegmenterInclusive as i32:
+    no = 0
+    yes = 1
+
+# mark: AsciiGraphemeSegmenter ==================================================================
+
+## Unicode::AsciiGraphemeSegmenter (Libraries/LibUnicode/Segmenter.cpp:50).
+pub struct AsciiGraphemeSegmenter: IsAsciiGraphemeSegmenter, IsSegmenter:
+    pub var segmenter_base: Segmenter  # primary base
+    pub var m_length: usize  # C++ default: { 0 }
+    pub var m_current: usize  # C++ default: { 0 }
+
+    func ascii_grapheme_segmenter() -> AsciiGraphemeSegmenter*: return (AsciiGraphemeSegmenter*)&self
+
+    func segmenter() -> Segmenter*: return (Segmenter*)&self
+
+## Upcast to Unicode::AsciiGraphemeSegmenter (implemented by every struct in its hierarchy).
+pub interface IsAsciiGraphemeSegmenter:
+    func ascii_grapheme_segmenter() -> AsciiGraphemeSegmenter*
+
+## Virtual functions introduced by Unicode::AsciiGraphemeSegmenter.
+pub struct AsciiGraphemeSegmenterVTable:
+    pub let segmenter_vtable: SegmenterVTable
+    pub let for_each_boundary_string: func(AsciiGraphemeSegmenter*, ak.String, ak.Function1[u64, ak.IterationDecision]) -> unit = ascii_grapheme_segmenter_for_each_boundary_string_impl
+    pub let for_each_boundary_utf16_view: func(AsciiGraphemeSegmenter*, ak.Utf16View, ak.Function1[u64, ak.IterationDecision]) -> unit = ascii_grapheme_segmenter_for_each_boundary_utf16_view_impl
+    pub let for_each_boundary_utf32_view: func(AsciiGraphemeSegmenter*, ak.Utf32View, ak.Function1[u64, ak.IterationDecision]) -> unit = ascii_grapheme_segmenter_for_each_boundary_utf32_view_impl
+
+## Virtual: Unicode::AsciiGraphemeSegmenter::for_each_boundary.
+pub func ascii_grapheme_segmenter_for_each_boundary_string(this: AsciiGraphemeSegmenter*, text: ak.String, callback: ak.Function1[u64, ak.IterationDecision]):
+    ((const AsciiGraphemeSegmenterVTable*)((Segmenter*)this).vtable).for_each_boundary_string(this, text, callback)
+
+## Virtual: Unicode::AsciiGraphemeSegmenter::for_each_boundary.
+pub func ascii_grapheme_segmenter_for_each_boundary_utf16_view(this: AsciiGraphemeSegmenter*, text: ak.Utf16View, callback: ak.Function1[u64, ak.IterationDecision]):
+    ((const AsciiGraphemeSegmenterVTable*)((Segmenter*)this).vtable).for_each_boundary_utf16_view(this, text, callback)
+
+## Virtual: Unicode::AsciiGraphemeSegmenter::for_each_boundary.
+pub func ascii_grapheme_segmenter_for_each_boundary_utf32_view(this: AsciiGraphemeSegmenter*, text: ak.Utf32View, callback: ak.Function1[u64, ak.IterationDecision]):
+    ((const AsciiGraphemeSegmenterVTable*)((Segmenter*)this).vtable).for_each_boundary_utf32_view(this, text, callback)
+
+## The vtable of Unicode::AsciiGraphemeSegmenter.
+pub let ascii_grapheme_segmenter_vtable: AsciiGraphemeSegmenterVTable = AsciiGraphemeSegmenterVTable(segmenter_vtable = SegmenterVTable(class_info = &ascii_grapheme_segmenter_class, clone = ascii_grapheme_segmenter_clone_impl, set_segmented_text_string = ascii_grapheme_segmenter_set_segmented_text_string_impl, set_segmented_text_utf16_view = ascii_grapheme_segmenter_set_segmented_text_utf16_view_impl, current_boundary = ascii_grapheme_segmenter_current_boundary_impl, previous_boundary = ascii_grapheme_segmenter_previous_boundary_impl, next_boundary = ascii_grapheme_segmenter_next_boundary_impl, is_current_boundary_word_like = ascii_grapheme_segmenter_is_current_boundary_word_like_impl))
+
+## Class information of Unicode::AsciiGraphemeSegmenter: name, class-id range (pre-order), size, vtable.
+pub let ascii_grapheme_segmenter_class: ak.ClassInfo = ak.ClassInfo(name = "AsciiGraphemeSegmenter", first_id = 1, last_id = 1, size = sizeof(AsciiGraphemeSegmenter), vtable = (const void*)&ascii_grapheme_segmenter_vtable)
+
+## is<Unicode::AsciiGraphemeSegmenter>: the class-id range test.
+pub func is_ascii_grapheme_segmenter[P: IsSegmenter](p: P*) -> bool:
+    let id = p.segmenter().class_id
+    return id >= ascii_grapheme_segmenter_class.first_id and id <= ascii_grapheme_segmenter_class.last_id
+
+## as_if<Unicode::AsciiGraphemeSegmenter>.
+pub func as_if_ascii_grapheme_segmenter[P: IsSegmenter](p: P*) -> AsciiGraphemeSegmenter*?:
+    if is_ascii_grapheme_segmenter(p): return (AsciiGraphemeSegmenter*)p
+    return none
+
+## as<Unicode::AsciiGraphemeSegmenter> (verify_cast).
+pub func as_ascii_grapheme_segmenter[P: IsSegmenter](p: P*) -> AsciiGraphemeSegmenter*:
+    return as_if_ascii_grapheme_segmenter(p) else trap("as<Unicode::AsciiGraphemeSegmenter> failed")
+
+# mark: SegmenterImpl ===========================================================================
+
+## Unicode::SegmenterImpl (Libraries/LibUnicode/Segmenter.cpp:134).
+pub struct SegmenterImpl: IsSegmenterImpl, IsSegmenter:
+    pub var segmenter_base: Segmenter  # primary base
+    pub var m_segmenter: Icu78BreakIterator*
+    pub var m_segmented_text: ak.EmptyOrStringOrIcu78UnicodeString
+
+    func segmenter_impl() -> SegmenterImpl*: return (SegmenterImpl*)&self
+
+    func segmenter() -> Segmenter*: return (Segmenter*)&self
+
+## Upcast to Unicode::SegmenterImpl (implemented by every struct in its hierarchy).
+pub interface IsSegmenterImpl:
+    func segmenter_impl() -> SegmenterImpl*
+
+## Virtual functions introduced by Unicode::SegmenterImpl.
+pub struct SegmenterImplVTable:
+    pub let segmenter_vtable: SegmenterVTable
+    pub let for_each_boundary_string: func(SegmenterImpl*, ak.String, ak.Function1[u64, ak.IterationDecision]) -> unit = segmenter_impl_for_each_boundary_string_impl
+    pub let for_each_boundary_utf16_view: func(SegmenterImpl*, ak.Utf16View, ak.Function1[u64, ak.IterationDecision]) -> unit = segmenter_impl_for_each_boundary_utf16_view_impl
+    pub let for_each_boundary_utf32_view: func(SegmenterImpl*, ak.Utf32View, ak.Function1[u64, ak.IterationDecision]) -> unit = segmenter_impl_for_each_boundary_utf32_view_impl
+
+## Virtual: Unicode::SegmenterImpl::for_each_boundary.
+pub func segmenter_impl_for_each_boundary_string(this: SegmenterImpl*, text: ak.String, callback: ak.Function1[u64, ak.IterationDecision]):
+    ((const SegmenterImplVTable*)((Segmenter*)this).vtable).for_each_boundary_string(this, text, callback)
+
+## Virtual: Unicode::SegmenterImpl::for_each_boundary.
+pub func segmenter_impl_for_each_boundary_utf16_view(this: SegmenterImpl*, text: ak.Utf16View, callback: ak.Function1[u64, ak.IterationDecision]):
+    ((const SegmenterImplVTable*)((Segmenter*)this).vtable).for_each_boundary_utf16_view(this, text, callback)
+
+## Virtual: Unicode::SegmenterImpl::for_each_boundary.
+pub func segmenter_impl_for_each_boundary_utf32_view(this: SegmenterImpl*, text: ak.Utf32View, callback: ak.Function1[u64, ak.IterationDecision]):
+    ((const SegmenterImplVTable*)((Segmenter*)this).vtable).for_each_boundary_utf32_view(this, text, callback)
+
+## The vtable of Unicode::SegmenterImpl.
+pub let segmenter_impl_vtable: SegmenterImplVTable = SegmenterImplVTable(segmenter_vtable = SegmenterVTable(class_info = &segmenter_impl_class, clone = segmenter_impl_clone_impl, set_segmented_text_string = segmenter_impl_set_segmented_text_string_impl, set_segmented_text_utf16_view = segmenter_impl_set_segmented_text_utf16_view_impl, current_boundary = segmenter_impl_current_boundary_impl, previous_boundary = segmenter_impl_previous_boundary_impl, next_boundary = segmenter_impl_next_boundary_impl, is_current_boundary_word_like = segmenter_impl_is_current_boundary_word_like_impl))
+
+## Class information of Unicode::SegmenterImpl: name, class-id range (pre-order), size, vtable.
+pub let segmenter_impl_class: ak.ClassInfo = ak.ClassInfo(name = "SegmenterImpl", first_id = 2, last_id = 2, size = sizeof(SegmenterImpl), vtable = (const void*)&segmenter_impl_vtable)
+
+## is<Unicode::SegmenterImpl>: the class-id range test.
+pub func is_segmenter_impl[P: IsSegmenter](p: P*) -> bool:
+    let id = p.segmenter().class_id
+    return id >= segmenter_impl_class.first_id and id <= segmenter_impl_class.last_id
+
+## as_if<Unicode::SegmenterImpl>.
+pub func as_if_segmenter_impl[P: IsSegmenter](p: P*) -> SegmenterImpl*?:
+    if is_segmenter_impl(p): return (SegmenterImpl*)p
+    return none
+
+## as<Unicode::SegmenterImpl> (verify_cast).
+pub func as_segmenter_impl[P: IsSegmenter](p: P*) -> SegmenterImpl*:
+    return as_if_segmenter_impl(p) else trap("as<Unicode::SegmenterImpl> failed")

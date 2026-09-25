@@ -1,0 +1,19 @@
+#==============================================================================================
+#
+#   types_root - declarations of Libraries/LibGC/Root.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/Root.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: RootImpl ================================================================================
+
+## GC::RootImpl (Libraries/LibGC/Root.h:19).
+pub struct RootImpl:
+    pub var m_cell: Cell*?
+    pub var m_location: ak.SourceLocation
+    pub var m_list_node: ak.IntrusiveListNode[RootImpl, RootImpl*?]

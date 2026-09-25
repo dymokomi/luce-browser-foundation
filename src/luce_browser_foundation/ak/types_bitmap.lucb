@@ -1,0 +1,17 @@
+#==============================================================================================
+#
+#   types_bitmap - declarations of AK/Bitmap.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Bitmap.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Bitmap ==================================================================================
+
+## AK::Bitmap (AK/Bitmap.h:19).
+pub struct Bitmap:
+    pub var bitmap_view: BitmapView  # primary base
+    pub var m_is_owning: bool  # C++ default: { true }

@@ -1,0 +1,24 @@
+#==============================================================================================
+#
+#   types_utf32_view - declarations of AK/Utf32View.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Utf32View.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Utf32CodePointIterator ==================================================================
+
+## AK::Utf32CodePointIterator (AK/Utf32View.h:20).
+pub struct Utf32CodePointIterator:
+    pub var m_ptr: const u32*?  # C++ default: { nullptr }
+    pub var m_length: isize  # C++ default: { - 1 }
+
+# mark: Utf32View ===============================================================================
+
+## AK::Utf32View (AK/Utf32View.h:64).
+pub struct Utf32View:
+    pub var m_code_points: const u32*?  # C++ default: { nullptr }
+    pub var m_length: usize  # C++ default: { 0 }

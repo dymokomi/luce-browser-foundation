@@ -1,0 +1,49 @@
+#==============================================================================================
+#
+#   types_hash_table - declarations of AK/HashTable.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/HashTable.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::HashSetResult (AK/HashTable.h:22).
+pub enum HashSetResult as i32:
+    inserted_new_entry = 0
+    replaced_existing_entry = 1
+    kept_existing_entry = 2
+
+## AK::HashSetExistingEntryBehavior (AK/HashTable.h:28).
+pub enum HashSetExistingEntryBehavior as i32:
+    keep = 0
+    replace = 1
+
+## AK::BucketState (AK/HashTable.h:37).
+pub enum BucketState as i64:
+    free_ = 0
+    calculate_length = -1
+
+# mark: HashTableIterator =======================================================================
+
+## AK::HashTableIterator (AK/HashTable.h:43): a generic struct.
+pub struct HashTableIterator[THashTableType, T, TBucketType]:
+    pub var m_bucket: TBucketType*?  # C++ default: { nullptr }
+    pub var m_end_bucket: TBucketType*?  # C++ default: { nullptr }
+
+# mark: OrderedHashTableIterator ================================================================
+
+## AK::OrderedHashTableIterator (AK/HashTable.h:78): a generic struct.
+pub struct OrderedHashTableIterator[TOrderedHashTableType, T, TBucketType]:
+    pub var m_bucket: TBucketType*?  # C++ default: { nullptr }
+
+# mark: ReverseOrderedHashTableIterator =========================================================
+
+## AK::ReverseOrderedHashTableIterator (AK/HashTable.h:99): a generic struct.
+pub struct ReverseOrderedHashTableIterator[TOrderedHashTableType, T, TBucketType]:
+    pub var m_bucket: TBucketType*?  # C++ default: { nullptr }
+
+## AK::HashTable::LookupForWritingResult (AK/HashTable.h:700): opaque in this phase (not in the phase-1 closure).
+pub struct LookupForWritingResult:
+    pub var opaque_: u8

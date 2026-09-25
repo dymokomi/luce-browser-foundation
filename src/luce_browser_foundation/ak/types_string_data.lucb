@@ -1,0 +1,29 @@
+#==============================================================================================
+#
+#   types_string_data - declarations of AK/StringData.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/StringData.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::Detail::MAX_SHORT_STRING_BYTE_COUNT (AK/StringData.h:17).
+# C++ initializer: sizeof ( StringData * ) - sizeof ( u8 )
+pub var max_short_string_byte_count: usize
+
+# mark: StringData ==============================================================================
+
+## AK::Detail::StringData (AK/StringData.h:23).
+pub struct StringData:
+    pub var m_byte_count: u32  # C++ default: { 0 }
+    pub var m_hash: u32  # C++ default: { 0 }
+    pub var m_has_hash: bool  # C++ default: { false }
+    pub var m_substring: bool  # C++ default: { false }
+    pub var m_is_fly_string: bool  # C++ default: { false }
+    pub var m_bytes_or_substring_data: u8*?
+
+## AK::Detail::StringData::SubstringData (AK/StringData.h:63): opaque in this phase (not in the phase-1 closure).
+pub struct StringDataSubstringData:
+    pub var opaque_: u8

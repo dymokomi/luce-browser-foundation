@@ -1,0 +1,178 @@
+#==============================================================================================
+#
+#   types_format - declarations of AK/Format.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Format.cpp, AK/Format.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+## AK::AllowDebugOnlyFormatters (AK/Format.h:29).
+pub enum AllowDebugOnlyFormatters as u32:
+    no = 0
+    yes = 1
+
+# mark: FormatParser ============================================================================
+
+## AK::FormatParser (AK/Format.cpp:44).
+pub struct FormatParser:
+    pub var generic_lexer: GenericLexer[u8]  # base AK::Detail::GenericLexer<char>
+
+## AK::FormatParser::FormatSpecifier (AK/Format.cpp:46): opaque in this phase (not in the phase-1 closure).
+pub struct FormatParserFormatSpecifier:
+    pub var opaque_: u8
+
+## AK::max_format_arguments (AK/Format.h:52).
+pub let max_format_arguments: usize = 256
+
+## AK::(anonymous)::use_next_index (AK/Format.cpp:61).
+# C++ initializer: NumericLimits < size_t > :: max ( )
+pub var use_next_index: usize
+
+# mark: TypeErasedParameter =====================================================================
+
+## AK::TypeErasedParameter (AK/Format.h:63).
+pub struct TypeErasedParameter:
+    pub var value: TypeErasedParameterUnion
+    pub var type_: TypeErasedParameterType
+
+## AK::TypeErasedParameter::Type (AK/Format.h:64).
+pub enum TypeErasedParameterType as i32:
+    unsigned_integer = 0
+    signed_integer = 1
+    boolean = 2
+    character = 3
+    float = 4
+    double = 5
+    string_view = 6
+    c_string = 7
+    custom_type = 8
+
+# mark: TypeErasedParameterCustomType ===========================================================
+
+## AK::TypeErasedParameter::CustomType (AK/Format.h:76).
+pub struct TypeErasedParameterCustomType:
+    pub var value: const void*?
+    pub var formatter: (func(TypeErasedFormatParams*, FormatBuilder*, FormatParser*, const void*?) -> unit!)?
+
+# mark: TypeErasedParameterUnion ================================================================
+
+## AK::TypeErasedParameter::(anonymous union) (AK/Format.h:184).
+pub union TypeErasedParameterUnion:
+    pub as_unsigned: u64
+    pub as_signed: i64
+    pub as_bool: bool
+    pub as_char: u8
+    pub as_float: f32
+    pub as_double: f64
+    pub as_string_view: StringView
+    pub as_c_string: const u8*?
+    pub as_custom_type: TypeErasedParameterCustomType
+
+# mark: FormatBuilder ===========================================================================
+
+## AK::FormatBuilder (AK/Format.h:198).
+pub struct FormatBuilder:
+    pub var m_builder: StringBuilder*
+
+## AK::FormatBuilder::Align (AK/Format.h:200).
+pub enum FormatBuilderAlign as i32:
+    default = 0
+    left = 1
+    center = 2
+    right = 3
+
+## AK::FormatBuilder::SignMode (AK/Format.h:206).
+pub enum FormatBuilderSignMode as i32:
+    only_if_needed = 0
+    always = 1
+    reserved = 2
+
+## AK::FormatBuilder::SignMode::Default (a second name for only_if_needed).
+pub let format_builder_sign_mode_default: FormatBuilderSignMode = FormatBuilderSignMode.only_if_needed
+
+## AK::FormatBuilder::RealNumberDisplayMode (AK/Format.h:213).
+pub enum FormatBuilderRealNumberDisplayMode as i32:
+    fixed_point = 0
+    general = 1
+
+## AK::FormatBuilder::RealNumberDisplayMode::Default (a second name for general).
+pub let format_builder_real_number_display_mode_default: FormatBuilderRealNumberDisplayMode = FormatBuilderRealNumberDisplayMode.general
+
+# mark: TypeErasedFormatParams ==================================================================
+
+## AK::TypeErasedFormatParams (AK/Format.h:330).
+pub struct TypeErasedFormatParams:
+    pub var m_size: u32  # C++ default: { 0 }
+    pub var m_next_index: u32  # C++ default: { 0 }
+    pub var m_parameters: TypeErasedParameter*?
+
+# mark: VariadicFormatParams ====================================================================
+
+## AK::VariadicFormatParams (AK/Format.h:348): a generic struct.
+pub struct VariadicFormatParams[TParameters]:
+    pub var type_erased_format_params: TypeErasedFormatParams
+    pub var m_parameter_storage: TypeErasedParameter*?
+
+# mark: StandardFormatter =======================================================================
+
+## AK::StandardFormatter (AK/Format.h:369).
+pub struct StandardFormatter:
+    pub var m_align: FormatBuilderAlign  # C++ default: FormatBuilder :: Align :: Default
+    pub var m_sign_mode: FormatBuilderSignMode  # C++ default: FormatBuilder :: SignMode :: OnlyIfNeeded
+    pub var m_mode: StandardFormatterMode  # C++ default: Mode :: Default
+    pub var m_alternative_form: bool  # C++ default: false
+    pub var m_use_separator: bool  # C++ default: false
+    pub var m_fill: u8  # C++ default: ' '
+    pub var m_zero_pad: bool  # C++ default: false
+    pub var m_width: u64?
+    pub var m_precision: u64?
+
+## AK::StandardFormatter::Mode (AK/Format.h:370).
+pub enum StandardFormatterMode as i32:
+    default = 0
+    binary = 1
+    binary_uppercase = 2
+    decimal = 3
+    octal = 4
+    hexadecimal = 5
+    hexadecimal_uppercase = 6
+    character = 7
+    string = 8
+    pointer = 9
+    fixed_point = 10
+    hexfloat = 11
+    hexfloat_uppercase = 12
+    hex_dump = 13
+
+# mark: FormatIfSupported =======================================================================
+
+## AK::FormatIfSupported (AK/Format.h:749): a generic struct.
+pub struct FormatIfSupported[T]:
+    pub var m_value: const T*
+
+# mark: FormatIfSupported2 ======================================================================
+
+## AK::__FormatIfSupported (AK/Format.h:762): a generic struct.
+pub struct FormatIfSupported2[T]:
+    pub var empty_: u8
+
+# mark: FormatString ============================================================================
+
+## AK::FormatString (AK/Format.h:781).
+pub struct FormatString:
+    pub var empty_: u8
+
+## AK::is_debug_enabled (AK/Format.cpp:1285).
+pub var is_debug_enabled: bool = true
+
+## AK::is_rich_debug_enabled (AK/Format.cpp:1293).
+# C++ initializer: # if defined ( AK_OS_SERENITY ) true ; # else false
+pub var is_rich_debug_enabled: bool
+
+## AK::s_main_thread_id (AK/Format.cpp:1334).
+# C++ initializer: current_thread_id ( )
+pub var s_main_thread_id: u64

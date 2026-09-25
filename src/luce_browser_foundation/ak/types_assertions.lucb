@@ -1,0 +1,13 @@
+#==============================================================================================
+#
+#   types_assertions - declarations of AK/Assertions.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Assertions.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## TODO (AK/Assertions.h:22).
+pub let todo: bool = false

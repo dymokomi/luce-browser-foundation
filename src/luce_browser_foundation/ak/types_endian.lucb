@@ -1,0 +1,31 @@
+#==============================================================================================
+#
+#   types_endian - declarations of AK/Endian.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Endian.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::HostIsLittleEndian (AK/Endian.h:16).
+pub let host_is_little_endian: bool = true
+
+## AK::Endianness (AK/Endian.h:21).
+pub enum Endianness as i32:
+    host = 0
+    big = 1
+    little = 2
+
+# mark: LittleEndian ============================================================================
+
+## AK::LittleEndian (AK/Endian.h:64): a generic struct.
+pub struct LittleEndian[T]:
+    pub var m_value: T  # C++ default: { 0 }
+
+# mark: BigEndian ===============================================================================
+
+## AK::BigEndian (AK/Endian.h:80): a generic struct.
+pub struct BigEndian[T]:
+    pub var m_value: T  # C++ default: { 0 }

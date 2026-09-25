@@ -1,0 +1,36 @@
+#==============================================================================================
+#
+#   types_part - declarations of Libraries/LibURL/Pattern/Part.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Pattern/Part.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: Part ====================================================================================
+
+## URL::Pattern::Part (Libraries/LibURL/Pattern/Part.h:15).
+pub struct Part:
+    pub var type_: PartType  # C++ default: { }
+    pub var value: ak.String
+    pub var modifier: PartModifier
+    pub var name: ak.String
+    pub var prefix: ak.String
+    pub var suffix: ak.String
+
+## URL::Pattern::Part::Type (Libraries/LibURL/Pattern/Part.h:17).
+pub enum PartType as i32:
+    fixed_text = 0
+    regexp = 1
+    segment_wildcard = 2
+    full_wildcard = 3
+
+## URL::Pattern::Part::Modifier (Libraries/LibURL/Pattern/Part.h:34).
+pub enum PartModifier as i32:
+    none_ = 0
+    optional = 1
+    zero_or_more = 2
+    one_or_more = 3

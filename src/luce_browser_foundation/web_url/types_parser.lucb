@@ -1,0 +1,51 @@
+#==============================================================================================
+#
+#   types_parser - declarations of Libraries/LibURL/Parser.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Parser.cpp, Libraries/LibURL/Parser.h (Ladybird 47c82b38d0) by the
+#       skeleton generator (DESIGN.md §4.4). Regenerate rather than edit, except to fill a
+#       field the generator could not map.
+#
+#==============================================================================================
+
+## URL::end_of_file (Libraries/LibURL/Parser.cpp:28).
+pub let end_of_file: u32 = 0xffffffff
+
+# mark: Parser ==================================================================================
+
+## URL::Parser (Libraries/LibURL/Parser.h:40).
+pub struct Parser:
+    pub var empty_: u8
+
+## URL::Parser::State (Libraries/LibURL/Parser.h:42).
+pub enum ParserState as i32:
+    scheme_start = 0
+    scheme = 1
+    no_scheme = 2
+    special_relative_or_authority = 3
+    path_or_authority = 4
+    relative = 5
+    relative_slash = 6
+    special_authority_slashes = 7
+    special_authority_ignore_slashes = 8
+    authority = 9
+    host = 10
+    hostname = 11
+    port = 12
+    file = 13
+    file_slash = 14
+    file_host = 15
+    path_start = 16
+    path = 17
+    opaque_path = 18
+    query = 19
+    fragment = 20
+
+# mark: ParsedIPv4Number ========================================================================
+
+## URL::ParsedIPv4Number (Libraries/LibURL/Parser.cpp:84).
+pub struct ParsedIPv4Number:
+    pub var number: u32  # C++ default: { 0 }
+    pub var validation_error: bool  # C++ default: { false }

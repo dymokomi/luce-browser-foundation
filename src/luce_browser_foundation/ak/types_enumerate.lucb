@@ -1,0 +1,20 @@
+#==============================================================================================
+#
+#   types_enumerate - declarations of AK/Enumerate.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Enumerate.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Enumerator ==============================================================================
+
+## AK::Detail::Enumerator (AK/Enumerate.h:16): a generic struct.
+pub struct Enumerator[TIterable]:
+    pub var iterable: TIterable
+
+## AK::Detail::Enumerator::Iterator (AK/Enumerate.h:25): opaque in this phase (not in the phase-1 closure).
+pub struct EnumeratorIterator:
+    pub var opaque_: u8

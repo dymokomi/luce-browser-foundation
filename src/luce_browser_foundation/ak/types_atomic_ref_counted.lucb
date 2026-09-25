@@ -1,0 +1,23 @@
+#==============================================================================================
+#
+#   types_atomic_ref_counted - declarations of AK/AtomicRefCounted.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/AtomicRefCounted.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: AtomicRefCountedBase ====================================================================
+
+## AK::AtomicRefCountedBase (AK/AtomicRefCounted.h:17).
+pub struct AtomicRefCountedBase:
+    pub var m_ref_count: u32  # C++ default: { 1 }
+
+# mark: AtomicRefCounted ========================================================================
+
+## AK::AtomicRefCounted (AK/AtomicRefCounted.h:67): a generic struct.
+pub struct AtomicRefCounted[T]:
+    pub var atomic_ref_counted_base: AtomicRefCountedBase

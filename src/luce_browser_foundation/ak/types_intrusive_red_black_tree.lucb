@@ -1,0 +1,37 @@
+#==============================================================================================
+#
+#   types_intrusive_red_black_tree - declarations of AK/IntrusiveRedBlackTree.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/IntrusiveRedBlackTree.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: ExtractIntrusiveRedBlackTreeTypes =======================================================
+
+## AK::Detail::ExtractIntrusiveRedBlackTreeTypes (AK/IntrusiveRedBlackTree.h:17).
+pub struct ExtractIntrusiveRedBlackTreeTypes:
+    pub var empty_: u8
+
+# mark: IntrusiveRedBlackTree ===================================================================
+
+## AK::Detail::IntrusiveRedBlackTree (AK/IntrusiveRedBlackTree.h:30): a generic struct.
+pub struct IntrusiveRedBlackTree[K, V, TContainer]:
+    pub var empty_: u8
+
+# mark: BaseIterator ============================================================================
+
+## AK::Detail::IntrusiveRedBlackTree::BaseIterator (AK/IntrusiveRedBlackTree.h:78): a generic struct.
+pub struct BaseIterator[TElementType]:
+    pub var m_node: void*?  # unmapped: SubstitutedIntrusiveRedBlackTreeNode<K, V, Container>
+    pub var m_prev: void*?  # unmapped: SubstitutedIntrusiveRedBlackTreeNode<K, V, Container>
+
+# mark: IntrusiveRedBlackTreeNode ===============================================================
+
+## AK::Detail::IntrusiveRedBlackTreeNode (AK/IntrusiveRedBlackTree.h:189): a generic struct.
+pub struct IntrusiveRedBlackTreeNode[K, V, TContainer]:
+    pub var m_in_tree: bool  # C++ default: { false }
+    pub var m_self: SelfReferenceIfNeeded[TContainer]

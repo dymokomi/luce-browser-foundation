@@ -1,0 +1,32 @@
+#==============================================================================================
+#
+#   types_buffered_stream - declarations of AK/BufferedStream.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/BufferedStream.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: BufferedHelper ==========================================================================
+
+## AK::BufferedHelper (AK/BufferedStream.h:22): a generic struct.
+pub struct BufferedHelper[T]:
+    pub var m_stream: T*
+    pub var m_buffer: CircularBuffer
+
+# mark: InputBufferedSeekable ===================================================================
+
+## AK::InputBufferedSeekable (AK/BufferedStream.h:308): a generic struct.
+pub struct InputBufferedSeekable[T]:
+    pub var seekable_stream: SeekableStream
+    pub var m_helper: BufferedHelper[T]
+
+# mark: OutputBufferedSeekable ==================================================================
+
+## AK::OutputBufferedSeekable (AK/BufferedStream.h:377): a generic struct.
+pub struct OutputBufferedSeekable[T]:
+    pub var seekable_stream: SeekableStream
+    pub var m_stream: T*
+    pub var m_buffer: CircularBuffer

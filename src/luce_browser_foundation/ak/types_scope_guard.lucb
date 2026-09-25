@@ -1,0 +1,23 @@
+#==============================================================================================
+#
+#   types_scope_guard - declarations of AK/ScopeGuard.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/ScopeGuard.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: ScopeGuard ==============================================================================
+
+## AK::ScopeGuard (AK/ScopeGuard.h:14): a generic struct.
+pub struct ScopeGuard[TCallback]:
+    pub var m_callback: TCallback
+
+# mark: ArmedScopeGuard =========================================================================
+
+## AK::ArmedScopeGuard (AK/ScopeGuard.h:31): a generic struct.
+pub struct ArmedScopeGuard[TCallback]:
+    pub var m_callback: TCallback
+    pub var m_armed: bool  # C++ default: { true }

@@ -1,0 +1,30 @@
+#==============================================================================================
+#
+#   types_init - declarations of Libraries/LibURL/Pattern/Init.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Pattern/Init.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: Init ====================================================================================
+
+## URL::Pattern::Init (Libraries/LibURL/Pattern/Init.h:16).
+pub struct Init:
+    pub var protocol: ak.String?
+    pub var username: ak.String?
+    pub var password: ak.String?
+    pub var hostname: ak.String?
+    pub var port: ak.String?
+    pub var pathname: ak.String?
+    pub var search: ak.String?
+    pub var hash: ak.String?
+    pub var base_url: ak.String?
+
+## URL::Pattern::PatternProcessType (Libraries/LibURL/Pattern/Init.h:28).
+pub enum PatternProcessType as i32:
+    pattern = 0
+    url = 1

@@ -1,0 +1,32 @@
+#==============================================================================================
+#
+#   types_optional - declarations of AK/Optional.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Optional.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::Detail::AddConstIfNeeded (AK/Optional.h:41): opaque in this phase.
+pub struct AddConstIfNeeded[TSelf, T]:
+    pub var opaque_: u8
+
+# mark: OptionalNone ============================================================================
+
+## AK::OptionalNone (AK/Optional.h:63).
+pub struct OptionalNone:
+    pub var empty_: u8
+
+# mark: OptionalBase ============================================================================
+
+## AK::OptionalBase (AK/Optional.h:69): a generic struct.
+pub struct OptionalBase[T]:
+    pub var empty_: u8
+
+# mark: SentinelOptional ========================================================================
+
+## AK::SentinelOptional (AK/Optional.h:668): a generic struct.
+pub struct SentinelOptional[T, TTraits]:
+    pub var m_value: T  # C++ default: { Traits :: sentinel_value ( ) }

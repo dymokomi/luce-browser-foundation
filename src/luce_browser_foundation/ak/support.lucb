@@ -1,0 +1,140 @@
+#==============================================================================================
+#
+#   support - ClassInfo, Traits, containers and Function<> shapes
+#
+#   DESCRIPTION:
+#       Hand-written generic shapes the generated declarations use (DESIGN.md §2.3, §2.6, §2.7):
+#       ClassInfo, AK's Traits as an interface, the containers (inline capacity dropped), Checked<T>
+#       and Function<>. Part of the skeleton generator's output (Ladybird 47c82b38d0).
+#
+#==============================================================================================
+
+## Class information of one class of a polymorphic hierarchy: name, pre-order class-id range,
+## size and vtable (DESIGN.md §2.3).
+pub struct ClassInfo:
+    pub let name: str
+    pub let first_id: u16
+    pub let last_id: u16
+    pub let size: usize
+    pub let vtable: const void*
+
+## AK::Traits<K> (AK/Traits.h): AK's hash and equality for a key type, as an interface a one-byte
+## traits struct implements (DESIGN.md §2.6).
+pub interface Traits[K]:
+    func hash_of(key: const K*) -> u32
+
+    func equals(a: const K*, b: const K*) -> bool
+
+## AK::Traits<T*>: pointers hash by address with AK's ptr_hash.
+pub struct PtrTraits[T]: Traits[T*]:
+    var empty_: u8
+
+    func hash_of(key: const (T*)*) -> u32: trap("unported: AK::Traits<T*>::hash")
+
+    func equals(a: const (T*)*, b: const (T*)*) -> bool: return *a == *b
+
+## AK::Traits<T> for key types the generator could not give their own traits struct.
+pub struct DefaultTraits[T]: Traits[T]:
+    var empty_: u8
+
+    func hash_of(key: const T*) -> u32: trap("unported: AK::Traits<T>::hash")
+
+    func equals(a: const T*, b: const T*) -> bool: trap("unported: AK::Traits<T>::equals")
+
+## AK::Vector<T, N> (AK/Vector.h): size, capacity and the outline buffer; inline capacity dropped.
+pub struct Vector[T]:
+    pub var m_size: usize
+    pub var m_capacity: usize
+    pub var m_outline_buffer: T*?
+
+## AK::HashTableBucket<T> (AK/HashTable.h).
+pub struct HashTableBucket[T]:
+    pub var state: u8
+    pub var storage: T
+
+## AK::HashTable<T, TT> (AK/HashTable.h).
+pub struct HashTable[T, TT: Traits[T]]:
+    pub var m_buckets: HashTableBucket[T]*?
+    pub var m_size: usize
+    pub var m_capacity: usize
+    pub var m_deleted_count: usize
+
+## AK::OrderedHashTable<T, TT> (AK/HashTable.h, IsOrdered = true).
+pub struct OrderedHashTable[T, TT: Traits[T]]:
+    pub var m_buckets: HashTableBucket[T]*?
+    pub var m_size: usize
+    pub var m_capacity: usize
+    pub var m_deleted_count: usize
+    pub var m_collection_head: HashTableBucket[T]*?
+    pub var m_collection_tail: HashTableBucket[T]*?
+
+## AK::HashMap<K, V>::Entry (AK/HashMap.h).
+pub struct HashMapEntry[K, V]:
+    pub var key: K
+    pub var value: V
+
+## AK::HashMap<K, V>::EntryTraits (AK/HashMap.h).
+pub struct HashMapEntryTraits[K, V, KT: Traits[K]]: Traits[HashMapEntry[K, V]]:
+    var empty_: u8
+
+    func hash_of(key: const HashMapEntry[K, V]*) -> u32: trap("unported: AK::HashMap::EntryTraits::hash")
+
+    func equals(a: const HashMapEntry[K, V]*, b: const HashMapEntry[K, V]*) -> bool: trap("unported: AK::HashMap::EntryTraits::equals")
+
+## AK::HashMap<K, V, KT> (AK/HashMap.h).
+pub struct HashMap[K, V, KT: Traits[K]]:
+    pub var m_table: HashTable[HashMapEntry[K, V], HashMapEntryTraits[K, V, KT]]
+
+## AK::OrderedHashMap<K, V, KT> (AK/HashMap.h, IsOrdered = true).
+pub struct OrderedHashMap[K, V, KT: Traits[K]]:
+    pub var m_table: OrderedHashTable[HashMapEntry[K, V], HashMapEntryTraits[K, V, KT]]
+
+## AK::Checked<T> (AK/Checked.h).
+pub struct Checked[T]:
+    pub var m_value: T
+    pub var m_overflow: bool
+
+## AK::Function<R()>: a function pointer beside its capture context (DESIGN.md §2.7).
+pub struct Function0[R]:
+    pub var call: (func(void*?) -> R)?
+    pub var context: void*?
+
+## AK::Function<R(A1)>: a function pointer beside its capture context (DESIGN.md §2.7).
+pub struct Function1[A1, R]:
+    pub var call: (func(void*?, A1) -> R)?
+    pub var context: void*?
+
+## AK::Function<R(A1, A2)>: a function pointer beside its capture context (DESIGN.md §2.7).
+pub struct Function2[A1, A2, R]:
+    pub var call: (func(void*?, A1, A2) -> R)?
+    pub var context: void*?
+
+## AK::Function<R(A1, A2, A3)>: a function pointer beside its capture context (DESIGN.md §2.7).
+pub struct Function3[A1, A2, A3, R]:
+    pub var call: (func(void*?, A1, A2, A3) -> R)?
+    pub var context: void*?
+
+## AK::Function<R(A1, A2, A3, A4)>: a function pointer beside its capture context (DESIGN.md §2.7).
+pub struct Function4[A1, A2, A3, A4, R]:
+    pub var call: (func(void*?, A1, A2, A3, A4) -> R)?
+    pub var context: void*?
+
+## AK::Function<R(A1, A2, A3, A4, A5)>: a function pointer beside its capture context (DESIGN.md §2.7).
+pub struct Function5[A1, A2, A3, A4, A5, R]:
+    pub var call: (func(void*?, A1, A2, A3, A4, A5) -> R)?
+    pub var context: void*?
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6)>: a function pointer beside its capture context (DESIGN.md §2.7).
+pub struct Function6[A1, A2, A3, A4, A5, A6, R]:
+    pub var call: (func(void*?, A1, A2, A3, A4, A5, A6) -> R)?
+    pub var context: void*?
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6, A7)>: a function pointer beside its capture context (DESIGN.md §2.7).
+pub struct Function7[A1, A2, A3, A4, A5, A6, A7, R]:
+    pub var call: (func(void*?, A1, A2, A3, A4, A5, A6, A7) -> R)?
+    pub var context: void*?
+
+## AK::Function<R(A1, A2, A3, A4, A5, A6, A7, A8)>: a function pointer beside its capture context (DESIGN.md §2.7).
+pub struct Function8[A1, A2, A3, A4, A5, A6, A7, A8, R]:
+    pub var call: (func(void*?, A1, A2, A3, A4, A5, A6, A7, A8) -> R)?
+    pub var context: void*?

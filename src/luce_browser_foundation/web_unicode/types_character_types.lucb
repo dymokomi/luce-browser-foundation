@@ -1,0 +1,131 @@
+#==============================================================================================
+#
+#   types_character_types - declarations of Libraries/LibUnicode/CharacterTypes.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibUnicode/CharacterTypes.cpp, Libraries/LibUnicode/CharacterTypes.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: PropertyName ============================================================================
+
+## Unicode::PropertyName (Libraries/LibUnicode/CharacterTypes.cpp:24): a generic struct.
+pub struct PropertyName[TPropertyType]:
+    pub var long_name: ak.StringView?
+    pub var short_name: ak.StringView?
+    pub var additional_name: ak.StringView?
+
+## Unicode::ADDITIONAL_NAME (Libraries/LibUnicode/CharacterTypes.cpp:32).
+# C++ initializer: static_cast < UPropertyNameChoice > ( U_LONG_PROPERTY_NAME + 1 )
+pub var additional_name: CEUPropertyNameChoice
+
+## Unicode::GENERAL_CATEGORY_CASED_LETTER (Libraries/LibUnicode/CharacterTypes.cpp:46).
+# C++ initializer: U_CHAR_CATEGORY_COUNT + 1
+pub var general_category_cased_letter: u32
+
+## Unicode::GENERAL_CATEGORY_LETTER (Libraries/LibUnicode/CharacterTypes.cpp:47).
+# C++ initializer: U_CHAR_CATEGORY_COUNT + 2
+pub var general_category_letter: u32
+
+## Unicode::GENERAL_CATEGORY_MARK (Libraries/LibUnicode/CharacterTypes.cpp:48).
+# C++ initializer: U_CHAR_CATEGORY_COUNT + 3
+pub var general_category_mark: u32
+
+## Unicode::GENERAL_CATEGORY_NUMBER (Libraries/LibUnicode/CharacterTypes.cpp:49).
+# C++ initializer: U_CHAR_CATEGORY_COUNT + 4
+pub var general_category_number: u32
+
+## Unicode::GENERAL_CATEGORY_PUNCTUATION (Libraries/LibUnicode/CharacterTypes.cpp:50).
+# C++ initializer: U_CHAR_CATEGORY_COUNT + 5
+pub var general_category_punctuation: u32
+
+## Unicode::GENERAL_CATEGORY_SYMBOL (Libraries/LibUnicode/CharacterTypes.cpp:51).
+# C++ initializer: U_CHAR_CATEGORY_COUNT + 6
+pub var general_category_symbol: u32
+
+## Unicode::BidiClass (Libraries/LibUnicode/CharacterTypes.h:52).
+pub enum BidiClass as i32:
+    arabic_number = 0
+    block_separator = 1
+    boundary_neutral = 2
+    common_number_separator = 3
+    dir_non_spacing_mark = 4
+    european_number = 5
+    european_number_separator = 6
+    european_number_terminator = 7
+    first_strong_isolate = 8
+    left_to_right = 9
+    left_to_right_embedding = 10
+    left_to_right_isolate = 11
+    left_to_right_override = 12
+    other_neutral = 13
+    pop_directional_format = 14
+    pop_directional_isolate = 15
+    right_to_left = 16
+    right_to_left_arabic = 17
+    right_to_left_embedding = 18
+    right_to_left_isolate = 19
+    right_to_left_override = 20
+    segment_separator = 21
+    white_space_neutral = 22
+
+## Unicode::GENERAL_CATEGORY_SEPARATOR (Libraries/LibUnicode/CharacterTypes.cpp:52).
+# C++ initializer: U_CHAR_CATEGORY_COUNT + 7
+pub var general_category_separator: u32
+
+## Unicode::GENERAL_CATEGORY_OTHER (Libraries/LibUnicode/CharacterTypes.cpp:53).
+# C++ initializer: U_CHAR_CATEGORY_COUNT + 8
+pub var general_category_other: u32
+
+## Unicode::GENERAL_CATEGORY_LIMIT (Libraries/LibUnicode/CharacterTypes.cpp:54).
+# C++ initializer: U_CHAR_CATEGORY_COUNT + 9
+pub var general_category_limit: u32
+
+## Unicode::s_category_sets_with_case_closure (Libraries/LibUnicode/CharacterTypes.cpp:56).
+pub var s_category_sets_with_case_closure: ak.HashMap[u32, Icu78UnicodeSet*, ak.U32Traits]
+
+## Unicode::s_property_sets_with_case_closure (Libraries/LibUnicode/CharacterTypes.cpp:57).
+pub var s_property_sets_with_case_closure: ak.HashMap[u32, Icu78UnicodeSet*, ak.U32Traits]
+
+## Unicode::LineBreakClass (Libraries/LibUnicode/CharacterTypes.h:80).
+pub enum LineBreakClass as i32:
+    alphabetic = 0
+    numeric = 1
+    ideographic = 2
+    ambiguous = 3
+    complex_context = 4
+    combining_mark = 5
+    other = 6
+
+# mark: CodePointRange ==========================================================================
+
+## Unicode::CodePointRange (Libraries/LibUnicode/CharacterTypes.h:92).
+pub struct CodePointRange:
+    pub var from_: u32  # C++ default: { 0 }
+    pub var to: u32  # C++ default: { 0 }
+
+## Unicode::PROPERTY_ANY (Libraries/LibUnicode/CharacterTypes.cpp:183).
+# C++ initializer: UCHAR_BINARY_LIMIT + 1
+pub var property_any: u32
+
+## Unicode::PROPERTY_ASCII (Libraries/LibUnicode/CharacterTypes.cpp:184).
+# C++ initializer: UCHAR_BINARY_LIMIT + 2
+pub var property_ascii: u32
+
+## Unicode::PROPERTY_ASSIGNED (Libraries/LibUnicode/CharacterTypes.cpp:185).
+# C++ initializer: UCHAR_BINARY_LIMIT + 3
+pub var property_assigned: u32
+
+## Unicode::PROPERTY_LIMIT (Libraries/LibUnicode/CharacterTypes.cpp:186).
+# C++ initializer: UCHAR_BINARY_LIMIT + 4
+pub var property_limit: u32
+
+## ResolvedPropertyKind (Libraries/LibUnicode/CharacterTypes.cpp:641).
+pub enum ResolvedPropertyKind as u8:
+    script = 0
+    script_extension = 1
+    general_category = 2
+    binary_property = 3

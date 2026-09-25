@@ -1,0 +1,55 @@
+#==============================================================================================
+#
+#   types_conservative_vector - declarations of Libraries/LibGC/ConservativeVector.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/ConservativeVector.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: ConservativeVectorBase ==================================================================
+
+## GC::ConservativeVectorBase (Libraries/LibGC/ConservativeVector.h:15).
+pub struct ConservativeVectorBase: IsConservativeVectorBase:
+    pub var vtable: const ConservativeVectorBaseVTable*
+    pub var class_id: u16
+    pub var m_heap: Heap*?  # C++ default: { nullptr }
+    pub var m_list_node: ak.IntrusiveListNode[ConservativeVectorBase, ConservativeVectorBase*?]
+
+    func conservative_vector_base() -> ConservativeVectorBase*: return (ConservativeVectorBase*)&self
+
+## Upcast to GC::ConservativeVectorBase (implemented by every struct in its hierarchy).
+pub interface IsConservativeVectorBase:
+    func conservative_vector_base() -> ConservativeVectorBase*
+
+## Virtual functions introduced by GC::ConservativeVectorBase.
+pub struct ConservativeVectorBaseVTable:
+    pub let class_info: const ak.ClassInfo*
+    pub let possible_values: func(ConservativeVectorBase*) -> const u64[] = conservative_vector_base_possible_values_impl
+
+## Virtual: GC::ConservativeVectorBase::possible_values.
+pub func conservative_vector_base_possible_values(this: ConservativeVectorBase*) -> const u64[]:
+    return ((const ConservativeVectorBaseVTable*)this.vtable).possible_values(this)
+
+## The vtable of GC::ConservativeVectorBase.
+pub let conservative_vector_base_vtable: ConservativeVectorBaseVTable = ConservativeVectorBaseVTable(class_info = &conservative_vector_base_class)
+
+## Class information of GC::ConservativeVectorBase: name, class-id range (pre-order), size, vtable.
+pub let conservative_vector_base_class: ak.ClassInfo = ak.ClassInfo(name = "ConservativeVectorBase", first_id = 0, last_id = 0, size = sizeof(ConservativeVectorBase), vtable = (const void*)&conservative_vector_base_vtable)
+
+## is<GC::ConservativeVectorBase>: the class-id range test.
+pub func is_conservative_vector_base[P: IsConservativeVectorBase](p: P*) -> bool:
+    let id = p.conservative_vector_base().class_id
+    return id >= conservative_vector_base_class.first_id and id <= conservative_vector_base_class.last_id
+
+## as_if<GC::ConservativeVectorBase>.
+pub func as_if_conservative_vector_base[P: IsConservativeVectorBase](p: P*) -> ConservativeVectorBase*?:
+    if is_conservative_vector_base(p): return (ConservativeVectorBase*)p
+    return none
+
+## as<GC::ConservativeVectorBase> (verify_cast).
+pub func as_conservative_vector_base[P: IsConservativeVectorBase](p: P*) -> ConservativeVectorBase*:
+    return as_if_conservative_vector_base(p) else trap("as<GC::ConservativeVectorBase> failed")

@@ -1,0 +1,16 @@
+#==============================================================================================
+#
+#   types_default_delete - declarations of AK/DefaultDelete.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/DefaultDelete.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: DefaultDelete ===========================================================================
+
+## AK::DefaultDelete (AK/DefaultDelete.h:12): a generic struct.
+pub struct DefaultDelete[T]:
+    pub var empty_: u8

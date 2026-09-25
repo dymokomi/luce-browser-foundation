@@ -1,0 +1,22 @@
+#==============================================================================================
+#
+#   types_byte_string - declarations of AK/ByteString.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/ByteString.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: ByteString ==============================================================================
+
+## AK::ByteString (AK/ByteString.h:39).
+pub struct ByteString:
+    pub var m_impl: const ByteStringImpl*
+
+# mark: CaseInsensitiveAsciiStringTraits ========================================================
+
+## AK::CaseInsensitiveASCIIStringTraits (AK/ByteString.h:320).
+pub struct CaseInsensitiveAsciiStringTraits:
+    pub var empty_: u8

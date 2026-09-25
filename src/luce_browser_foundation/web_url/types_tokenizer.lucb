@@ -1,0 +1,48 @@
+#==============================================================================================
+#
+#   types_tokenizer - declarations of Libraries/LibURL/Pattern/Tokenizer.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Pattern/Tokenizer.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: Token ===================================================================================
+
+## URL::Pattern::Token (Libraries/LibURL/Pattern/Tokenizer.h:16).
+pub struct Token:
+    pub var type_: TokenType  # C++ default: { Type :: InvalidChar }
+    pub var index: u32  # C++ default: { 0 }
+    pub var value: ak.String
+
+## URL::Pattern::Token::Type (Libraries/LibURL/Pattern/Tokenizer.h:18).
+pub enum TokenType as i32:
+    open = 0
+    close = 1
+    regexp = 2
+    name = 3
+    char_ = 4
+    escaped_char = 5
+    other_modifier = 6
+    asterisk = 7
+    end = 8
+    invalid_char = 9
+
+# mark: Tokenizer ===============================================================================
+
+## URL::Pattern::Tokenizer (Libraries/LibURL/Pattern/Tokenizer.h:69).
+pub struct Tokenizer:
+    pub var m_input: ak.Utf8View
+    pub var m_policy: TokenizerPolicy  # C++ default: { Policy :: Strict }
+    pub var m_token_list: ak.Vector[Token]
+    pub var m_index: usize  # C++ default: { 0 }
+    pub var m_next_index: usize  # C++ default: { 0 }
+    pub var m_code_point: u32  # C++ default: { }
+
+## URL::Pattern::Tokenizer::Policy (Libraries/LibURL/Pattern/Tokenizer.h:73).
+pub enum TokenizerPolicy as i32:
+    strict = 0
+    lenient = 1

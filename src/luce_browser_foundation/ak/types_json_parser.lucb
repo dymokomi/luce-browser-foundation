@@ -1,0 +1,25 @@
+#==============================================================================================
+#
+#   types_json_parser - declarations of AK/JsonParser.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/JsonParser.cpp, AK/JsonParser.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: JsonParser ==============================================================================
+
+## AK::JsonParser (AK/JsonParser.h:14).
+pub struct JsonParser:
+    pub var generic_lexer: GenericLexer[u8]  # base AK::Detail::GenericLexer<char>
+    pub var m_current_nesting_depth: usize  # C++ default: { 0 }
+
+## AK::exceeded_max_nesting_depth_error (AK/JsonParser.cpp:22).
+# C++ initializer: "JsonParser: Exceeded maximum nesting depth"sv
+pub var exceeded_max_nesting_depth_error: StringView
+
+## AK::JsonParser::max_nesting_depth (AK/JsonParser.h:37).
+pub let json_parser_max_nesting_depth: usize = 512

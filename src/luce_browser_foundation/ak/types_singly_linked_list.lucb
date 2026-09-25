@@ -1,0 +1,31 @@
+#==============================================================================================
+#
+#   types_singly_linked_list - declarations of AK/SinglyLinkedList.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/SinglyLinkedList.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: SinglyLinkedListIterator ================================================================
+
+## AK::SinglyLinkedListIterator (AK/SinglyLinkedList.h:19): a generic struct.
+pub struct SinglyLinkedListIterator[TListType, TElementType]:
+    pub var m_node: void*?  # unmapped: typename ListType::Node
+    pub var m_prev: void*?  # unmapped: typename ListType::Node
+    pub var m_next: void*?  # unmapped: typename ListType::Node
+
+# mark: SinglyLinkedList ========================================================================
+
+## AK::SinglyLinkedList (AK/SinglyLinkedList.h:57): a generic struct.
+pub struct SinglyLinkedList[T, TTSizeCalculationPolicy]:
+    pub var m_head: SinglyLinkedListNode*?  # C++ default: { nullptr }
+    pub var m_tail: SinglyLinkedListNode*?  # C++ default: { nullptr }
+    pub var m_size_policy: TTSizeCalculationPolicy  # C++ default: { }
+
+## AK::SinglyLinkedList::Node (AK/SinglyLinkedList.h:59): opaque in this phase (not in the phase-1 closure).
+pub struct SinglyLinkedListNode:
+    pub var opaque_: u8

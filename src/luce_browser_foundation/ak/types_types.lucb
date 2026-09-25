@@ -1,0 +1,48 @@
+#==============================================================================================
+#
+#   types_types - declarations of AK/Types.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Types.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## KiB (AK/Types.h:146).
+pub let ki_b: u64 = 1024
+
+## MiB (AK/Types.h:147).
+# C++ initializer: KiB * KiB
+pub var mi_b: u64
+
+## GiB (AK/Types.h:148).
+# C++ initializer: KiB * KiB * KiB
+pub var gi_b: u64
+
+## TiB (AK/Types.h:149).
+# C++ initializer: KiB * KiB * KiB * KiB
+pub var ti_b: u64
+
+## PiB (AK/Types.h:150).
+# C++ initializer: KiB * KiB * KiB * KiB * KiB
+pub var pi_b: u64
+
+## EiB (AK/Types.h:151).
+# C++ initializer: KiB * KiB * KiB * KiB * KiB * KiB
+pub var ei_b: u64
+
+## AK::TriState (AK/Types.h:187).
+pub enum TriState as u8:
+    false_ = 0
+    true_ = 1
+    unknown = 2
+
+## AK::MemoryOrder (AK/Types.h:193).
+pub enum MemoryOrder as u32:
+    memory_order_relaxed = 0
+    memory_order_consume = 1
+    memory_order_acquire = 2
+    memory_order_release = 3
+    memory_order_acq_rel = 4
+    memory_order_seq_cst = 5

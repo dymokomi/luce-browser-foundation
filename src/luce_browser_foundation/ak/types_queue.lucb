@@ -1,0 +1,18 @@
+#==============================================================================================
+#
+#   types_queue - declarations of AK/Queue.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Queue.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Queue ===================================================================================
+
+## AK::Queue (AK/Queue.h:17): a generic struct.
+pub struct Queue[T]:
+    pub var m_segments: IntrusiveList[u8, u8]
+    pub var m_index_into_first: usize  # C++ default: { 0 }
+    pub var m_size: usize  # C++ default: { 0 }

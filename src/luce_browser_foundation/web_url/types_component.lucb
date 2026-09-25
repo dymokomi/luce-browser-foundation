@@ -1,0 +1,38 @@
+#==============================================================================================
+#
+#   types_component - declarations of Libraries/LibURL/Pattern/Component.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Pattern/Component.cpp, Libraries/LibURL/Pattern/Component.h (Ladybird
+#       47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather than edit,
+#       except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Component ===============================================================================
+
+## URL::Pattern::Component (Libraries/LibURL/Pattern/Component.h:19).
+pub struct Component:
+    pub var pattern_string: ak.String
+    pub var regular_expression: RegexEcmaScriptRegex*?
+    pub var group_name_list: ak.Vector[ak.String]
+    pub var has_regexp_groups: bool  # C++ default: { }
+
+# mark: ComponentResult =========================================================================
+
+## URL::Pattern::Component::Result (Libraries/LibURL/Pattern/Component.h:23).
+pub struct ComponentResult:
+    pub var input: ak.String
+    pub var groups: ak.OrderedHashMap[ak.String, ak.StringOrEmpty, ak.StringTraits]
+
+## URL::Pattern::Component::ExecutionResult (Libraries/LibURL/Pattern/Component.h:28): opaque in this phase (not in the phase-1 closure).
+pub struct ComponentExecutionResult:
+    pub var opaque_: u8
+
+# mark: RegularExpressionAndNameList ============================================================
+
+## URL::Pattern::RegularExpressionAndNameList (Libraries/LibURL/Pattern/Component.cpp:35).
+pub struct RegularExpressionAndNameList:
+    pub var regular_expression: ak.String
+    pub var name_list: ak.Vector[ak.String]

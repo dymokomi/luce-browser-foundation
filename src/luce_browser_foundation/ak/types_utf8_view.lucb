@@ -1,0 +1,43 @@
+#==============================================================================================
+#
+#   types_utf8_view - declarations of AK/Utf8View.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Utf8View.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Utf8CodePointIterator ===================================================================
+
+## AK::Utf8CodePointIterator (AK/Utf8View.h:22).
+pub struct Utf8CodePointIterator:
+    pub var m_ptr: const u8*?  # C++ default: { nullptr }
+    pub var m_length: usize  # C++ default: { 0 }
+
+# mark: Utf8View ================================================================================
+
+## AK::Utf8View (AK/Utf8View.h:64).
+pub struct Utf8View:
+    pub var m_string: StringView
+    pub var m_length: usize  # C++ default: { 0 }
+    pub var m_have_length: bool  # C++ default: { false }
+
+# mark: Utf8ViewUtf8EncodedByteData =============================================================
+
+## AK::Utf8View::Utf8EncodedByteData (AK/Utf8View.h:194).
+pub struct Utf8ViewUtf8EncodedByteData:
+    pub var byte_length: usize  # C++ default: { 0 }
+    pub var encoding_bits: u8  # C++ default: { 0 }
+    pub var encoding_mask: u8  # C++ default: { 0 }
+    pub var first_code_point: u32  # C++ default: { 0 }
+    pub var last_code_point: u32  # C++ default: { 0 }
+
+## AK::Utf8View::utf8_encoded_byte_data (AK/Utf8View.h:202).
+# C++ initializer: { { { 1 , 0b0000'0000 , 0b1000'0000 , 0x0000 , 0x007F } , { 2 , 0b1100'0000 , 0b1110'0000 , 0x0080 ,
+pub var utf8_view_utf8_encoded_byte_data: Utf8ViewUtf8EncodedByteData[4]
+
+## AK::Utf8View::LeadingByte (AK/Utf8View.h:209): opaque in this phase (not in the phase-1 closure).
+pub struct Utf8ViewLeadingByte:
+    pub var opaque_: u8

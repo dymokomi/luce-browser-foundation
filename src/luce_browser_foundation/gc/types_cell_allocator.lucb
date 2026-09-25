@@ -1,0 +1,32 @@
+#==============================================================================================
+#
+#   types_cell_allocator - declarations of Libraries/LibGC/CellAllocator.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/CellAllocator.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: CellAllocator ===========================================================================
+
+## GC::CellAllocator (Libraries/LibGC/CellAllocator.h:32).
+pub struct CellAllocator:
+    pub var m_list_node: ak.IntrusiveListNode[CellAllocator, CellAllocator*?]
+    pub var m_class_name: ak.StringView?
+    pub var m_cell_size: usize
+    pub var m_block_allocator: BlockAllocator
+    pub var m_full_blocks: ak.IntrusiveList[HeapBlock, HeapBlock*?]
+    pub var m_usable_blocks: ak.IntrusiveList[HeapBlock, HeapBlock*?]
+    pub var m_min_block_address: usize  # C++ default: { explode_byte ( 0xff ) }
+    pub var m_max_block_address: usize  # C++ default: { 0 }
+    pub var m_overrides_must_survive_garbage_collection: bool  # C++ default: { false }
+    pub var m_overrides_finalize: bool  # C++ default: { false }
+
+# mark: TypeIsolatingCellAllocator ==============================================================
+
+## GC::TypeIsolatingCellAllocator (Libraries/LibGC/CellAllocator.h:82): a generic struct.
+pub struct TypeIsolatingCellAllocator[T]:
+    pub var allocator: CellAllocator

@@ -1,0 +1,27 @@
+#==============================================================================================
+#
+#   types_weak_block - declarations of Libraries/LibGC/WeakBlock.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/WeakBlock.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: WeakBlock ===============================================================================
+
+## GC::WeakBlock (Libraries/LibGC/WeakBlock.h:15).
+pub struct WeakBlock:
+    pub var m_list_node: ak.IntrusiveListNode[WeakBlock, WeakBlock*?]
+    pub var m_freelist: WeakImpl*?  # C++ default: { nullptr }
+    pub var m_impls: WeakImpl[681]
+
+## GC::WeakBlock::BLOCK_SIZE (Libraries/LibGC/WeakBlock.h:17).
+# C++ initializer: 16 * KiB
+pub var weak_block_block_size: usize
+
+## GC::WeakBlock::IMPL_COUNT (Libraries/LibGC/WeakBlock.h:39).
+# C++ initializer: ( BLOCK_SIZE - sizeof ( m_list_node ) - sizeof ( WeakImpl * ) ) / sizeof ( WeakImpl )
+pub var weak_block_impl_count: usize

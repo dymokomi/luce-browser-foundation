@@ -1,0 +1,23 @@
+#==============================================================================================
+#
+#   types_i_pv4_address - declarations of AK/IPv4Address.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/IPv4Address.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: IPv4Address =============================================================================
+
+## AK::IPv4Address (AK/IPv4Address.h:19).
+pub struct IPv4Address:
+    pub var m_data: u32  # C++ default: { }
+
+## AK::IPv4Address::SubnetClass (AK/IPv4Address.h:20).
+pub enum IPv4AddressSubnetClass as i32:
+    a = 0
+    b = 1
+    c_ = 2
+    d = 3

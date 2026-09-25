@@ -1,0 +1,16 @@
+#==============================================================================================
+#
+#   types_json_object - declarations of AK/JsonObject.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/JsonObject.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: JsonObject ==============================================================================
+
+## AK::JsonObject (AK/JsonObject.h:20).
+pub struct JsonObject:
+    pub var m_members: OrderedHashMap[String, JsonValue2, StringTraits]

@@ -1,0 +1,133 @@
+#==============================================================================================
+#
+#   types_cell - declarations of Libraries/LibGC/Cell.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/Cell.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: Cell ====================================================================================
+
+## GC::Cell (Libraries/LibGC/Cell.h:41).
+pub struct Cell: IsCell:
+    pub var vtable: const CellVTable*
+    pub var class_id: u16
+    pub var m_mark: bool  # C++ default: { false }
+    pub var m_state: CellState  # C++ default: { State :: Live }
+
+    func cell() -> Cell*: return (Cell*)&self
+
+## Upcast to GC::Cell (implemented by every struct in its hierarchy).
+pub interface IsCell:
+    func cell() -> Cell*
+
+## Virtual functions introduced by GC::Cell.
+pub struct CellVTable:
+    pub let class_info: const ak.ClassInfo*
+    pub let class_name: func(Cell*) -> ak.StringView = cell_class_name_impl
+    pub let visit_edges: func(Cell*, CellVisitor*) -> unit = cell_visit_edges_impl
+    pub let finalize: func(Cell*) -> unit = cell_finalize_impl
+    pub let must_survive_garbage_collection: func(Cell*) -> bool = cell_must_survive_garbage_collection_impl
+
+## Virtual: GC::Cell::class_name.
+pub func cell_class_name(this: Cell*) -> ak.StringView:
+    return ((const CellVTable*)this.vtable).class_name(this)
+
+## Virtual: GC::Cell::visit_edges.
+pub func cell_visit_edges(this: Cell*, arg0: CellVisitor*):
+    ((const CellVTable*)this.vtable).visit_edges(this, arg0)
+
+## Virtual: GC::Cell::finalize.
+pub func cell_finalize(this: Cell*):
+    ((const CellVTable*)this.vtable).finalize(this)
+
+## Virtual: GC::Cell::must_survive_garbage_collection.
+pub func cell_must_survive_garbage_collection(this: Cell*) -> bool:
+    return ((const CellVTable*)this.vtable).must_survive_garbage_collection(this)
+
+## The vtable of GC::Cell.
+pub let cell_vtable: CellVTable = CellVTable(class_info = &cell_class)
+
+## Class information of GC::Cell: name, class-id range (pre-order), size, vtable.
+pub let cell_class: ak.ClassInfo = ak.ClassInfo(name = "Cell", first_id = 0, last_id = 359, size = sizeof(Cell), vtable = (const void*)&cell_vtable)
+
+## is<GC::Cell>: the class-id range test.
+pub func is_cell[P: IsCell](p: P*) -> bool:
+    let id = p.cell().class_id
+    return id >= cell_class.first_id and id <= cell_class.last_id
+
+## as_if<GC::Cell>.
+pub func as_if_cell[P: IsCell](p: P*) -> Cell*?:
+    if is_cell(p): return (Cell*)p
+    return none
+
+## as<GC::Cell> (verify_cast).
+pub func as_cell[P: IsCell](p: P*) -> Cell*:
+    return as_if_cell(p) else trap("as<GC::Cell> failed")
+
+## GC::Cell::OVERRIDES_MUST_SURVIVE_GARBAGE_COLLECTION (Libraries/LibGC/Cell.h:46).
+pub let cell_overrides_must_survive_garbage_collection: bool = false
+
+## GC::Cell::OVERRIDES_FINALIZE (Libraries/LibGC/Cell.h:47).
+pub let cell_overrides_finalize: bool = false
+
+## GC::Cell::State (Libraries/LibGC/Cell.h:54).
+pub enum CellState as i64:
+    live = 0
+    dead = -1
+
+# mark: CellVisitor =============================================================================
+
+## GC::Cell::Visitor (Libraries/LibGC/Cell.h:64).
+pub struct CellVisitor: IsCellVisitor:
+    pub var vtable: const CellVisitorVTable*
+    pub var class_id: u16
+
+    func cell_visitor() -> CellVisitor*: return (CellVisitor*)&self
+
+## Upcast to GC::Cell::Visitor (implemented by every struct in its hierarchy).
+pub interface IsCellVisitor:
+    func cell_visitor() -> CellVisitor*
+
+## Virtual functions introduced by GC::Cell::Visitor.
+pub struct CellVisitorVTable:
+    pub let class_info: const ak.ClassInfo*
+    pub let visit_possible_values: func(CellVisitor*, const u8[]) -> unit = cell_visitor_visit_possible_values_impl
+    pub let visit_impl_cell: func(CellVisitor*, Cell*) -> unit = cell_visitor_visit_impl_cell_impl
+    pub let visit_impl_span_nan_boxed_value: func(CellVisitor*, const NanBoxedValue[]) -> unit = cell_visitor_visit_impl_span_nan_boxed_value_impl
+
+## Virtual: GC::Cell::Visitor::visit_possible_values.
+pub func cell_visitor_visit_possible_values(this: CellVisitor*, arg0: const u8[]):
+    ((const CellVisitorVTable*)this.vtable).visit_possible_values(this, arg0)
+
+## Virtual: GC::Cell::Visitor::visit_impl.
+pub func cell_visitor_visit_impl_cell(this: CellVisitor*, arg0: Cell*):
+    ((const CellVisitorVTable*)this.vtable).visit_impl_cell(this, arg0)
+
+## Virtual: GC::Cell::Visitor::visit_impl.
+pub func cell_visitor_visit_impl_span_nan_boxed_value(this: CellVisitor*, arg0: const NanBoxedValue[]):
+    ((const CellVisitorVTable*)this.vtable).visit_impl_span_nan_boxed_value(this, arg0)
+
+## The vtable of GC::Cell::Visitor.
+pub let cell_visitor_vtable: CellVisitorVTable = CellVisitorVTable(class_info = &cell_visitor_class)
+
+## Class information of GC::Cell::Visitor: name, class-id range (pre-order), size, vtable.
+pub let cell_visitor_class: ak.ClassInfo = ak.ClassInfo(name = "Visitor", first_id = 0, last_id = 2, size = sizeof(CellVisitor), vtable = (const void*)&cell_visitor_vtable)
+
+## is<GC::Cell::Visitor>: the class-id range test.
+pub func is_cell_visitor[P: IsCellVisitor](p: P*) -> bool:
+    let id = p.cell_visitor().class_id
+    return id >= cell_visitor_class.first_id and id <= cell_visitor_class.last_id
+
+## as_if<GC::Cell::Visitor>.
+pub func as_if_cell_visitor[P: IsCellVisitor](p: P*) -> CellVisitor*?:
+    if is_cell_visitor(p): return (CellVisitor*)p
+    return none
+
+## as<GC::Cell::Visitor> (verify_cast).
+pub func as_cell_visitor[P: IsCellVisitor](p: P*) -> CellVisitor*:
+    return as_if_cell_visitor(p) else trap("as<GC::Cell::Visitor> failed")

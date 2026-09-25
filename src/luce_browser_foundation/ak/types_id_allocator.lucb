@@ -1,0 +1,17 @@
+#==============================================================================================
+#
+#   types_id_allocator - declarations of AK/IDAllocator.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/IDAllocator.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: IdAllocator =============================================================================
+
+## AK::IDAllocator (AK/IDAllocator.h:16).
+pub struct IdAllocator:
+    pub var m_allocated_ids: HashTable[i32, I32Traits]
+    pub var m_minimum_value: i32  # C++ default: { 1 }

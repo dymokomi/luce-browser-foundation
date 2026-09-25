@@ -1,0 +1,17 @@
+#==============================================================================================
+#
+#   types_iterator - declarations of AK/Iterator.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Iterator.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: SimpleIterator ==========================================================================
+
+## AK::SimpleIterator (AK/Iterator.h:16): a generic struct.
+pub struct SimpleIterator[TContainer, TValueType]:
+    pub var m_container: TContainer*?  # C++ default: nullptr
+    pub var m_index: usize  # C++ default: 0

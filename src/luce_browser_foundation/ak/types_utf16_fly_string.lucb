@@ -1,0 +1,27 @@
+#==============================================================================================
+#
+#   types_utf16_fly_string - declarations of AK/Utf16FlyString.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Utf16FlyString.cpp, AK/Utf16FlyString.h (Ladybird 47c82b38d0) by the skeleton
+#       generator (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the
+#       generator could not map.
+#
+#==============================================================================================
+
+# mark: Utf16FlyStringTableHashTraits ===========================================================
+
+## AK::Utf16FlyStringTableHashTraits (AK/Utf16FlyString.cpp:13).
+pub struct Utf16FlyStringTableHashTraits: Traits[const Utf16StringData*?]:
+    pub var empty_: u8
+
+    func hash_of(key: const (const Utf16StringData*?)*) -> u32: trap("unported: AK::Utf16FlyStringTableHashTraits::hash")
+
+    func equals(a: const (const Utf16StringData*?)*, b: const (const Utf16StringData*?)*) -> bool: trap("unported: AK::Utf16FlyStringTableHashTraits::equals")
+
+# mark: Utf16FlyString ==========================================================================
+
+## AK::Utf16FlyString (AK/Utf16FlyString.h:16).
+pub struct Utf16FlyString:
+    pub var m_data: Utf16StringBase

@@ -1,0 +1,72 @@
+#==============================================================================================
+#
+#   types_url - declarations of Libraries/LibURL/URL.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/URL.cpp, Libraries/LibURL/URL.h (Ladybird 47c82b38d0) by the skeleton
+#       generator (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the
+#       generator could not map.
+#
+#==============================================================================================
+
+## URL::s_file_scheme_urls_have_tuple_origins (Libraries/LibURL/URL.cpp:22).
+pub var s_file_scheme_urls_have_tuple_origins: bool = false
+
+## URL::PercentEncodeSet (Libraries/LibURL/URL.h:27).
+pub enum PercentEncodeSet as i32:
+    c0_control = 0
+    fragment = 1
+    query = 2
+    special_query = 3
+    path = 4
+    userinfo = 5
+    component = 6
+    application_xwww_form_urlencoded = 7
+    encode_uri = 8
+
+## URL::ExcludeFragment (Libraries/LibURL/URL.h:39).
+pub enum ExcludeFragment as i32:
+    no = 0
+    yes = 1
+
+# mark: BlobUrlEntry ============================================================================
+
+## URL::BlobURLEntry (Libraries/LibURL/URL.h:45).
+pub struct BlobUrlEntry:
+    pub var object: BlobUrlEntryObject
+    pub var environment: BlobUrlEntryEnvironment
+
+# mark: BlobUrlEntryBlob ========================================================================
+
+## URL::BlobURLEntry::Blob (Libraries/LibURL/URL.h:47).
+pub struct BlobUrlEntryBlob:
+    pub var type_: ak.String
+    pub var data: ak.ByteBuffer
+
+# mark: BlobUrlEntryMediaSource =================================================================
+
+## URL::BlobURLEntry::MediaSource (Libraries/LibURL/URL.h:53).
+pub struct BlobUrlEntryMediaSource:
+    pub var empty_: u8
+
+# mark: BlobUrlEntryEnvironment =================================================================
+
+## URL::BlobURLEntry::Environment (Libraries/LibURL/URL.h:58).
+pub struct BlobUrlEntryEnvironment:
+    pub var origin: Origin
+
+## URL::SpaceAsPlus (Libraries/LibURL/URL.h:73).
+pub enum SpaceAsPlus as i32:
+    no = 0
+    yes = 1
+
+# mark: Url =====================================================================================
+
+## URL::URL (Libraries/LibURL/URL.h:82).
+pub struct Url:
+    pub var m_data: ak.CopyOnWrite[UrlData]
+
+## URL::URL::Data (Libraries/LibURL/URL.h:156): opaque in this phase (not in the phase-1 closure).
+pub struct UrlData:
+    pub var opaque_: u8

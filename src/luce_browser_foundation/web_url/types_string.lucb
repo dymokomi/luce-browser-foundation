@@ -1,0 +1,15 @@
+#==============================================================================================
+#
+#   types_string - declarations of Libraries/LibURL/Pattern/String.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Pattern/String.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+## URL::Pattern::full_wildcard_regexp_value (Libraries/LibURL/Pattern/String.h:16).
+# C++ initializer: ".*"sv
+pub var pattern_full_wildcard_regexp_value: ak.StringView

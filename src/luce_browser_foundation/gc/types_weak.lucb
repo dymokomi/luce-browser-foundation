@@ -1,0 +1,27 @@
+#==============================================================================================
+#
+#   types_weak - declarations of Libraries/LibGC/Weak.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/Weak.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: WeakImpl ================================================================================
+
+## GC::WeakImpl (Libraries/LibGC/Weak.h:18).
+pub struct WeakImpl:
+    pub var m_ref_count: usize  # C++ default: { 0 }
+    pub var m_state: WeakImplState  # C++ default: { State :: Allocated }
+    pub var m_ptr: void*?  # C++ default: { nullptr }
+
+## GC::WeakImpl::the_null_weak_impl (Libraries/LibGC/Weak.h:21).
+pub var weak_impl_the_null_weak_impl: WeakImpl
+
+## GC::WeakImpl::State (Libraries/LibGC/Weak.h:44).
+pub enum WeakImplState as i32:
+    allocated = 0
+    freelist = 1

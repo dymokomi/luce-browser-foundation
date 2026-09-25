@@ -1,0 +1,58 @@
+#==============================================================================================
+#
+#   types_idna - declarations of Libraries/LibUnicode/IDNA.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibUnicode/IDNA.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+## Unicode::IDNA::CheckHyphens (Libraries/LibUnicode/IDNA.h:15).
+pub enum CheckHyphens as i32:
+    no = 0
+    yes = 1
+
+## Unicode::IDNA::CheckBidi (Libraries/LibUnicode/IDNA.h:20).
+pub enum CheckBidi as i32:
+    no = 0
+    yes = 1
+
+## Unicode::IDNA::CheckJoiners (Libraries/LibUnicode/IDNA.h:25).
+pub enum CheckJoiners as i32:
+    no = 0
+    yes = 1
+
+## Unicode::IDNA::UseStd3AsciiRules (Libraries/LibUnicode/IDNA.h:30).
+pub enum UseStd3AsciiRules as i32:
+    no = 0
+    yes = 1
+
+## Unicode::IDNA::TransitionalProcessing (Libraries/LibUnicode/IDNA.h:35).
+pub enum TransitionalProcessing as i32:
+    no = 0
+    yes = 1
+
+## Unicode::IDNA::VerifyDnsLength (Libraries/LibUnicode/IDNA.h:40).
+pub enum VerifyDnsLength as i32:
+    no = 0
+    yes = 1
+
+## Unicode::IDNA::IgnoreInvalidPunycode (Libraries/LibUnicode/IDNA.h:45).
+pub enum IgnoreInvalidPunycode as i32:
+    no = 0
+    yes = 1
+
+# mark: ToAsciiOptions ==========================================================================
+
+## Unicode::IDNA::ToAsciiOptions (Libraries/LibUnicode/IDNA.h:50).
+pub struct ToAsciiOptions:
+    pub var check_hyphens: CheckHyphens  # C++ default: { CheckHyphens :: Yes }
+    pub var check_bidi: CheckBidi  # C++ default: { CheckBidi :: Yes }
+    pub var check_joiners: CheckJoiners  # C++ default: { CheckJoiners :: Yes }
+    pub var use_std3_ascii_rules: UseStd3AsciiRules  # C++ default: { UseStd3AsciiRules :: No }
+    pub var transitional_processing: TransitionalProcessing  # C++ default: { TransitionalProcessing :: No }
+    pub var verify_dns_length: VerifyDnsLength  # C++ default: { VerifyDnsLength :: Yes }
+    pub var ignore_invalid_punycode: IgnoreInvalidPunycode  # C++ default: { IgnoreInvalidPunycode :: No }

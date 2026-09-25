@@ -1,0 +1,147 @@
+#==============================================================================================
+#
+#   types_heap - declarations of Libraries/LibGC/Heap.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/Heap.cpp, Libraries/LibGC/Heap.h (Ladybird 47c82b38d0) by the skeleton
+#       generator (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the
+#       generator could not map.
+#
+#==============================================================================================
+
+# mark: StackFrameInfo ==========================================================================
+
+## GC::StackFrameInfo (Libraries/LibGC/Heap.h:31).
+pub struct StackFrameInfo:
+    pub var label: ak.String
+    pub var size_bytes: usize  # C++ default: { 0 }
+
+# mark: Heap ====================================================================================
+
+## GC::Heap (Libraries/LibGC/Heap.h:36).
+pub struct Heap:
+    pub var m_gc_bytes_threshold: usize  # C++ default: { GC_MIN_BYTES_THRESHOLD }
+    pub var m_allocated_bytes_since_last_gc: usize  # C++ default: { 0 }
+    pub var m_should_collect_on_every_allocation: bool  # C++ default: { false }
+    pub var m_size_based_cell_allocators: ak.Vector[CellAllocator*]
+    pub var m_all_cell_allocators: ak.IntrusiveList[CellAllocator, CellAllocator*?]
+    pub var m_roots: ak.IntrusiveList[RootImpl, RootImpl*?]
+    pub var m_root_vectors: ak.IntrusiveList[RootVectorBase, RootVectorBase*?]
+    pub var m_root_hash_maps: ak.IntrusiveList[RootHashMapBase, RootHashMapBase*?]
+    pub var m_conservative_vectors: ak.IntrusiveList[ConservativeVectorBase, ConservativeVectorBase*?]
+    pub var m_weak_containers: ak.IntrusiveList[WeakContainer, WeakContainer*?]
+    pub var m_uprooted_cells: ak.Vector[Cell*?]
+    pub var m_gc_deferrals: usize  # C++ default: { 0 }
+    pub var m_should_gc_when_deferral_ends: bool  # C++ default: { false }
+    pub var m_collecting_garbage: bool  # C++ default: { false }
+    pub var m_stack_info: ak.StackInfo
+    pub var m_gather_embedder_roots: ak.Function1[ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*, unit]
+    pub var m_post_gc_tasks: ak.Vector[ak.Function0[unit]]
+    pub var m_sweep_callbacks: ak.Vector[ak.Function0[unit]]
+    pub var m_usable_weak_blocks: ak.IntrusiveList[WeakBlock, WeakBlock*?]
+    pub var m_full_weak_blocks: ak.IntrusiveList[WeakBlock, WeakBlock*?]
+
+## GC::s_the (Libraries/LibGC/Heap.cpp:41).
+pub var s_the: Heap*?
+
+## GC::Heap::CollectionType (Libraries/LibGC/Heap.h:56).
+pub enum HeapCollectionType as i32:
+    collect_garbage = 0
+    collect_everything = 1
+
+# mark: GraphConstructorVisitor =================================================================
+
+## GC::GraphConstructorVisitor (Libraries/LibGC/Heap.cpp:129).
+pub struct GraphConstructorVisitor: IsGraphConstructorVisitor, IsCellVisitor:
+    pub var visitor: CellVisitor  # primary base
+    pub var m_node_being_visited: GraphConstructorVisitorGraphNode*?  # C++ default: { nullptr }
+    pub var m_work_queue: ak.Vector[Cell*]
+    pub var m_graph: ak.HashMap[u64, GraphConstructorVisitorGraphNode, ak.U64Traits]
+    pub var m_heap: Heap*
+    pub var m_all_live_heap_blocks: ak.HashTable[HeapBlock*?, ak.PtrTraits[HeapBlock]]
+    pub var m_min_block_address: usize
+    pub var m_max_block_address: usize
+
+    func graph_constructor_visitor() -> GraphConstructorVisitor*: return (GraphConstructorVisitor*)&self
+
+    func cell_visitor() -> CellVisitor*: return (CellVisitor*)&self
+
+## Upcast to GC::GraphConstructorVisitor (implemented by every struct in its hierarchy).
+pub interface IsGraphConstructorVisitor:
+    func graph_constructor_visitor() -> GraphConstructorVisitor*
+
+## Virtual functions introduced by GC::GraphConstructorVisitor.
+pub struct GraphConstructorVisitorVTable:
+    pub let visitor_vtable: CellVisitorVTable
+
+## The vtable of GC::GraphConstructorVisitor.
+pub let graph_constructor_visitor_vtable: GraphConstructorVisitorVTable = GraphConstructorVisitorVTable(visitor_vtable = CellVisitorVTable(class_info = &graph_constructor_visitor_class, visit_possible_values = graph_constructor_visitor_visit_possible_values_impl, visit_impl_cell = graph_constructor_visitor_visit_impl_cell_impl, visit_impl_span_nan_boxed_value = graph_constructor_visitor_visit_impl_span_nan_boxed_value_impl))
+
+## Class information of GC::GraphConstructorVisitor: name, class-id range (pre-order), size, vtable.
+pub let graph_constructor_visitor_class: ak.ClassInfo = ak.ClassInfo(name = "GraphConstructorVisitor", first_id = 1, last_id = 1, size = sizeof(GraphConstructorVisitor), vtable = (const void*)&graph_constructor_visitor_vtable)
+
+## is<GC::GraphConstructorVisitor>: the class-id range test.
+pub func is_graph_constructor_visitor[P: IsCellVisitor](p: P*) -> bool:
+    let id = p.cell_visitor().class_id
+    return id >= graph_constructor_visitor_class.first_id and id <= graph_constructor_visitor_class.last_id
+
+## as_if<GC::GraphConstructorVisitor>.
+pub func as_if_graph_constructor_visitor[P: IsCellVisitor](p: P*) -> GraphConstructorVisitor*?:
+    if is_graph_constructor_visitor(p): return (GraphConstructorVisitor*)p
+    return none
+
+## as<GC::GraphConstructorVisitor> (verify_cast).
+pub func as_graph_constructor_visitor[P: IsCellVisitor](p: P*) -> GraphConstructorVisitor*:
+    return as_if_graph_constructor_visitor(p) else trap("as<GC::GraphConstructorVisitor> failed")
+
+## GC::Heap::GC_MIN_BYTES_THRESHOLD (Libraries/LibGC/Heap.h:158).
+# C++ initializer: { 4 * 1024 * 1024 }
+pub var heap_gc_min_bytes_threshold: usize
+
+## GC::GraphConstructorVisitor::GraphNode (Libraries/LibGC/Heap.cpp:256): opaque in this phase (not in the phase-1 closure).
+pub struct GraphConstructorVisitorGraphNode:
+    pub var opaque_: u8
+
+# mark: MarkingVisitor ==========================================================================
+
+## GC::MarkingVisitor (Libraries/LibGC/Heap.cpp:611).
+pub struct MarkingVisitor: IsMarkingVisitor, IsCellVisitor:
+    pub var visitor: CellVisitor  # primary base
+    pub var m_heap: Heap*
+    pub var m_work_queue: ak.Vector[Cell*]
+    pub var m_all_live_heap_blocks: const ak.HashTable[HeapBlock*?, ak.PtrTraits[HeapBlock]]*
+    pub var m_min_block_address: usize
+    pub var m_max_block_address: usize
+
+    func marking_visitor() -> MarkingVisitor*: return (MarkingVisitor*)&self
+
+    func cell_visitor() -> CellVisitor*: return (CellVisitor*)&self
+
+## Upcast to GC::MarkingVisitor (implemented by every struct in its hierarchy).
+pub interface IsMarkingVisitor:
+    func marking_visitor() -> MarkingVisitor*
+
+## Virtual functions introduced by GC::MarkingVisitor.
+pub struct MarkingVisitorVTable:
+    pub let visitor_vtable: CellVisitorVTable
+
+## The vtable of GC::MarkingVisitor.
+pub let marking_visitor_vtable: MarkingVisitorVTable = MarkingVisitorVTable(visitor_vtable = CellVisitorVTable(class_info = &marking_visitor_class, visit_possible_values = marking_visitor_visit_possible_values_impl, visit_impl_cell = marking_visitor_visit_impl_cell_impl, visit_impl_span_nan_boxed_value = marking_visitor_visit_impl_span_nan_boxed_value_impl))
+
+## Class information of GC::MarkingVisitor: name, class-id range (pre-order), size, vtable.
+pub let marking_visitor_class: ak.ClassInfo = ak.ClassInfo(name = "MarkingVisitor", first_id = 2, last_id = 2, size = sizeof(MarkingVisitor), vtable = (const void*)&marking_visitor_vtable)
+
+## is<GC::MarkingVisitor>: the class-id range test.
+pub func is_marking_visitor[P: IsCellVisitor](p: P*) -> bool:
+    let id = p.cell_visitor().class_id
+    return id >= marking_visitor_class.first_id and id <= marking_visitor_class.last_id
+
+## as_if<GC::MarkingVisitor>.
+pub func as_if_marking_visitor[P: IsCellVisitor](p: P*) -> MarkingVisitor*?:
+    if is_marking_visitor(p): return (MarkingVisitor*)p
+    return none
+
+## as<GC::MarkingVisitor> (verify_cast).
+pub func as_marking_visitor[P: IsCellVisitor](p: P*) -> MarkingVisitor*:
+    return as_if_marking_visitor(p) else trap("as<GC::MarkingVisitor> failed")

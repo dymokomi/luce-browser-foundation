@@ -1,0 +1,156 @@
+#==============================================================================================
+#
+#   types_stream - declarations of AK/Stream.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Stream.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Stream ==================================================================================
+
+## AK::Stream (AK/Stream.h:23).
+pub struct Stream: IsStream:
+    pub var vtable: const StreamVTable*
+    pub var class_id: u16
+
+    func stream() -> Stream*: return (Stream*)&self
+
+## Upcast to AK::Stream (implemented by every struct in its hierarchy).
+pub interface IsStream:
+    func stream() -> Stream*
+
+## Virtual functions introduced by AK::Stream.
+pub struct StreamVTable:
+    pub let class_info: const ClassInfo*
+    pub let read_some: func(Stream*, u8[]) -> u8[]! = stream_read_some_impl
+    pub let read_until_filled: func(Stream*, u8[]) -> unit! = stream_read_until_filled_impl
+    pub let read_until_eof: func(Stream*, usize) -> ByteBuffer! = stream_read_until_eof_impl
+    pub let discard: func(Stream*, usize) -> unit! = stream_discard_impl
+    pub let write_some: func(Stream*, const u8[]) -> u64! = stream_write_some_impl
+    pub let write_until_depleted_span_u8: func(Stream*, const u8[]) -> unit! = stream_write_until_depleted_span_u8_impl
+    pub let is_eof: func(Stream*) -> bool = stream_is_eof_impl
+    pub let is_open: func(Stream*) -> bool = stream_is_open_impl
+    pub let close: func(Stream*) -> unit = stream_close_impl
+
+## Virtual: AK::Stream::read_some.
+pub func stream_read_some(this: Stream*, arg0: u8[]) -> u8[]!:
+    return try ((const StreamVTable*)this.vtable).read_some(this, arg0)
+
+## Virtual: AK::Stream::read_until_filled.
+pub func stream_read_until_filled(this: Stream*, buffer: u8[]) -> !:
+    try ((const StreamVTable*)this.vtable).read_until_filled(this, buffer)
+
+## Virtual: AK::Stream::read_until_eof.
+pub func stream_read_until_eof(this: Stream*, block_size_: usize) -> ByteBuffer!:
+    return try ((const StreamVTable*)this.vtable).read_until_eof(this, block_size_)
+
+## Virtual: AK::Stream::discard.
+pub func stream_discard(this: Stream*, discarded_bytes: usize) -> !:
+    try ((const StreamVTable*)this.vtable).discard(this, discarded_bytes)
+
+## Virtual: AK::Stream::write_some.
+pub func stream_write_some(this: Stream*, arg0: const u8[]) -> u64!:
+    return try ((const StreamVTable*)this.vtable).write_some(this, arg0)
+
+## Virtual: AK::Stream::write_until_depleted.
+pub func stream_write_until_depleted_span_u8(this: Stream*, buffer: const u8[]) -> !:
+    try ((const StreamVTable*)this.vtable).write_until_depleted_span_u8(this, buffer)
+
+## Virtual: AK::Stream::is_eof.
+pub func stream_is_eof(this: Stream*) -> bool:
+    return ((const StreamVTable*)this.vtable).is_eof(this)
+
+## Virtual: AK::Stream::is_open.
+pub func stream_is_open(this: Stream*) -> bool:
+    return ((const StreamVTable*)this.vtable).is_open(this)
+
+## Virtual: AK::Stream::close.
+pub func stream_close(this: Stream*):
+    ((const StreamVTable*)this.vtable).close(this)
+
+## The vtable of AK::Stream.
+pub let stream_vtable: StreamVTable = StreamVTable(class_info = &stream_class)
+
+## Class information of AK::Stream: name, class-id range (pre-order), size, vtable.
+pub let stream_class: ClassInfo = ClassInfo(name = "Stream", first_id = 0, last_id = 3, size = sizeof(Stream), vtable = (const void*)&stream_vtable)
+
+## is<AK::Stream>: the class-id range test.
+pub func is_stream[P: IsStream](p: P*) -> bool:
+    let id = p.stream().class_id
+    return id >= stream_class.first_id and id <= stream_class.last_id
+
+## as_if<AK::Stream>.
+pub func as_if_stream[P: IsStream](p: P*) -> Stream*?:
+    if is_stream(p): return (Stream*)p
+    return none
+
+## as<AK::Stream> (verify_cast).
+pub func as_stream[P: IsStream](p: P*) -> Stream*:
+    return as_if_stream(p) else trap("as<AK::Stream> failed")
+
+## AK::SeekMode (AK/Stream.h:142).
+pub enum SeekMode as i32:
+    set_position = 0
+    from_current_position = 1
+    from_end_position = 2
+
+# mark: SeekableStream ==========================================================================
+
+## AK::SeekableStream (AK/Stream.h:150).
+pub struct SeekableStream: IsSeekableStream, IsStream:
+    pub var stream_base: Stream  # primary base
+
+    func seekable_stream() -> SeekableStream*: return (SeekableStream*)&self
+
+    func stream() -> Stream*: return (Stream*)&self
+
+## Upcast to AK::SeekableStream (implemented by every struct in its hierarchy).
+pub interface IsSeekableStream:
+    func seekable_stream() -> SeekableStream*
+
+## Virtual functions introduced by AK::SeekableStream.
+pub struct SeekableStreamVTable:
+    pub let stream_vtable: StreamVTable
+    pub let seek: func(SeekableStream*, i64, SeekMode) -> u64! = seekable_stream_seek_impl
+    pub let tell: func(SeekableStream*) -> u64! = seekable_stream_tell_impl
+    pub let size: func(SeekableStream*) -> u64! = seekable_stream_size_impl
+    pub let truncate: func(SeekableStream*, usize) -> unit! = seekable_stream_truncate_impl
+
+## Virtual: AK::SeekableStream::seek.
+pub func seekable_stream_seek(this: SeekableStream*, offset: i64, arg1: SeekMode) -> u64!:
+    return try ((const SeekableStreamVTable*)((Stream*)this).vtable).seek(this, offset, arg1)
+
+## Virtual: AK::SeekableStream::tell.
+pub func seekable_stream_tell(this: SeekableStream*) -> u64!:
+    return try ((const SeekableStreamVTable*)((Stream*)this).vtable).tell(this)
+
+## Virtual: AK::SeekableStream::size.
+pub func seekable_stream_size(this: SeekableStream*) -> u64!:
+    return try ((const SeekableStreamVTable*)((Stream*)this).vtable).size(this)
+
+## Virtual: AK::SeekableStream::truncate.
+pub func seekable_stream_truncate(this: SeekableStream*, length: usize) -> !:
+    try ((const SeekableStreamVTable*)((Stream*)this).vtable).truncate(this, length)
+
+## The vtable of AK::SeekableStream.
+pub let seekable_stream_vtable: SeekableStreamVTable = SeekableStreamVTable(stream_vtable = StreamVTable(class_info = &seekable_stream_class, discard = seekable_stream_discard_impl))
+
+## Class information of AK::SeekableStream: name, class-id range (pre-order), size, vtable.
+pub let seekable_stream_class: ClassInfo = ClassInfo(name = "SeekableStream", first_id = 2, last_id = 3, size = sizeof(SeekableStream), vtable = (const void*)&seekable_stream_vtable)
+
+## is<AK::SeekableStream>: the class-id range test.
+pub func is_seekable_stream[P: IsStream](p: P*) -> bool:
+    let id = p.stream().class_id
+    return id >= seekable_stream_class.first_id and id <= seekable_stream_class.last_id
+
+## as_if<AK::SeekableStream>.
+pub func as_if_seekable_stream[P: IsStream](p: P*) -> SeekableStream*?:
+    if is_seekable_stream(p): return (SeekableStream*)p
+    return none
+
+## as<AK::SeekableStream> (verify_cast).
+pub func as_seekable_stream[P: IsStream](p: P*) -> SeekableStream*:
+    return as_if_seekable_stream(p) else trap("as<AK::SeekableStream> failed")

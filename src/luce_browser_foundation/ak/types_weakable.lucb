@@ -1,0 +1,22 @@
+#==============================================================================================
+#
+#   types_weakable - declarations of AK/Weakable.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/Weakable.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: WeakLink ================================================================================
+
+## AK::WeakLink (AK/Weakable.h:19).
+pub struct WeakLink:
+    pub var m_ptr: void*?  # C++ default: { nullptr }
+
+# mark: Weakable ================================================================================
+
+## AK::Weakable (AK/Weakable.h:54): a generic struct.
+pub struct Weakable[T]:
+    pub var m_link: WeakLink*?

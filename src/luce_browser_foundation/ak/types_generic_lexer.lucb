@@ -1,0 +1,47 @@
+#==============================================================================================
+#
+#   types_generic_lexer - declarations of AK/GenericLexer.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/GenericLexer.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::is_path_separator (AK/GenericLexer.h:30).
+# C++ initializer: is_any_of ( "/\\"sv )
+pub var is_path_separator: void*?
+
+## AK::is_quote (AK/GenericLexer.h:31).
+# C++ initializer: is_any_of ( "'\""sv )
+pub var is_quote: void*?
+
+## AK::UnicodeEscapeError (AK/GenericLexer.h:33).
+pub enum UnicodeEscapeError as i32:
+    malformed_unicode_escape = 0
+    unicode_escape_overflow = 1
+
+# mark: GenericLexer ============================================================================
+
+## AK::Detail::GenericLexer (AK/GenericLexer.h:41): a generic struct.
+pub struct GenericLexer[TCharType]:
+    pub var m_input: void*?  # unmapped: Conditional<IsSame<CharType, char>, StringView, Utf16View>
+    pub var m_index: usize  # C++ default: { 0 }
+
+# mark: LineTrackingLexer =======================================================================
+
+## AK::LineTrackingLexer (AK/GenericLexer.h:492).
+pub struct LineTrackingLexer:
+    pub var generic_lexer: GenericLexer[u8]  # base AK::Detail::GenericLexer<char>
+    pub var m_first_line_start_position: LineTrackingLexerPosition
+    pub var m_line_start_positions: RedBlackTree[u64, u64]*
+    pub var m_largest_known_line_start_position: usize  # C++ default: { 0 }
+
+# mark: LineTrackingLexerPosition ===============================================================
+
+## AK::LineTrackingLexer::Position (AK/GenericLexer.h:494).
+pub struct LineTrackingLexerPosition:
+    pub var offset: usize  # C++ default: { 0 }
+    pub var line: usize  # C++ default: { 0 }
+    pub var column: usize  # C++ default: { 0 }

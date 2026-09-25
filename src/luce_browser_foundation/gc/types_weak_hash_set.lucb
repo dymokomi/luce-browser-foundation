@@ -1,0 +1,26 @@
+#==============================================================================================
+#
+#   types_weak_hash_set - declarations of Libraries/LibGC/WeakHashSet.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/WeakHashSet.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: WeakHashSet =============================================================================
+
+## GC::WeakHashSet (Libraries/LibGC/WeakHashSet.h:15): a generic struct.
+pub struct WeakHashSet[T]:
+    pub var m_table: ak.HashTable[Weak[T], ak.DefaultTraits[Weak[T]]]
+    pub var m_mutations_since_last_prune: usize  # C++ default: { 0 }
+
+## GC::WeakHashSet::Iterator (Libraries/LibGC/WeakHashSet.h:61): opaque in this phase (not in the phase-1 closure).
+pub struct Iterator:
+    pub var opaque_: u8
+
+## GC::WeakHashSet::ConstIterator (Libraries/LibGC/WeakHashSet.h:98): opaque in this phase (not in the phase-1 closure).
+pub struct ConstIterator:
+    pub var opaque_: u8

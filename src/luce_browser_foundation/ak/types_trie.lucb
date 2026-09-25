@@ -1,0 +1,24 @@
+#==============================================================================================
+#
+#   types_trie - declarations of AK/Trie.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Trie.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Trie2 ===================================================================================
+
+## AK::Detail::Trie (AK/Trie.h:30): a generic struct.
+pub struct Trie2[TDeclaredBaseType, TDefaultBaseType, TValueType, TMetadataT, TValueTraits]:
+    pub var m_value: TValueType
+    pub var m_metadata: void*?  # unmapped: Optional<MetadataType>
+    pub var m_children: void*?  # unmapped: MapType<ValueType, NonnullOwnPtr<Trie<DeclaredBaseType, DefaultBaseType, ValueType, MetadataT, ValueTraits, MapType>>, V
+
+# mark: Trie ====================================================================================
+
+## AK::Trie (AK/Trie.h:288): a generic struct.
+pub struct Trie[TValueType, TMetadataT, TValueTraits, TBaseT]:
+    pub var empty_: u8

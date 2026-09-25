@@ -1,0 +1,16 @@
+#==============================================================================================
+#
+#   types_vector - declarations of AK/Vector.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Vector.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: VectorMetadata ==========================================================================
+
+## AK::Detail::VectorMetadata (AK/Vector.h:45): a generic struct.
+pub struct VectorMetadata[TStorageType]:
+    pub var outline_buffer: TStorageType*?  # C++ default: { nullptr }

@@ -1,0 +1,19 @@
+#==============================================================================================
+#
+#   types_options - declarations of Libraries/LibURL/Pattern/Options.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Pattern/Options.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: Options =================================================================================
+
+## URL::Pattern::Options (Libraries/LibURL/Pattern/Options.h:14).
+pub struct Options:
+    pub var delimiter_code_point: u8?
+    pub var prefix_code_point: u8?
+    pub var ignore_case: bool  # C++ default: { false }

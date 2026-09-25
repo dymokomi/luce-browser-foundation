@@ -1,0 +1,34 @@
+#==============================================================================================
+#
+#   types_circular_buffer - declarations of AK/CircularBuffer.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/CircularBuffer.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: CircularBuffer ==========================================================================
+
+## AK::CircularBuffer (AK/CircularBuffer.h:17).
+pub struct CircularBuffer:
+    pub var m_buffer: ByteBuffer  # C++ default: { }
+    pub var m_reading_head: usize  # C++ default: { }
+    pub var m_used_space: usize  # C++ default: { }
+    pub var m_seekback_limit: usize  # C++ default: { }
+
+# mark: SearchableCircularBuffer ================================================================
+
+## AK::SearchableCircularBuffer (AK/CircularBuffer.h:64).
+pub struct SearchableCircularBuffer:
+    pub var circular_buffer: CircularBuffer  # primary base
+    pub var m_hash_location_map: HashMap[u32, u64, U32Traits]
+    pub var m_location_chain_map: HashMap[u64, u64, U64Traits]
+
+## AK::SearchableCircularBuffer::Match (AK/CircularBuffer.h:76): opaque in this phase (not in the phase-1 closure).
+pub struct SearchableCircularBufferMatch:
+    pub var opaque_: u8
+
+## AK::SearchableCircularBuffer::HASH_CHUNK_SIZE (AK/CircularBuffer.h:89).
+pub let searchable_circular_buffer_hash_chunk_size: usize = 3

@@ -1,0 +1,25 @@
+#==============================================================================================
+#
+#   types_json_value - declarations of AK/JsonValue.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/JsonValue.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: JsonValue2 ==============================================================================
+
+## AK::JsonValue (AK/JsonValue.h:17).
+pub struct JsonValue2:
+    pub var m_value: JsonValueStorage
+
+## AK::JsonValue::Type (AK/JsonValue.h:19).
+pub enum JsonValueType as i32:
+    null = 0
+    bool_ = 1
+    number = 2
+    string = 3
+    array = 4
+    object = 5

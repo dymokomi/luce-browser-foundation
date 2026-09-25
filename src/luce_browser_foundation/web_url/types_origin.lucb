@@ -1,0 +1,38 @@
+#==============================================================================================
+#
+#   types_origin - declarations of Libraries/LibURL/Origin.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Origin.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: Origin ==================================================================================
+
+## URL::Origin (Libraries/LibURL/Origin.h:18).
+pub struct Origin:
+    pub var m_state: OriginTupleOrOriginOpaqueData
+
+# mark: OriginOpaqueData ========================================================================
+
+## URL::Origin::OpaqueData (Libraries/LibURL/Origin.h:20).
+pub struct OriginOpaqueData:
+    pub var nonce: u8[16]
+    pub var type_: OriginOpaqueDataType
+
+## URL::Origin::OpaqueData::Type (Libraries/LibURL/Origin.h:21).
+pub enum OriginOpaqueDataType as u8:
+    standard = 0
+    file = 1
+
+# mark: OriginTuple =============================================================================
+
+## URL::Origin::Tuple (Libraries/LibURL/Origin.h:70).
+pub struct OriginTuple:
+    pub var scheme: ak.String?
+    pub var host: Host
+    pub var port: u16?
+    pub var domain: ak.String?

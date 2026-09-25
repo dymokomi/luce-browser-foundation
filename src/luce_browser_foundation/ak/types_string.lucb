@@ -1,0 +1,36 @@
+#==============================================================================================
+#
+#   types_string - declarations of AK/String.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/String.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: String ==================================================================================
+
+## AK::String (AK/String.h:32).
+pub struct String:
+    pub var string_base: StringBase  # primary base
+
+## AK::String::MAX_SHORT_STRING_BYTE_COUNT (AK/String.h:38).
+# C++ initializer: Detail :: MAX_SHORT_STRING_BYTE_COUNT
+pub var string_max_short_string_byte_count: usize
+
+## AK::String::WithBOMHandling (AK/String.h:45).
+pub enum StringWithBomHandling as i32:
+    yes = 0
+    no = 1
+
+## AK::String::Case (AK/String.h:101).
+pub enum StringCase as i32:
+    upper = 0
+    lower = 1
+
+# mark: AsciiCaseInsensitiveStringTraits ========================================================
+
+## AK::ASCIICaseInsensitiveStringTraits (AK/String.h:272).
+pub struct AsciiCaseInsensitiveStringTraits:
+    pub var empty_: u8

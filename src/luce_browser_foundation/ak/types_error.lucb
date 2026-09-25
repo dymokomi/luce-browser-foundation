@@ -1,0 +1,25 @@
+#==============================================================================================
+#
+#   types_error - declarations of AK/Error.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/Error.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: AkError =================================================================================
+
+## AK::Error (AK/Error.h:16).
+pub struct AkError:
+    pub var m_string_literal: StringView
+    pub var m_code: i32  # C++ default: { 0 }
+    pub var m_kind: AkErrorKind  # C++ default: { }
+
+## AK::Error::Kind (AK/Error.h:18).
+pub enum AkErrorKind as u8:
+    errno = 0
+    syscall = 1
+    windows = 2
+    string_literal = 3

@@ -1,0 +1,28 @@
+#==============================================================================================
+#
+#   types_bitmap_view - declarations of AK/BitmapView.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/BitmapView.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::bitmask_first_byte (AK/BitmapView.h:17).
+# C++ initializer: { 0xFF , 0xFE , 0xFC , 0xF8 , 0xF0 , 0xE0 , 0xC0 , 0x80 }
+pub var bitmask_first_byte: i32[8]
+
+## AK::bitmask_last_byte (AK/BitmapView.h:18).
+# C++ initializer: { 0x00 , 0x1 , 0x3 , 0x7 , 0xF , 0x1F , 0x3F , 0x7F }
+pub var bitmask_last_byte: i32[8]
+
+# mark: BitmapView ==============================================================================
+
+## AK::BitmapView (AK/BitmapView.h:20).
+pub struct BitmapView:
+    pub var m_data: u8*?  # C++ default: { nullptr }
+    pub var m_size: usize  # C++ default: { 0 }
+
+## AK::BitmapView::max_size (AK/BitmapView.h:363).
+pub let bitmap_view_max_size: usize = 0xffffffff

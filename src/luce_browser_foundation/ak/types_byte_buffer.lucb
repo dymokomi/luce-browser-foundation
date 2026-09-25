@@ -1,0 +1,24 @@
+#==============================================================================================
+#
+#   types_byte_buffer - declarations of AK/ByteBuffer.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/ByteBuffer.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: ByteBuffer ==============================================================================
+
+## AK::Detail::ByteBuffer (AK/ByteBuffer.h:21): a generic struct.
+pub struct ByteBuffer:
+    pub var m_size: usize  # C++ default: { 0 }
+    pub var m_inline: bool  # C++ default: { true }
+
+## AK::Detail::ByteBuffer::ZeroFillNewElements (AK/ByteBuffer.h:185).
+pub enum ZeroFillNewElements as i32:
+    no = 0
+
+## AK::Detail::ByteBuffer::ZeroFillNewElements::Yes (a second name for no).
+pub let zero_fill_new_elements_yes: ZeroFillNewElements = ZeroFillNewElements.no

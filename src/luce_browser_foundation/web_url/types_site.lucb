@@ -1,0 +1,24 @@
+#==============================================================================================
+#
+#   types_site - declarations of Libraries/LibURL/Site.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Site.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: SchemeAndHost ===========================================================================
+
+## URL::SchemeAndHost (Libraries/LibURL/Site.h:17).
+pub struct SchemeAndHost:
+    pub var scheme: ak.String
+    pub var host: Host
+
+# mark: Site ====================================================================================
+
+## URL::Site (Libraries/LibURL/Site.h:24).
+pub struct Site:
+    pub var m_value: OriginOrSchemeAndHost

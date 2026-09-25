@@ -1,0 +1,33 @@
+#==============================================================================================
+#
+#   types_unicode_utils - declarations of AK/UnicodeUtils.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/UnicodeUtils.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::UnicodeUtils::HIGH_SURROGATE_MIN (AK/UnicodeUtils.h:81).
+pub let unicode_utils_high_surrogate_min: u16 = 0xd800
+
+## AK::UnicodeUtils::HIGH_SURROGATE_MAX (AK/UnicodeUtils.h:82).
+pub let unicode_utils_high_surrogate_max: u16 = 0xdbff
+
+## AK::UnicodeUtils::LOW_SURROGATE_MIN (AK/UnicodeUtils.h:83).
+pub let unicode_utils_low_surrogate_min: u16 = 0xdc00
+
+## AK::UnicodeUtils::LOW_SURROGATE_MAX (AK/UnicodeUtils.h:84).
+pub let unicode_utils_low_surrogate_max: u16 = 0xdfff
+
+## AK::UnicodeUtils::REPLACEMENT_CODE_POINT (AK/UnicodeUtils.h:85).
+pub let unicode_utils_replacement_code_point: u32 = 0xfffd
+
+## AK::UnicodeUtils::FIRST_SUPPLEMENTARY_PLANE_CODE_POINT (AK/UnicodeUtils.h:86).
+pub let unicode_utils_first_supplementary_plane_code_point: u32 = 0x10000
+
+## AK::UnicodeUtils::AllowLonelySurrogates (AK/UnicodeUtils.h:88).
+pub enum AllowLonelySurrogates as i32:
+    no = 0
+    yes = 1

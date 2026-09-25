@@ -1,0 +1,23 @@
+#==============================================================================================
+#
+#   types_reverse_iterator - declarations of AK/ReverseIterator.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/ReverseIterator.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: SimpleReverseIterator ===================================================================
+
+## AK::SimpleReverseIterator (AK/ReverseIterator.h:14): a generic struct.
+pub struct SimpleReverseIterator[TContainer, TValueType]:
+    pub var m_container: TContainer*
+    pub var m_index: i32  # C++ default: { 0 }
+
+# mark: ReverseWrapper ==========================================================================
+
+## AK::ReverseWrapper::ReverseWrapper (AK/ReverseIterator.h:93): a generic struct.
+pub struct ReverseWrapper[TContainer]:
+    pub var container: TContainer*

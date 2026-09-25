@@ -1,0 +1,16 @@
+#==============================================================================================
+#
+#   types_leb128 - declarations of AK/LEB128.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from AK/LEB128.h
+#       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
+#       than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: Leb128 ==================================================================================
+
+## AK::LEB128 (AK/LEB128.h:16): a generic struct.
+pub struct Leb128[TValueType]:
+    pub var m_value: TValueType  # C++ default: { 0 }

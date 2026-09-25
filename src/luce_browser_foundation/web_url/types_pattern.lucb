@@ -1,0 +1,43 @@
+#==============================================================================================
+#
+#   types_pattern - declarations of Libraries/LibURL/Pattern/Pattern.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibURL/Pattern/Pattern.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: Result ==================================================================================
+
+## URL::Pattern::Result (Libraries/LibURL/Pattern/Pattern.h:24).
+pub struct Result:
+    pub var inputs: ak.Vector[Input]
+    pub var protocol: ComponentResult
+    pub var username: ComponentResult
+    pub var password: ComponentResult
+    pub var hostname: ComponentResult
+    pub var port: ComponentResult
+    pub var pathname: ComponentResult
+    pub var search: ComponentResult
+    pub var hash: ComponentResult
+
+## URL::Pattern::IgnoreCase (Libraries/LibURL/Pattern/Pattern.h:38).
+pub enum IgnoreCase as i32:
+    yes = 0
+    no = 1
+
+# mark: Pattern =================================================================================
+
+## URL::Pattern::Pattern (Libraries/LibURL/Pattern/Pattern.h:44).
+pub struct Pattern:
+    pub var m_protocol_component: Component
+    pub var m_username_component: Component
+    pub var m_password_component: Component
+    pub var m_hostname_component: Component
+    pub var m_port_component: Component
+    pub var m_pathname_component: Component
+    pub var m_search_component: Component
+    pub var m_hash_component: Component

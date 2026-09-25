@@ -1,0 +1,31 @@
+#==============================================================================================
+#
+#   types_heap_root - declarations of Libraries/LibGC/HeapRoot.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibGC/HeapRoot.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md
+#       §4.4). Regenerate rather than edit, except to fill a field the generator could not
+#       map.
+#
+#==============================================================================================
+
+# mark: HeapRoot ================================================================================
+
+## GC::HeapRoot (Libraries/LibGC/HeapRoot.h:15).
+pub struct HeapRoot:
+    pub var type_: HeapRootType
+    pub var location: const ak.SourceLocation*?  # C++ default: { nullptr }
+    pub var stack_frame_index: u32?  # C++ default: { }
+
+## GC::HeapRoot::Type (Libraries/LibGC/HeapRoot.h:16).
+pub enum HeapRootType as i32:
+    conservative_vector = 0
+    heap_function_captured_pointer = 1
+    must_survive_gc = 2
+    register_pointer = 3
+    root = 4
+    root_hash_map = 5
+    root_vector = 6
+    stack_pointer = 7
+    vm = 8

@@ -1,0 +1,26 @@
+#==============================================================================================
+#
+#   types_circular_queue - declarations of AK/CircularQueue.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/CircularQueue.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+# mark: CircularQueue ===========================================================================
+
+## AK::CircularQueue (AK/CircularQueue.h:16): a generic struct.
+pub struct CircularQueue[T]:
+    pub var m_storage: u8*?
+    pub var m_size: usize  # C++ default: { 0 }
+    pub var m_head: usize  # C++ default: { 0 }
+
+## AK::CircularQueue::ConstIterator (AK/CircularQueue.h:70): opaque in this phase (not in the phase-1 closure).
+pub struct ConstIterator:
+    pub var opaque_: u8
+
+## AK::CircularQueue::Iterator (AK/CircularQueue.h:92): opaque in this phase (not in the phase-1 closure).
+pub struct Iterator:
+    pub var opaque_: u8

@@ -1,0 +1,70 @@
+#==============================================================================================
+#
+#   types_locale - declarations of Libraries/LibUnicode/Locale.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibUnicode/Locale.h (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: LanguageId ==============================================================================
+
+## Unicode::LanguageID (Libraries/LibUnicode/Locale.h:20).
+pub struct LanguageId:
+    pub var is_root: bool  # C++ default: { false }
+    pub var language: ak.String?  # C++ default: { }
+    pub var script: ak.String?  # C++ default: { }
+    pub var region: ak.String?  # C++ default: { }
+    pub var variants: ak.Vector[ak.String]  # C++ default: { }
+
+# mark: Keyword =================================================================================
+
+## Unicode::Keyword (Libraries/LibUnicode/Locale.h:31).
+pub struct Keyword:
+    pub var key: ak.String  # C++ default: { }
+    pub var value: ak.String  # C++ default: { }
+
+# mark: LocaleExtension =========================================================================
+
+## Unicode::LocaleExtension (Libraries/LibUnicode/Locale.h:36).
+pub struct LocaleExtension:
+    pub var attributes: ak.Vector[ak.String]  # C++ default: { }
+    pub var keywords: ak.Vector[Keyword]  # C++ default: { }
+
+# mark: TransformedField ========================================================================
+
+## Unicode::TransformedField (Libraries/LibUnicode/Locale.h:41).
+pub struct TransformedField:
+    pub var key: ak.String  # C++ default: { }
+    pub var value: ak.String  # C++ default: { }
+
+# mark: TransformedExtension ====================================================================
+
+## Unicode::TransformedExtension (Libraries/LibUnicode/Locale.h:46).
+pub struct TransformedExtension:
+    pub var language: LanguageId?  # C++ default: { }
+    pub var fields: ak.Vector[TransformedField]  # C++ default: { }
+
+# mark: OtherExtension ==========================================================================
+
+## Unicode::OtherExtension (Libraries/LibUnicode/Locale.h:51).
+pub struct OtherExtension:
+    pub var key: u8  # C++ default: { }
+    pub var value: ak.String  # C++ default: { }
+
+# mark: LocaleId ================================================================================
+
+## Unicode::LocaleID (Libraries/LibUnicode/Locale.h:58).
+pub struct LocaleId:
+    pub var language_id: LanguageId  # C++ default: { }
+    pub var extensions: ak.Vector[Extension]  # C++ default: { }
+    pub var private_use_extensions: ak.Vector[ak.String]  # C++ default: { }
+
+## Unicode::Style (Libraries/LibUnicode/Locale.h:93).
+pub enum Style as i32:
+    long = 0
+    short = 1
+    narrow = 2

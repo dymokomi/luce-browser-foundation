@@ -1,0 +1,58 @@
+#==============================================================================================
+#
+#   support - Weak<T> and GC::Function<> shapes
+#
+#   DESCRIPTION:
+#       Hand-written generic shapes the generated declarations use: GC::Weak<T> and GC::Function<>
+#       (DESIGN.md §2.6). Part of the skeleton generator's output (Ladybird 47c82b38d0).
+#
+#==============================================================================================
+
+## GC::Weak<T> (LibGC/Weak.h): a weak reference through a WeakImpl.
+pub struct Weak[T]:
+    pub var m_impl: void*?
+
+## GC::Function<R()>: a cell holding an escaping callback and its captures (scanned conservatively, as LibGC does).
+pub struct Function0[R]:
+    pub var cell_base: Cell
+    pub var function: ak.Function0[R]
+
+## GC::Function<R(A1)>: a cell holding an escaping callback and its captures (scanned conservatively, as LibGC does).
+pub struct Function1[A1, R]:
+    pub var cell_base: Cell
+    pub var function: ak.Function1[A1, R]
+
+## GC::Function<R(A1, A2)>: a cell holding an escaping callback and its captures (scanned conservatively, as LibGC does).
+pub struct Function2[A1, A2, R]:
+    pub var cell_base: Cell
+    pub var function: ak.Function2[A1, A2, R]
+
+## GC::Function<R(A1, A2, A3)>: a cell holding an escaping callback and its captures (scanned conservatively, as LibGC does).
+pub struct Function3[A1, A2, A3, R]:
+    pub var cell_base: Cell
+    pub var function: ak.Function3[A1, A2, A3, R]
+
+## GC::Function<R(A1, A2, A3, A4)>: a cell holding an escaping callback and its captures (scanned conservatively, as LibGC does).
+pub struct Function4[A1, A2, A3, A4, R]:
+    pub var cell_base: Cell
+    pub var function: ak.Function4[A1, A2, A3, A4, R]
+
+## GC::Function<R(A1, A2, A3, A4, A5)>: a cell holding an escaping callback and its captures (scanned conservatively, as LibGC does).
+pub struct Function5[A1, A2, A3, A4, A5, R]:
+    pub var cell_base: Cell
+    pub var function: ak.Function5[A1, A2, A3, A4, A5, R]
+
+## GC::Function<R(A1, A2, A3, A4, A5, A6)>: a cell holding an escaping callback and its captures (scanned conservatively, as LibGC does).
+pub struct Function6[A1, A2, A3, A4, A5, A6, R]:
+    pub var cell_base: Cell
+    pub var function: ak.Function6[A1, A2, A3, A4, A5, A6, R]
+
+## GC::Function<R(A1, A2, A3, A4, A5, A6, A7)>: a cell holding an escaping callback and its captures (scanned conservatively, as LibGC does).
+pub struct Function7[A1, A2, A3, A4, A5, A6, A7, R]:
+    pub var cell_base: Cell
+    pub var function: ak.Function7[A1, A2, A3, A4, A5, A6, A7, R]
+
+## GC::Function<R(A1, A2, A3, A4, A5, A6, A7, A8)>: a cell holding an escaping callback and its captures (scanned conservatively, as LibGC does).
+pub struct Function8[A1, A2, A3, A4, A5, A6, A7, A8, R]:
+    pub var cell_base: Cell
+    pub var function: ak.Function8[A1, A2, A3, A4, A5, A6, A7, A8, R]

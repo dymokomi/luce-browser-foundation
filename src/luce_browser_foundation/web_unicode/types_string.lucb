@@ -1,0 +1,18 @@
+#==============================================================================================
+#
+#   types_string - declarations of Libraries/LibUnicode/String.cpp
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       Libraries/LibUnicode/String.cpp (Ladybird 47c82b38d0) by the skeleton generator
+#       (DESIGN.md §4.4). Regenerate rather than edit, except to fill a field the generator
+#       could not map.
+#
+#==============================================================================================
+
+# mark: ResolvedLocale ==========================================================================
+
+## AK::ResolvedLocale (Libraries/LibUnicode/String.cpp:21).
+pub struct ResolvedLocale:
+    pub var buffer: ak.ByteString
+    pub var locale: const u8*?  # C++ default: { nullptr }

@@ -1,0 +1,20 @@
+#==============================================================================================
+#
+#   types_number_format - declarations of AK/NumberFormat.h
+#
+#   DESCRIPTION:
+#       Structs, enums, vtables, class information and cast helpers generated from
+#       AK/NumberFormat.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
+#       Regenerate rather than edit, except to fill a field the generator could not map.
+#
+#==============================================================================================
+
+## AK::HumanReadableBasedOn (AK/NumberFormat.h:14).
+pub enum HumanReadableBasedOn as i32:
+    base2 = 0
+    base10 = 1
+
+## AK::UseThousandsSeparator (AK/NumberFormat.h:19).
+pub enum UseThousandsSeparator as i32:
+    yes = 0
+    no = 1
