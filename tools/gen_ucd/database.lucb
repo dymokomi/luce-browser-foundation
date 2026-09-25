@@ -1,0 +1,419 @@
+#==============================================================================================
+#
+#   database - the per-code-point property arrays and their parser
+#
+#   DESCRIPTION:
+#       Reads ppucd.txt (ICU's preparsed UCD) into one array per property. The file lists
+#       `defaults` for every code point, then `block` ranges relative to the defaults, then
+#       `cp` ranges relative to their block and `unassigned` ranges relative to the defaults;
+#       applying the lines in file order gives every code point its values.
+#
+#==============================================================================================
+
+# mark: Database ================================================================================
+
+# The string-valued properties the generator keeps, as indexes into Database.mapping_*.
+let mapping_slc: usize = 0
+let mapping_suc: usize = 1
+let mapping_stc: usize = 2
+let mapping_scf: usize = 3
+let mapping_lc: usize = 4
+let mapping_uc: usize = 5
+let mapping_tc: usize = 6
+let mapping_cf: usize = 7
+let mapping_dm: usize = 8
+let mapping_turkic: usize = 9
+let mapping_kind_count: usize = 10
+
+## A binary property alias of ppucd.txt and ICU's number for the property.
+struct BinaryAlias:
+    var name: str
+    var index: usize
+
+## The short, long and additional names of a property or a property value; empty when absent.
+struct Names:
+    var short_name: str
+    var long_name: str
+    var additional_name: str
+
+## An alias of an enumerated property value and its short name.
+struct ValueAlias:
+    var property: str
+    var alias: str
+    var short_name: str
+
+## A code point with Conditional_Case_Mappings, and their unparsed text.
+struct ConditionalMappings:
+    var code_point: u32
+    var text: str
+
+## Everything the generator knows about every code point.
+struct Database:
+    var gc: u8[]
+    var bc: u8[]
+    var lb: u8[]
+    var ea: u8[]
+    var gcb: u8[]
+    var wb: u8[]
+    var sb: u8[]
+    var incb: u8[]
+    var sc: u8[]
+    var jt: u8[]
+    var ccc: u8[]
+    var dt: u8[]
+    var nfd_qc: u8[]
+    var nfkd_qc: u8[]
+    var nfc_qc: u8[]
+    var nfkc_qc: u8[]
+    ## Two words of binary properties per code point, in ICU's UProperty order.
+    var bits: u64[]
+    ## The script extension set of each code point: 0 for none, else 1 + its index.
+    var scx: u16[]
+    var scx_sets: U32List
+    var scx_set_offsets: U32List
+    ## Per code point and mapping kind: 0 for the default, else 1 + the offset in `pool`.
+    var mapping_offset: u32[]
+    var mapping_length: u8[]
+    var pool: U32List
+    var conditional: ConditionalMappings[16]
+    var conditional_count: usize
+    var binary_aliases: BinaryAlias[256]
+    var binary_alias_count: usize
+    var binary_names: Names[76]
+    var value_aliases: ValueAlias[4096]
+    var value_alias_count: usize
+    var general_category_names: Names[30]
+    var general_category_group_names: Names[8]
+    var script_names: Names[213]
+    ## The tokens of the `defaults` line, re-applied to `unassigned` ranges.
+    var defaults: str
+    ## The multi-code-point sequences of the emoji string properties: count, then code points.
+    var emoji_sequences: U32List
+    var emoji_sequence_properties: U32List
+
+    static func create() -> Database!:
+        let n = code_point_count
+        return Database(
+            gc = try new u8[n], bc = try new u8[n], lb = try new u8[n], ea = try new u8[n],
+            gcb = try new u8[n], wb = try new u8[n], sb = try new u8[n], incb = try new u8[n],
+            sc = try new u8[n], jt = try new u8[n], ccc = try new u8[n], dt = try new u8[n],
+            nfd_qc = try new u8[n], nfkd_qc = try new u8[n], nfc_qc = try new u8[n],
+            nfkc_qc = try new u8[n], bits = try new u64[n * 2], scx = try new u16[n],
+            scx_sets = try U32List.create(), scx_set_offsets = try U32List.create(),
+            mapping_offset = try new u32[n * mapping_kind_count],
+            mapping_length = try new u8[n * mapping_kind_count], pool = try U32List.create(),
+            conditional_count = 0, binary_alias_count = 0, value_alias_count = 0, defaults = "",
+            emoji_sequences = try U32List.create(),
+            emoji_sequence_properties = try U32List.create())
+
+    func has_bit(code_point: u32, property: usize) -> bool:
+        let word = self.bits[(usize)code_point * 2 + property // 64]
+        return (word >> (u64)(property % 64)) & 1 != 0
+
+    mutating func set_bit(code_point: u32, property: usize, value: bool):
+        let index = (usize)code_point * 2 + property // 64
+        let mask = (u64)1 << (u64)(property % 64)
+        if value:
+            self.bits[index] |= mask
+        else:
+            self.bits[index] &= ~mask
+
+    ## The mapping of `kind` of `code_point`, or none for the default (the code point itself).
+    func mapping(code_point: u32, kind: usize) -> const u32[]?:
+        let slot = (usize)code_point * mapping_kind_count + kind
+        let offset = self.mapping_offset[slot]
+        if offset == 0:
+            return none
+        let start = (usize)(offset - 1)
+        return self.pool.view()[start..<start + (usize)self.mapping_length[slot]]
+
+    ## The single code point of a simple mapping of `code_point`.
+    func simple_mapping(code_point: u32, kind: usize) -> u32:
+        let mapped = self.mapping(code_point, kind) else return code_point
+        assert(mapped.length == 1)
+        return mapped[0]
+
+    ## The full mapping of `kind`: the explicit one, else the simple mapping `simple_kind`.
+    func full_mapping(code_point: u32, kind: usize, simple_kind: usize, buffer: u32[]) -> const u32[]:
+        if let mapped = self.mapping(code_point, kind):
+            return mapped
+        buffer[0] = self.simple_mapping(code_point, simple_kind)
+        return buffer[..<1]
+
+# mark: Parsing ppucd.txt =======================================================================
+
+func parse_ppucd(database: Database*, data: u8[]) -> !:
+    # Pool offset 0 is never a mapping, so that 0 can mean "none".
+    try database.pool.append(0)
+    # Script extension set 0 is "none".
+    try database.scx_set_offsets.append(0)
+    try database.scx_sets.append(0)
+    var lines = Lines.over(data)
+    while let line = lines.next():
+        if line.length == 0 or line.bytes[0] == '#':
+            continue
+        var fields = Fields.over(line, ';')
+        let kind = fields.next() else continue
+        if kind == "property":
+            try parse_property_line(database, line)
+        elif kind == "value":
+            try parse_value_line(database, line)
+        elif kind == "defaults" or kind == "block" or kind == "cp" or kind == "unassigned":
+            let range = parse_range(fields.next() else trap("a range line without a range"))
+            if kind == "defaults":
+                database.defaults = line
+            elif kind == "unassigned":
+                try reset_to_defaults(database, range)
+            while let token = fields.next():
+                try apply_token(database, token, range)
+
+# property;Binary;Alpha;Alphabetic[;additional]
+func parse_property_line(database: Database*, line: str) -> !:
+    var fields = Fields.over(line, ';')
+    discard(fields.next())
+    let type_ = fields.next() else return
+    if type_ != "Binary":
+        return
+    let short_name = fields.next() else return
+    let long_name = fields.next() else return
+    let additional_name = fields.next() else ""
+    let index = index_of(icu_binary_properties, long_name) else return
+    database.binary_names[index] = Names(short_name = short_name, long_name = long_name, additional_name = additional_name)
+    add_binary_alias(database, short_name, index)
+    add_binary_alias(database, long_name, index)
+    add_binary_alias(database, additional_name, index)
+
+func add_binary_alias(database: Database*, name: str, index: usize):
+    if name.length == 0:
+        return
+    database.binary_aliases[database.binary_alias_count] = BinaryAlias(name = name, index = index)
+    database.binary_alias_count += 1
+
+# value;gc;Lu;Uppercase_Letter[;additional]
+func parse_value_line(database: Database*, line: str) -> !:
+    var fields = Fields.over(line, ';')
+    discard(fields.next())
+    let property = fields.next() else return
+    let short_name = fields.next() else return
+    let long_name = fields.next() else ""
+    let additional_name = fields.next() else ""
+    let names = Names(short_name = short_name, long_name = long_name, additional_name = additional_name)
+    if property == "gc":
+        if let index = index_of(icu_general_categories, short_name):
+            database.general_category_names[index] = names
+        elif let group = index_of(icu_general_category_groups, short_name):
+            database.general_category_group_names[group] = names
+    elif property == "sc":
+        let index = index_of(icu_scripts, short_name) else trap(f"a script ICU does not number: {short_name}")
+        database.script_names[index] = names
+    add_value_alias(database, property, short_name, short_name)
+    add_value_alias(database, property, long_name, short_name)
+    add_value_alias(database, property, additional_name, short_name)
+
+func add_value_alias(database: Database*, property: str, alias: str, short_name: str):
+    if alias.length == 0:
+        return
+    assert(database.value_alias_count < database.value_aliases.length)
+    database.value_aliases[database.value_alias_count] = ValueAlias(property = property, alias = alias, short_name = short_name)
+    database.value_alias_count += 1
+
+## The ICU number of the value `value` of the enumerated property `property`.
+func enum_value(database: const Database*, property: str, names: const str[], value: str) -> u8:
+    if let index = index_of(names, value):
+        return (u8)index
+    for alias in database.value_aliases[..<database.value_alias_count]:
+        if alias.property == property and alias.alias == value:
+            if let index = index_of(names, alias.short_name):
+                return (u8)index
+    trap(f"unknown value {value} of property {property}")
+
+func fill_u8(array: u8[], range: CodePointRange, value: u8):
+    for code_point in (usize)range.first..=(usize)range.last:
+        array[code_point] = value
+
+func reset_to_defaults(database: Database*, range: CodePointRange) -> !:
+    for code_point in range.first..=range.last:
+        let index = (usize)code_point * 2
+        database.bits[index] = 0
+        database.bits[index + 1] = 0
+        database.scx[(usize)code_point] = 0
+        for kind in 0..<mapping_kind_count:
+            database.mapping_offset[(usize)code_point * mapping_kind_count + kind] = 0
+    var fields = Fields.over(database.defaults, ';')
+    discard(fields.next())
+    discard(fields.next())
+    while let token = fields.next():
+        try apply_token(database, token, range)
+
+## Apply one `name=value`, `name` or `-name` token of a range line to `range`.
+func apply_token(database: Database*, token: str, range: CodePointRange) -> !:
+    let split = strings.split_once(token, "=")
+    if split == none:
+        # A binary property: `Name` sets it, `-Name` clears it.
+        let clear = token.length > 0 and token.bytes[0] == '-'
+        let binary_name = (str)token.bytes[1..] if clear else token
+        for alias in database.binary_aliases[..<database.binary_alias_count]:
+            if alias.name == binary_name:
+                for code_point in range.first..=range.last:
+                    database.set_bit(code_point, alias.index, not clear)
+                return
+        # Binary properties ICU has no UProperty for are ignored.
+        return
+    let pair = split else return
+    let name = pair.0
+    let value = pair.1
+    if name == "na" or name == "age" or name == "blk" or name == "Name_Alias":
+        return
+    if name == "gc":
+        fill_u8(database.gc, range, enum_value(database, "gc", icu_general_categories, value))
+    elif name == "bc":
+        fill_u8(database.bc, range, enum_value(database, "bc", icu_bidi_classes, value))
+    elif name == "lb":
+        fill_u8(database.lb, range, enum_value(database, "lb", icu_line_breaks, value))
+    elif name == "ea":
+        fill_u8(database.ea, range, enum_value(database, "ea", icu_east_asian_widths, value))
+    elif name == "GCB":
+        fill_u8(database.gcb, range, enum_value(database, "GCB", icu_grapheme_cluster_breaks, value))
+    elif name == "WB":
+        fill_u8(database.wb, range, enum_value(database, "WB", icu_word_breaks, value))
+    elif name == "SB":
+        fill_u8(database.sb, range, enum_value(database, "SB", icu_sentence_breaks, value))
+    elif name == "InCB":
+        fill_u8(database.incb, range, enum_value(database, "InCB", icu_indic_conjunct_breaks, value))
+    elif name == "sc":
+        fill_u8(database.sc, range, enum_value(database, "sc", icu_scripts, value))
+    elif name == "jt":
+        fill_u8(database.jt, range, enum_value(database, "jt", icu_joining_types, value))
+    elif name == "dt":
+        fill_u8(database.dt, range, enum_value(database, "dt", icu_decomposition_types, value))
+    elif name == "ccc":
+        fill_u8(database.ccc, range, (u8)parse_decimal(value))
+    elif name == "NFD_QC":
+        fill_u8(database.nfd_qc, range, enum_value(database, "NFD_QC", icu_quick_checks, value))
+    elif name == "NFKD_QC":
+        fill_u8(database.nfkd_qc, range, enum_value(database, "NFKD_QC", icu_quick_checks, value))
+    elif name == "NFC_QC":
+        fill_u8(database.nfc_qc, range, enum_value(database, "NFC_QC", icu_quick_checks, value))
+    elif name == "NFKC_QC":
+        fill_u8(database.nfkc_qc, range, enum_value(database, "NFKC_QC", icu_quick_checks, value))
+    elif name == "scx":
+        let set = try script_extension_set(database, value)
+        for code_point in range.first..=range.last:
+            database.scx[(usize)code_point] = set
+    elif name == "Conditional_Case_Mappings":
+        assert(range.first == range.last)
+        database.conditional[database.conditional_count] = ConditionalMappings(code_point = range.first, text = value)
+        database.conditional_count += 1
+    else:
+        let kind = mapping_kind(name) else return
+        try set_mapping(database, range, kind, value)
+
+func mapping_kind(name: str) -> usize?:
+    if name == "slc": return mapping_slc
+    if name == "suc": return mapping_suc
+    if name == "stc": return mapping_stc
+    if name == "scf": return mapping_scf
+    if name == "lc": return mapping_lc
+    if name == "uc": return mapping_uc
+    if name == "tc": return mapping_tc
+    if name == "cf": return mapping_cf
+    if name == "dm": return mapping_dm
+    if name == "Turkic_Case_Folding": return mapping_turkic
+    return none
+
+## Parse space-separated hexadecimal code points into `buffer`.
+func parse_code_points(text: str, buffer: u32[]) -> const u32[]:
+    var count: usize = 0
+    var fields = Fields.over(trim_spaces(text), ' ')
+    while let field = fields.next():
+        if field.length == 0:
+            continue
+        buffer[count] = parse_hex(field)
+        count += 1
+    return buffer[..<count]
+
+func set_mapping(database: Database*, range: CodePointRange, kind: usize, value: str) -> !:
+    var offset: u32 = 0
+    var length: u8 = 0
+    if value != "<code point>":
+        var buffer: u32[32]
+        let code_points = parse_code_points(value, buffer)
+        offset = (u32)database.pool.count + 1
+        length = (u8)code_points.length
+        for code_point in code_points:
+            try database.pool.append(code_point)
+    for code_point in range.first..=range.last:
+        let slot = (usize)code_point * mapping_kind_count + kind
+        database.mapping_offset[slot] = offset
+        database.mapping_length[slot] = length
+
+## The set number of a space-separated list of scripts; equal lists share a set.
+func script_extension_set(database: Database*, value: str) -> u16!:
+    if value == "<script>":
+        return 0
+    var scripts: u32[64]
+    var count: usize = 0
+    var fields = Fields.over(value, ' ')
+    while let field = fields.next():
+        scripts[count] = (u32)enum_value(database, "sc", icu_scripts, field)
+        count += 1
+    let wanted = scripts[..<count]
+    for set in 1..<database.scx_set_offsets.count:
+        let offset = (usize)database.scx_set_offsets.at(set)
+        let length = (usize)database.scx_sets.at(offset)
+        if same_u32s(database.scx_sets.view()[offset + 1..<offset + 1 + length], wanted):
+            return (u16)set
+    try database.scx_set_offsets.append((u32)database.scx_sets.count)
+    try database.scx_sets.append((u32)count)
+    for script in wanted:
+        try database.scx_sets.append(script)
+    return (u16)(database.scx_set_offsets.count - 1)
+
+# mark: Emoji sequences =========================================================================
+
+# 231A..231B    ; Basic_Emoji    ; watch..hourglass done    # E0.6   [2] (⌚..⌛)
+# 0023 FE0F 20E3; Emoji_Keycap_Sequence ; keycap: #         # E0.6   [1] (#️⃣)
+func parse_emoji_sequences(database: Database*, data: u8[]) -> !:
+    var lines = Lines.over(data)
+    while let line = lines.next():
+        let content = strip_comment(line)
+        if trim_spaces(content).length == 0:
+            continue
+        var fields = Fields.over(content, ';')
+        let code_points = trim_spaces(fields.next() else continue)
+        let property_name = trim_spaces(fields.next() else continue)
+        let property = index_of(icu_binary_properties, property_name) else trap(f"an unknown emoji property: {property_name}")
+        if strings.contains(code_points, " "):
+            var buffer: u32[32]
+            let sequence = parse_code_points(code_points, buffer)
+            try add_emoji_sequence(database, property, sequence)
+            try add_emoji_sequence(database, property_rgi_emoji, sequence)
+        else:
+            let range = parse_range(code_points)
+            for code_point in range.first..=range.last:
+                database.set_bit(code_point, property, true)
+                database.set_bit(code_point, property_rgi_emoji, true)
+
+func add_emoji_sequence(database: Database*, property: usize, sequence: const u32[]) -> !:
+    try database.emoji_sequence_properties.append((u32)property)
+    try database.emoji_sequence_properties.append((u32)database.emoji_sequences.count)
+    try database.emoji_sequences.append((u32)sequence.length)
+    for code_point in sequence:
+        try database.emoji_sequences.append(code_point)
+
+# mark: Canonical combining classes =============================================================
+
+## ICU answers u_getCombiningClass from its normalization data, nfc.txt (the gennorm2 input
+## ICU 78.2 ships), which lacks the classes of a few characters new in Unicode 17 that
+## ppucd.txt has; the classes are taken from nfc.txt, as ICU's are.
+# 0300..0314:230
+func parse_nfc_combining_classes(database: Database*, data: u8[]):
+    for code_point in 0..<code_point_count:
+        database.ccc[code_point] = 0
+    var lines = Lines.over(data)
+    while let line = lines.next():
+        let content = trim_spaces(strip_comment(line))
+        if content.length == 0 or content.bytes[0] == '*':
+            continue
+        let pair = strings.split_once(content, ":") else continue
+        fill_u8(database.ccc, parse_range(pair.0), (u8)parse_decimal(pair.1))

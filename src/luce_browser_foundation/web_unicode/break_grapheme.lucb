@@ -1,0 +1,118 @@
+#==============================================================================================
+#
+#   break_grapheme - extended grapheme cluster boundaries (UAX #29)
+#
+#   DESCRIPTION:
+#       Not a port: replaces ICU's character break iterator (the rules of ICU 78's char.txt,
+#       which are UAX #29's extended grapheme cluster rules for Unicode 17). Boundaries are
+#       indexes into the code points; the break iterator converts them to code units.
+#
+#==============================================================================================
+
+# UGraphemeClusterBreak values.
+let gcb_other: u32 = 0
+let gcb_control: u32 = 1
+let gcb_cr: u32 = 2
+let gcb_extend: u32 = 3
+let gcb_l: u32 = 4
+let gcb_lf: u32 = 5
+let gcb_lv: u32 = 6
+let gcb_lvt: u32 = 7
+let gcb_t: u32 = 8
+let gcb_v: u32 = 9
+let gcb_spacing_mark: u32 = 10
+let gcb_prepend: u32 = 11
+let gcb_regional_indicator: u32 = 12
+let gcb_zwj: u32 = 17
+
+# UIndicConjunctBreak values.
+let incb_none: u32 = 0
+let incb_consonant: u32 = 1
+let incb_extend: u32 = 2
+let incb_linker: u32 = 3
+
+## Append the grapheme cluster boundaries of `code_points` to `boundaries`: 0, every
+## boundary between code points, and the end (0 alone for empty text).
+func grapheme_boundaries(code_points: const u32[], boundaries: CodePointBuffer*):
+    boundaries.append(0)
+    if code_points.length == 0:
+        return
+    var previous = ucd_grapheme_cluster_break(code_points[0])
+    # GB11: whether the text before the position ends with \p{ExtPict} Extend* ZWJ.
+    var pictographic_run = ucd_has_binary_property(code_points[0], uchar_extended_pictographic)
+    var pictographic_zwj = false
+    # GB12/GB13: the number of regional indicators ending the text before the position.
+    var regional_indicators: usize = 1 if previous == gcb_regional_indicator else 0
+    # GB9c: 0 outside a conjunct, 1 after a consonant [Extend Linker]*, 2 once a linker
+    # was seen.
+    var conjunct = conjunct_state(0, ucd_indic_conjunct_break(code_points[0]))
+    for index in 1..<code_points.length:
+        let code_point = code_points[index]
+        let current = ucd_grapheme_cluster_break(code_point)
+        let incb = ucd_indic_conjunct_break(code_point)
+        let extended_pictographic = ucd_has_binary_property(code_point, uchar_extended_pictographic)
+        if grapheme_break_between(previous, current, incb, extended_pictographic, pictographic_zwj, regional_indicators, conjunct):
+            boundaries.append((u32)index)
+        # Advance the context past this code point.
+        pictographic_zwj = current == gcb_zwj and pictographic_run
+        if extended_pictographic:
+            pictographic_run = true
+        elif current != gcb_extend:
+            pictographic_run = false
+        regional_indicators = regional_indicators + 1 if current == gcb_regional_indicator else 0
+        conjunct = conjunct_state(conjunct, incb)
+        previous = current
+    boundaries.append((u32)code_points.length)
+
+## The GB9c state after a code point of Indic_Conjunct_Break `incb`.
+func conjunct_state(state: u32, incb: u32) -> u32:
+    if incb == incb_consonant:
+        return 1
+    if incb == incb_linker and state != 0:
+        return 2
+    if incb == incb_extend and state != 0:
+        return state
+    return 0
+
+## Whether UAX #29 breaks between a code point of Grapheme_Cluster_Break `previous` and
+## one of `current`, given the context before the position.
+func grapheme_break_between(previous: u32, current: u32, incb: u32, extended_pictographic: bool, pictographic_zwj: bool, regional_indicators: usize, conjunct: u32) -> bool:
+    # GB3: CR × LF
+    if previous == gcb_cr and current == gcb_lf:
+        return false
+    # GB4: (Control | CR | LF) ÷
+    if previous == gcb_control or previous == gcb_cr or previous == gcb_lf:
+        return true
+    # GB5: ÷ (Control | CR | LF)
+    if current == gcb_control or current == gcb_cr or current == gcb_lf:
+        return true
+    # GB6: L × (L | V | LV | LVT)
+    if previous == gcb_l and (current == gcb_l or current == gcb_v or current == gcb_lv or current == gcb_lvt):
+        return false
+    # GB7: (LV | V) × (V | T)
+    if (previous == gcb_lv or previous == gcb_v) and (current == gcb_v or current == gcb_t):
+        return false
+    # GB8: (LVT | T) × T
+    if (previous == gcb_lvt or previous == gcb_t) and current == gcb_t:
+        return false
+    # GB9: × (Extend | ZWJ)
+    if current == gcb_extend or current == gcb_zwj:
+        return false
+    # GB9a: × SpacingMark
+    if current == gcb_spacing_mark:
+        return false
+    # GB9b: Prepend ×
+    if previous == gcb_prepend:
+        return false
+    # GB9c: \p{InCB=Consonant} [\p{InCB=Extend}\p{InCB=Linker}]* \p{InCB=Linker}
+    #       [\p{InCB=Extend}\p{InCB=Linker}]* × \p{InCB=Consonant}
+    if conjunct == 2 and incb == incb_consonant:
+        return false
+    # GB11: \p{ExtPict} Extend* ZWJ × \p{ExtPict}
+    if pictographic_zwj and extended_pictographic:
+        return false
+    # GB12, GB13: pairs of regional indicators
+    if previous == gcb_regional_indicator and current == gcb_regional_indicator and regional_indicators % 2 == 1:
+        return false
+    # GB999: Any ÷ Any
+    return true

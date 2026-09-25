@@ -1,0 +1,89 @@
+#==============================================================================================
+#
+#   gen_ucd - the generator of web_unicode's Unicode Character Database tables
+#
+#   DESCRIPTION:
+#       Ladybird's LibUnicode is a wrapper over ICU; the luce-browser port replaces the ICU
+#       pieces LibWeb needs with tables of its own (DESIGN.md §1.1, §5). This program reads
+#       the data ICU 78.2 builds its own tables from, copied into data/ucd, and the locale
+#       data ICU 78.2 answers with, dumped into data/icu:
+#
+#           ucd/ppucd.txt                ICU's preparsed UCD, Unicode 17.0.0: every property
+#           ucd/emoji-sequences.txt      the emoji sequence properties (Basic_Emoji, RGI_*)
+#           ucd/emoji-zwj-sequences.txt  RGI_Emoji_ZWJ_Sequence
+#           ucd/uts46.txt                the UTS #46 IDNA mapping table in gennorm2 syntax
+#           ucd/nfc.txt                  ICU's canonical combining classes (gennorm2 syntax)
+#           icu/available_locales.txt    icu::Locale::getAvailableLocales
+#           icu/likely_subtags.txt       icu::Locale::addLikelySubtags of the tags it lists
+#           icu/rtl_scripts.txt          uscript_isRightToLeft
+#
+#       and writes the generated fragments of the web_unicode module:
+#
+#           generated_ucd_properties.lucb    per-code-point properties and property names
+#           generated_ucd_casing.lucb        case mappings, case closure, width mappings
+#           generated_ucd_idna.lucb          the IDNA mapping table
+#           generated_ucd_emoji.lucb         the multi-code-point emoji sequences
+#           generated_icu_locales.lucb       available locales, likely subtags, RTL scripts
+#
+#       Usage: gen_ucd DATA_DIRECTORY OUTPUT_DIRECTORY, e.g. gen_ucd data
+#       src/luce_browser_foundation/web_unicode. test.sh regenerates into a temporary
+#       directory and compares with the committed fragments.
+#
+#       The numbering of every enumeration is ICU's (uchar.h, uscript.h), because the C++
+#       API of LibUnicode exposes ICU's values (Unicode::GeneralCategory, Property, Script).
+#
+#       Copyright (c) 2026 the luce-browser authors.
+#       SPDX-License-Identifier: BSD-2-Clause (see LICENSE)
+#
+#==============================================================================================
+
+import c
+import files
+import memory
+import strings
+
+## The number of code points.
+let code_point_count: usize = 0x110000
+
+## Generate every table from `arguments[1]` (the data directory) into `arguments[2]`.
+pub func main(arguments: c.str[]) -> i32!:
+    if arguments.length != 3:
+        print("usage: gen_ucd DATA_DIRECTORY OUTPUT_DIRECTORY")
+        return 2
+    let data_directory = try str(arguments[1])
+    let output_directory = try str(arguments[2])
+
+    var database = try Database.create()
+    try parse_ppucd(&database, try read_data(data_directory, "ucd/ppucd.txt"))
+    try parse_emoji_sequences(&database, try read_data(data_directory, "ucd/emoji-sequences.txt"))
+    try parse_emoji_sequences(&database, try read_data(data_directory, "ucd/emoji-zwj-sequences.txt"))
+    parse_nfc_combining_classes(&database, try read_data(data_directory, "ucd/nfc.txt"))
+    derive_binary_properties(&database)
+
+    try write_output(output_directory, "generated_ucd_properties.lucb", try emit_properties(&database))
+    try write_output(output_directory, "generated_ucd_casing.lucb", try emit_casing(&database))
+    try write_output(output_directory, "generated_ucd_emoji.lucb", try emit_emoji(&database))
+
+    var idna = try IdnaTable.create()
+    try parse_uts46(&idna, try read_data(data_directory, "ucd/uts46.txt"))
+    try write_output(output_directory, "generated_ucd_idna.lucb", try emit_idna(&idna))
+
+    let locales = try emit_locales(try read_data(data_directory, "icu/available_locales.txt"), try read_data(data_directory, "icu/likely_subtags.txt"), try read_data(data_directory, "icu/rtl_scripts.txt"))
+    try write_output(output_directory, "generated_icu_locales.lucb", locales)
+    return 0
+
+## The bytes of the data file `name` of `directory`; the whole run owns them.
+func read_data(directory: str, name: str) -> u8[]!:
+    var path = try strings.Builder.create()
+    try path.put(directory)
+    try path.put("/")
+    try path.put(name)
+    return try files.read((c.str)path.view())
+
+## Write `text` to the file `name` of `directory`.
+func write_output(directory: str, name: str, text: str) -> !:
+    var path = try strings.Builder.create()
+    try path.put(directory)
+    try path.put("/")
+    try path.put(name)
+    try files.write((c.str)path.view(), text.bytes)

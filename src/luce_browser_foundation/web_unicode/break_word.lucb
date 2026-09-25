@@ -1,0 +1,261 @@
+#==============================================================================================
+#
+#   break_word - word boundaries and word rule statuses (UAX #29, ICU's word.txt)
+#
+#   DESCRIPTION:
+#       Not a port: replaces ICU's word break iterator. The rules are UAX #29's word boundary
+#       rules for Unicode 17 as ICU 78's word.txt states them, including ICU's tailorings:
+#       complex-context (South East Asian) letters count as letters, and runs of Han,
+#       Hiragana and Katakana stay together (ICU then subdivides such runs with dictionaries,
+#       which this port does not have). Each boundary carries ICU's rule status of the word
+#       before it: UBRK_WORD_NUMBER (100), UBRK_WORD_LETTER (200), UBRK_WORD_IDEO (400) or
+#       UBRK_WORD_NONE (0).
+#
+#==============================================================================================
+
+# mark: Classes =================================================================================
+
+# UWordBreakValues, and two classes of ICU's word.txt that are not Word_Break values.
+let wb_other: u32 = 0
+let wb_aletter: u32 = 1
+let wb_format: u32 = 2
+let wb_katakana: u32 = 3
+let wb_mid_letter: u32 = 4
+let wb_mid_num: u32 = 5
+let wb_numeric: u32 = 6
+let wb_extend_num_let: u32 = 7
+let wb_cr: u32 = 8
+let wb_extend: u32 = 9
+let wb_lf: u32 = 10
+let wb_mid_num_let: u32 = 11
+let wb_newline: u32 = 12
+let wb_regional_indicator: u32 = 13
+let wb_hebrew_letter: u32 = 14
+let wb_single_quote: u32 = 15
+let wb_double_quote: u32 = 16
+let wb_zwj: u32 = 21
+let wb_wseg_space: u32 = 22
+## ICU's $Han and $Hiragana: part of $KanaKanji with $Katakana.
+let wb_kanji_hiragana: u32 = 30
+## ICU's $HangulSyllable (U+AC00..U+D7A3): not part of $ALetterPlus in ICU's rules.
+let wb_hangul_syllable: u32 = 31
+
+# The rule statuses of ubrk.h.
+let ubrk_word_none: u32 = 0
+let ubrk_word_number: u32 = 100
+let ubrk_word_letter: u32 = 200
+let ubrk_word_kana: u32 = 300
+let ubrk_word_ideo: u32 = 400
+
+# UScriptCode values of word.txt's $Han and $Hiragana.
+let usc_han: u32 = 17
+let usc_hiragana: u32 = 20
+
+# ULineBreak U_LB_COMPLEX_CONTEXT, and UGraphemeClusterBreak Control.
+let u_lb_complex_context: u32 = 24
+
+## The class of `code_point` in ICU's word rules.
+func word_class(code_point: u32) -> u32:
+    let record = ucd_record(code_point)
+    let wb = ucd_hex(ucd_records, record + ucd_field_word_break, 2)
+    if wb == wb_extend or wb == wb_format or wb == wb_zwj or wb == wb_katakana:
+        return wb
+    if code_point >= 0xac00 and code_point <= 0xd7a3:
+        return wb_hangul_syllable
+    let script = ucd_hex(ucd_records, record + ucd_field_script, 2)
+    if script == usc_han or script == usc_hiragana:
+        if wb == wb_other or wb == wb_aletter:
+            return wb_kanji_hiragana
+    # $ALetterPlus = [$ALetter - $dictionaryCJK [$ComplexContext - $Extend - $Control]]
+    if ucd_hex(ucd_records, record + ucd_field_line_break, 2) == u_lb_complex_context:
+        if ucd_hex(ucd_records, record + ucd_field_grapheme_cluster_break, 2) != gcb_control:
+            return wb_aletter
+    return wb
+
+func is_word_ignorable(class: u32) -> bool:
+    return class == wb_extend or class == wb_format or class == wb_zwj
+
+func is_ahletter(class: u32) -> bool:
+    return class == wb_aletter or class == wb_hebrew_letter
+
+func is_mid_num_let_q(class: u32) -> bool:
+    return class == wb_mid_num_let or class == wb_single_quote
+
+func is_kana_kanji(class: u32) -> bool:
+    return class == wb_katakana or class == wb_kanji_hiragana
+
+## The rule status of a word made of the one character of class `class`.
+func word_single_status(class: u32) -> u32:
+    if is_ahletter(class) or class == wb_hangul_syllable:
+        return ubrk_word_letter
+    if class == wb_numeric:
+        return ubrk_word_number
+    if is_kana_kanji(class):
+        return ubrk_word_ideo
+    return ubrk_word_none
+
+# mark: Boundaries ==============================================================================
+
+## Append the word boundaries of `code_points` to `boundaries`, and the rule status of each
+## boundary to `statuses` (the status of the first boundary is 0).
+func word_boundaries(code_points: const u32[], boundaries: CodePointBuffer*, statuses: CodePointBuffer*):
+    boundaries.append(0)
+    statuses.append(ubrk_word_none)
+    let count = code_points.length
+    if count == 0:
+        return
+    var classes = CodePointBuffer.create(count)
+    for code_point in code_points:
+        classes.append(word_class(code_point))
+    let class = classes.view()
+    # WB4: base[i] is the character an ignorable character i attaches to (itself otherwise);
+    # an ignorable at the start of text or after CR, LF or Newline is its own base.
+    var base = CodePointBuffer.create(count)
+    for index in 0..<count:
+        var own = true
+        if index > 0 and is_word_ignorable(class[index]):
+            let previous = base.items[index - 1]
+            let previous_class = class[(usize)previous]
+            if previous_class != wb_cr and previous_class != wb_lf and previous_class != wb_newline:
+                own = false
+                base.append(previous)
+        if own:
+            base.append((u32)index)
+    # next_base[i]: the first non-ignorable character at or after i, or `count`.
+    var next_base = CodePointBuffer.create(count + 1)
+    for _unused in 0..=count:
+        next_base.append((u32)count)
+    var index = count
+    while index > 0:
+        index -= 1
+        next_base.items[index] = (u32)index if not is_word_ignorable(class[index]) else next_base.items[index + 1]
+
+    var status = word_single_status(class[0])
+    var status_ends_without_extension = false
+    # The regional indicators ending the text before the position, counted over bases.
+    var regional_indicators: usize = 1 if class[0] == wb_regional_indicator else 0
+    for position in 1..<count:
+        let current = class[position]
+        let raw_previous = class[position - 1]
+        let previous_index = (usize)base.items[position - 1]
+        let previous = class[previous_index]
+        var joined = false
+        var tag = status
+        # WB3: CR × LF
+        if raw_previous == wb_cr and current == wb_lf:
+            joined = true
+            tag = ubrk_word_none
+        # WB3a, WB3b: break after and before newlines
+        elif raw_previous == wb_cr or raw_previous == wb_lf or raw_previous == wb_newline:
+            joined = false
+        elif current == wb_cr or current == wb_lf or current == wb_newline:
+            joined = false
+        # WB3c: ZWJ × \p{Extended_Pictographic}
+        elif raw_previous == wb_zwj and ucd_has_binary_property(code_points[position], uchar_extended_pictographic):
+            joined = true
+            tag = ubrk_word_none
+        # WB3d: WSegSpace × WSegSpace
+        elif raw_previous == wb_wseg_space and current == wb_wseg_space:
+            joined = true
+            tag = ubrk_word_none
+        # WB4: X (Extend | Format | ZWJ)* → X. ICU's rule for Hangul syllables has no
+        # $ExFm*: the ignorables attach by the untagged rule 4, whose status is 0.
+        elif is_word_ignorable(current):
+            joined = true
+            # So do those of ICU's rules 7a and 13a, which end in a Single_Quote or
+            # ExtendNumLet without $ExFm*.
+            if previous == wb_hangul_syllable or (status_ends_without_extension and not is_word_ignorable(raw_previous)):
+                tag = ubrk_word_none
+        # ICU's $HangulSyllable $HangulSyllable {200}, with nothing between them.
+        elif current == wb_hangul_syllable and raw_previous == wb_hangul_syllable:
+            joined = true
+            tag = ubrk_word_letter
+        else:
+            let rule = word_join_rule(class, base.view(), next_base.view(), previous_index, previous, position, current, regional_indicators)
+            if rule != 0xffffffff:
+                joined = true
+                tag = rule
+        if joined:
+            if not is_word_ignorable(current):
+                # Rules 7a (Hebrew_Letter × Single_Quote) and 13a (× ExtendNumLet).
+                status_ends_without_extension = current == wb_extend_num_let or (current == wb_single_quote and previous == wb_hebrew_letter)
+            status = tag
+        else:
+            boundaries.append((u32)position)
+            statuses.append(status)
+            status = word_single_status(current) if not is_word_ignorable(current) else ubrk_word_none
+            status_ends_without_extension = false
+        if not is_word_ignorable(current):
+            regional_indicators = regional_indicators + 1 if current == wb_regional_indicator else 0
+    boundaries.append((u32)count)
+    statuses.append(status)
+
+## Whether rules WB5 through WB16 keep the characters of classes `previous` (at
+## `previous_index`, a base) and `current` (at `position`) together; the rule's status tag
+## if so, else 0xffffffff.
+func word_join_rule(class: const u32[], base: const u32[], next_base: const u32[], previous_index: usize, previous: u32, position: usize, current: u32, regional_indicators: usize) -> u32:
+    let count = class.length
+    let next_index = (usize)next_base[position + 1] if position + 1 < count else count
+    let next = class[next_index] if next_index < count else wb_other
+    let before_index: usize? = (usize)base[previous_index - 1] if previous_index > 0 else none
+    var before = wb_other
+    if let found = before_index:
+        before = class[found]
+    # WB5: AHLetter × AHLetter
+    if is_ahletter(previous) and is_ahletter(current):
+        return ubrk_word_letter
+    # WB6: AHLetter × (MidLetter | MidNumLetQ) AHLetter
+    if is_ahletter(previous) and (current == wb_mid_letter or is_mid_num_let_q(current)) and is_ahletter(next):
+        return ubrk_word_letter
+    # WB7: AHLetter (MidLetter | MidNumLetQ) × AHLetter
+    if is_ahletter(before) and (previous == wb_mid_letter or is_mid_num_let_q(previous)) and is_ahletter(current):
+        return ubrk_word_letter
+    # WB7a: Hebrew_Letter × Single_Quote
+    if previous == wb_hebrew_letter and current == wb_single_quote:
+        return ubrk_word_letter
+    # WB7b: Hebrew_Letter × Double_Quote Hebrew_Letter
+    if previous == wb_hebrew_letter and current == wb_double_quote and next == wb_hebrew_letter:
+        return ubrk_word_letter
+    # WB7c: Hebrew_Letter Double_Quote × Hebrew_Letter
+    if before == wb_hebrew_letter and previous == wb_double_quote and current == wb_hebrew_letter:
+        return ubrk_word_letter
+    # WB8: Numeric × Numeric
+    if previous == wb_numeric and current == wb_numeric:
+        return ubrk_word_number
+    # WB9: AHLetter × Numeric (ICU's rule status is the number's)
+    if is_ahletter(previous) and current == wb_numeric:
+        return ubrk_word_number
+    # WB10: Numeric × AHLetter
+    if previous == wb_numeric and is_ahletter(current):
+        return ubrk_word_letter
+    # WB11: Numeric (MidNum | MidNumLetQ) × Numeric
+    if before == wb_numeric and (previous == wb_mid_num or is_mid_num_let_q(previous)) and current == wb_numeric:
+        return ubrk_word_number
+    # WB12: Numeric × (MidNum | MidNumLetQ) Numeric
+    if previous == wb_numeric and (current == wb_mid_num or is_mid_num_let_q(current)) and next == wb_numeric:
+        return ubrk_word_number
+    # WB13 and ICU's $KanaKanji $KanaKanji: Katakana × Katakana, and runs of Han, Hiragana
+    # and Katakana (kept for dictionary segmentation in ICU)
+    if is_kana_kanji(previous) and is_kana_kanji(current):
+        return ubrk_word_ideo
+    # WB13a: (AHLetter | Numeric | Katakana | ExtendNumLet) × ExtendNumLet
+    if current == wb_extend_num_let:
+        if is_ahletter(previous) or previous == wb_extend_num_let:
+            return ubrk_word_letter
+        if previous == wb_numeric:
+            return ubrk_word_number
+        if previous == wb_katakana:
+            return ubrk_word_ideo
+    # WB13b: ExtendNumLet × (AHLetter | Numeric | Katakana)
+    if previous == wb_extend_num_let:
+        if is_ahletter(current):
+            return ubrk_word_letter
+        if current == wb_numeric:
+            return ubrk_word_number
+        if current == wb_katakana:
+            return ubrk_word_ideo
+    # WB15, WB16: pairs of regional indicators
+    if previous == wb_regional_indicator and current == wb_regional_indicator and regional_indicators % 2 == 1:
+        return ubrk_word_none
+    # WB999: Any ÷ Any
+    return 0xffffffff

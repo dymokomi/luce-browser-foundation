@@ -1,0 +1,59 @@
+#==============================================================================================
+#
+#   normalize - Unicode::normalize: the Unicode normalization forms
+#
+#   DESCRIPTION:
+#       Port of LibUnicode/Normalize.cpp (lines 1-79). ICU's Normalizer2 is luce-std's
+#       unicode.normalize (Unicode 17, the version of ICU 78), as DESIGN.md §7.1 decides.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibUnicode/Normalize.cpp:16 Unicode::normalization_form_from_string.
+pub func normalization_form_from_string(form: ak.StringView) -> NormalizationForm:
+    if view_equals(form, "NFD"):
+        return NormalizationForm.nfd
+    if view_equals(form, "NFC"):
+        return NormalizationForm.nfc
+    if view_equals(form, "NFKD"):
+        return NormalizationForm.nfkd
+    if view_equals(form, "NFKC"):
+        return NormalizationForm.nfkc
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibUnicode/Normalize.cpp:29 Unicode::normalization_form_to_string.
+pub func normalization_form_to_string(form: NormalizationForm) -> ak.StringView:
+    match form:
+        .nfd: return view_of("NFD")
+        .nfc: return view_of("NFC")
+        .nfkd: return view_of("NFKD")
+        .nfkc: return view_of("NFKC")
+        _: trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibUnicode/Normalize.cpp:44 Unicode::normalize.
+pub func normalize(string: ak.StringView, form: NormalizationForm) -> ak.String:
+    # A failure of ICU (here: text that is not UTF-8) returns the text unchanged.
+    if let normalized = normalize_utf8(view_bytes(string), form):
+        return ak.string_from_utf8(view_of(normalized)) else trap("MUST: StringBuilder::to_string")
+    return ak.string_from_utf8(string) else trap("MUST: String::from_utf8")
+
+## Normalizer2::normalizeUTF8: `bytes` in `form`, or none when they are not UTF-8.
+func normalize_utf8(bytes: const u8[], form: NormalizationForm) -> str?:
+    let text = str(bytes) else return none
+    let unicode_form = match form:
+        .nfd => unicode.NormalizationForm.nfd
+        .nfc => unicode.NormalizationForm.nfc
+        .nfkd => unicode.NormalizationForm.nfkd
+        .nfkc => unicode.NormalizationForm.nfkc
+        _ => trap("VERIFY_NOT_REACHED")
+    let normalized = unicode.normalize(text, unicode_form) else return none
+    return normalized
+
+## The code points of `code_points` in `form` (lone surrogates become U+FFFD).
+func normalize_code_points(code_points: const u32[], form: NormalizationForm) -> CodePointBuffer:
+    let bytes = encode_utf8_all(code_points)
+    var out = CodePointBuffer.create(code_points.length + 1)
+    if let normalized = normalize_utf8(bytes.view(), form):
+        decode_utf8(normalized.bytes, &out, none)
+    else:
+        out.append_all(code_points)
+    return out

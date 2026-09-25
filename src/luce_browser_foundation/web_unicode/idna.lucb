@@ -1,0 +1,471 @@
+#==============================================================================================
+#
+#   idna - Unicode::IDNA::to_ascii: UTS #46 processing of domain names
+#
+#   DESCRIPTION:
+#       Port of LibUnicode/IDNA.cpp (lines 1-65), and of the ICU code it calls, which the
+#       port replaces: ICU 78's uts46.cpp (UTS46::nameToASCII_UTF8 and its helpers) and
+#       punycode.cpp (u_strToPunycode, u_strFromPunycode), © Unicode, Inc. and others,
+#       Unicode License v3. The uts46 normalizer (uts46.nrm: the UTS #46 mapping followed by
+#       NFC) is generated_ucd_idna.lucb's table and luce-std's NFC. ICU works in UTF-16; the
+#       port works in code points, which only changes the unit of internal offsets.
+#
+#==============================================================================================
+
+# mark: Unicode::IDNA ===========================================================================
+
+# The options of ICU's uidna.h.
+let uidna_check_bidi: u32 = 4
+let uidna_check_contextj: u32 = 8
+let uidna_nontransitional_to_ascii: u32 = 0x10
+let uidna_nontransitional_to_unicode: u32 = 0x20
+let uidna_use_std3_rules: u32 = 2
+
+# The errors of ICU's uidna.h.
+let uidna_error_empty_label: u32 = 1
+let uidna_error_label_too_long: u32 = 2
+let uidna_error_domain_name_too_long: u32 = 4
+let uidna_error_leading_hyphen: u32 = 8
+let uidna_error_trailing_hyphen: u32 = 0x10
+let uidna_error_hyphen_3_4: u32 = 0x20
+let uidna_error_leading_combining_mark: u32 = 0x40
+let uidna_error_disallowed: u32 = 0x80
+let uidna_error_punycode: u32 = 0x100
+let uidna_error_label_has_dot: u32 = 0x200
+let uidna_error_invalid_ace_label: u32 = 0x400
+let uidna_error_bidi: u32 = 0x800
+let uidna_error_contextj: u32 = 0x1000
+
+## Ported from Libraries/LibUnicode/IDNA.cpp:16 Unicode::IDNA::to_ascii.
+# https://www.unicode.org/reports/tr46/#ToASCII
+pub func idna_to_ascii(domain_name: ak.Utf8View, options: ToAsciiOptions) -> ak.String!:
+    var icu_options: u32 = 0
+
+    if options.check_bidi == CheckBidi.yes:
+        icu_options |= uidna_check_bidi
+    if options.check_joiners == CheckJoiners.yes:
+        icu_options |= uidna_check_contextj
+    if options.use_std3_ascii_rules == UseStd3AsciiRules.yes:
+        icu_options |= uidna_use_std3_rules
+    if options.transitional_processing == TransitionalProcessing.no:
+        icu_options |= uidna_nontransitional_to_ascii | uidna_nontransitional_to_unicode
+
+    # icu::IDNA::createUTS46Instance(icu_options) and nameToASCII_UTF8.
+    var info = IdnaInfo()
+    let result = uts46_name_to_ascii_utf8(view_bytes(domain_name.m_string), icu_options, &info)
+
+    var errors = info.errors
+
+    if options.check_hyphens == CheckHyphens.no:
+        errors &= ~uidna_error_hyphen_3_4
+        errors &= ~uidna_error_leading_hyphen
+        errors &= ~uidna_error_trailing_hyphen
+
+    if options.verify_dns_length == VerifyDnsLength.no:
+        errors &= ~uidna_error_empty_label
+        errors &= ~uidna_error_label_too_long
+        errors &= ~uidna_error_domain_name_too_long
+
+    if options.ignore_invalid_punycode == IgnoreInvalidPunycode.yes:
+        errors &= ~uidna_error_punycode
+
+    if info.failed or errors != 0:
+        error(ak.ak_error, "Unable to convert domain to ASCII")
+
+    return ak.string_from_utf8(ak.StringView(m_characters = result.items.data, m_length = result.count)) else trap("MUST: StringBuilder::to_string")
+
+# mark: UTS46 (ICU uts46.cpp) ===================================================================
+
+## icu::IDNAInfo, and ICU's UErrorCode failure of the whole operation (`failed`).
+struct IdnaInfo:
+    var errors: u32
+    var label_errors: u32
+    var is_trans_diff: bool
+    var is_bidi: bool
+    var is_ok_bidi: bool = true
+    var failed: bool
+
+# Severe errors which usually result in a U+FFFD replacement character in the result string.
+let severe_errors: u32 = uidna_error_leading_combining_mark | uidna_error_disallowed | uidna_error_punycode | uidna_error_label_has_dot | uidna_error_invalid_ace_label
+
+# UTS #46 data for ASCII characters.
+# The normalizer (using uts46.nrm) maps uppercase ASCII letters to lowercase
+# and passes through all other ASCII characters.
+# If UIDNA_USE_STD3_RULES is set, then non-LDH characters are disallowed
+# using this data.
+# The ASCII fastpath also uses this data.
+# Values: -1=disallowed  0==valid  1==mapped (lowercase)
+func ascii_data(c: u32) -> i32:
+    if c == 0x2d or c == 0x2e or (c >= 0x30 and c <= 0x39) or (c >= 0x61 and c <= 0x7a):
+        return 0
+    if c >= 0x41 and c <= 0x5a:
+        return 1
+    return -1
+
+## The uts46 Normalizer2: the UTS #46 mapping, then NFC.
+func uts46_normalize(source: const u32[]) -> CodePointBuffer:
+    var mapped = CodePointBuffer.create(source.length + 1)
+    for code_point in source:
+        let entry = idna_range(code_point)
+        let status = ucd_hex(ucd_idna_ranges, entry + 12, 1)
+        if status == idna_status_mapped:
+            let offset = (usize)ucd_hex(ucd_idna_ranges, entry + 13, 4)
+            let length = (usize)ucd_hex(ucd_idna_ranges, entry + 17, 2)
+            for index in 0..<length:
+                mapped.append(ucd_hex(ucd_idna_pool, (offset + index) * 6, 6))
+        elif status == idna_status_disallowed:
+            mapped.append(0xfffd)
+        elif status != idna_status_ignored:
+            # valid, and deviation characters (handled by mapDevChars)
+            mapped.append(code_point)
+    return normalize_code_points(mapped.view(), NormalizationForm.nfc)
+
+# The statuses of ucd_idna_ranges.
+let idna_status_valid: u32 = 0
+let idna_status_mapped: u32 = 1
+let idna_status_deviation: u32 = 2
+let idna_status_disallowed: u32 = 3
+let idna_status_ignored: u32 = 4
+
+## The digit offset of the ucd_idna_ranges entry containing `code_point`.
+func idna_range(code_point: u32) -> usize:
+    var low: usize = 0
+    var high = ucd_idna_ranges.length // 19
+    while low + 1 < high:
+        let middle = low + (high - low) // 2
+        if ucd_hex(ucd_idna_ranges, middle * 19, 6) <= code_point:
+            low = middle
+        else:
+            high = middle
+    return low * 19
+
+## Whether uts46_normalize leaves `text` unchanged (Normalizer2::isNormalized).
+func uts46_is_normalized(text: const u32[]) -> bool:
+    let normalized = uts46_normalize(text)
+    if normalized.count != text.length:
+        return false
+    for index in 0..<text.length:
+        if normalized.items[index] != text[index]:
+            return false
+    return true
+
+## UTS46::processUTF8 with isLabel=false and toASCII=true (nameToASCII_UTF8): the UTF-8 result.
+func uts46_name_to_ascii_utf8(source: const u8[], options: u32, info: IdnaInfo*) -> ByteBuffer:
+    let is_label = false
+    let to_ascii = true
+    var dest = ByteBuffer.create(source.length + 20)
+    let src_length = source.length
+    if src_length == 0:
+        info.errors |= uidna_error_empty_label
+        return dest
+    var dest_string = CodePointBuffer.create(src_length + 1)
+    var label_start: usize = 0
+    if src_length <= 256:
+        # ASCII fastpath
+        var dest_array = ByteBuffer.create(src_length + 1)
+        let disallow_non_ldh_dot = (options & uidna_use_std3_rules) != 0
+        var i: usize = 0
+        while true:
+            if i == src_length:
+                if to_ascii:
+                    if i - label_start > 63:
+                        info.label_errors |= uidna_error_label_too_long
+                    # There is a trailing dot if labelStart==i.
+                    if not is_label and i >= 254 and (i > 254 or label_start < i):
+                        info.errors |= uidna_error_domain_name_too_long
+                info.errors |= info.label_errors
+                return dest_array
+            let c = (u32)source[i]
+            if c > 0x7f:
+                break
+            let c_data = ascii_data(c)
+            if c_data > 0:
+                # Lowercase an uppercase ASCII letter.
+                dest_array.append((u8)(c + 0x20))
+            elif c_data < 0 and disallow_non_ldh_dot:
+                # Replacing with U+FFFD can be complicated for toASCII.
+                break
+            else:
+                dest_array.append((u8)c)
+                if c == 0x2d:
+                    # hyphen
+                    if i == label_start + 3 and source[i - 1] == 0x2d:
+                        # "??--..." is Punycode or forbidden.
+                        break
+                    if i == label_start:
+                        # label starts with "-"
+                        info.label_errors |= uidna_error_leading_hyphen
+                    if i + 1 == src_length or source[i + 1] == 0x2e:
+                        # label ends with "-"
+                        info.label_errors |= uidna_error_trailing_hyphen
+                elif c == 0x2e:
+                    # dot
+                    if is_label:
+                        # Replacing with U+FFFD can be complicated for toASCII.
+                        break
+                    if i == label_start:
+                        info.label_errors |= uidna_error_empty_label
+                    if to_ascii and i - label_start > 63:
+                        info.label_errors |= uidna_error_label_too_long
+                    info.errors |= info.label_errors
+                    info.label_errors = 0
+                    label_start = i + 1
+            i += 1
+        info.errors |= info.label_errors
+        # Convert the processed ASCII prefix of the current label to UTF-16 (code points).
+        let mapping_start = dest_array.count - label_start
+        for byte in dest_array.view()[label_start..]:
+            dest_string.append((u32)byte)
+        # Output the previous ASCII labels and process the rest of src in UTF-16.
+        for byte in dest_array.view()[..<label_start]:
+            dest.append(byte)
+        var rest = CodePointBuffer.create(src_length - label_start + 1)
+        decode_utf8(source[label_start..], &rest, none)
+        uts46_process_unicode(rest.view(), 0, mapping_start, is_label, to_ascii, &dest_string, options, info)
+    else:
+        # src is too long for the ASCII fastpath implementation.
+        var all = CodePointBuffer.create(src_length + 1)
+        decode_utf8(source, &all, none)
+        uts46_process_unicode(all.view(), 0, 0, is_label, to_ascii, &dest_string, options, info)
+    # destString.toUTF8(dest)
+    for code_point in dest_string.view():
+        encode_utf8(code_point, &dest)
+    if to_ascii and not is_label:
+        # length==labelStart==254 means that there is a trailing dot (ok) and
+        # destString is empty (do not index at 253-labelStart).
+        let length = label_start + dest_string.count
+        if length >= 254 and is_ascii_code_points(dest_string.view()) and (length > 254 or (label_start < 254 and dest_string.items[253 - label_start] != 0x2e)):
+            info.errors |= uidna_error_domain_name_too_long
+    if info.is_bidi and not info.failed and (info.errors & severe_errors) == 0 and (not info.is_ok_bidi or (label_start > 0 and not is_ascii_ok_bidi(source[..<label_start]))):
+        info.errors |= uidna_error_bidi
+    return dest
+
+func is_ascii_code_points(text: const u32[]) -> bool:
+    for c in text:
+        if c > 0x7f:
+            return false
+    return true
+
+## UTS46::processUnicode: `dest` holds the mapped ASCII prefix of the current label (up to
+## mappingStart); the rest of `source` is mapped, normalized and processed label by label.
+func uts46_process_unicode(source: const u32[], label_start_: usize, mapping_start: usize, is_label: bool, to_ascii: bool, dest: CodePointBuffer*, options: u32, info: IdnaInfo*):
+    var label_start = label_start_
+    if mapping_start == 0:
+        dest.count = 0
+        let normalized = uts46_normalize(source)
+        dest.append_all(normalized.view())
+    else:
+        # normalizeSecondAndAppend(dest, src.tempSubString(mappingStart)): the prefix is
+        # mapped ASCII, which the mapping keeps, so normalizing the whole is the same.
+        var whole = CodePointBuffer.create(dest.count + source.length + 1)
+        whole.append_all(dest.view())
+        whole.append_all(source[mapping_start..])
+        let normalized = uts46_normalize(whole.view())
+        dest.count = 0
+        dest.append_all(normalized.view())
+    var do_map_dev_chars = (options & uidna_nontransitional_to_ascii) == 0 if to_ascii else (options & uidna_nontransitional_to_unicode) == 0
+    var label_limit = label_start
+    while label_limit < dest.count:
+        let c = dest.items[label_limit]
+        if c == 0x2e and not is_label:
+            let label_length = label_limit - label_start
+            let new_length = uts46_process_label(dest, label_start, label_length, to_ascii, options, info)
+            info.errors |= info.label_errors
+            info.label_errors = 0
+            if info.failed:
+                return
+            label_start += new_length + 1
+            label_limit = label_start
+            continue
+        elif c < 0xdf:
+            # pass
+            discard(c)
+        elif c <= 0x200d and (c == 0xdf or c == 0x3c2 or c >= 0x200c):
+            info.is_trans_diff = true
+            if do_map_dev_chars:
+                uts46_map_dev_chars(dest, label_start, label_limit)
+                # All deviation characters have been mapped, no need to check for them again.
+                do_map_dev_chars = false
+                # Do not increment labelLimit in case c was removed.
+                continue
+        label_limit += 1
+    # Permit an empty label at the end (0<labelStart==labelLimit==destLength is ok)
+    # but not an empty label elsewhere nor a completely empty domain name.
+    # processLabel() sets UIDNA_ERROR_EMPTY_LABEL when labelLength==0.
+    if label_start == 0 or label_start < label_limit:
+        discard(uts46_process_label(dest, label_start, label_limit - label_start, to_ascii, options, info))
+        info.errors |= info.label_errors
+
+## UTS46::mapDevChars: transitional processing of ß, ς, ZWJ and ZWNJ from `mapping_start`.
+func uts46_map_dev_chars(dest: CodePointBuffer*, label_start: usize, mapping_start: usize):
+    var mapped = CodePointBuffer.create(dest.count + 2)
+    mapped.append_all(dest.view()[..<mapping_start])
+    var did_map_dev_chars = false
+    for c in dest.view()[mapping_start..]:
+        if c == 0xdf:
+            # Map sharp s to ss.
+            did_map_dev_chars = true
+            mapped.append(0x73)
+            mapped.append(0x73)
+        elif c == 0x3c2:
+            # Map final sigma to nonfinal sigma.
+            did_map_dev_chars = true
+            mapped.append(0x3c3)
+        elif c == 0x200c or c == 0x200d:
+            # Ignore/remove ZWNJ and ZWJ.
+            did_map_dev_chars = true
+        else:
+            mapped.append(c)
+    dest.count = 0
+    if did_map_dev_chars:
+        # Mapping deviation characters might have resulted in an un-NFC string.
+        dest.append_all(mapped.view()[..<label_start])
+        let normalized = uts46_normalize(mapped.view()[label_start..])
+        dest.append_all(normalized.view())
+    else:
+        dest.append_all(mapped.view())
+
+## Replace dest[start..start + length) with `label`.
+func replace_label(dest: CodePointBuffer*, start: usize, length: usize, label: const u32[]):
+    var result = CodePointBuffer.create(dest.count - length + label.length + 1)
+    result.append_all(dest.view()[..<start])
+    result.append_all(label)
+    result.append_all(dest.view()[start + length..])
+    dest.count = 0
+    dest.append_all(result.view())
+
+## UTS46::processLabel: validate and convert one label; answers its new length.
+func uts46_process_label(dest: CodePointBuffer*, label_start_: usize, label_length_: usize, to_ascii: bool, options: u32, info: IdnaInfo*) -> usize:
+    let dest_label_start = label_start_
+    var dest_label_length = label_length_
+    var label_length = label_length_
+    var was_punycode = false
+    # The label being checked: a copy of dest's label, or the Punycode-decoded label.
+    var label = CodePointBuffer.create(label_length + 1)
+    label.append_all(dest.view()[label_start_..<label_start_ + label_length])
+    let first4 = label.view()
+    if label_length >= 4 and first4[0] == 0x78 and first4[1] == 0x6e and first4[2] == 0x2d and first4[3] == 0x2d:
+        # Label starts with "xn--", try to un-Punycode it.
+        # In IDNA2008, labels like "xn--" (decodes to an empty string) and
+        # "xn--ASCII-" (decodes to just "ASCII") fail the round-trip validation from
+        # comparing the ToUnicode input with the back-to-ToASCII output.
+        # They are alternate encodings of the respective ASCII labels.
+        # Ignore "xn---" here: It will fail Punycode.decode() which logically comes before
+        # the round-trip verification.
+        if label_length == 4 or (label_length > 5 and first4[label_length - 1] == 0x2d):
+            info.label_errors |= uidna_error_invalid_ace_label
+            return uts46_mark_bad_ace_label(dest, dest_label_start, dest_label_length, to_ascii, options, info)
+        was_punycode = true
+        var from_punycode = CodePointBuffer.create(1)
+        if let decoded_label = punycode_decode(first4[4..]):
+            from_punycode = decoded_label
+        else:
+            info.label_errors |= uidna_error_punycode
+            return uts46_mark_bad_ace_label(dest, dest_label_start, dest_label_length, to_ascii, options, info)
+        # Check for NFC, and for characters that are not
+        # valid or deviation characters according to the normalizer.
+        # If there is something wrong, then the string will change.
+        # Note that the normalizer passes through non-LDH ASCII and deviation characters.
+        # Deviation characters are ok in Punycode even in transitional processing.
+        # In the code further below, if we find non-LDH ASCII and we have UIDNA_USE_STD3_RULES
+        # then we will set UIDNA_ERROR_INVALID_ACE_LABEL there too.
+        let is_valid = uts46_is_normalized(from_punycode.view())
+        # Unicode 15.1 UTS #46:
+        # Added an additional condition in 4.1 Validity Criteria to
+        # disallow labels such as xn--xn---epa., which do not round-trip.
+        # --> Validity Criteria new criterion 4:
+        # If not CheckHyphens, the label must not begin with “xn--”.
+        let decoded = from_punycode.view()
+        let starts_with_xn = decoded.length >= 4 and decoded[0] == 0x78 and decoded[1] == 0x6e and decoded[2] == 0x2d and decoded[3] == 0x2d
+        if not is_valid or starts_with_xn:
+            info.label_errors |= uidna_error_invalid_ace_label
+            return uts46_mark_bad_ace_label(dest, dest_label_start, dest_label_length, to_ascii, options, info)
+        label = from_punycode
+        label_length = label.count
+    # Validity check
+    if label_length == 0:
+        info.label_errors |= uidna_error_empty_label
+        replace_label(dest, dest_label_start, dest_label_length, label.view())
+        return label_length
+    # labelLength>0
+    let s = label.items
+    if label_length >= 4 and s[2] == 0x2d and s[3] == 0x2d:
+        # label starts with "??--"
+        info.label_errors |= uidna_error_hyphen_3_4
+    if s[0] == 0x2d:
+        # label starts with "-"
+        info.label_errors |= uidna_error_leading_hyphen
+    if s[label_length - 1] == 0x2d:
+        # label ends with "-"
+        info.label_errors |= uidna_error_trailing_hyphen
+    # If the label was not a Punycode label, then it was the result of
+    # mapping, normalization and label segmentation.
+    # If the label was in Punycode, then we mapped it again above
+    # and checked its validity.
+    # Now we handle the STD3 restriction to LDH characters (if set)
+    # and we look for U+FFFD which indicates disallowed characters
+    # in a non-Punycode label or U+FFFD itself in a Punycode label.
+    # We also check for dots which can come from the input to a single-label function.
+    var ored_chars: u32 = 0
+    # If we enforce STD3 rules, then ASCII characters other than LDH and dot are disallowed.
+    let disallow_non_ldh_dot = (options & uidna_use_std3_rules) != 0
+    for index in 0..<label_length:
+        let c = s[index]
+        if c <= 0x7f:
+            if c == 0x2e:
+                info.label_errors |= uidna_error_label_has_dot
+                s[index] = 0xfffd
+            elif disallow_non_ldh_dot and ascii_data(c) < 0:
+                info.label_errors |= uidna_error_disallowed
+                s[index] = 0xfffd
+        else:
+            ored_chars |= c
+            if c == 0xfffd:
+                info.label_errors |= uidna_error_disallowed
+    # Check for a leading combining mark after other validity checks
+    # so that we don't report UIDNA_ERROR_DISALLOWED for the U+FFFD from here.
+    if (ucd_general_category_mask(s[0]) & u_gc_m_mask) != 0:
+        info.label_errors |= uidna_error_leading_combining_mark
+        s[0] = 0xfffd
+    let label_view = label.view()
+    if (info.label_errors & severe_errors) == 0:
+        # Do contextual checks only if we do not have U+FFFD from a severe error
+        # because U+FFFD can make these checks fail.
+        if (options & uidna_check_bidi) != 0 and (not info.is_bidi or info.is_ok_bidi):
+            uts46_check_label_bidi(label_view, info)
+        if (options & uidna_check_contextj) != 0 and (ored_chars & 0x200c) == 0x200c and not uts46_is_label_ok_context_j(label_view):
+            info.label_errors |= uidna_error_contextj
+        if to_ascii:
+            if was_punycode:
+                # Leave a Punycode label unchanged if it has no severe errors.
+                if dest_label_length > 63:
+                    info.label_errors |= uidna_error_label_too_long
+                return dest_label_length
+            elif ored_chars >= 0x80:
+                # Contains non-ASCII characters.
+                var punycode = CodePointBuffer.create(label_length + 8)
+                # Write "xn--".
+                punycode.append(0x78)
+                punycode.append(0x6e)
+                punycode.append(0x2d)
+                punycode.append(0x2d)
+                if not punycode_encode(label_view, &punycode):
+                    info.failed = true
+                    return dest_label_length
+                if punycode.count > 63:
+                    info.label_errors |= uidna_error_label_too_long
+                replace_label(dest, dest_label_start, dest_label_length, punycode.view())
+                return punycode.count
+            else:
+                # all-ASCII label
+                if label_length > 63:
+                    info.label_errors |= uidna_error_label_too_long
+    else:
+        # If a Punycode label has severe errors,
+        # then leave it but make sure it does not look valid.
+        if was_punycode:
+            info.label_errors |= uidna_error_invalid_ace_label
+            return uts46_mark_bad_ace_label(dest, dest_label_start, dest_label_length, to_ascii, options, info)
+    replace_label(dest, dest_label_start, dest_label_length, label_view)
+    dest_label_length = label_length
+    return dest_label_length

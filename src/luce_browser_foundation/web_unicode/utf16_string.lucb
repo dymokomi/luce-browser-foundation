@@ -1,0 +1,79 @@
+#==============================================================================================
+#
+#   utf16_string - the AK::Utf16String methods that require UCD data
+#
+#   DESCRIPTION:
+#       Port of LibUnicode/Utf16String.cpp (lines 1-87): "definitions of AK::Utf16String
+#       methods which require UCD data", functions of web_unicode for the reason string.lucb
+#       gives. ICU's UnicodeString case mapping is casing.lucb.
+#
+#==============================================================================================
+
+## Unicode::icu_string(Utf16String): the code points of the string.
+func utf16_string_code_points(this: const ak.Utf16String*) -> CodePointBuffer:
+    let view = ak.utf16_string_base_utf16_view(&this.utf16_string_base)
+    var code_points = CodePointBuffer.create(utf16_view_length(&view) + 1)
+    if utf16_view_is_ascii(&view):
+        for byte in utf16_view_ascii(&view):
+            code_points.append((u32)byte)
+    else:
+        decode_utf16(utf16_view_units(&view), &code_points, none)
+    return code_points
+
+## Unicode::icu_string_to_utf16_string: a Utf16String of code points.
+func utf16_string_from_code_points(code_points: const u32[]) -> ak.Utf16String:
+    let units = encode_utf16_all(code_points)
+    return ak.utf16_string_from_utf16(utf16_view_of_units(units.view()))
+
+## Unicode::LocaleData::for_locale(locale), as the case locale ICU takes from it.
+func case_locale_of_view(locale: ak.StringView?) -> CaseLocale:
+    let found = locale else return CaseLocale.root
+    return case_locale_of(view_bytes(found))
+
+## Ported from Libraries/LibUnicode/Utf16String.cpp:18 AK::Utf16String::to_lowercase.
+pub func utf16_string_to_lowercase(this: const ak.Utf16String*, locale: ak.StringView? = none) -> ak.Utf16String:
+    if ak.utf16_string_base_has_ascii_storage(&this.utf16_string_base) and locale == none:
+        return ak.utf16_string_to_ascii_lowercase(this)
+
+    let icu_string = utf16_string_code_points(this)
+    # locale_data.has_value() ? icu_string.toLower(locale_data->locale()) : icu_string.toLower();
+    let lowercased = lowercase_code_points(icu_string.view(), case_locale_of_view(locale))
+
+    return utf16_string_from_code_points(lowercased.view())
+
+## Ported from Libraries/LibUnicode/Utf16String.cpp:33 AK::Utf16String::to_uppercase.
+pub func utf16_string_to_uppercase(this: const ak.Utf16String*, locale: ak.StringView? = none) -> ak.Utf16String:
+    if ak.utf16_string_base_has_ascii_storage(&this.utf16_string_base) and locale == none:
+        return ak.utf16_string_to_ascii_uppercase(this)
+
+    let icu_string = utf16_string_code_points(this)
+    let uppercased = uppercase_code_points(icu_string.view(), case_locale_of_view(locale))
+
+    return utf16_string_from_code_points(uppercased.view())
+
+## Ported from Libraries/LibUnicode/Utf16String.cpp:48 AK::Utf16String::to_titlecase.
+pub func utf16_string_to_titlecase(this: const ak.Utf16String*, locale: ak.StringView? = none, trailing_code_point_transformation: ak.TrailingCodePointTransformation = ak.TrailingCodePointTransformation.lowercase) -> ak.Utf16String:
+    # options |= U_TITLECASE_NO_LOWERCASE for PreserveExisting
+    let no_lowercase = trailing_code_point_transformation == ak.TrailingCodePointTransformation.preserve_existing
+
+    # icu_string.toTitle(nullptr, locale or icu::Locale::getDefault(), options); the default
+    # locale is the root locale's casing.
+    let icu_string = utf16_string_code_points(this)
+    let titlecased = titlecase_code_points(icu_string.view(), case_locale_of_view(locale), no_lowercase)
+
+    return utf16_string_from_code_points(titlecased.view())
+
+## Ported from Libraries/LibUnicode/Utf16String.cpp:66 AK::Utf16String::to_casefold.
+pub func utf16_string_to_casefold(this: const ak.Utf16String*) -> ak.Utf16String:
+    let icu_string = utf16_string_code_points(this)
+    let folded = case_fold_code_points(icu_string.view(), false)
+
+    return utf16_string_from_code_points(folded.view())
+
+## Ported from Libraries/LibUnicode/Utf16String.cpp:74 AK::Utf16String::to_fullwidth.
+pub func utf16_string_to_fullwidth(this: const ak.Utf16String*) -> ak.Utf16String:
+    # icu::Transliterator::createInstance("Halfwidth-Fullwidth", UTRANS_FORWARD)
+    let icu_string = utf16_string_code_points(this)
+    let fullwidth = fullwidth_code_points(icu_string.view())
+
+    return utf16_string_from_code_points(fullwidth.view())

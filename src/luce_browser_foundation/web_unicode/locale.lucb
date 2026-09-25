@@ -1,0 +1,525 @@
+#==============================================================================================
+#
+#   locale - Unicode::Locale: parsing and serializing Unicode locale identifiers
+#
+#   DESCRIPTION:
+#       Port of LibUnicode/Locale.cpp (lines 1-730) and Locale.h (lines 1-156). The parsing is
+#       Ladybird's own and ported as it is. The functions the C++ answers with ICU answer from
+#       ICU 78.2's data dumped into generated_icu_locales.lucb (available locales, likely
+#       subtags, right-to-left scripts); canonicalization puts identifiers into the canonical
+#       syntax of UTS #35 (case, order of variants, extensions and keywords) but does not
+#       replace deprecated subtags by CLDR's aliases as ICU does.
+#
+#==============================================================================================
+
+# mark: The lexer ===============================================================================
+
+## AK::GenericLexer over a StringView: the part Locale.cpp uses. (The generated
+## ak.GenericLexer[u8] has no mapped input yet; hand-written until r02 ports it.)
+struct LocaleLexer:
+    var input: const u8[]
+    var index: usize
+
+    static func over(input: ak.StringView) -> LocaleLexer:
+        return LocaleLexer(input = view_bytes(input), index = 0)
+
+    func tell() -> usize:
+        return self.index
+
+    func is_eof() -> bool:
+        return self.index >= self.input.length
+
+    ## next_is(is_any_of("-_"sv))
+    func next_is_separator() -> bool:
+        return not self.is_eof() and (self.input[self.index] == '-' or self.input[self.index] == '_')
+
+    mutating func ignore(count: usize = 1):
+        self.index = self.index + count if self.index + count <= self.input.length else self.input.length
+
+    mutating func retreat(count: usize = 1):
+        assert(self.index >= count)
+        self.index -= count
+
+    ## consume_until(is_any_of("-_"sv))
+    mutating func consume_until_separator() -> ak.StringView:
+        let start = self.index
+        while not self.is_eof() and not self.next_is_separator():
+            self.index += 1
+        return view_of_bytes(self.input[start..<self.index])
+
+    mutating func consume_specific(text: str) -> bool:
+        if self.input.length - self.index < text.length:
+            return false
+        for index in 0..<text.length:
+            if self.input[self.index + index] != text.bytes[index]:
+                return false
+        self.index += text.length
+        return true
+
+## A StringView of `bytes`.
+func view_of_bytes(bytes: const u8[]) -> ak.StringView:
+    return ak.StringView(m_characters = bytes.data, m_length = bytes.length)
+
+## MUST(String::from_utf8(view)).
+func string_of(view: ak.StringView) -> ak.String:
+    return ak.string_from_utf8(view) else trap("MUST: String::from_utf8")
+
+## The elements of an AK::Vector (its storage, AK/Vector.h).
+func vector_items[T](vector: const ak.Vector[T]*) -> const T[]:
+    var empty: const T[]
+    let items = vector.m_outline_buffer else return empty
+    return T[]((T*)items, vector.m_size)
+
+func is_ascii_alpha_byte(c: u8) -> bool:
+    return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z')
+
+func is_ascii_digit_byte(c: u8) -> bool:
+    return c >= '0' and c <= '9'
+
+func is_ascii_alphanumeric_byte(c: u8) -> bool:
+    return is_ascii_alpha_byte(c) or is_ascii_digit_byte(c)
+
+## all_of(view, predicate)
+func all_of(view: ak.StringView, predicate: func(u8) -> bool) -> bool:
+    for c in view_bytes(view):
+        if not predicate(c):
+            return false
+    return true
+
+# mark: Subtags =================================================================================
+
+## Ported from Libraries/LibUnicode/Locale.cpp:20 Unicode::is_key.
+func is_key(key: ak.StringView) -> bool:
+    # key = alphanum alpha
+    let bytes = view_bytes(key)
+    if bytes.length != 2:
+        return false
+    return is_ascii_alphanumeric_byte(bytes[0]) and is_ascii_alpha_byte(bytes[1])
+
+## Ported from Libraries/LibUnicode/Locale.cpp:28 Unicode::is_single_type.
+func is_single_type(type_: ak.StringView) -> bool:
+    # type = alphanum{3,8} (sep alphanum{3,8})*
+    # Note: Consecutive types are not handled here, that is left to the caller.
+    if type_.m_length < 3 or type_.m_length > 8:
+        return false
+    return all_of(type_, is_ascii_alphanumeric_byte)
+
+## Ported from Libraries/LibUnicode/Locale.cpp:37 Unicode::is_attribute.
+func is_attribute(type_: ak.StringView) -> bool:
+    # attribute = alphanum{3,8}
+    if type_.m_length < 3 or type_.m_length > 8:
+        return false
+    return all_of(type_, is_ascii_alphanumeric_byte)
+
+## Ported from Libraries/LibUnicode/Locale.cpp:45 Unicode::is_transformed_key.
+func is_transformed_key(key: ak.StringView) -> bool:
+    # tkey = alpha digit
+    let bytes = view_bytes(key)
+    if bytes.length != 2:
+        return false
+    return is_ascii_alpha_byte(bytes[0]) and is_ascii_digit_byte(bytes[1])
+
+## Ported from Libraries/LibUnicode/Locale.cpp:53 Unicode::is_single_transformed_value.
+func is_single_transformed_value(value: ak.StringView) -> bool:
+    # tvalue = (sep alphanum{3,8})+
+    # Note: Consecutive values are not handled here, that is left to the caller.
+    if value.m_length < 3 or value.m_length > 8:
+        return false
+    return all_of(value, is_ascii_alphanumeric_byte)
+
+## Ported from Libraries/LibUnicode/Locale.cpp:62 Unicode::consume_next_segment.
+func consume_next_segment(lexer: LocaleLexer*, with_separator: bool = true) -> ak.StringView?:
+    if with_separator:
+        if not lexer.next_is_separator():
+            return none
+        lexer.ignore()
+
+    let segment = lexer.consume_until_separator()
+    if segment.m_length == 0:
+        lexer.retreat(1 if with_separator else 0)
+        return none
+
+    return segment
+
+## Ported from Libraries/LibUnicode/Locale.cpp:81 Unicode::is_type_identifier.
+pub func is_type_identifier(identifier: ak.StringView) -> bool:
+    # type = alphanum{3,8} (sep alphanum{3,8})*
+    var lexer = LocaleLexer.over(identifier)
+
+    while true:
+        let type_ = consume_next_segment(&lexer, lexer.tell() > 0) else break
+        if not is_single_type(type_):
+            return false
+
+    return lexer.is_eof() and lexer.tell() > 0
+
+## Ported from Libraries/LibUnicode/Locale.h:101 Unicode::is_unicode_language_subtag.
+# Note: These methods only verify that the provided strings match the EBNF grammar of the
+# Unicode identifier subtag (i.e. no validation is done that the tags actually exist).
+pub func is_unicode_language_subtag(subtag: ak.StringView) -> bool:
+    # unicode_language_subtag = alpha{2,3} | alpha{5,8}
+    if subtag.m_length < 2 or subtag.m_length == 4 or subtag.m_length > 8:
+        return false
+    return all_of(subtag, is_ascii_alpha_byte)
+
+## Ported from Libraries/LibUnicode/Locale.h:109 Unicode::is_unicode_script_subtag.
+pub func is_unicode_script_subtag(subtag: ak.StringView) -> bool:
+    # unicode_script_subtag = alpha{4}
+    if subtag.m_length != 4:
+        return false
+    return all_of(subtag, is_ascii_alpha_byte)
+
+## Ported from Libraries/LibUnicode/Locale.h:117 Unicode::is_unicode_region_subtag.
+pub func is_unicode_region_subtag(subtag: ak.StringView) -> bool:
+    # unicode_region_subtag = (alpha{2} | digit{3})
+    if subtag.m_length == 2:
+        return all_of(subtag, is_ascii_alpha_byte)
+    if subtag.m_length == 3:
+        return all_of(subtag, is_ascii_digit_byte)
+    return false
+
+## Ported from Libraries/LibUnicode/Locale.h:127 Unicode::is_unicode_variant_subtag.
+pub func is_unicode_variant_subtag(subtag: ak.StringView) -> bool:
+    # unicode_variant_subtag = (alphanum{5,8} | digit alphanum{3})
+    let bytes = view_bytes(subtag)
+    if bytes.length >= 5 and bytes.length <= 8:
+        return all_of(subtag, is_ascii_alphanumeric_byte)
+    if bytes.length == 4:
+        return is_ascii_digit_byte(bytes[0]) and all_of(view_of_bytes(bytes[1..]), is_ascii_alphanumeric_byte)
+    return false
+
+# mark: Parsing =================================================================================
+
+# The states of parse_unicode_language_id.
+enum LanguageIdParseState:
+    parsing_language_or_script
+    parsing_script
+    parsing_region
+    parsing_variant
+    done
+
+## Ported from Libraries/LibUnicode/Locale.cpp:97 Unicode::parse_unicode_language_id.
+func parse_unicode_language_id_generic_lexer(lexer: LocaleLexer*) -> LanguageId?:
+    # https://unicode.org/reports/tr35/#Unicode_language_identifier
+    #
+    # unicode_language_id = "root"
+    #     OR
+    # unicode_language_id = ((unicode_language_subtag (sep unicode_script_subtag)?) | unicode_script_subtag)
+    #                       (sep unicode_region_subtag)?
+    #                       (sep unicode_variant_subtag)*
+    var language_id = LanguageId()
+
+    if lexer.consume_specific("root"):
+        language_id.is_root = true
+        return language_id
+
+    var state = LanguageIdParseState.parsing_language_or_script
+
+    while not lexer.is_eof() and state != LanguageIdParseState.done:
+        let segment = consume_next_segment(lexer, state != LanguageIdParseState.parsing_language_or_script) else return none
+
+        # The C++ switch falls through from ParsingScript to ParsingRegion to ParsingVariant.
+        if state == LanguageIdParseState.parsing_language_or_script:
+            if is_unicode_language_subtag(segment):
+                state = LanguageIdParseState.parsing_script
+                language_id.language = string_of(segment)
+            elif is_unicode_script_subtag(segment):
+                state = LanguageIdParseState.parsing_region
+                language_id.script = string_of(segment)
+            else:
+                return none
+            continue
+
+        if state == LanguageIdParseState.parsing_script:
+            if is_unicode_script_subtag(segment):
+                state = LanguageIdParseState.parsing_region
+                language_id.script = string_of(segment)
+                continue
+
+            state = LanguageIdParseState.parsing_region
+        # [[fallthrough]];
+
+        if state == LanguageIdParseState.parsing_region:
+            if is_unicode_region_subtag(segment):
+                state = LanguageIdParseState.parsing_variant
+                language_id.region = string_of(segment)
+                continue
+
+            state = LanguageIdParseState.parsing_variant
+        # [[fallthrough]];
+
+        # ParseState::ParsingVariant
+        if is_unicode_variant_subtag(segment):
+            ak.vector_append_t(&language_id.variants, string_of(segment))
+        else:
+            lexer.retreat(segment.m_length + 1)
+            state = LanguageIdParseState.done
+
+    return language_id
+
+# The states of parse_unicode_locale_extension.
+enum LocaleExtensionParseState:
+    parsing_attribute_or_keyword
+    parsing_attribute
+    parsing_keyword
+    done
+
+## Join `values` with '-' into a String (StringBuilder::join).
+func join_segments(values: const ak.StringView[]) -> ak.String:
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    for index in 0..<values.length:
+        if index > 0:
+            ak.string_builder_append_u8(&builder, '-')
+        ak.string_builder_append_string_view(&builder, values[index])
+    return ak.string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")
+
+## A small growable list of StringViews (the C++ Vector<StringView> locals).
+struct ViewList:
+    var items: ak.StringView[]
+    var count: usize
+
+    static func create() -> ViewList:
+        let items = new ak.StringView[4] else trap("out of memory")
+        return ViewList(items = items, count = 0)
+
+    mutating func append(view: ak.StringView):
+        if self.count == self.items.length:
+            let grown = new ak.StringView[self.items.length * 2] else trap("out of memory")
+            for index in 0..<self.count:
+                grown[index] = self.items[index]
+            self.items = grown
+        self.items[self.count] = view
+        self.count += 1
+
+    func view() -> const ak.StringView[]:
+        return self.items[..<self.count]
+
+## Ported from Libraries/LibUnicode/Locale.cpp:178 Unicode::parse_unicode_locale_extension.
+func parse_unicode_locale_extension(lexer: LocaleLexer*) -> LocaleExtension?:
+    # https://unicode.org/reports/tr35/#unicode_locale_extensions
+    #
+    # unicode_locale_extensions = sep [uU] ((sep keyword)+ | (sep attribute)+ (sep keyword)*)
+    var locale_extension = LocaleExtension()
+
+    var state = LocaleExtensionParseState.parsing_attribute_or_keyword
+
+    while not lexer.is_eof() and state != LocaleExtensionParseState.done:
+        let segment = consume_next_segment(lexer) else return none
+
+        if state == LocaleExtensionParseState.parsing_attribute_or_keyword:
+            state = LocaleExtensionParseState.parsing_keyword if is_key(segment) else LocaleExtensionParseState.parsing_attribute
+
+        if state == LocaleExtensionParseState.parsing_attribute:
+            if is_attribute(segment):
+                ak.vector_append_t(&locale_extension.attributes, string_of(segment))
+                continue
+
+            state = LocaleExtensionParseState.parsing_keyword
+        # [[fallthrough]];
+
+        # ParseState::ParsingKeyword:
+        # keyword = key (sep type)?
+        var keyword = Keyword(key = string_of(segment))
+        var keyword_values = ViewList.create()
+
+        if not is_key(segment):
+            lexer.retreat(segment.m_length + 1)
+            state = LocaleExtensionParseState.done
+            continue
+
+        while true:
+            let type_ = consume_next_segment(lexer)
+
+            if type_ == none or not is_single_type(type_ else ak.StringView()):
+                if let found = type_:
+                    lexer.retreat(found.m_length + 1)
+                break
+
+            keyword_values.append(type_ else break)
+
+        keyword.value = join_segments(keyword_values.view())
+
+        ak.vector_append_t(&locale_extension.keywords, keyword)
+
+    if locale_extension.attributes.m_size == 0 and locale_extension.keywords.m_size == 0:
+        return none
+    return locale_extension
+
+# The states of parse_transformed_extension.
+enum TransformedExtensionParseState:
+    parsing_language_or_field
+    parsing_language
+    parsing_field
+    done
+
+## Ported from Libraries/LibUnicode/Locale.cpp:253 Unicode::parse_transformed_extension.
+func parse_transformed_extension(lexer: LocaleLexer*) -> TransformedExtension?:
+    # https://unicode.org/reports/tr35/#transformed_extensions
+    #
+    # transformed_extensions = sep [tT] ((sep tlang (sep tfield)*) | (sep tfield)+)
+    var transformed_extension = TransformedExtension()
+
+    var state = TransformedExtensionParseState.parsing_language_or_field
+
+    while not lexer.is_eof() and state != TransformedExtensionParseState.done:
+        let segment = consume_next_segment(lexer) else return none
+
+        if state == TransformedExtensionParseState.parsing_language_or_field:
+            state = TransformedExtensionParseState.parsing_language if is_unicode_language_subtag(segment) else TransformedExtensionParseState.parsing_field
+
+        if state == TransformedExtensionParseState.parsing_language:
+            lexer.retreat(segment.m_length)
+
+            if let language_id = parse_unicode_language_id_generic_lexer(lexer):
+                transformed_extension.language = language_id
+                state = TransformedExtensionParseState.parsing_field
+                continue
+
+            return none
+
+        # ParseState::ParsingField:
+        # tfield = tkey tvalue;
+        var field = TransformedField(key = string_of(segment))
+        var field_values = ViewList.create()
+
+        if not is_transformed_key(segment):
+            lexer.retreat(segment.m_length + 1)
+            state = TransformedExtensionParseState.done
+            continue
+
+        while true:
+            let value = consume_next_segment(lexer)
+
+            if value == none or not is_single_transformed_value(value else ak.StringView()):
+                if let found = value:
+                    lexer.retreat(found.m_length + 1)
+                break
+
+            field_values.append(value else break)
+
+        if field_values.count == 0:
+            return none
+
+        field.value = join_segments(field_values.view())
+
+        ak.vector_append_t(&transformed_extension.fields, field)
+
+    if transformed_extension.language == none and transformed_extension.fields.m_size == 0:
+        return none
+    return transformed_extension
+
+## Ported from Libraries/LibUnicode/Locale.cpp:333 Unicode::parse_other_extension.
+func parse_other_extension(key: u8, lexer: LocaleLexer*) -> OtherExtension?:
+    # https://unicode.org/reports/tr35/#other_extensions
+    #
+    # other_extensions = sep [alphanum-[tTuUxX]] (sep alphanum{2,8})+ ;
+    var other_extension = OtherExtension(key = key)
+    var other_values = ViewList.create()
+
+    if not is_ascii_alphanumeric_byte(key) or key == 'x' or key == 'X':
+        return none
+
+    while true:
+        let segment = consume_next_segment(lexer) else break
+
+        if segment.m_length < 2 or segment.m_length > 8 or not all_of(segment, is_ascii_alphanumeric_byte):
+            lexer.retreat(segment.m_length + 1)
+            break
+
+        other_values.append(segment)
+
+    if other_values.count == 0:
+        return none
+
+    other_extension.value = join_segments(other_values.view())
+
+    return other_extension
+
+## Ported from Libraries/LibUnicode/Locale.cpp:367 Unicode::parse_extension.
+func parse_extension(lexer: LocaleLexer*) -> Extension?:
+    # https://unicode.org/reports/tr35/#extensions
+    #
+    # extensions = unicode_locale_extensions | transformed_extensions | other_extensions
+    let starting_position = lexer.tell()
+
+    if let header = consume_next_segment(lexer):
+        if header.m_length == 1:
+            let key = view_bytes(header)[0]
+            match key:
+                'u', 'U':
+                    if let extension = parse_unicode_locale_extension(lexer):
+                        return Extension.locale_extension(value = extension)
+                't', 'T':
+                    if let extension = parse_transformed_extension(lexer):
+                        return Extension.transformed_extension(value = extension)
+                _:
+                    if let extension = parse_other_extension(key, lexer):
+                        return Extension.other_extension(value = extension)
+
+    lexer.retreat(lexer.tell() - starting_position)
+    return none
+
+## Ported from Libraries/LibUnicode/Locale.cpp:399 Unicode::parse_private_use_extensions.
+func parse_private_use_extensions(lexer: LocaleLexer*) -> ak.Vector[ak.String]:
+    # https://unicode.org/reports/tr35/#pu_extensions
+    #
+    # pu_extensions = = sep [xX] (sep alphanum{1,8})+ ;
+    let starting_position = lexer.tell()
+
+    var none_: ak.Vector[ak.String]
+    let header = consume_next_segment(lexer) else return none_
+
+    let header_bytes = view_bytes(header)
+    if header_bytes.length == 1 and (header_bytes[0] == 'x' or header_bytes[0] == 'X'):
+        # parse_values
+        var extensions: ak.Vector[ak.String]
+
+        while true:
+            let segment = consume_next_segment(lexer) else break
+
+            if segment.m_length < 1 or segment.m_length > 8 or not all_of(segment, is_ascii_alphanumeric_byte):
+                lexer.retreat(segment.m_length + 1)
+                break
+
+            ak.vector_append_t(&extensions, string_of(segment))
+
+        if extensions.m_size != 0:
+            return extensions
+
+    lexer.retreat(lexer.tell() - starting_position)
+    return none_
+
+## Ported from Libraries/LibUnicode/Locale.cpp:438 Unicode::parse_unicode_language_id.
+pub func parse_unicode_language_id_string_view(language: ak.StringView) -> LanguageId?:
+    var lexer = LocaleLexer.over(language)
+
+    let language_id = parse_unicode_language_id_generic_lexer(&lexer)
+    if not lexer.is_eof():
+        return none
+
+    return language_id
+
+## Ported from Libraries/LibUnicode/Locale.cpp:449 Unicode::parse_unicode_locale_id.
+pub func parse_unicode_locale_id(locale: ak.StringView) -> LocaleId?:
+    var lexer = LocaleLexer.over(locale)
+
+    # https://unicode.org/reports/tr35/#Unicode_locale_identifier
+    #
+    # unicode_locale_id = unicode_language_id
+    #                     extensions*
+    #                     pu_extensions?
+    let language_id = parse_unicode_language_id_generic_lexer(&lexer) else return none
+
+    var locale_id = LocaleId(language_id = language_id)
+
+    while true:
+        let extension = parse_extension(&lexer) else break
+        ak.vector_append_t(&locale_id.extensions, extension)
+
+    locale_id.private_use_extensions = parse_private_use_extensions(&lexer)
+
+    if not lexer.is_eof():
+        return none
+
+    return locale_id

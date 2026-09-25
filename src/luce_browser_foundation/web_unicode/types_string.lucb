@@ -14,5 +14,7 @@
 
 ## AK::ResolvedLocale (Libraries/LibUnicode/String.cpp:21).
 pub struct ResolvedLocale:
-    pub var buffer: ak.ByteString
-    pub var locale: const u8*?  # C++ default: { nullptr }
+    # Hand-edited: C++ copies the locale into a ByteString to hand ICU a C string; the ICU
+    # replacement takes the locale's bytes.
+    pub var buffer: const u8[]
+    pub var locale: (const u8[])?  # C++ default: { nullptr }

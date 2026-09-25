@@ -1,0 +1,132 @@
+#==============================================================================================
+#
+#   break_sentence - sentence boundaries (UAX #29)
+#
+#   DESCRIPTION:
+#       Not a port: replaces ICU's sentence break iterator (ICU 78's sent.txt, which is
+#       UAX #29's sentence boundary rules for Unicode 17).
+#
+#==============================================================================================
+
+# USentenceBreak values.
+let sb_other: u32 = 0
+let sb_aterm: u32 = 1
+let sb_close: u32 = 2
+let sb_format: u32 = 3
+let sb_lower: u32 = 4
+let sb_numeric: u32 = 5
+let sb_oletter: u32 = 6
+let sb_sep: u32 = 7
+let sb_sp: u32 = 8
+let sb_sterm: u32 = 9
+let sb_upper: u32 = 10
+let sb_cr: u32 = 11
+let sb_extend: u32 = 12
+let sb_lf: u32 = 13
+let sb_scontinue: u32 = 14
+
+func is_sentence_ignorable(class: u32) -> bool:
+    return class == sb_extend or class == sb_format
+
+func is_para_sep(class: u32) -> bool:
+    return class == sb_sep or class == sb_cr or class == sb_lf
+
+func is_saterm(class: u32) -> bool:
+    return class == sb_sterm or class == sb_aterm
+
+## Append the sentence boundaries of `code_points` to `boundaries`.
+func sentence_boundaries(code_points: const u32[], boundaries: CodePointBuffer*):
+    boundaries.append(0)
+    let count = code_points.length
+    if count == 0:
+        return
+    var classes = CodePointBuffer.create(count)
+    for code_point in code_points:
+        classes.append(ucd_sentence_break(code_point))
+    let class = classes.view()
+    # SB5: base[i] is the character an Extend or Format character attaches to; one at the
+    # start of text or after a paragraph separator is its own base.
+    var base = CodePointBuffer.create(count)
+    for index in 0..<count:
+        if index > 0 and is_sentence_ignorable(class[index]) and not is_para_sep(class[(usize)base.items[index - 1]]):
+            base.append(base.items[index - 1])
+        else:
+            base.append((u32)index)
+    # For SB8: the first character at or after i (over bases) that is OLetter, Upper, Lower,
+    # a paragraph separator or an SATerm, or `count`.
+    var significant = CodePointBuffer.create(count + 1)
+    for _unused in 0..=count:
+        significant.append((u32)count)
+    var index = count
+    while index > 0:
+        index -= 1
+        let c = class[index]
+        let is_significant = not is_sentence_ignorable(c) and (c == sb_oletter or c == sb_upper or c == sb_lower or is_para_sep(c) or is_saterm(c))
+        significant.items[index] = (u32)index if is_significant else significant.items[index + 1]
+
+    # The context ending before the position: 0 none, 1 SATerm Close*, 2 SATerm Close* Sp+;
+    # whether its SATerm is an ATerm; the class of the base before the SATerm.
+    var context: u32 = 0
+    var context_is_aterm = false
+    var before_aterm = sb_other
+    var previous_base_class = sb_other
+    context = sentence_context(context, class[0])
+    context_is_aterm = class[0] == sb_aterm
+    previous_base_class = class[0]
+    for position in 1..<count:
+        let current = class[position]
+        let raw_previous = class[position - 1]
+        let previous = class[(usize)base.items[position - 1]]
+        var joined = true
+        # SB3: CR × LF
+        if raw_previous == sb_cr and current == sb_lf:
+            joined = true
+        # SB4: ParaSep ÷
+        elif is_para_sep(raw_previous):
+            joined = false
+        # SB5: X (Extend | Format)* → X
+        elif is_sentence_ignorable(current):
+            joined = true
+        # SB6: ATerm × Numeric
+        elif previous == sb_aterm and current == sb_numeric:
+            joined = true
+        # SB7: (Upper | Lower) ATerm × Upper
+        elif previous == sb_aterm and (before_aterm == sb_upper or before_aterm == sb_lower) and current == sb_upper:
+            joined = true
+        # SB8: ATerm Close* Sp* × ( ¬(OLetter | Upper | Lower | ParaSep | SATerm) )* Lower
+        elif context != 0 and context_is_aterm and significant.items[position] < (u32)count and class[(usize)significant.items[position]] == sb_lower:
+            joined = true
+        # SB8a: SATerm Close* Sp* × (SContinue | SATerm)
+        elif context != 0 and (current == sb_scontinue or is_saterm(current)):
+            joined = true
+        # SB9: SATerm Close* × (Close | Sp | ParaSep)
+        elif context == 1 and (current == sb_close or current == sb_sp or is_para_sep(current)):
+            joined = true
+        # SB10: SATerm Close* Sp* × (Sp | ParaSep)
+        elif context != 0 and (current == sb_sp or is_para_sep(current)):
+            joined = true
+        # SB11: SATerm Close* Sp* ParaSep? ÷
+        elif context != 0:
+            joined = false
+        # SB998: Any × Any
+        else:
+            joined = true
+        if not joined:
+            boundaries.append((u32)position)
+        if not is_sentence_ignorable(current) or position == (usize)base.items[position]:
+            if is_saterm(current):
+                before_aterm = previous_base_class
+            context_is_aterm = current == sb_aterm if is_saterm(current) else context_is_aterm
+            context = sentence_context(context, current)
+            previous_base_class = current
+    boundaries.append((u32)count)
+
+## The SATerm Close* Sp* context after a character of class `class`.
+func sentence_context(context: u32, class: u32) -> u32:
+    if is_saterm(class):
+        return 1
+    if class == sb_close and context == 1:
+        return 1
+    if class == sb_sp and context != 0:
+        return 2
+    return 0

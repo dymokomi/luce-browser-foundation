@@ -152,11 +152,21 @@ pub func as_ascii_grapheme_segmenter[P: IsSegmenter](p: P*) -> AsciiGraphemeSegm
 
 # mark: SegmenterImpl ===========================================================================
 
+## Variant<Empty, String, icu::UnicodeString>: the text a SegmenterImpl segments (hand-edited:
+## the ICU UnicodeString is the copied UTF-16 code units; `utf8` holds a String's bytes, or a
+## copy of an ASCII Utf16View's bytes, which C++ converts to a String with the same offsets).
+pub enum SegmentedText:
+    empty
+    utf8(string: ak.String?, bytes: const u8[])
+    utf16(units: const u16[])
+
 ## Unicode::SegmenterImpl (Libraries/LibUnicode/Segmenter.cpp:134).
 pub struct SegmenterImpl: IsSegmenterImpl, IsSegmenter:
     pub var segmenter_base: Segmenter  # primary base
-    pub var m_segmenter: Icu78BreakIterator*
-    pub var m_segmented_text: ak.EmptyOrStringOrIcu78UnicodeString
+    # The ICU replacement (hand-edited: icu::BreakIterator and the Variant with
+    # icu::UnicodeString become web_unicode's BreakIterator and SegmentedText).
+    pub var m_segmenter: BreakIterator*
+    pub var m_segmented_text: SegmentedText
 
     func segmenter_impl() -> SegmenterImpl*: return (SegmenterImpl*)&self
 

@@ -1,0 +1,408 @@
+#==============================================================================================
+#
+#   idna_2 - UTS #46 validity checks and Punycode (ICU uts46.cpp, punycode.cpp)
+#
+#   DESCRIPTION:
+#       The rest of the ICU code idna.lucb replaces: UTS46::markBadACELabel, checkLabelBiDi,
+#       isASCIIOkBiDi and isLabelOkContextJ of ICU 78's uts46.cpp, and u_strToPunycode and
+#       u_strFromPunycode of punycode.cpp, © Unicode, Inc. and others, Unicode License v3.
+#
+#==============================================================================================
+
+# mark: UTS46 validity (ICU uts46.cpp) ==========================================================
+
+## UTS46::markBadACELabel: make sure an ACE label does not look valid. Append U+FFFD if the
+## label has only LDH characters; with UIDNA_USE_STD3_RULES, also replace disallowed ASCII
+## characters with U+FFFD.
+func uts46_mark_bad_ace_label(dest: CodePointBuffer*, label_start: usize, label_length_: usize, to_ascii: bool, options: u32, info: IdnaInfo*) -> usize:
+    var label_length = label_length_
+    let disallow_non_ldh_dot = (options & uidna_use_std3_rules) != 0
+    var is_ascii = true
+    var only_ldh = true
+    # Start after the initial "xn--".
+    for index in label_start + 4..<label_start + label_length:
+        let c = dest.items[index]
+        if c <= 0x7f:
+            if c == 0x2e:
+                info.label_errors |= uidna_error_label_has_dot
+                dest.items[index] = 0xfffd
+                is_ascii = false
+                only_ldh = false
+            elif ascii_data(c) < 0:
+                only_ldh = false
+                if disallow_non_ldh_dot:
+                    dest.items[index] = 0xfffd
+                    is_ascii = false
+        else:
+            is_ascii = false
+            only_ldh = false
+    if only_ldh:
+        let marker: u32[1] = [0xfffd]
+        replace_label(dest, label_start + label_length, 0, marker)
+        label_length += 1
+    else:
+        if to_ascii and is_ascii and label_length > 63:
+            info.label_errors |= uidna_error_label_too_long
+    return label_length
+
+# UCharDirection masks of the BiDi rule.
+func direction_mask(direction: u32) -> u32:
+    return (u32)1 << direction
+
+let l_mask: u32 = 1
+let r_al_mask: u32 = (1 << 1) | (1 << 13)
+let l_r_al_mask: u32 = l_mask | r_al_mask
+let r_al_an_mask: u32 = r_al_mask | (1 << 5)
+let en_an_mask: u32 = (1 << 2) | (1 << 5)
+let r_al_en_an_mask: u32 = r_al_mask | en_an_mask
+let l_en_mask: u32 = l_mask | (1 << 2)
+# ES, CS, ET, ON, BN, NSM
+let es_cs_et_on_bn_nsm_mask: u32 = (1 << 3) | (1 << 6) | (1 << 4) | (1 << 10) | (1 << 18) | (1 << 17)
+let l_en_es_cs_et_on_bn_nsm_mask: u32 = l_en_mask | es_cs_et_on_bn_nsm_mask
+let r_al_an_en_es_cs_et_on_bn_nsm_mask: u32 = r_al_mask | en_an_mask | es_cs_et_on_bn_nsm_mask
+
+## UTS46::checkLabelBiDi.
+# We scan the whole label and check both for whether it contains RTL characters
+# and whether it passes the BiDi Rule.
+# In a BiDi domain name, all labels must pass the BiDi Rule, but we might find
+# that a domain name is a BiDi domain name (has an RTL label) only after
+# processing several earlier labels.
+func uts46_check_label_bidi(label: const u32[], info: IdnaInfo*):
+    # IDNA2008 BiDi rule
+    # Get the directionality of the first character.
+    var i: usize = 1
+    let first_mask = direction_mask(ucd_bidi_class(label[0]))
+    # 1. The first character must be a character with BIDI property L, R
+    # or AL.  If it has the R or AL property, it is an RTL label; if it
+    # has the L property, it is an LTR label.
+    if (first_mask & ~l_r_al_mask) != 0:
+        info.is_ok_bidi = false
+    # Get the directionality of the last non-NSM character.
+    var last_mask: u32 = 0
+    var label_length = label.length
+    while true:
+        if i >= label_length:
+            last_mask = first_mask
+            break
+        label_length -= 1
+        let direction = ucd_bidi_class(label[label_length])
+        if direction != 17:
+            last_mask = direction_mask(direction)
+            break
+    # 3. In an RTL label, the end of the label must be a character with
+    # BIDI property R, AL, EN or AN, followed by zero or more
+    # characters with BIDI property NSM.
+    # 6. In an LTR label, the end of the label must be a character with
+    # BIDI property L or EN, followed by zero or more characters with
+    # BIDI property NSM.
+    let bad_end = (last_mask & ~l_en_mask) != 0 if (first_mask & l_mask) != 0 else (last_mask & ~r_al_en_an_mask) != 0
+    if bad_end:
+        info.is_ok_bidi = false
+    # Add the directionalities of the intervening characters.
+    var mask = first_mask | last_mask
+    while i < label_length:
+        mask |= direction_mask(ucd_bidi_class(label[i]))
+        i += 1
+    if (first_mask & l_mask) != 0:
+        # 5. In an LTR label, only characters with the BIDI properties L, EN,
+        # ES, CS, ET, ON, BN and NSM are allowed.
+        if (mask & ~l_en_es_cs_et_on_bn_nsm_mask) != 0:
+            info.is_ok_bidi = false
+    else:
+        # 2. In an RTL label, only characters with the BIDI properties R, AL,
+        # AN, EN, ES, CS, ET, ON, BN and NSM are allowed.
+        if (mask & ~r_al_an_en_es_cs_et_on_bn_nsm_mask) != 0:
+            info.is_ok_bidi = false
+        # 4. In an RTL label, if an EN is present, no AN may be present, and
+        # vice versa.
+        if (mask & en_an_mask) == en_an_mask:
+            info.is_ok_bidi = false
+    # An RTL label is a label that contains at least one character of type
+    # R, AL or AN. [...]
+    # A "BIDI domain name" is a domain name that contains at least one RTL
+    # label. [...]
+    # The following rule, consisting of six conditions, applies to labels
+    # in BIDI domain names.
+    if (mask & r_al_an_mask) != 0:
+        info.is_bidi = true
+
+## isASCIIOkBiDi, the UTF-8 version, called for the source ASCII prefix (which can contain
+## uppercase A-Z). s[length-1] must be the trailing dot.
+# IDNA2008 BiDi rule, parts relevant to ASCII labels:
+# 1. The first character must be a character with BIDI property L [...]
+# 5. In an LTR label, only characters with the BIDI properties L, EN,
+# ES, CS, ET, ON, BN and NSM are allowed.
+# 6. In an LTR label, the end of the label must be a character with
+# BIDI property L or EN [...]
+func is_ascii_ok_bidi(s: const u8[]) -> bool:
+    var label_start: usize = 0
+    for i in 0..<s.length:
+        var c = s[i]
+        if c == 0x2e:
+            # dot
+            if i > label_start:
+                c = s[i - 1]
+                if not (0x61 <= c and c <= 0x7a) and not (0x41 <= c and c <= 0x5a) and not (0x30 <= c and c <= 0x39):
+                    # Last character in the label is not an L or EN.
+                    return false
+            label_start = i + 1
+        elif i == label_start:
+            if not (0x61 <= c and c <= 0x7a) and not (0x41 <= c and c <= 0x5a):
+                # First character in the label is not an L.
+                return false
+        else:
+            if c <= 0x20 and (c >= 0x1c or (9 <= c and c <= 0xd)):
+                # Intermediate character in the label is a B, S or WS.
+                return false
+    return true
+
+# UJoiningType values.
+let u_jt_dual_joining: u32 = 2
+let u_jt_left_joining: u32 = 3
+let u_jt_right_joining: u32 = 4
+let u_jt_transparent: u32 = 5
+
+## UTS46::isLabelOkContextJ.
+func uts46_is_label_ok_context_j(label: const u32[]) -> bool:
+    # [IDNA2008-Tables]
+    # 200C..200D  ; CONTEXTJ    # ZERO WIDTH NON-JOINER..ZERO WIDTH JOINER
+    for i in 0..<label.length:
+        if label[i] == 0x200c:
+            # Appendix A.1. ZERO WIDTH NON-JOINER
+            # Rule Set:
+            #  False;
+            #  If Canonical_Combining_Class(Before(cp)) .eq.  Virama Then True;
+            #  If RegExpMatch((Joining_Type:{L,D})(Joining_Type:T)*‌
+            #     (Joining_Type:T)*(Joining_Type:{R,D})) Then True;
+            if i == 0:
+                return false
+            var j = i - 1
+            var c = label[j]
+            if ucd_combining_class(c) == 9:
+                continue
+            # check precontext (Joining_Type:{L,D})(Joining_Type:T)*
+            while true:
+                let type_ = ucd_joining_type(c)
+                if type_ == u_jt_transparent:
+                    if j == 0:
+                        return false
+                    j -= 1
+                    c = label[j]
+                elif type_ == u_jt_left_joining or type_ == u_jt_dual_joining:
+                    # precontext fulfilled
+                    break
+                else:
+                    return false
+            # check postcontext (Joining_Type:T)*(Joining_Type:{R,D})
+            j = i + 1
+            while true:
+                if j == label.length:
+                    return false
+                let type_ = ucd_joining_type(label[j])
+                j += 1
+                if type_ == u_jt_transparent:
+                    # just skip this character
+                    continue
+                elif type_ == u_jt_right_joining or type_ == u_jt_dual_joining:
+                    # postcontext fulfilled
+                    break
+                else:
+                    return false
+        elif label[i] == 0x200d:
+            # Appendix A.2. ZERO WIDTH JOINER (U+200D)
+            # Rule Set:
+            #  False;
+            #  If Canonical_Combining_Class(Before(cp)) .eq.  Virama Then True;
+            if i == 0:
+                return false
+            if ucd_combining_class(label[i - 1]) != 9:
+                return false
+    return true
+
+# mark: Punycode (ICU punycode.cpp) =============================================================
+
+let punycode_base: i64 = 36
+let punycode_tmin: i64 = 1
+let punycode_tmax: i64 = 26
+let punycode_skew: i64 = 38
+let punycode_damp: i64 = 700
+let punycode_initial_bias: i64 = 72
+let punycode_initial_n: i64 = 0x80
+# ICU-13727: Limit input length for n^2 algorithm
+# where well-formed strings are at most 59 characters long.
+let punycode_encode_max_code_units: usize = 1000
+let punycode_decode_max_chars: usize = 2000
+
+## digitToBasic, lowercase: 0..25 map to ASCII a..z, 26..35 map to ASCII 0..9.
+func punycode_digit_to_basic(digit: i64) -> u32:
+    if digit < 26:
+        return (u32)(0x61 + digit)
+    return (u32)(0x30 - 26 + digit)
+
+## decodeDigit: the numeric value of a basic code point, or -1.
+func punycode_decode_digit(cp: u32) -> i64:
+    if cp <= 0x5a:
+        if cp <= 0x39:
+            if cp < 0x30:
+                return -1
+            # 0..9 -> 26..35
+            return (i64)(cp - 0x30) + 26
+        if cp < 0x41:
+            return -1
+        # A-Z -> 0..25
+        return (i64)(cp - 0x41)
+    if cp >= 0x61 and cp <= 0x7a:
+        # a..z -> 0..25
+        return (i64)(cp - 0x61)
+    return -1
+
+## Bias adaptation function.
+func punycode_adapt_bias(delta_: i64, length: i64, first_time: bool) -> i64:
+    var delta = delta_ // punycode_damp if first_time else delta_ // 2
+    delta += delta // length
+    var count: i64 = 0
+    while delta > ((punycode_base - punycode_tmin) * punycode_tmax) // 2:
+        delta = delta // (punycode_base - punycode_tmin)
+        count += punycode_base
+    return count + ((punycode_base - punycode_tmin + 1) * delta) // (delta + punycode_skew)
+
+## u_strToPunycode without case flags, appending to `dest`; false on ICU's errors
+## (U_INPUT_TOO_LONG_ERROR, U_INTERNAL_PROGRAM_ERROR).
+func punycode_encode(source: const u32[], dest: CodePointBuffer*) -> bool:
+    var utf16_length: usize = 0
+    for c in source:
+        utf16_length += 2 if c >= 0x10000 else 1
+    if utf16_length > punycode_encode_max_code_units:
+        return false
+    # Handle the basic code points.
+    var basic_length: i64 = 0
+    for c in source:
+        if c < 0x80:
+            dest.append(c)
+            basic_length += 1
+    # Finish the basic string - if it is not empty - with a delimiter.
+    if basic_length > 0:
+        dest.append(0x2d)
+    let src_cp_count = (i64)source.length
+    var n = punycode_initial_n
+    var delta: i64 = 0
+    var bias = punycode_initial_bias
+    var handled_cp_count = basic_length
+    while handled_cp_count < src_cp_count:
+        # All non-basic code points < n have been handled already. Find the next larger one:
+        var m: i64 = 0x7fffffff
+        for c in source:
+            let q = (i64)c
+            if n <= q and q < m:
+                m = q
+        # Increase delta enough to advance the decoder's <n,i> state to <m,0>, but guard
+        # against overflow:
+        if m - n > (0x7fffffff - handled_cp_count - delta) // (handled_cp_count + 1):
+            return false
+        delta += (m - n) * (handled_cp_count + 1)
+        n = m
+        # Encode a sequence of same code points n
+        for c in source:
+            let q_value = (i64)c
+            if q_value < n:
+                delta += 1
+            elif q_value == n:
+                # Represent delta as a generalized variable-length integer:
+                var q = delta
+                var k = punycode_base
+                while true:
+                    var t = k - bias
+                    if t < punycode_tmin:
+                        t = punycode_tmin
+                    elif k >= bias + punycode_tmax:
+                        t = punycode_tmax
+                    if q < t:
+                        break
+                    dest.append(punycode_digit_to_basic(t + (q - t) % (punycode_base - t)))
+                    q = (q - t) // (punycode_base - t)
+                    k += punycode_base
+                dest.append(punycode_digit_to_basic(q))
+                bias = punycode_adapt_bias(delta, handled_cp_count + 1, handled_cp_count == basic_length)
+                delta = 0
+                handled_cp_count += 1
+        delta += 1
+        n += 1
+    return true
+
+## u_strFromPunycode without case flags: the decoded code points, or none on an error.
+func punycode_decode(source: const u32[]) -> CodePointBuffer?:
+    let src_length = source.length
+    if src_length > punycode_decode_max_chars:
+        return none
+    # Handle the basic code points: let basicLength be the number of input code points
+    # before the last delimiter, or 0 if there is none, then copy the first basicLength
+    # code points to the output.
+    var j = src_length
+    while j > 0:
+        j -= 1
+        if source[j] == 0x2d:
+            break
+    let basic_length = j
+    var dest = CodePointBuffer.create(src_length + 1)
+    for index in 0..<basic_length:
+        let b = source[index]
+        if b >= 0x80:
+            return none
+        dest.append(b)
+    # Initialize the state:
+    var n = punycode_initial_n
+    var i: i64 = 0
+    var bias = punycode_initial_bias
+    var dest_cp_count = (i64)basic_length
+    # Main decoding loop: start just after the last delimiter if any basic code points
+    # were copied; start at the beginning otherwise.
+    var input = basic_length + 1 if basic_length > 0 else 0
+    while input < src_length:
+        # Decode a generalized variable-length integer into delta, which gets added to i.
+        let oldi = i
+        var w: i64 = 1
+        var k = punycode_base
+        while true:
+            if input >= src_length:
+                return none
+            let digit = punycode_decode_digit(source[input])
+            input += 1
+            if digit < 0:
+                return none
+            if digit > (0x7fffffff - i) // w:
+                # integer overflow
+                return none
+            i += digit * w
+            var t = k - bias
+            if t < punycode_tmin:
+                t = punycode_tmin
+            elif k >= bias + punycode_tmax:
+                t = punycode_tmax
+            if digit < t:
+                break
+            if w > 0x7fffffff // (punycode_base - t):
+                # integer overflow
+                return none
+            w *= punycode_base - t
+            k += punycode_base
+        dest_cp_count += 1
+        bias = punycode_adapt_bias(i - oldi, dest_cp_count, oldi == 0)
+        # i was supposed to wrap around from (incremented) destCPCount to 0, incrementing n
+        # each time, so we'll fix that now:
+        if i // dest_cp_count > 0x7fffffff - n:
+            # integer overflow
+            return none
+        n += i // dest_cp_count
+        i = i % dest_cp_count
+        if n > 0x10ffff or (n >= 0xd800 and n <= 0xdfff):
+            # Unicode code point overflow
+            return none
+        # Insert n at position i of the output.
+        dest.append(0)
+        var position = dest.count - 1
+        while position > (usize)i:
+            dest.items[position] = dest.items[position - 1]
+            position -= 1
+        dest.items[(usize)i] = (u32)n
+        i += 1
+    return dest

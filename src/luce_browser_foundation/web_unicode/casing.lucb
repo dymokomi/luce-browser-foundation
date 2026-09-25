@@ -1,0 +1,471 @@
+#==============================================================================================
+#
+#   casing - full case mapping, case folding, case closure and width mapping
+#
+#   DESCRIPTION:
+#       Not a port: replaces ICU's ucase.cpp and ustrcase.cpp (u_strToLower, u_strToUpper,
+#       u_strToTitle, u_strFoldCase, UnicodeSet::closeOver(USET_CASE_INSENSITIVE)) and the
+#       Halfwidth-Fullwidth transliterator, over the tables of generated_ucd_casing.lucb.
+#       The context conditions of SpecialCasing.txt (Final_Sigma, More_Above, ...) and the
+#       case locales of ICU (Turkish/Azeri, Lithuanian, Dutch titlecasing, Armenian) are ICU's.
+#       ICU's special uppercasing of Greek (removing accents) is not implemented: Greek text
+#       is uppercased as in the root locale.
+#
+#==============================================================================================
+
+# mark: Case locales ============================================================================
+
+## ICU's UCASE_LOC_*: the languages whose case mappings differ from the root locale's.
+enum CaseLocale:
+    root
+    turkish
+    lithuanian
+    greek
+    dutch
+    armenian
+
+## ucase_getCaseLocale: the case locale of a locale identifier's language subtag.
+func case_locale_of(locale: const u8[]) -> CaseLocale:
+    var end: usize = 0
+    while end < locale.length and locale[end] != '-' and locale[end] != '_':
+        end += 1
+    let language = locale[..<end]
+    if ascii_equals_ignoring_case(language, "tr") or ascii_equals_ignoring_case(language, "tur") or ascii_equals_ignoring_case(language, "az") or ascii_equals_ignoring_case(language, "aze"):
+        return CaseLocale.turkish
+    if ascii_equals_ignoring_case(language, "lt") or ascii_equals_ignoring_case(language, "lit"):
+        return CaseLocale.lithuanian
+    if ascii_equals_ignoring_case(language, "el") or ascii_equals_ignoring_case(language, "ell"):
+        return CaseLocale.greek
+    if ascii_equals_ignoring_case(language, "nl") or ascii_equals_ignoring_case(language, "nld"):
+        return CaseLocale.dutch
+    if ascii_equals_ignoring_case(language, "hy") or ascii_equals_ignoring_case(language, "hye"):
+        return CaseLocale.armenian
+    return CaseLocale.root
+
+func ascii_equals_ignoring_case(bytes: const u8[], text: str) -> bool:
+    if bytes.length != text.length:
+        return false
+    for index in 0..<bytes.length:
+        var a = bytes[index]
+        if a >= 'A' and a <= 'Z':
+            a += 32
+        if a != text.bytes[index]:
+            return false
+    return true
+
+# mark: Case mapping tables =====================================================================
+
+let case_mapping_digits: usize = 50
+
+## The digit offset of the case mapping entry of `code_point`, or none.
+func case_mapping_entry(code_point: u32) -> usize?:
+    var low: usize = 0
+    var high = ucd_case_mappings.length // case_mapping_digits
+    while low < high:
+        let middle = low + (high - low) // 2
+        let key = ucd_hex(ucd_case_mappings, middle * case_mapping_digits, 6)
+        if key < code_point:
+            low = middle + 1
+        elif key > code_point:
+            high = middle
+        else:
+            return middle * case_mapping_digits
+    return none
+
+# The fields of a case mapping entry.
+let case_simple_lower: usize = 6
+let case_simple_upper: usize = 12
+let case_simple_title: usize = 18
+let case_simple_fold: usize = 24
+let case_full_lower: usize = 30
+let case_full_upper: usize = 35
+let case_full_title: usize = 40
+let case_full_fold: usize = 45
+
+## A simple (single code point) case mapping: Simple_Lowercase_Mapping and friends.
+func simple_case_mapping(code_point: u32, field: usize) -> u32:
+    let entry = case_mapping_entry(code_point) else return code_point
+    return ucd_hex(ucd_case_mappings, entry + field, 6)
+
+## u_foldCase(c, U_FOLD_CASE_DEFAULT).
+func simple_case_folding(code_point: u32) -> u32:
+    return simple_case_mapping(code_point, case_simple_fold)
+
+## Append `length` code points of ucd_case_pool at `offset`.
+func append_case_pool(offset: u32, length: u32, out: CodePointBuffer*):
+    for index in 0..<(usize)length:
+        out.append(ucd_hex(ucd_case_pool, ((usize)offset + index) * 6, 6))
+
+## Append the unconditional full mapping of `full` (else the simple mapping of `simple`).
+func append_full_case_mapping(code_point: u32, full: usize, simple: usize, out: CodePointBuffer*):
+    let found = case_mapping_entry(code_point)
+    if found == none:
+        out.append(code_point)
+        return
+    let entry = found else return
+    let length = ucd_hex(ucd_case_mappings, entry + full + 4, 1)
+    if length == 0:
+        out.append(ucd_hex(ucd_case_mappings, entry + simple, 6))
+        return
+    append_case_pool(ucd_hex(ucd_case_mappings, entry + full, 4), length, out)
+
+# mark: Contexts ================================================================================
+
+# ICU's dot types (ucase.h UCASE_DOT_MASK).
+let dot_no_dot: u32 = 0
+let dot_soft_dotted: u32 = 1
+let dot_above: u32 = 2
+let dot_other_accent: u32 = 3
+
+func dot_type(code_point: u32) -> u32:
+    if ucd_has_binary_property(code_point, uchar_soft_dotted):
+        return dot_soft_dotted
+    let ccc = ucd_combining_class(code_point)
+    if ccc == 230:
+        return dot_above
+    if ccc != 0:
+        return dot_other_accent
+    return dot_no_dot
+
+## isFollowedByCasedLetter: skipping case-ignorable characters from index + direction,
+## whether the first other character is cased.
+func is_followed_by_cased_letter(text: const u32[], index: usize, direction: isize) -> bool:
+    var position = (isize)index + direction
+    while position >= 0 and position < (isize)text.length:
+        let code_point = text[(usize)position]
+        if not ucd_has_binary_property(code_point, uchar_case_ignorable):
+            return ucd_has_binary_property(code_point, uchar_cased)
+        position += direction
+    return false
+
+## isPrecededBySoftDotted.
+func is_preceded_by_soft_dotted(text: const u32[], index: usize) -> bool:
+    var position = index
+    while position > 0:
+        position -= 1
+        let type_ = dot_type(text[position])
+        if type_ == dot_soft_dotted:
+            return true
+        if type_ != dot_other_accent:
+            return false
+    return false
+
+## isPrecededBy_I.
+func is_preceded_by_i(text: const u32[], index: usize) -> bool:
+    var position = index
+    while position > 0:
+        position -= 1
+        if text[position] == 0x49:
+            return true
+        if dot_type(text[position]) != dot_other_accent:
+            return false
+    return false
+
+## isFollowedByMoreAbove.
+func is_followed_by_more_above(text: const u32[], index: usize) -> bool:
+    for position in index + 1..<text.length:
+        let type_ = dot_type(text[position])
+        if type_ == dot_above:
+            return true
+        if type_ != dot_other_accent:
+            return false
+    return false
+
+## isFollowedByDotAbove.
+func is_followed_by_dot_above(text: const u32[], index: usize) -> bool:
+    for position in index + 1..<text.length:
+        if text[position] == 0x307:
+            return true
+        if dot_type(text[position]) != dot_other_accent:
+            return false
+    return false
+
+# The conditions of ucd_conditional_case_mappings.
+let condition_none: u32 = 0
+let condition_final_sigma: u32 = 1
+let condition_after_soft_dotted: u32 = 2
+let condition_more_above: u32 = 3
+let condition_before_dot: u32 = 4
+let condition_after_i: u32 = 5
+let condition_not: u32 = 8
+
+func case_condition_holds(condition: u32, text: const u32[], index: usize) -> bool:
+    let base = condition & 7
+    var holds = true
+    if base == condition_final_sigma:
+        holds = not is_followed_by_cased_letter(text, index, 1) and is_followed_by_cased_letter(text, index, -1)
+    elif base == condition_after_soft_dotted:
+        holds = is_preceded_by_soft_dotted(text, index)
+    elif base == condition_more_above:
+        holds = is_followed_by_more_above(text, index)
+    elif base == condition_before_dot:
+        holds = is_followed_by_dot_above(text, index)
+    elif base == condition_after_i:
+        holds = is_preceded_by_i(text, index)
+    return not holds if (condition & condition_not) != 0 else holds
+
+let conditional_mapping_digits: usize = 23
+
+## Append the conditional mapping (field 0 lower, 1 title, 2 upper) of text[index] that
+## applies in `locale`, and answer whether one did.
+func append_conditional_case_mapping(text: const u32[], index: usize, locale: CaseLocale, field: usize, out: CodePointBuffer*) -> bool:
+    let code_point = text[index]
+    var entry: usize = 0
+    while entry < ucd_conditional_case_mappings.length:
+        if ucd_hex(ucd_conditional_case_mappings, entry, 6) == code_point:
+            let language = ucd_hex(ucd_conditional_case_mappings, entry + 6, 1)
+            let applies_to_locale = language == 0 or (language == 1 and locale == CaseLocale.lithuanian) or ((language == 2 or language == 3) and locale == CaseLocale.turkish)
+            if applies_to_locale and case_condition_holds(ucd_hex(ucd_conditional_case_mappings, entry + 7, 1), text, index):
+                let mapping = entry + 8 + field * 5
+                let length = ucd_hex(ucd_conditional_case_mappings, mapping + 4, 1)
+                if length == 0xf:
+                    out.append(code_point)
+                else:
+                    append_case_pool(ucd_hex(ucd_conditional_case_mappings, mapping, 4), length, out)
+                return true
+        entry += conditional_mapping_digits
+    return false
+
+# mark: Full case mapping of one code point ======================================================
+
+## ucase_toFullLower.
+func append_full_lowercase(text: const u32[], index: usize, locale: CaseLocale, out: CodePointBuffer*):
+    if append_conditional_case_mapping(text, index, locale, 0, out):
+        return
+    append_full_case_mapping(text[index], case_full_lower, case_simple_lower, out)
+
+## ucase_toFullUpper and ucase_toFullTitle.
+func append_full_uppercase_or_titlecase(text: const u32[], index: usize, locale: CaseLocale, upper_not_title: bool, out: CodePointBuffer*):
+    let code_point = text[index]
+    if code_point == 0x587 and locale == CaseLocale.armenian:
+        # ICU-13416: ech-yiwn uppercases to ech+vew in Eastern Armenian.
+        out.append(0x535)
+        out.append(0x54e if upper_not_title else 0x57e)
+        return
+    if append_conditional_case_mapping(text, index, locale, 2 if upper_not_title else 1, out):
+        return
+    if upper_not_title:
+        append_full_case_mapping(code_point, case_full_upper, case_simple_upper, out)
+    else:
+        append_full_case_mapping(code_point, case_full_title, case_simple_title, out)
+
+## ucase_toFullFolding; `turkic` is U_FOLD_CASE_EXCLUDE_SPECIAL_I.
+func append_full_case_folding(code_point: u32, turkic: bool, out: CodePointBuffer*):
+    if turkic:
+        var entry: usize = 0
+        while entry < ucd_turkic_case_folding.length:
+            if ucd_hex(ucd_turkic_case_folding, entry, 6) == code_point:
+                append_case_pool(ucd_hex(ucd_turkic_case_folding, entry + 6, 4), ucd_hex(ucd_turkic_case_folding, entry + 10, 1), out)
+                return
+            entry += 11
+    append_full_case_mapping(code_point, case_full_fold, case_simple_fold, out)
+
+# mark: Full case mapping of text ================================================================
+
+## u_strToLower.
+func lowercase_code_points(text: const u32[], locale: CaseLocale) -> CodePointBuffer:
+    var out = CodePointBuffer.create(text.length + 1)
+    for index in 0..<text.length:
+        append_full_lowercase(text, index, locale, &out)
+    return out
+
+## u_strToUpper (the root locale's rules for Greek as well).
+func uppercase_code_points(text: const u32[], locale: CaseLocale) -> CodePointBuffer:
+    var out = CodePointBuffer.create(text.length + 1)
+    for index in 0..<text.length:
+        append_full_uppercase_or_titlecase(text, index, locale, true, &out)
+    return out
+
+## u_strFoldCase.
+func case_fold_code_points(text: const u32[], turkic: bool) -> CodePointBuffer:
+    var out = CodePointBuffer.create(text.length + 1)
+    for code_point in text:
+        append_full_case_folding(code_point, turkic, &out)
+    return out
+
+## ustrcase_isLNS: a letter, number, symbol or private use character; a modifier letter
+## only when cased.
+func is_lns(code_point: u32) -> bool:
+    let lns = (u_gc_l_mask | u_gc_n_mask | u_gc_s_mask | u_mask(17)) & ~u_mask(u_modifier_letter)
+    let gc = ucd_general_category(code_point)
+    return (u_mask(gc) & lns) != 0 or (gc == u_modifier_letter and ucd_has_binary_property(code_point, uchar_cased))
+
+## ustrcase_internalToTitle with a word break iterator and options 0 or
+## U_TITLECASE_NO_LOWERCASE (`no_lowercase`).
+func titlecase_code_points(text: const u32[], locale: CaseLocale, no_lowercase: bool) -> CodePointBuffer:
+    var out = CodePointBuffer.create(text.length + 1)
+    var boundaries = CodePointBuffer.create(text.length + 2)
+    var statuses = CodePointBuffer.create(text.length + 2)
+    word_boundaries(text, &boundaries, &statuses)
+    var previous: usize = 0
+    for boundary in boundaries.view():
+        let index = (usize)boundary
+        # Segment [previous..index[ into: skipped characters (copied), the first letter
+        # (titlecased), the rest (lowercased).
+        if previous < index:
+            var title_start = previous
+            var title_limit = previous + 1
+            # Adjust the titlecasing index to the next letter, number, symbol or private use.
+            while not is_lns(text[title_limit - 1]):
+                title_start = title_limit
+                if title_limit == index:
+                    break
+                title_limit += 1
+            for position in previous..<title_start:
+                out.append(text[position])
+            if title_start < title_limit:
+                let before_title = out.count
+                append_full_uppercase_or_titlecase(text, title_start, locale, false, &out)
+                # Special case Dutch IJ titlecasing.
+                if title_start + 1 < index and locale == CaseLocale.dutch and out.count == before_title + 1:
+                    let titled = out.items[out.count - 1]
+                    if titled == 0x49 or titled == 0xcd:
+                        title_limit = maybe_title_dutch_ij(text, titled, title_limit, index, &out)
+                if title_limit < index:
+                    if no_lowercase:
+                        for position in title_limit..<index:
+                            out.append(text[position])
+                    else:
+                        for position in title_limit..<index:
+                            append_full_lowercase(text, position, locale, &out)
+        previous = index
+    return out
+
+## ustrcase.cpp maybeTitleDutchIJ: after a titlecased I or Í, titlecase a following j (with
+## a matching acute accent). Answers where lowercasing continues.
+func maybe_title_dutch_ij(text: const u32[], titled: u32, start: usize, limit: usize, out: CodePointBuffer*) -> usize:
+    let acute: u32 = 0x301
+    var index = start
+    var with_acute = false
+    var unchanged1: usize = 0
+    var do_title_j = false
+    var unchanged2: usize = 0
+    var c2 = text[index]
+    index += 1
+    if titled == 0x49:
+        if c2 == acute:
+            with_acute = true
+            unchanged1 = 1
+            if index == limit:
+                return start
+            c2 = text[index]
+            index += 1
+    else:
+        with_acute = true
+    if c2 == 0x6a:
+        do_title_j = true
+    elif c2 == 0x4a:
+        unchanged1 += 1
+    else:
+        return start
+    if with_acute:
+        if index == limit or text[index] != acute:
+            return start
+        index += 1
+        if do_title_j:
+            unchanged2 = 1
+        else:
+            unchanged1 += 1
+    if index < limit and (ucd_general_category_mask(text[index]) & u_gc_m_mask) != 0:
+        return start
+    var position = start
+    for _unused in 0..<unchanged1:
+        out.append(text[position])
+        position += 1
+    if do_title_j:
+        out.append(0x4a)
+        position += 1
+    for _unused in 0..<unchanged2:
+        out.append(text[position])
+        position += 1
+    return index
+
+# mark: Case closure ============================================================================
+
+## The other code points of the case closure class of `code_point` (ucase_addCaseClosure,
+## transitively, as UnicodeSet::closeOver(USET_CASE_INSENSITIVE) adds them).
+func append_case_closure(code_point: u32, out: CodePointBuffer*):
+    var low: usize = 0
+    var high = ucd_case_closure.length // 12
+    while low < high:
+        let middle = low + (high - low) // 2
+        let key = ucd_hex(ucd_case_closure, middle * 12, 6)
+        if key < code_point:
+            low = middle + 1
+        elif key > code_point:
+            high = middle
+        else:
+            let entry = middle * 12
+            append_case_pool(ucd_hex(ucd_case_closure, entry + 6, 4), ucd_hex(ucd_case_closure, entry + 10, 2), out)
+            return
+
+## Whether the case closure of `code_point` (the code point included) has a member for which
+## `predicate(context, member)` holds.
+func case_closure_any(code_point: u32, context: const void*, predicate: func(const void*, u32) -> bool) -> bool:
+    if predicate(context, code_point):
+        return true
+    var members = CodePointBuffer.create(4)
+    append_case_closure(code_point, &members)
+    for member in members.view():
+        if predicate(context, member):
+            return true
+    return false
+
+# mark: Width ===================================================================================
+
+let fullwidth_mapping_digits: usize = 13
+
+## The Halfwidth-Fullwidth entry of `code_point`, or none.
+func fullwidth_entry(code_point: u32) -> usize?:
+    var low: usize = 0
+    var high = ucd_fullwidth_mappings.length // fullwidth_mapping_digits
+    while low < high:
+        let middle = low + (high - low) // 2
+        let key = ucd_hex(ucd_fullwidth_mappings, middle * fullwidth_mapping_digits, 6)
+        if key < code_point:
+            low = middle + 1
+        elif key > code_point:
+            high = middle
+        else:
+            return middle * fullwidth_mapping_digits
+    return none
+
+func is_halfwidth_hangul(code_point: u32) -> bool:
+    return code_point >= 0xffa0 and code_point <= 0xffdc
+
+## The Halfwidth-Fullwidth transliterator: characters with a <wide> counterpart become it;
+## runs of <narrow> characters are put in NFKC, so that a halfwidth katakana and its voiced
+## sound mark become one character and halfwidth Hangul becomes
+## conjoining jamo (NFKD, not composed).
+func fullwidth_code_points(text: const u32[]) -> CodePointBuffer:
+    var out = CodePointBuffer.create(text.length + 1)
+    var index: usize = 0
+    while index < text.length:
+        let found = fullwidth_entry(text[index])
+        if found == none:
+            out.append(text[index])
+            index += 1
+            continue
+        let entry = found else break
+        if ucd_hex(ucd_fullwidth_mappings, entry + 12, 1) == 0:
+            out.append(ucd_hex(ucd_fullwidth_mappings, entry + 6, 6))
+            index += 1
+            continue
+        # Halfwidth Hangul becomes conjoining jamo, which ICU's rules do not compose.
+        if is_halfwidth_hangul(text[index]):
+            let single: u32[1] = [text[index]]
+            let jamo = normalize_code_points(single, NormalizationForm.nfkd)
+            out.append_all(jamo.view())
+            index += 1
+            continue
+        # A run of other narrow characters.
+        var run = CodePointBuffer.create(4)
+        while index < text.length and not is_halfwidth_hangul(text[index]):
+            let narrow = fullwidth_entry(text[index]) else break
+            if ucd_hex(ucd_fullwidth_mappings, narrow + 12, 1) == 0:
+                break
+            run.append(text[index])
+            index += 1
+        let composed = normalize_code_points(run.view(), NormalizationForm.nfkc)
+        out.append_all(composed.view())
+    return out

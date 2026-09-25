@@ -1,0 +1,70 @@
+#==============================================================================================
+#
+#   tests_normalize - Tests/LibUnicode/TestUnicodeNormalization.cpp
+#
+#   DESCRIPTION:
+#       The cases of Ladybird's normalization tests through normalize_utf8, the core of
+#       Unicode::normalize (which returns an AK String that ak's stubs cannot build yet).
+#
+#==============================================================================================
+
+func expect_normalized(input: str, form: NormalizationForm, expected: str):
+    let actual = normalize_utf8(input.bytes, form) else trap("normalize failed")
+    if actual != expected:
+        print(f"normalize({input}): expected {expected}, got {actual}")
+        trap("normalize")
+
+# Ported from TestUnicodeNormalization.cpp TEST_CASE(normalize_nfd).
+test "normalize_nfd":
+    expect_normalized("", NormalizationForm.nfd, "")
+    expect_normalized("Hello", NormalizationForm.nfd, "Hello")
+    expect_normalized("Amélie", NormalizationForm.nfd, "Ame\u{0301}lie")
+    expect_normalized("Oﬀice", NormalizationForm.nfd, "Oﬀice")
+    expect_normalized("\u{1E9B}\u{0323}", NormalizationForm.nfd, "\u{017F}\u{0323}\u{0307}")
+    expect_normalized("\u{0112}\u{0300}", NormalizationForm.nfd, "\u{0045}\u{0304}\u{0300}")
+    expect_normalized("\u{03D3}", NormalizationForm.nfd, "\u{03D2}\u{0301}")
+    expect_normalized("\u{03D4}", NormalizationForm.nfd, "\u{03D2}\u{0308}")
+    expect_normalized("닭", NormalizationForm.nfd, "\u{1103}\u{1161}\u{11B0}")
+    expect_normalized("\u{1100}\u{AC00}\u{11A8}", NormalizationForm.nfd, "\u{1100}\u{1100}\u{1161}\u{11A8}")
+    expect_normalized("\u{0958}", NormalizationForm.nfd, "\u{0915}\u{093C}")
+    expect_normalized("\u{2126}", NormalizationForm.nfd, "\u{03A9}")
+
+# Ported from TestUnicodeNormalization.cpp TEST_CASE(normalize_nfc).
+test "normalize_nfc":
+    expect_normalized("", NormalizationForm.nfc, "")
+    expect_normalized("Hello", NormalizationForm.nfc, "Hello")
+    expect_normalized("Office", NormalizationForm.nfc, "Office")
+    expect_normalized("\u{1E9B}\u{0323}", NormalizationForm.nfc, "\u{1E9B}\u{0323}")
+    expect_normalized("\u{0044}\u{0307}", NormalizationForm.nfc, "\u{1E0A}")
+    expect_normalized("\u{0044}\u{0307}\u{0323}", NormalizationForm.nfc, "\u{1E0C}\u{0307}")
+    expect_normalized("\u{0044}\u{0323}\u{0307}", NormalizationForm.nfc, "\u{1E0C}\u{0307}")
+    expect_normalized("\u{0112}\u{0300}", NormalizationForm.nfc, "\u{1E14}")
+    expect_normalized("\u{1E14}\u{0304}", NormalizationForm.nfc, "\u{1E14}\u{0304}")
+    expect_normalized("\u{05B8}\u{05B9}\u{05B1}\u{0591}\u{05C3}\u{05B0}\u{05AC}\u{059F}", NormalizationForm.nfc, "\u{05B1}\u{05B8}\u{05B9}\u{0591}\u{05C3}\u{05B0}\u{05AC}\u{059F}")
+    expect_normalized("\u{0592}\u{05B7}\u{05BC}\u{05A5}\u{05B0}\u{05C0}\u{05C4}\u{05AD}", NormalizationForm.nfc, "\u{05B0}\u{05B7}\u{05BC}\u{05A5}\u{0592}\u{05C0}\u{05AD}\u{05C4}")
+    expect_normalized("\u{03D3}", NormalizationForm.nfc, "\u{03D3}")
+    expect_normalized("\u{03D4}", NormalizationForm.nfc, "\u{03D4}")
+    expect_normalized("\u{0958}", NormalizationForm.nfc, "\u{0915}\u{093C}")
+    expect_normalized("\u{2126}", NormalizationForm.nfc, "\u{03A9}")
+    expect_normalized("\u{1103}\u{1161}\u{11B0}", NormalizationForm.nfc, "닭")
+    expect_normalized("\u{1100}\u{AC00}\u{11A8}", NormalizationForm.nfc, "\u{1100}\u{AC01}")
+    expect_normalized("\u{1103}\u{1161}\u{11B0}\u{11B0}", NormalizationForm.nfc, "닭\u{11B0}")
+
+# Ported from TestUnicodeNormalization.cpp TEST_CASE(normalize_nfkd).
+test "normalize_nfkd":
+    expect_normalized("", NormalizationForm.nfkd, "")
+    expect_normalized("Oﬀice", NormalizationForm.nfkd, "Office")
+    expect_normalized("¼", NormalizationForm.nfkd, "1\u{2044}4")
+    expect_normalized("\u{03D3}", NormalizationForm.nfkd, "\u{03A5}\u{0301}")
+    expect_normalized("\u{03D4}", NormalizationForm.nfkd, "\u{03A5}\u{0308}")
+    expect_normalized("\u{0958}", NormalizationForm.nfkd, "\u{0915}\u{093C}")
+    expect_normalized("\u{2126}", NormalizationForm.nfkd, "\u{03A9}")
+    expect_normalized("\u{FDFA}", NormalizationForm.nfkd, "\u{0635}\u{0644}\u{0649}\u{0020}\u{0627}\u{0644}\u{0644}\u{0647}\u{0020}\u{0639}\u{0644}\u{064A}\u{0647}\u{0020}\u{0648}\u{0633}\u{0644}\u{0645}")
+
+# Ported from TestUnicodeNormalization.cpp TEST_CASE(normalize_nfkc).
+test "normalize_nfkc":
+    expect_normalized("", NormalizationForm.nfkc, "")
+    expect_normalized("\u{03D3}", NormalizationForm.nfkc, "\u{038E}")
+    expect_normalized("\u{03D4}", NormalizationForm.nfkc, "\u{03AB}")
+    expect_normalized("\u{0958}", NormalizationForm.nfkc, "\u{0915}\u{093C}")
+    expect_normalized("\u{2126}", NormalizationForm.nfkc, "\u{03A9}")

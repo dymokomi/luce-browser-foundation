@@ -1,0 +1,199 @@
+#==============================================================================================
+#
+#   text - lines, fields, hex numbers and growable lists for the generator
+#
+#   DESCRIPTION:
+#       The small text and container helpers the parsers and emitters share. Everything is
+#       allocated with the current allocator (the C heap) and lives for the whole run.
+#
+#==============================================================================================
+
+# mark: Lines and fields ========================================================================
+
+## A cursor over the lines of a file; `next` yields each line without its line feed.
+struct Lines:
+    var data: const u8[]
+    var offset: usize
+
+    static func over(data: const u8[]) -> Lines:
+        return Lines(data = data, offset = 0)
+
+    mutating func next() -> str?:
+        if self.offset >= self.data.length:
+            return none
+        let start = self.offset
+        var end = start
+        while end < self.data.length and self.data[end] != '\n':
+            end += 1
+        self.offset = end + 1
+        var trimmed = end
+        if trimmed > start and self.data[trimmed - 1] == '\r':
+            trimmed -= 1
+        return (str)self.data[start..<trimmed]
+
+## A cursor over the `separator`-separated fields of a line.
+struct Fields:
+    var text: str
+    var offset: usize
+    var separator: u8
+    var done: bool
+
+    static func over(text: str, separator: u8) -> Fields:
+        return Fields(text = text, offset = 0, separator = separator, done = false)
+
+    mutating func next() -> str?:
+        if self.done:
+            return none
+        let bytes = self.text.bytes
+        let start = self.offset
+        var end = start
+        while end < bytes.length and bytes[end] != self.separator:
+            end += 1
+        if end >= bytes.length:
+            self.done = true
+        self.offset = end + 1
+        return (str)bytes[start..<end]
+
+## `text` without leading and trailing spaces and tabs.
+func trim_spaces(text: str) -> str:
+    let bytes = text.bytes
+    var start: usize = 0
+    var end = bytes.length
+    while start < end and (bytes[start] == ' ' or bytes[start] == '\t'):
+        start += 1
+    while end > start and (bytes[end - 1] == ' ' or bytes[end - 1] == '\t'):
+        end -= 1
+    return (str)bytes[start..<end]
+
+## `text` up to its first `#` comment.
+func strip_comment(text: str) -> str:
+    let bytes = text.bytes
+    var end: usize = 0
+    while end < bytes.length and bytes[end] != '#':
+        end += 1
+    return (str)bytes[..<end]
+
+## Whether `text` begins with `prefix`.
+func has_prefix(text: str, prefix: str) -> bool:
+    return strings.starts_with(text, prefix)
+
+# mark: Numbers =================================================================================
+
+## The value of a hexadecimal number; traps on anything else (the data is trusted).
+func parse_hex(text: str) -> u32:
+    let value = strings.parse_u64(text, 16) else trap(f"not a hexadecimal number: {text}")
+    return (u32)value
+
+## The value of a decimal number.
+func parse_decimal(text: str) -> u32:
+    let value = strings.parse_u64(text, 10) else trap(f"not a decimal number: {text}")
+    return (u32)value
+
+## A code point range `XXXX` or `XXXX..YYYY`.
+struct CodePointRange:
+    var first: u32
+    var last: u32
+
+func parse_range(text: str) -> CodePointRange:
+    let trimmed = trim_spaces(text)
+    if let pair = strings.split_once(trimmed, ".."):
+        return CodePointRange(first = parse_hex(pair.0), last = parse_hex(pair.1))
+    let value = parse_hex(trimmed)
+    return CodePointRange(first = value, last = value)
+
+# mark: Growable lists ==========================================================================
+
+## A growable list of u32 values.
+struct U32List:
+    var items: u32[]
+    var count: usize
+
+    static func create() -> U32List!:
+        return U32List(items = try new u32[256], count = 0)
+
+    mutating func append(value: u32) -> !:
+        if self.count == self.items.length:
+            let grown = try new u32[self.items.length * 2]
+            memory.copy(grown, self.items, self.count)
+            free(self.items)
+            self.items = grown
+        self.items[self.count] = value
+        self.count += 1
+
+    func at(index: usize) -> u32:
+        assert(index < self.count)
+        return self.items[index]
+
+    func view() -> const u32[]:
+        return self.items[..<self.count]
+
+## Whether two spans of u32 hold the same values.
+func same_u32s(a: const u32[], b: const u32[]) -> bool:
+    if a.length != b.length:
+        return false
+    for index in 0..<a.length:
+        if a[index] != b[index]:
+            return false
+    return true
+
+## A pool of u32 sequences, found again by content so that equal sequences are stored once.
+struct SequencePool:
+    var values: U32List
+
+    static func create() -> SequencePool!:
+        return SequencePool(values = try U32List.create())
+
+    ## The offset of `sequence` in the pool, adding it when it is not there yet.
+    mutating func intern(sequence: const u32[]) -> u32!:
+        if sequence.length == 0:
+            return 0
+        let all = self.values.view()
+        if all.length >= sequence.length:
+            for start in 0..<(all.length - sequence.length + 1):
+                if all[start] == sequence[0] and same_u32s(all[start..<start + sequence.length], sequence):
+                    return (u32)start
+        let offset = (u32)self.values.count
+        for value in sequence:
+            try self.values.append(value)
+        return offset
+
+# mark: Output ==================================================================================
+
+## Fixed-width lowercase hexadecimal digits of `value`, appended to `out`.
+func put_hex(out: strings.Builder*, value: u64, digits: usize) -> !:
+    var buffer: u8[16]
+    assert(digits <= 16)
+    var remaining = value
+    var index = digits
+    while index > 0:
+        index -= 1
+        let digit = (u8)(remaining & 15)
+        buffer[index] = ('0' + digit) if digit < 10 else ('a' + digit - 10)
+        remaining >>= 4
+    assert(remaining == 0, "a value does not fit its hexadecimal width")
+    try out.put((str)buffer[..<digits])
+
+## `value` in decimal, appended to `out`.
+func put_decimal(out: strings.Builder*, value: u64) -> !:
+    var buffer: u8[32]
+    try out.put(try strings.format_u64(value, buffer))
+
+## The standard header box of a generated fragment.
+func put_header(out: strings.Builder*, name: str, summary: str, description: const str[]) -> !:
+    let rule = "#=============================================================================================="
+    try out.put(rule)
+    try out.put("\n#\n#   ")
+    try out.put(name)
+    try out.put(" - ")
+    try out.put(summary)
+    try out.put("\n#\n#   DESCRIPTION:\n")
+    for line in description:
+        if line.length == 0:
+            try out.put("#\n")
+        else:
+            try out.put("#       ")
+            try out.put(line)
+            try out.put("\n")
+    try out.put("#\n")
+    try out.put(rule)
+    try out.put("\n")
