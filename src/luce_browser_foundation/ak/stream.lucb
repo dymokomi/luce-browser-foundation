@@ -1,0 +1,250 @@
+#==============================================================================================
+#
+#   stream - Stream and SeekableStream: the abstract byte-stream interfaces
+#
+#   DESCRIPTION:
+#       Port of AK/Stream.h (lines 1-173) and AK/Stream.cpp (lines 1-121). The classes are
+#       the generated vtable hierarchy of types_stream (DESIGN.md §2.3): each virtual is a
+#       dispatcher (`stream_read_some`) over a `_impl` body taking the introducing class's
+#       pointer. ErrorOr<size_t> is `usize!`. The templates over a value type (read_value,
+#       write_value) copy the value's bytes in host order, which is what they do for the
+#       trivially serializable types; the AnyString overload of write_until_depleted takes a
+#       StringView.
+#
+#==============================================================================================
+
+# mark: errno values ============================================================================
+
+## errno EINTR (the same on every supported target).
+pub let eintr: i32 = 4
+
+## errno EBADF (the same on every supported target).
+pub let ebadf: i32 = 9
+
+## errno EAGAIN of the build target.
+pub func eagain() -> i32:
+    if os.macos:
+        return 35
+    else:
+        return 11
+
+## errno ENOTCONN of the build target.
+pub func enotconn() -> i32:
+    if os.macos:
+        return 57
+    else:
+        return 107
+
+## errno EMSGSIZE of the build target.
+pub func emsgsize() -> i32:
+    if os.macos:
+        return 40
+    else:
+        return 90
+
+# Whether a caught failure is the errno error `code` (`error.is_errno() && error.code() == code`).
+func failure_is_errno(failure: Error, code: i32) -> bool:
+    let e = ak_error_from_failure(failure)
+    return ak_error_is_errno(&e) and ak_error_code(&e) == code
+
+# mark: Stream ==================================================================================
+
+## Ported from AK/Stream.h:29 AK::Stream::read_some (virtual).
+# Reads into a buffer, with the maximum size being the size of the buffer.
+# The amount of bytes read can be smaller than the size of the buffer.
+# Returns either the bytes that were read, or an errno in the case of
+# failure.
+pub func stream_read_some_impl(this: Stream*, arg0: u8[]) -> u8[]!:
+    discard(this)
+    discard(arg0)
+    trap("pure virtual: AK::Stream::read_some")
+
+## Ported from AK/Stream.h:32 AK::Stream::read_until_filled (virtual).
+# Tries to fill the entire buffer through reading. Returns whether the
+# buffer was filled without an error.
+pub func stream_read_until_filled_impl(this: Stream*, buffer: u8[]) -> !:
+    var nread: usize = 0
+    while nread < buffer.length:
+        if stream_is_eof(this):
+            error(ak_error, "Reached end-of-file before filling the entire buffer")
+
+        let result = stream_read_some(this, buffer[nread..]) catch failure:
+            if failure_is_errno(failure, eintr):
+                continue
+            error(failure.code, failure.message)
+
+        nread += result.length
+
+## Ported from AK/Stream.cpp:15 AK::Stream::read_until_eof (virtual).
+# Reads the stream until EOF, storing the contents into a ByteBuffer which
+# is returned once EOF is encountered. The block size determines the size
+# of newly allocated chunks while reading.
+pub func stream_read_until_eof_impl(this: Stream*, block_size_: usize) -> ByteBuffer!:
+    return try stream_read_until_eof_impl_2(this, block_size_)
+
+## Ported from AK/Stream.cpp:41 AK::Stream::discard (virtual).
+# Discards the given number of bytes from the stream. As this is usually used
+# as an efficient version of `read_until_filled`, it returns an error
+# if reading failed or if not all bytes could be discarded.
+# Unless specifically overwritten, this just uses read() to read into an
+# internal stack-based buffer.
+pub func stream_discard_impl(this: Stream*, discarded_bytes: usize) -> !:
+    # Note: This was chosen arbitrarily.
+    # Note: This can't be PAGE_SIZE because it is defined to sysconf() on Lagom.
+    let continuous_read_size: usize = 4096
+
+    var buffer: u8[4096] = ---
+    var remaining = discarded_bytes
+
+    while remaining > 0:
+        if stream_is_eof(this):
+            error(ak_error, "Reached end-of-file before reading all discarded bytes")
+
+        let slice = try stream_read_some(this, buffer[0..<min(remaining, continuous_read_size)])
+        remaining -= slice.length
+
+## Ported from AK/Stream.h:67 AK::Stream::write_some (virtual).
+# Tries to write the entire contents of the buffer. It is possible for
+# less than the full buffer to be written. Returns either the amount of
+# bytes written into the stream, or an errno in the case of failure.
+pub func stream_write_some_impl(this: Stream*, arg0: const u8[]) -> usize!:
+    discard(this)
+    discard(arg0)
+    trap("pure virtual: AK::Stream::write_some")
+
+## Ported from AK/Stream.cpp:60 AK::Stream::write_until_depleted (virtual).
+# Same as write, but does not return until either the entire buffer
+# contents are written or an error occurs.
+pub func stream_write_until_depleted_span_u8_impl(this: Stream*, buffer: const u8[]) -> !:
+    var nwritten: usize = 0
+    while nwritten < buffer.length:
+        let result = stream_write_some(this, buffer[nwritten..]) catch failure:
+            if failure_is_errno(failure, eintr):
+                continue
+            error(failure.code, failure.message)
+
+        nwritten += result
+
+## Ported from AK/Stream.h:73 AK::Stream::write_until_depleted(T const&) for a string type:
+## writes the string's bytes (`StringView { buffer }.bytes()`).
+pub func stream_write_until_depleted_t(this: Stream*, buffer: StringView) -> !:
+    let characters = buffer.m_characters else return try stream_write_until_depleted_span_u8(this, empty_span[u8]())
+    return try stream_write_until_depleted_span_u8(this, u8[]((u8*)characters, buffer.m_length))
+
+## Ported from AK/Stream.h:80 AK::Stream::read_value: a trivially serializable value read as its
+## bytes in host order.
+pub func stream_read_value[T](this: Stream*) -> T!:
+    var value: T = ---
+    let bytes = u8[]((u8*)&value, sizeof(T))
+    memory.set(bytes, 0)
+    try stream_read_until_filled(this, bytes)
+    return value
+
+## Ported from AK/Stream.h:96 AK::Stream::write_value: a trivially serializable value written as
+## its bytes in host order.
+pub func stream_write_value[T](this: Stream*, value: T) -> !:
+    var copy = value
+    return try stream_write_until_depleted_span_u8(this, u8[]((u8*)&copy, sizeof(T)))
+
+## Ported from AK/Stream.h:121 AK::Stream::is_eof (virtual).
+# Returns whether the stream has reached the end of file. For sockets,
+# this most likely means that the protocol has disconnected (in the case
+# of TCP). For seekable streams, this means the end of the file. Note that
+# is_eof will only return true _after_ a read with 0 length, so this
+# method should be called after a read.
+pub func stream_is_eof_impl(this: Stream*) -> bool:
+    discard(this)
+    trap("pure virtual: AK::Stream::is_eof")
+
+## Ported from AK/Stream.h:123 AK::Stream::is_open (virtual).
+pub func stream_is_open_impl(this: Stream*) -> bool:
+    discard(this)
+    trap("pure virtual: AK::Stream::is_open")
+
+## Ported from AK/Stream.h:124 AK::Stream::close (virtual).
+pub func stream_close_impl(this: Stream*):
+    discard(this)
+    trap("pure virtual: AK::Stream::close")
+
+## Ported from AK/Stream.cpp:20 AK::Stream::read_until_eof_impl.
+# Provides a default implementation of read_until_eof that works for streams
+# that behave like POSIX file descriptors. expected_file_size can be
+# passed as a heuristic for what the Stream subclass expects the file
+# content size to be in order to reduce allocations (does not affect
+# actual reading).
+pub func stream_read_until_eof_impl_2(this: Stream*, block_size_: usize, expected_file_size: usize = 0) -> ByteBuffer!:
+    var data: ByteBuffer
+    byte_buffer_ensure_capacity(&data, expected_file_size)
+
+    var total_read: usize = 0
+    var buffer = empty_span[u8]()
+    while not stream_is_eof(this):
+        if buffer.length == 0:
+            buffer = try byte_buffer_get_bytes_for_writing(&data, block_size_)
+
+        let nread = (try stream_read_some(this, buffer)).length
+        total_read += nread
+        buffer = buffer[nread..]
+
+    byte_buffer_resize(&data, total_read)
+    return data
+
+## Ported from AK/Stream.cpp:79 AK::Stream::write_formatted_impl.
+pub func stream_write_formatted_impl(this: Stream*, fmtstr: StringView, parameters: TypeErasedFormatParams*) -> !:
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    try vformat(&builder, fmtstr, parameters)
+
+    let string = string_builder_string_view(&builder)
+    try stream_write_until_depleted_t(this, string)
+
+# mark: SeekableStream ==========================================================================
+
+## Ported from AK/Stream.h:154 AK::SeekableStream::seek (virtual).
+# Seeks to the given position in the given mode. Returns either the
+# current position of the file, or an errno in the case of an error.
+pub func seekable_stream_seek_impl(this: SeekableStream*, offset: i64, arg1: SeekMode) -> usize!:
+    discard(this)
+    discard(offset)
+    discard(arg1)
+    trap("pure virtual: AK::SeekableStream::seek")
+
+## Ported from AK/Stream.cpp:89 AK::SeekableStream::tell (virtual).
+# Returns the current position of the file, or an errno in the case of
+# an error.
+pub func seekable_stream_tell_impl(this: SeekableStream*) -> usize!:
+    # Seek with 0 and SEEK_CUR does not modify anything despite the const_cast,
+    # so it's safe to do this.
+    return try seekable_stream_seek(this, 0, SeekMode.from_current_position)
+
+## Ported from AK/Stream.cpp:96 AK::SeekableStream::size (virtual).
+# Returns the total size of the stream, or an errno in the case of an
+# error. May not preserve the original position on the stream on failure.
+pub func seekable_stream_size_impl(this: SeekableStream*) -> usize!:
+    let original_position = try seekable_stream_tell(this)
+
+    let seek_result = seekable_stream_seek(this, 0, SeekMode.from_end_position) catch failure:
+        # Let's try to restore the original position, just in case.
+        discard(seekable_stream_seek(this, (i64)original_position, SeekMode.set_position) catch:
+            io.stderr().write("SeekableStream::size: Couldn't restore initial position, stream might have incorrect position now!\n") catch:
+                recover 0
+            recover 0)
+        error(failure.code, failure.message)
+
+    discard(try seekable_stream_seek(this, (i64)original_position, SeekMode.set_position))
+    return seek_result
+
+## Ported from AK/Stream.h:163 AK::SeekableStream::truncate (virtual).
+# Shrinks or extends the stream to the given size. Returns an errno in
+# the case of an error.
+pub func seekable_stream_truncate_impl(this: SeekableStream*, length: usize) -> !:
+    discard(this)
+    discard(length)
+    trap("pure virtual: AK::SeekableStream::truncate")
+
+## Ported from AK/Stream.cpp:115 AK::SeekableStream::discard (override).
+# Seeks until after the given amount of bytes to be discarded instead of
+# reading and discarding everything manually;
+pub func seekable_stream_discard_impl(base: Stream*, discarded_bytes: usize) -> !:
+    let this = (SeekableStream*)base
+    discard(try seekable_stream_seek(this, (i64)discarded_bytes, SeekMode.from_current_position))

@@ -8,23 +8,33 @@
 #       §4.4). Regenerate rather than edit, except to fill a field the generator could not
 #       map.
 #
+#       Edited by region r01: the node and iterator are generic over the element type (the
+#       node cache, a template value, is dropped); the iterator is a luce-base iterator, so
+#       a list can be walked with for.
+#
 #==============================================================================================
 
 # mark: DoublyLinkedListIterator ================================================================
 
-## AK::DoublyLinkedListIterator (AK/DoublyLinkedList.h:17): a generic struct.
-pub struct DoublyLinkedListIterator[TListType, TElementType]:
-    pub var m_node: void*?  # unmapped: typename ListType::Node
+## AK::DoublyLinkedListIterator (AK/DoublyLinkedList.h:16): the node an iteration is at (none at
+## the end); also a luce-base iterator yielding a pointer to each value.
+pub struct DoublyLinkedListIterator[T]: luce.Iterable[T*, DoublyLinkedListIterator[T]], luce.Iterator[T*]:
+    pub var m_node: DoublyLinkedListNode[T]*?
+
+    func iterator() -> DoublyLinkedListIterator[T]: return self
+
+    mutating func next() -> T*?: return doubly_linked_list_iterator_next(&self)
 
 # mark: DoublyLinkedList ========================================================================
 
-## AK::DoublyLinkedList (AK/DoublyLinkedList.h:41): a generic struct.
+## AK::DoublyLinkedList (AK/DoublyLinkedList.h:39): a zero DoublyLinkedList is empty.
 pub struct DoublyLinkedList[T]:
-    pub var m_head: DoublyLinkedListNode*?  # C++ default: { nullptr }
-    pub var m_tail: DoublyLinkedListNode*?  # C++ default: { nullptr }
+    pub var m_head: DoublyLinkedListNode[T]*?  # C++ default: { nullptr }
+    pub var m_tail: DoublyLinkedListNode[T]*?  # C++ default: { nullptr }
     pub var m_size: usize  # C++ default: { 0 }
-    pub var m_node_cache: void*?  # unmapped: Conditional<(node_cache_size > 0), NonemptyNodeCache, Empty>
 
-## AK::DoublyLinkedList::Node (AK/DoublyLinkedList.h:43): opaque in this phase (not in the phase-1 closure).
-pub struct DoublyLinkedListNode:
-    pub var opaque_: u8
+## AK::DoublyLinkedList::Node (AK/DoublyLinkedList.h:43).
+pub struct DoublyLinkedListNode[T]:
+    pub var next: DoublyLinkedListNode[T]*?  # C++ default: { nullptr }
+    pub var prev: DoublyLinkedListNode[T]*?  # C++ default: { nullptr }
+    pub var m_value: T

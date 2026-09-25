@@ -1,0 +1,259 @@
+#==============================================================================================
+#
+#   doubly_linked_list - DoublyLinkedList<T>: a list of heap-allocated nodes
+#
+#   DESCRIPTION:
+#       Port of AK/DoublyLinkedList.h (lines 1-314). The node cache (a template value) is
+#       dropped, so ensure_capacity does nothing, as the donor's does for a cache size of 0.
+#       Nodes are managed memory (DESIGN.md §3.3); drop_node frees one as the donor deletes
+#       it. The iterator is a luce-base iterator: `for value in doubly_linked_list_begin(&l)`.
+#       Traits<T>::equals in find() is `==` (`T: Equatable`).
+#
+#==============================================================================================
+
+# mark: DoublyLinkedListIterator ================================================================
+
+## Ported from AK/DoublyLinkedList.h:19 AK::DoublyLinkedListIterator::operator!=.
+pub func doubly_linked_list_iterator_ne[T](this: const DoublyLinkedListIterator[T]*, other: DoublyLinkedListIterator[T]) -> bool:
+    return this.m_node != other.m_node
+
+## Ported from AK/DoublyLinkedList.h:20 AK::DoublyLinkedListIterator::operator==.
+pub func doubly_linked_list_iterator_eq[T](this: const DoublyLinkedListIterator[T]*, other: DoublyLinkedListIterator[T]) -> bool:
+    return this.m_node == other.m_node
+
+## Ported from AK/DoublyLinkedList.h:21 AK::DoublyLinkedListIterator::operator++.
+pub func doubly_linked_list_iterator_inc[T](this: DoublyLinkedListIterator[T]*) -> DoublyLinkedListIterator[T]*:
+    let node = this.m_node else trap("VERIFY: incrementing the end of a DoublyLinkedList")
+    this.m_node = node.next
+    return this
+
+## Ported from AK/DoublyLinkedList.h:26 AK::DoublyLinkedListIterator::operator*.
+pub func doubly_linked_list_iterator_deref[T](this: DoublyLinkedListIterator[T]*) -> T*:
+    let node = this.m_node else trap("VERIFY: dereferencing the end of a DoublyLinkedList")
+    return doubly_linked_list_node_value(node)
+
+## Ported from AK/DoublyLinkedList.h:27 AK::DoublyLinkedListIterator::operator->.
+pub func doubly_linked_list_iterator_arrow[T](this: DoublyLinkedListIterator[T]*) -> T*:
+    return doubly_linked_list_iterator_deref(this)
+
+## Ported from AK/DoublyLinkedList.h:28 AK::DoublyLinkedListIterator::is_end.
+pub func doubly_linked_list_iterator_is_end[T](this: const DoublyLinkedListIterator[T]*) -> bool:
+    return this.m_node == none
+
+## Ported from AK/DoublyLinkedList.h:29 AK::DoublyLinkedListIterator::universal_end.
+pub func doubly_linked_list_iterator_universal_end[T]() -> DoublyLinkedListIterator[T]:
+    return DoublyLinkedListIterator[T](m_node = none)
+
+## Ported from AK/DoublyLinkedList.h:33 AK::DoublyLinkedListIterator::DoublyLinkedListIterator.
+pub func doubly_linked_list_iterator_construct[T](this: DoublyLinkedListIterator[T]*, node: DoublyLinkedListNode[T]*?):
+    this.m_node = node
+
+## The value the iterator is at, and the iterator moved past it; none at the end (the `for`
+## protocol over `*it` and `++it`).
+pub func doubly_linked_list_iterator_next[T](this: DoublyLinkedListIterator[T]*) -> T*?:
+    let node = this.m_node else return none
+    this.m_node = node.next
+    return &node.m_value
+
+# mark: Node ====================================================================================
+
+## Ported from AK/DoublyLinkedList.h:51 AK::DoublyLinkedList::Node::value const.
+pub func doubly_linked_list_node_value_const[T](this: const DoublyLinkedListNode[T]*) -> const T*:
+    return &this.m_value
+
+## Ported from AK/DoublyLinkedList.h:52 AK::DoublyLinkedList::Node::value.
+pub func doubly_linked_list_node_value[T](this: DoublyLinkedListNode[T]*) -> T*:
+    return &this.m_value
+
+# mark: DoublyLinkedList ========================================================================
+
+## Ported from AK/DoublyLinkedList.h:73 AK::DoublyLinkedList::is_empty.
+pub func doubly_linked_list_is_empty[T](this: const DoublyLinkedList[T]*) -> bool:
+    return this.m_head == none
+
+## Ported from AK/DoublyLinkedList.h:75 AK::DoublyLinkedList::clear.
+pub func doubly_linked_list_clear[T](this: DoublyLinkedList[T]*):
+    var node = this.m_head
+    while let current = node:
+        let next = current.next
+        doubly_linked_list_drop_node(this, current)
+        node = next
+    this.m_head = none
+    this.m_tail = none
+    this.m_size = 0
+
+## Ported from AK/DoublyLinkedList.h:87 AK::DoublyLinkedList::first.
+pub func doubly_linked_list_first[T](this: DoublyLinkedList[T]*) -> T*:
+    let head = this.m_head else trap("VERIFY: first() of an empty DoublyLinkedList")
+    return doubly_linked_list_node_value(head)
+
+## Ported from AK/DoublyLinkedList.h:92 AK::DoublyLinkedList::first const.
+pub func doubly_linked_list_first_const[T](this: const DoublyLinkedList[T]*) -> T:
+    let head = this.m_head else trap("VERIFY: first() of an empty DoublyLinkedList")
+    return head.m_value
+
+## Ported from AK/DoublyLinkedList.h:97 AK::DoublyLinkedList::last.
+pub func doubly_linked_list_last[T](this: DoublyLinkedList[T]*) -> T*:
+    assert(this.m_head != none)
+    let tail = this.m_tail else trap("VERIFY: last() of an empty DoublyLinkedList")
+    return doubly_linked_list_node_value(tail)
+
+## Ported from AK/DoublyLinkedList.h:102 AK::DoublyLinkedList::last const.
+pub func doubly_linked_list_last_const[T](this: const DoublyLinkedList[T]*) -> T:
+    assert(this.m_head != none)
+    let tail = this.m_tail else trap("VERIFY: last() of an empty DoublyLinkedList")
+    return tail.m_value
+
+## Ported from AK/DoublyLinkedList.h:108 AK::DoublyLinkedList::unchecked_last.
+pub func doubly_linked_list_unchecked_last[T](this: DoublyLinkedList[T]*) -> T*:
+    let tail = this.m_tail else trap("DoublyLinkedList::unchecked_last on an empty list")
+    return doubly_linked_list_node_value(tail)
+
+## Ported from AK/DoublyLinkedList.h:112 AK::DoublyLinkedList::unchecked_last const.
+pub func doubly_linked_list_unchecked_last_const[T](this: const DoublyLinkedList[T]*) -> T:
+    let tail = this.m_tail else trap("DoublyLinkedList::unchecked_last on an empty list")
+    return tail.m_value
+
+## Ported from AK/DoublyLinkedList.h:118 AK::DoublyLinkedList::try_append.
+pub func doubly_linked_list_try_append[T](this: DoublyLinkedList[T]*, value: T) -> !:
+    let node = doubly_linked_list_make_node(this, value) else return try ak_error_throw(ak_error_from_errno(enomem))
+    this.m_size += 1
+    if this.m_head == none:
+        assert(this.m_tail == none)
+        this.m_head = node
+        this.m_tail = node
+        return
+    let tail = this.m_tail else trap("VERIFY: DoublyLinkedList without a tail")
+    assert(node.next == none)
+    tail.next = node
+    node.prev = tail
+    this.m_tail = node
+
+## Ported from AK/DoublyLinkedList.h:141 AK::DoublyLinkedList::try_prepend.
+pub func doubly_linked_list_try_prepend[T](this: DoublyLinkedList[T]*, value: T) -> !:
+    let node = doubly_linked_list_make_node(this, value) else return try ak_error_throw(ak_error_from_errno(enomem))
+    this.m_size += 1
+    if this.m_head == none:
+        assert(this.m_tail == none)
+        this.m_head = node
+        this.m_tail = node
+        return
+    let head = this.m_head else trap("unreachable")
+    assert(this.m_tail != none)
+    assert(node.prev == none)
+    head.prev = node
+    node.next = head
+    this.m_head = node
+
+## Ported from AK/DoublyLinkedList.h:163 AK::DoublyLinkedList::append.
+pub func doubly_linked_list_append[T](this: DoublyLinkedList[T]*, value: T):
+    doubly_linked_list_try_append(this, value) else trap("MUST: DoublyLinkedList::append")
+
+## Ported from AK/DoublyLinkedList.h:169 AK::DoublyLinkedList::prepend.
+pub func doubly_linked_list_prepend[T](this: DoublyLinkedList[T]*, value: T):
+    doubly_linked_list_try_prepend(this, value) else trap("MUST: DoublyLinkedList::prepend")
+
+## Ported from AK/DoublyLinkedList.h:174 AK::DoublyLinkedList::contains_slow.
+pub func doubly_linked_list_contains_slow[T: luce.Equatable](this: const DoublyLinkedList[T]*, value: T) -> bool:
+    let it = doubly_linked_list_find_const(this, value)
+    return doubly_linked_list_iterator_ne(&it, doubly_linked_list_end_const(this))
+
+## Ported from AK/DoublyLinkedList.h:181 AK::DoublyLinkedList::begin.
+pub func doubly_linked_list_begin[T](this: DoublyLinkedList[T]*) -> DoublyLinkedListIterator[T]:
+    return DoublyLinkedListIterator[T](m_node = this.m_head)
+
+## Ported from AK/DoublyLinkedList.h:182 AK::DoublyLinkedList::end.
+pub func doubly_linked_list_end[T](this: DoublyLinkedList[T]*) -> DoublyLinkedListIterator[T]:
+    discard(this)
+    return doubly_linked_list_iterator_universal_end[T]()
+
+## Ported from AK/DoublyLinkedList.h:186 AK::DoublyLinkedList::begin const.
+pub func doubly_linked_list_begin_const[T](this: const DoublyLinkedList[T]*) -> DoublyLinkedListIterator[T]:
+    return DoublyLinkedListIterator[T](m_node = this.m_head)
+
+## Ported from AK/DoublyLinkedList.h:187 AK::DoublyLinkedList::end const.
+pub func doubly_linked_list_end_const[T](this: const DoublyLinkedList[T]*) -> DoublyLinkedListIterator[T]:
+    discard(this)
+    return doubly_linked_list_iterator_universal_end[T]()
+
+## Ported from AK/DoublyLinkedList.h:189 AK::DoublyLinkedList::find const (AK::find over
+## begin()..end() with `==`).
+pub func doubly_linked_list_find_const[T: luce.Equatable](this: const DoublyLinkedList[T]*, value: T) -> DoublyLinkedListIterator[T]:
+    var it = doubly_linked_list_begin_const(this)
+    while let node = it.m_node:
+        if node.m_value == value:
+            return it
+        it.m_node = node.next
+    return doubly_linked_list_end_const(this)
+
+## Ported from AK/DoublyLinkedList.h:194 AK::DoublyLinkedList::find.
+pub func doubly_linked_list_find[T: luce.Equatable](this: DoublyLinkedList[T]*, value: T) -> DoublyLinkedListIterator[T]:
+    return doubly_linked_list_find_const(this, value)
+
+## Ported from AK/DoublyLinkedList.h:199 AK::DoublyLinkedList::remove.
+pub func doubly_linked_list_remove[T](this: DoublyLinkedList[T]*, it: DoublyLinkedListIterator[T]) -> DoublyLinkedListIterator[T]:
+    let node = it.m_node else trap("VERIFY: removing the end of a DoublyLinkedList")
+    let next = node.next
+    if let prev = node.prev:
+        assert(this.m_head != (DoublyLinkedListNode[T]*?)node)
+        prev.next = node.next
+    else:
+        assert(this.m_head == (DoublyLinkedListNode[T]*?)node)
+        this.m_head = node.next
+    if let following = node.next:
+        assert(this.m_tail != (DoublyLinkedListNode[T]*?)node)
+        following.prev = node.prev
+    else:
+        assert(this.m_tail == (DoublyLinkedListNode[T]*?)node)
+        this.m_tail = node.prev
+    this.m_size -= 1
+    doubly_linked_list_drop_node(this, node)
+    return DoublyLinkedListIterator[T](m_node = next)
+
+## Ported from AK/DoublyLinkedList.h:223 AK::DoublyLinkedList::take_first.
+pub func doubly_linked_list_take_first[T](this: DoublyLinkedList[T]*) -> T:
+    let old_head = this.m_head else trap("VERIFY: take_first() of an empty DoublyLinkedList")
+    let value = old_head.m_value
+    this.m_head = old_head.next
+    if let head = this.m_head:
+        head.prev = none
+    else:
+        this.m_tail = none  # We removed the only element, no more elements left.
+    doubly_linked_list_drop_node(this, old_head)
+    this.m_size -= 1
+    return value
+
+## Ported from AK/DoublyLinkedList.h:238 AK::DoublyLinkedList::take_last.
+pub func doubly_linked_list_take_last[T](this: DoublyLinkedList[T]*) -> T:
+    let old_tail = this.m_tail else trap("VERIFY: take_last() of an empty DoublyLinkedList")
+    let value = old_tail.m_value
+    this.m_tail = old_tail.prev
+    if let tail = this.m_tail:
+        tail.next = none
+    else:
+        this.m_head = none  # We removed the only element, no more elements left.
+    doubly_linked_list_drop_node(this, old_tail)
+    this.m_size -= 1
+    return value
+
+## Ported from AK/DoublyLinkedList.h:253 AK::DoublyLinkedList::size.
+pub func doubly_linked_list_size[T](this: const DoublyLinkedList[T]*) -> usize:
+    return this.m_size
+
+## Ported from AK/DoublyLinkedList.h:256 AK::DoublyLinkedList::ensure_capacity: with no node
+## cache (node_cache_size == 0) there is nothing to prepare.
+pub func doubly_linked_list_ensure_capacity[T](this: DoublyLinkedList[T]*, new_capacity: usize, make_default_value: Function0[T]):
+    discard(this)
+    discard(new_capacity)
+    discard(make_default_value)
+
+## Ported from AK/DoublyLinkedList.h:269 AK::DoublyLinkedList::drop_node.
+pub func doubly_linked_list_drop_node[T](this: DoublyLinkedList[T]*, node: DoublyLinkedListNode[T]*):
+    discard(this)
+    free(node)
+
+## Ported from AK/DoublyLinkedList.h:284 AK::DoublyLinkedList::make_node (`new (nothrow)`).
+pub func doubly_linked_list_make_node[T](this: DoublyLinkedList[T]*, value: T) -> DoublyLinkedListNode[T]*?:
+    discard(this)
+    return new DoublyLinkedListNode[T](next = none, prev = none, m_value = value) catch:
+        recover none

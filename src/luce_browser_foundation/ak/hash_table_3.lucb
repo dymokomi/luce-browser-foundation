@@ -1,0 +1,219 @@
+#==============================================================================================
+#
+#   hash_table_3 - HashTable<T>: writing (Robin Hood insertion) and deleting buckets
+#
+#   DESCRIPTION:
+#       Port of AK/HashTable.h (lines 700-940); see hash_table_1.
+#
+#==============================================================================================
+
+# mark: Writing =================================================================================
+
+# lookup_for_writing's update_collection_for_swapped_buckets lambda: after two buckets traded
+# places, point the ordered list (head, tail and the neighbours' links) at their new places.
+func hash_table_update_collection_for_swapped_buckets[T, TT: Traits[T]](this: HashTable[T, TT]*, left_bucket: HashTableBucket[T]*, right_bucket: HashTableBucket[T]*):
+    if not this.m_ordered:
+        return
+    let left: HashTableBucket[T]*? = left_bucket
+    let right: HashTableBucket[T]*? = right_bucket
+    if this.m_head == left:
+        this.m_head = right
+    elif this.m_head == right:
+        this.m_head = left
+    if this.m_tail == left:
+        this.m_tail = right
+    elif this.m_tail == right:
+        this.m_tail = left
+
+    if let previous = left_bucket.previous:
+        if previous == left_bucket:
+            left_bucket.previous = right
+        let fixed = left_bucket.previous else trap("unreachable")
+        fixed.next = left
+    if let next = left_bucket.next:
+        if next == left_bucket:
+            left_bucket.next = right
+        let fixed = left_bucket.next else trap("unreachable")
+        fixed.previous = left
+
+    if let previous = right_bucket.previous:
+        if previous != left_bucket:
+            previous.next = right
+    if let next = right_bucket.next:
+        if next != left_bucket:
+            next.previous = right
+
+## Ported from AK/HashTable.h:708 AK::HashTable::lookup_for_writing.
+# NB: For InsertedNewEntry results we hand the bucket back in a tentative state:
+#     state=Free, not in the ordered list, and m_size unchanged. The caller must
+#     placement-new the value and then call commit_inserted_bucket() to finalize.
+#     Leaving state=Free across construction makes the bucket invisible to iterators,
+#     which is essential for ensure() callbacks that may trigger traversal.
+pub func hash_table_lookup_for_writing[T, TT: Traits[T]](this: HashTable[T, TT]*, hash_: u32, predicate: Function1[const T*, bool], existing_entry_behavior: HashSetExistingEntryBehavior) -> LookupForWritingResult[T]:
+    var bucket_index = (usize)hash_ & this.m_mask
+    var probe_length: usize = 0
+    while true:
+        var bucket = hash_table_bucket_at(this, bucket_index)
+
+        # We found a free bucket. Return it tentatively; caller commits after construction.
+        if bucket.state == (u8)BucketState.free_:
+            return LookupForWritingResult[T](result = HashSetResult.inserted_new_entry, bucket = bucket, probe_length = probe_length)
+
+        # The bucket is already used, does it have an identical value?
+        if bucket.hash == hash_ and function1_call(&predicate, &bucket.storage):
+            if existing_entry_behavior == HashSetExistingEntryBehavior.replace:
+                return LookupForWritingResult[T](result = HashSetResult.replaced_existing_entry, bucket = bucket, probe_length = 0)
+            return LookupForWritingResult[T](result = HashSetResult.kept_existing_entry, bucket = bucket, probe_length = 0)
+
+        # Robin hood: if our probe length is larger (poor) than this bucket's (rich), steal its position!
+        # This ensures that we will always traverse buckets in order of probe length.
+        var target_probe_length = hash_table_used_bucket_probe_length(this, bucket)
+        if probe_length > target_probe_length:
+            # Copy out bucket
+            var bucket_to_move: HashTableBucket[T] = ---
+            bucket_to_move.previous = none
+            bucket_to_move.next = none
+            hash_table_relocate_bucket[T, TT](&bucket_to_move, bucket)
+            hash_table_update_collection_for_swapped_buckets(this, bucket, &bucket_to_move)
+
+            # Tentatively occupy the stolen slot so the displacement loop below sees it as
+            # used with the correct probe length. We will un-stamp it before returning so
+            # that the caller can commit after constructing the value.
+            let inserted_bucket = bucket
+            let inserted_probe_length = probe_length
+            bucket.state = (u8)hash_table_bucket_state_for_probe_length(this, probe_length)
+            bucket.hash = hash_
+            probe_length = target_probe_length
+            if this.m_ordered:
+                bucket.previous = none
+                bucket.next = none
+
+            # Find a free bucket, swapping with smaller probe length buckets along the way
+            while true:
+                bucket_index = (bucket_index + 1) & this.m_mask
+                bucket = hash_table_bucket_at(this, bucket_index)
+                probe_length += 1
+
+                if bucket.state == (u8)BucketState.free_:
+                    hash_table_relocate_bucket[T, TT](bucket, &bucket_to_move)
+                    bucket.state = (u8)hash_table_bucket_state_for_probe_length(this, probe_length)
+                    hash_table_update_collection_for_swapped_buckets(this, &bucket_to_move, bucket)
+                    break
+
+                target_probe_length = hash_table_used_bucket_probe_length(this, bucket)
+                if probe_length > target_probe_length:
+                    hash_table_swap_buckets[T, TT](&bucket_to_move, bucket)
+                    bucket.state = (u8)hash_table_bucket_state_for_probe_length(this, probe_length)
+                    probe_length = target_probe_length
+                    hash_table_update_collection_for_swapped_buckets(this, &bucket_to_move, bucket)
+
+            # Un-stamp the target bucket: state back to Free, not in the ordered list,
+            # m_size unchanged. The caller will commit after placement-new.
+            inserted_bucket.state = (u8)BucketState.free_
+            if this.m_ordered:
+                inserted_bucket.previous = none
+                inserted_bucket.next = none
+
+            return LookupForWritingResult[T](result = HashSetResult.inserted_new_entry, bucket = inserted_bucket, probe_length = inserted_probe_length)
+
+        # Try next bucket
+        bucket_index = (bucket_index + 1) & this.m_mask
+        probe_length += 1
+
+## Ported from AK/HashTable.h:830 AK::HashTable::commit_inserted_bucket.
+# Finalizes a bucket tentatively reserved by lookup_for_writing. Must be called after
+# the caller has constructed the value in bucket.slot() via placement-new.
+pub func hash_table_commit_inserted_bucket[T, TT: Traits[T]](this: HashTable[T, TT]*, bucket: HashTableBucket[T]*, hash_: u32, probe_length: usize):
+    bucket.state = (u8)hash_table_bucket_state_for_probe_length(this, probe_length)
+    bucket.hash = hash_
+    if this.m_ordered:
+        if let tail = this.m_tail:
+            bucket.previous = tail
+            tail.next = bucket
+        else:
+            this.m_head = bucket
+        this.m_tail = bucket
+    this.m_size += 1
+
+## Ported from AK/HashTable.h:843 AK::HashTable::write_value.
+pub func hash_table_write_value[T, TT: Traits[T]](this: HashTable[T, TT]*, value: T, existing_entry_behavior: HashSetExistingEntryBehavior) -> HashSetResult:
+    var traits: TT = ---
+    let hash_ = traits.hash_of(&value)
+    var captures = HashTableEqualsValue[T, TT](value = value)
+    let equals: func(void*?, const T*) -> bool = HashTableEqualsValue[T, TT].call
+    let lookup = hash_table_lookup_for_writing(this, hash_, Function1[const T*, bool](call = equals, context = &captures), existing_entry_behavior)
+    let bucket = lookup.bucket
+    match lookup.result:
+        .replaced_existing_entry:
+            bucket.storage = value
+        .inserted_new_entry:
+            bucket.storage = value
+            hash_table_commit_inserted_bucket(this, bucket, hash_, lookup.probe_length)
+        .kept_existing_entry:
+            discard(bucket)
+        _:
+            trap("VERIFY_NOT_REACHED")
+    return lookup.result
+
+# mark: Deleting ================================================================================
+
+# delete_bucket's update_bucket_neighbors lambda: point the ordered list at a bucket's new place.
+func hash_table_update_bucket_neighbors[T, TT: Traits[T]](this: HashTable[T, TT]*, bucket: HashTableBucket[T]*):
+    if not this.m_ordered:
+        return
+    if let previous = bucket.previous:
+        previous.next = bucket
+    else:
+        this.m_head = bucket
+    if let next = bucket.next:
+        next.previous = bucket
+    else:
+        this.m_tail = bucket
+
+## Ported from AK/HashTable.h:864 AK::HashTable::delete_bucket.
+pub func hash_table_delete_bucket[T, TT: Traits[T]](this: HashTable[T, TT]*, bucket: HashTableBucket[T]*):
+    assert(bucket.state != (u8)BucketState.free_)
+
+    # Delete the bucket
+    if this.m_ordered:
+        if let previous = bucket.previous:
+            previous.next = bucket.next
+        else:
+            this.m_head = bucket.next
+        if let next = bucket.next:
+            next.previous = bucket.previous
+        else:
+            this.m_tail = bucket.previous
+        bucket.previous = none
+        bucket.next = none
+    this.m_size -= 1
+
+    # If we deleted a bucket, we need to make sure to shift up all buckets after it to ensure
+    # that we can still probe for buckets with collisions, and we automatically optimize the
+    # probe lengths. To do so, we shift the following buckets up until we reach a free bucket,
+    # or a bucket with a probe length of 0 (the ideal index for that bucket).
+    let buckets = this.m_buckets else trap("VERIFY: HashTable without buckets")
+    assert(bucket >= buckets)
+    var shift_to_index = (usize)(bucket - buckets)
+    assert(shift_to_index <= this.m_mask)
+    var shift_from_index = shift_to_index
+    while true:
+        shift_from_index = (shift_from_index + 1) & this.m_mask
+
+        let shift_from_bucket = hash_table_bucket_at(this, shift_from_index)
+        if shift_from_bucket.state == (u8)BucketState.free_:
+            break
+
+        let shift_from_probe_length = hash_table_used_bucket_probe_length(this, shift_from_bucket)
+        if shift_from_probe_length == 0:
+            break
+
+        let shift_to_bucket = hash_table_bucket_at(this, shift_to_index)
+        hash_table_relocate_bucket[T, TT](shift_to_bucket, shift_from_bucket)
+        shift_to_bucket.state = (u8)hash_table_bucket_state_for_probe_length(this, shift_from_probe_length - 1)
+        hash_table_update_bucket_neighbors(this, shift_to_bucket)
+
+        shift_to_index = (shift_to_index + 1) & this.m_mask
+
+    # Mark last bucket as free
+    hash_table_bucket_at(this, shift_to_index).state = (u8)BucketState.free_

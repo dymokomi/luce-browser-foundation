@@ -1,0 +1,65 @@
+#==============================================================================================
+#
+#   copy_on_write - CopyOnWrite<T>: a shared ref-counted value cloned before mutation
+#
+#   DESCRIPTION:
+#       Port of AK/CopyOnWrite.h (lines 1-41). T is a RefCounted<T> with clone(); the
+#       interface CopyOnWriteValue gives the generic code both. NonnullRefPtr<T> is `T*`
+#       (DESIGN.md §2.6), so the reference counts the donor's smart pointer maintains
+#       implicitly are explicit here: a C++ copy of a CopyOnWrite is copy_on_write_copy,
+#       which takes the reference the NonnullRefPtr copy would; assigning a new value
+#       drops the old one's. Nothing is freed (managed memory).
+#
+#==============================================================================================
+
+## What CopyOnWrite<T> needs of T: its reference count and a deep copy.
+pub interface CopyOnWriteValue[T]:
+    func ref_counted_base() -> RefCountedBase*
+
+    func clone() -> T*
+
+## Ported from AK/CopyOnWrite.h:16 AK::CopyOnWrite::CopyOnWrite<T>: adopts `value`, the
+## `new T` of the donor (a generic body cannot construct a T).
+pub func copy_on_write_construct[T: CopyOnWriteValue[T]](this: CopyOnWrite[T]*, value: T*):
+    this.m_value = adopt_ref(value)
+
+## The copy constructor of CopyOnWrite<T>: shares the value and takes a reference to it.
+pub func copy_on_write_copy[T: CopyOnWriteValue[T]](this: const CopyOnWrite[T]*) -> CopyOnWrite[T]:
+    ref_counted_base_ref(this.m_value.ref_counted_base())
+    return CopyOnWrite[T](m_value = this.m_value)
+
+## Ported from AK/CopyOnWrite.h:20 AK::CopyOnWrite::mutable_value.
+pub func copy_on_write_mutable_value[T: CopyOnWriteValue[T]](this: CopyOnWrite[T]*) -> T*:
+    if ref_counted_base_ref_count(this.m_value.ref_counted_base()) > 1:
+        let old = this.m_value
+        this.m_value = old.clone()
+        unref_if_not_null(old.ref_counted_base())
+    return this.m_value
+
+## Ported from AK/CopyOnWrite.h:26 AK::CopyOnWrite::value.
+pub func copy_on_write_value[T](this: const CopyOnWrite[T]*) -> const T*:
+    return this.m_value
+
+## Ported from AK/CopyOnWrite.h:28 AK::CopyOnWrite::operator T const&.
+pub func copy_on_write_to_const_t[T](this: const CopyOnWrite[T]*) -> const T*:
+    return copy_on_write_value(this)
+
+## Ported from AK/CopyOnWrite.h:29 AK::CopyOnWrite::operator T&.
+pub func copy_on_write_to_t[T: CopyOnWriteValue[T]](this: CopyOnWrite[T]*) -> T*:
+    return copy_on_write_mutable_value(this)
+
+## Ported from AK/CopyOnWrite.h:31 AK::CopyOnWrite::operator-> const.
+pub func copy_on_write_arrow_const[T](this: const CopyOnWrite[T]*) -> const T*:
+    return copy_on_write_value(this)
+
+## Ported from AK/CopyOnWrite.h:32 AK::CopyOnWrite::operator->.
+pub func copy_on_write_arrow[T: CopyOnWriteValue[T]](this: CopyOnWrite[T]*) -> T*:
+    return copy_on_write_mutable_value(this)
+
+## Ported from AK/CopyOnWrite.h:34 AK::CopyOnWrite::ptr const.
+pub func copy_on_write_ptr_const[T](this: const CopyOnWrite[T]*) -> const T*:
+    return this.m_value
+
+## Ported from AK/CopyOnWrite.h:35 AK::CopyOnWrite::ptr.
+pub func copy_on_write_ptr[T](this: CopyOnWrite[T]*) -> T*:
+    return this.m_value

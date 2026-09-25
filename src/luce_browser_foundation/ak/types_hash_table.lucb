@@ -7,6 +7,11 @@
 #       AK/HashTable.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
 #       Regenerate rather than edit, except to fill a field the generator could not map.
 #
+#       Edited by region r01: BucketState is a u8 (255 is CalculateLength); the iterators
+#       take the element type only (the bucket type is HashTableBucket[T], and one iterator
+#       serves ordered and unordered tables) and are luce-base iterators, so a table can be
+#       walked with `for`; LookupForWritingResult is generic over the element type.
+#
 #==============================================================================================
 
 ## AK::HashSetResult (AK/HashTable.h:22).
@@ -20,30 +25,51 @@ pub enum HashSetExistingEntryBehavior as i32:
     keep = 0
     replace = 1
 
-## AK::BucketState (AK/HashTable.h:37).
-pub enum BucketState as i64:
+## AK::BucketState (AK/HashTable.h:37). BucketState doubles as both an enum and a probe length
+## value: Free is an empty bucket, 1..254 a used bucket whose probe length is the value minus 1,
+## CalculateLength a used bucket whose probe length is over 253 and must be computed. Buckets
+## store it as a u8 (HashTableBucket.state).
+pub enum BucketState as u8:
     free_ = 0
-    calculate_length = -1
+    calculate_length = 255
 
 # mark: HashTableIterator =======================================================================
 
-## AK::HashTableIterator (AK/HashTable.h:43): a generic struct.
-pub struct HashTableIterator[THashTableType, T, TBucketType]:
-    pub var m_bucket: TBucketType*?  # C++ default: { nullptr }
-    pub var m_end_bucket: TBucketType*?  # C++ default: { nullptr }
+## AK::HashTableIterator and AK::OrderedHashTableIterator (AK/HashTable.h:43, 78): the bucket an
+## iteration is at (none at the end). An unordered table's iterator steps through the bucket
+## array to `m_end_bucket`; an ordered one follows the buckets' `next` links. Also a luce-base
+## iterator yielding a pointer to each value, so `for value in hash_table_begin(&table):` walks
+## the table in the donor's order.
+pub struct HashTableIterator[T]: luce.Iterable[T*, HashTableIterator[T]], luce.Iterator[T*]:
+    pub var m_bucket: HashTableBucket[T]*?  # C++ default: { nullptr }
+    pub var m_end_bucket: HashTableBucket[T]*?  # C++ default: { nullptr }
+    pub var m_ordered: bool
+
+    func iterator() -> HashTableIterator[T]: return self
+
+    mutating func next() -> T*?: return hash_table_iterator_next(&self)
 
 # mark: OrderedHashTableIterator ================================================================
 
-## AK::OrderedHashTableIterator (AK/HashTable.h:78): a generic struct.
-pub struct OrderedHashTableIterator[TOrderedHashTableType, T, TBucketType]:
-    pub var m_bucket: TBucketType*?  # C++ default: { nullptr }
+## AK::OrderedHashTableIterator (AK/HashTable.h:78): a bucket of an ordered table, stepping along
+## its `next` links.
+pub struct OrderedHashTableIterator[T]:
+    pub var m_bucket: HashTableBucket[T]*?  # C++ default: { nullptr }
 
 # mark: ReverseOrderedHashTableIterator =========================================================
 
-## AK::ReverseOrderedHashTableIterator (AK/HashTable.h:99): a generic struct.
-pub struct ReverseOrderedHashTableIterator[TOrderedHashTableType, T, TBucketType]:
-    pub var m_bucket: TBucketType*?  # C++ default: { nullptr }
+## AK::ReverseOrderedHashTableIterator (AK/HashTable.h:99): a bucket of an ordered table, stepping
+## along its `previous` links; also a luce-base iterator (`for value in ordered_hash_table_rbegin(&t):`).
+pub struct ReverseOrderedHashTableIterator[T]: luce.Iterable[T*, ReverseOrderedHashTableIterator[T]], luce.Iterator[T*]:
+    pub var m_bucket: HashTableBucket[T]*?  # C++ default: { nullptr }
 
-## AK::HashTable::LookupForWritingResult (AK/HashTable.h:700): opaque in this phase (not in the phase-1 closure).
-pub struct LookupForWritingResult:
-    pub var opaque_: u8
+    func iterator() -> ReverseOrderedHashTableIterator[T]: return self
+
+    mutating func next() -> T*?: return reverse_ordered_hash_table_iterator_next(&self)
+
+## AK::HashTable::LookupForWritingResult (AK/HashTable.h:700).
+pub struct LookupForWritingResult[T]:
+    pub var result: HashSetResult
+    pub var bucket: HashTableBucket[T]*
+    # Only meaningful for InsertedNewEntry: the probe length to stamp when the caller commits.
+    pub var probe_length: usize

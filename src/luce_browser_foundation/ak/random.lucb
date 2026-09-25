@@ -1,0 +1,146 @@
+#==============================================================================================
+#
+#   random - the CSPRNG, uniform integers, random UUIDs and the xorshift128+ generator
+#
+#   DESCRIPTION:
+#       Port of AK/Random.h (lines 1-68) and AK/Random.cpp (lines 1-176). csprng takes the
+#       arc4random_buf branch, which covers macOS and glibc 2.36 and later.
+#
+#==============================================================================================
+
+extern func arc4random_buf(buf: void*, nbytes: usize)
+
+## Ported from AK/Random.cpp:23 csprng.
+# We shouldn't use OpenSSL's RAND_bytes function here, because we want to avoid adding dependencies to AK.
+# Therefore, we will use the best platform-specific CSPRNG.
+pub func csprng(buf: void*?, size: usize) -> !:
+    # This target also covers MacOS and iOS and they both seem to support arc4random_buf
+    if let pointer = buf:
+        arc4random_buf(pointer, size)
+
+## Ported from AK/Random.cpp:56 AK::fill_with_random.
+pub func fill_with_random(bytes: u8[]):
+    if bytes.length == 0:
+        return
+    csprng(bytes.data, bytes.length) else trap("MUST: csprng")
+
+## Ported from AK/Random.h:24 AK::get_random.
+pub func get_random[T]() -> T:
+    var t: T = ---
+    fill_with_random(u8[]((u8*)&t, sizeof(T)))
+    return t
+
+## Ported from AK/Random.cpp:61 AK::get_random_uniform.
+pub func get_random_uniform(max_bounds: u32) -> u32:
+    # If we try to divide all 2**32 numbers into groups of "max_bounds" numbers, we may end up
+    # with a group around 2**32-1 that is a bit too small. For this reason, the implementation
+    # `arc4random() % max_bounds` would be insufficient. Here we compute the last number of the
+    # last "full group". Note that if max_bounds is a divisor of UINT32_MAX,
+    # then we end up with UINT32_MAX:
+    let max_usable: u32 = u32_max - (u32)(((u64)u32_max + 1) % (u64)max_bounds)
+    var random_value = get_random[u32]()
+    var i = 0
+    while i < 20 and random_value > max_usable:
+        # By chance we picked a value from the incomplete group. Note that this group has size at
+        # most 2**31-1, so picking this group has a chance of less than 50%.
+        # In practice, this means that for the worst possible input, there is still only a
+        # once-in-a-million chance to get to iteration 20. In theory we should be able to loop
+        # forever. Here we prefer marginally imperfect random numbers over weird runtime behavior.
+        random_value = get_random[u32]()
+        i += 1
+    return random_value % max_bounds
+
+## Ported from AK/Random.cpp:81 AK::get_random_uniform_64.
+pub func get_random_uniform_64(max_bounds: u64) -> u64:
+    # Uses the same algorithm as `get_random_uniform`,
+    # by replacing u64 with u128 and u32 with u64.
+    # (u128(UINT64_MAX) + 1) % max_bounds, computed without a 128-bit type.
+    let wrap = ((u64_max % max_bounds) + 1) % max_bounds
+    let max_usable = u64_max - wrap
+    var random_value = get_random[u64]()
+    var i = 0
+    while i < 20 and random_value > max_usable:
+        random_value = get_random[u64]()
+        i += 1
+    return random_value % max_bounds
+
+# The lowercase hexadecimal digits of `{:02x}`.
+let random_hex_digits: u8[16] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f']
+
+## Ported from AK/Random.cpp:94 AK::generate_random_uuid.
+# https://w3c.github.io/webcrypto/#dfn-generate-a-random-uuid
+pub func generate_random_uuid() -> String:
+    # 1. Let bytes be a byte sequence of length 16.
+    var bytes: u8[16]
+
+    # 2. Fill bytes with cryptographically secure random bytes.
+    fill_with_random(bytes)
+
+    # 3. Set the 4 most significant bits of bytes[6], which represent the UUID version, to 0100.
+    bytes[6] = (bytes[6] & 0x0f) | 0x40
+
+    # 4. Set the 2 most significant bits of bytes[8], which represent the UUID variant, to 10.
+    bytes[8] = (bytes[8] & 0x3f) | 0x80
+
+    # 5. Return the string concatenation of «
+    #     hexadecimal representation of bytes[0], ... bytes[3], "-", bytes[4], bytes[5], "-",
+    #     bytes[6], bytes[7], "-", bytes[8], bytes[9], "-", bytes[10], ... bytes[15]
+    # ».
+    var text: u8[36]
+    format_uuid(bytes, text)
+    return string_from_utf8_without_validation(text)
+
+# String::formatted("{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}...", bytes...).
+func format_uuid(bytes: const u8[], text: u8[]):
+    var out: usize = 0
+    for i in 0..<16usize:
+        if i == 4 or i == 6 or i == 8 or i == 10:
+            text[out] = '-'
+            out += 1
+        text[out] = random_hex_digits[bytes[i] >> 4]
+        text[out + 1] = random_hex_digits[bytes[i] & 0xf]
+        out += 2
+
+## Ported from AK/Random.h:50 AK::shuffle, over a span.
+pub func shuffle[T](collection: T[]):
+    # Fisher-Yates shuffle
+    var i = collection.length -% 1
+    while i >= 1:
+        let j: usize = get_random_uniform((u32)(i + 1))
+        swap_5(&collection[i], &collection[j])
+        i -= 1
+
+## Ported from AK/Random.cpp:139 AK::XorShift128PlusRNG::XorShift128PlusRNG.
+pub func xor_shift128_plus_rng_construct(this: XorShift128PlusRng*):
+    # Splitmix64 is used as xorshift is sensitive to being seeded with all 0s
+    var seed = get_random[u64]()
+    this.m_low = xor_shift128_plus_rng_splitmix64(this, &seed)
+    seed = get_random[u64]()
+    this.m_high = xor_shift128_plus_rng_splitmix64(this, &seed)
+
+## Ported from AK/Random.cpp:148 AK::XorShift128PlusRNG::get.
+pub func xor_shift128_plus_rng_get(this: XorShift128PlusRng*) -> f64:
+    let value = xor_shift128_plus_rng_advance(this) & (((u64)1 << 53) - 1)
+    return f64(value) * (1.0 / f64((u64)1 << 53))
+
+## Ported from AK/Random.cpp:154 AK::XorShift128PlusRNG::splitmix64.
+pub func xor_shift128_plus_rng_splitmix64(this: XorShift128PlusRng*, state: u64*) -> u64:
+    discard(this)
+    *state = *state +% 0x9e3779b97f4a7c15
+    var z = *state
+    z = (z ^ (z >> 30)) *% 0xbf58476d1ce4e5b9
+    z = (z ^ (z >> 27)) *% 0x94d049bb133111eb
+    return z ^ (z >> 31)
+
+## Ported from AK/Random.cpp:163 AK::XorShift128PlusRNG::advance.
+# Apparently this set of constants is better: https://stackoverflow.com/a/34432126
+pub func xor_shift128_plus_rng_advance(this: XorShift128PlusRng*) -> u64:
+    var s1 = this.m_low
+    let s0 = this.m_high
+    let result = s0 +% s1
+    this.m_low = s0
+    s1 = s1 ^ (s1 << 23)
+    s1 = s1 ^ (s1 >> 18)
+    s1 = s1 ^ (s0 ^ (s0 >> 5))
+    this.m_high = s1
+    return result +% s1

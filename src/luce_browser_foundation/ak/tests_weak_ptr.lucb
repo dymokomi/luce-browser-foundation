@@ -1,0 +1,45 @@
+#==============================================================================================
+#
+#   tests_weak_ptr - WeakLink, Weakable and weak_callback
+#
+#   DESCRIPTION:
+#       Port of the cases of Tests/AK/TestWeakPtr.cpp that apply without destructors: the
+#       object's end of life is weakable_revoke_weak_ptrs, which ~Weakable runs.
+#
+#==============================================================================================
+
+struct TestWeakable:
+    var weakable: Weakable[TestWeakable]
+    var m_member: i32
+
+test "weak_ptr: basic_weak":
+    var simple = TestWeakable(m_member = 123)
+    let link1 = weakable_ensure_link(&simple.weakable)
+    let link2 = weakable_ensure_link(&simple.weakable)
+    assert(link1 == link2)
+    assert(not weak_link_is_null(link1))
+    assert(weak_link_strong_ref[TestWeakable](link1) == (TestWeakable*?)&simple)
+    assert((weak_link_unsafe_ptr[TestWeakable](link2) else trap("null")).m_member == 123)
+    weakable_revoke_weak_ptrs(&simple.weakable)
+    assert(weak_link_is_null(link1))
+    assert(weak_link_strong_ref[TestWeakable](link1) == none)
+    assert(simple.weakable.m_link == none)
+
+struct TestWeakCallbackContext:
+    var was_called: bool
+
+func test_weak_callback_body(context: void*?, self_: TestWeakable*):
+    let captures = (TestWeakCallbackContext*)(context else trap("no context"))
+    assert(self_.m_member == 123)
+    captures.was_called = true
+
+test "weak_ptr: weak_callback":
+    var captures = TestWeakCallbackContext(was_called = false)
+    var simple = TestWeakable(m_member = 123)
+    let cb = weak_callback(&simple.weakable, Function1[TestWeakable*, unit](call = test_weak_callback_body, context = &captures))
+    weak_callback_call(&cb)
+    assert(captures.was_called)
+    captures.was_called = false
+    weakable_revoke_weak_ptrs(&simple.weakable)
+    weak_callback_call(&cb)
+    assert(not captures.was_called)

@@ -1,0 +1,47 @@
+#==============================================================================================
+#
+#   ref_counted - RefCountedBase and RefCounted<T>
+#
+#   DESCRIPTION:
+#       Port of AK/RefCounted.h (lines 1-80). DESIGN.md §3.3: ref-counted objects live in
+#       managed memory, so nothing is ever deleted here. The counter is kept faithfully
+#       (ref, try_ref, deref_base and their VERIFYs); `unref` reports whether the count
+#       reached zero, where the donor would run will_be_destroyed() and delete the object.
+#       A RefCounted<T> object's constructor must run ref_counted_base_init_fields (the
+#       count starts at 1, as in C++).
+#
+#==============================================================================================
+
+## Ported from AK/RefCounted.h:25 AK::RefCountedBase::ref.
+pub func ref_counted_base_ref(this: const RefCountedBase*):
+    assert(this.m_ref_count > 0)
+    assert(not checked_addition_would_overflow_u32(this.m_ref_count, 1))
+    let that = (RefCountedBase*)this
+    that.m_ref_count += 1
+
+## Ported from AK/RefCounted.h:32 AK::RefCountedBase::try_ref.
+pub func ref_counted_base_try_ref(this: const RefCountedBase*) -> bool:
+    if this.m_ref_count == 0:
+        return false
+    ref_counted_base_ref(this)
+    return true
+
+## Ported from AK/RefCounted.h:40 AK::RefCountedBase::ref_count.
+pub func ref_counted_base_ref_count(this: const RefCountedBase*) -> u32:
+    return this.m_ref_count
+
+## Ported from AK/RefCounted.h:46 AK::RefCountedBase::deref_base.
+pub func ref_counted_base_deref_base(this: const RefCountedBase*) -> u32:
+    assert(this.m_ref_count != 0)
+    let that = (RefCountedBase*)this
+    that.m_ref_count -= 1
+    return that.m_ref_count
+
+## Ported from AK/RefCounted.h:58 AK::RefCounted::unref.
+# The donor calls will_be_destroyed() and deletes the object when the count reaches zero; the
+# object is managed memory (DESIGN.md §3.3), so only the answer is kept.
+pub func ref_counted_unref[T](this: const RefCounted[T]*) -> bool:
+    let new_ref_count = ref_counted_base_deref_base(&this.ref_counted_base)
+    if new_ref_count == 0:
+        return true
+    return false

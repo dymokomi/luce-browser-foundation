@@ -1,0 +1,412 @@
+#==============================================================================================
+#
+#   time_2 - UnawareTime, UnixDateTime, MonotonicTime and the timeval/timespec helpers
+#
+#   DESCRIPTION:
+#       Port of AK/Time.h (lines 380-663) with the out-of-line definitions of AK/Time.cpp
+#       (lines 380-487, the POSIX clock branch) and the calendar name tables of
+#       AK/DateConstants.h. UnixDateTime::to_string_impl and parse are in time_3.
+#       CLOCK_*_COARSE is the plain clock on macOS, as AK/Platform.h defines it there.
+#
+#==============================================================================================
+
+# mark: C time functions ========================================================================
+
+# struct tm of <time.h>: the layout of macOS and glibc (tm_gmtoff is a long, tm_zone a char*).
+extern struct Tm:
+    tm_sec: i32
+    tm_min: i32
+    tm_hour: i32
+    tm_mday: i32
+    tm_mon: i32
+    tm_year: i32
+    tm_wday: i32
+    tm_yday: i32
+    tm_isdst: i32
+    tm_gmtoff: i64
+    tm_zone: const u8*?
+
+extern func clock_gettime(clock_id: i32, tp: Timespec*) -> i32
+extern func gmtime_r(timep: const i64*, result: Tm*) -> Tm*?
+extern func localtime_r(timep: const i64*, result: Tm*) -> Tm*?
+extern func mktime(tm: Tm*) -> i64
+extern func timegm(tm: Tm*) -> i64
+
+# A zeroed struct tm.
+func zeroed_tm() -> Tm:
+    return Tm(tm_sec = 0, tm_min = 0, tm_hour = 0, tm_mday = 0, tm_mon = 0, tm_year = 0, tm_wday = 0, tm_yday = 0, tm_isdst = 0, tm_gmtoff = 0, tm_zone = none)
+
+# CLOCK_REALTIME and CLOCK_REALTIME_COARSE: 0 on both targets; Linux's coarse clock is 5.
+func clock_realtime_coarse() -> i32:
+    if os.linux:
+        return 5
+    else:
+        return 0
+
+# CLOCK_MONOTONIC: 6 on macOS, 1 on Linux.
+func clock_monotonic() -> i32:
+    if os.macos:
+        return 6
+    else:
+        return 1
+
+# CLOCK_MONOTONIC_COARSE: CLOCK_MONOTONIC on macOS (AK/Platform.h), 6 on Linux.
+func clock_monotonic_coarse() -> i32:
+    if os.linux:
+        return 6
+    else:
+        return clock_monotonic()
+
+# mark: DateConstants ===========================================================================
+
+# AK/DateConstants.h.
+let long_day_names: str[7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+let short_day_names: str[7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+let long_month_names: str[12] = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+let short_month_names: str[12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+# mark: UnawareTime =============================================================================
+
+# Common base class for all unaware time types.
+# Naive, or unaware, in the time context means to make heavily simplifying assumptions about time.
+# In the case of this class and its children, they are not timezone-aware and strictly ordered.
+
+## Ported from AK/Time.h:388 AK::Detail::UnawareTime::to_timespec.
+pub func unaware_time_to_timespec(this: const UnawareTime*) -> Timespec:
+    return duration_to_timespec(&this.m_offset)
+
+## Ported from AK/Time.h:390 AK::Detail::UnawareTime::to_timeval.
+# Rounds towards -inf.
+pub func unaware_time_to_timeval(this: const UnawareTime*) -> Timeval:
+    return duration_to_timeval(&this.m_offset)
+
+## Ported from AK/Time.h:395 AK::Detail::UnawareTime::UnawareTime.
+pub func unaware_time_construct(this: UnawareTime*, offset: Duration):
+    this.m_offset = offset
+
+# mark: UnixDateTime ============================================================================
+
+# Naive UNIX time, representing an offset from 1970-01-01 00:00:00Z, without accounting for UTC leap seconds.
+# This class is mainly intended for interoperating with anything that expects a unix timestamp.
+
+# The private constructor UnixDateTime(Duration), as a value.
+func make_unix_date_time(offset: Duration) -> UnixDateTime:
+    var t: UnixDateTime
+    unix_date_time_construct_duration(&t, offset)
+    return t
+
+## Ported from AK/Time.h:409 AK::UnixDateTime::UnixDateTime.
+pub func unix_date_time_construct(this: UnixDateTime*):
+    unaware_time_construct(&this.unaware_time, duration_zero())
+
+## Ported from AK/Time.h:414 AK::UnixDateTime::epoch.
+pub func unix_date_time_epoch() -> UnixDateTime:
+    var t: UnixDateTime
+    unix_date_time_construct(&t)
+    return t
+
+## Ported from AK/Time.cpp:447 AK::UnixDateTime::from_iso8601_week.
+# Creates UNIX time from an ISO 8601 Week, such as 2025-W06, with year 2025 and week 6.
+pub func unix_date_time_from_iso8601_week(week_year: u32, week: u32) -> UnixDateTime:
+    let day_of_week_january_4th = (day_of_week((i32)week_year, 1, 4) + 6) % 7
+    let ordinal_day = (i32)(7 * week) - (i32)day_of_week_january_4th - 3
+
+    if ordinal_day < 1:
+        return unix_date_time_from_ordinal_date(week_year - 1, (u32)(ordinal_day + (i32)days_in_year((i32)week_year - 1)))
+    let days_in_week_year = days_in_year((i32)week_year)
+    if (u32)ordinal_day > days_in_week_year:
+        return unix_date_time_from_ordinal_date(week_year + 1, (u32)ordinal_day - days_in_week_year)
+    return unix_date_time_from_ordinal_date(week_year, (u32)ordinal_day)
+
+## Ported from AK/Time.cpp:459 AK::UnixDateTime::from_ordinal_date.
+# Creates UNIX time from an ordinal date, such as 2025-100, with year 2025 and day 100.
+pub func unix_date_time_from_ordinal_date(year: u32, day: u32) -> UnixDateTime:
+    let month_starts_normal: u32[12] = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
+    let month_starts_leap: u32[12] = [1, 32, 61, 92, 122, 153, 183, 214, 245, 275, 306, 336]
+
+    let month_starts = month_starts_leap if is_leap_year((i32)year) else month_starts_normal
+
+    # Estimate month using integer division (approx 30.6 days per month)
+    var estimated_month = (day * 12 + 6) // 367  # Gives 0-based month index
+
+    # Correct month if estimate overshot
+    if day < month_starts[estimated_month]:
+        estimated_month -= 1
+
+    let month = estimated_month + 1  # convert to 1-based month
+    let day_of_month = day - month_starts[estimated_month] + 1
+
+    return unix_date_time_from_unix_time_parts((i32)year, (u8)month, (u8)day_of_month, 0, 0, 0, 0)
+
+## Ported from AK/Time.cpp:427 AK::(anonymous)::now_time_from_clock.
+# clockid_t is a 32-bit integer (an enum on macOS) on the supported targets.
+func now_time_from_clock(clock_id: i32) -> Duration:
+    var now_spec = Timespec(tv_sec = 0, tv_nsec = 0)
+    discard(clock_gettime(clock_id, &now_spec))
+    return duration_from_timespec(now_spec)
+
+## Ported from AK/Time.h:427 AK::UnixDateTime::from_unix_time_parts.
+# Creates UNIX time from a unix timestamp.
+# Note that the returned time is probably not equivalent to the same timestamp in UTC time, since UNIX time does not observe leap seconds.
+pub func unix_date_time_from_unix_time_parts(year: i32, month: u8, day: u8, hour: u8, minute: u8, second: u8, millisecond: u16) -> UnixDateTime:
+    let days = days_since_epoch(year, (i32)month, (i32)day)
+    # With year=2'147'483'648, we can end up with days=569'603'931'504.
+    # Expressing that in milliseconds would require more than 64 bits,
+    # so we must choose seconds here, and not milliseconds.
+    var seconds_since_epoch = (i64)((f64)days * seconds_per_day)
+
+    seconds_since_epoch += (i64)((i32)hour * seconds_per_hour)
+    seconds_since_epoch += (i64)((i32)minute * seconds_per_minute)
+    seconds_since_epoch += (i64)second
+    let base = unix_date_time_from_seconds_since_epoch(seconds_since_epoch)
+    return unix_date_time_add(&base, duration_from_milliseconds((i64)millisecond))
+
+## Ported from AK/Time.h:441 AK::UnixDateTime::from_seconds_since_epoch.
+pub func unix_date_time_from_seconds_since_epoch(seconds: i64) -> UnixDateTime:
+    return make_unix_date_time(duration_from_seconds(seconds))
+
+## Ported from AK/Time.h:446 AK::UnixDateTime::from_milliseconds_since_epoch.
+pub func unix_date_time_from_milliseconds_since_epoch(milliseconds: i64) -> UnixDateTime:
+    return make_unix_date_time(duration_from_milliseconds(milliseconds))
+
+## Ported from AK/Time.h:451 AK::UnixDateTime::from_nanoseconds_since_epoch.
+pub func unix_date_time_from_nanoseconds_since_epoch(nanoseconds: i64) -> UnixDateTime:
+    return make_unix_date_time(duration_from_nanoseconds(nanoseconds))
+
+## Ported from AK/Time.h:456 AK::UnixDateTime::from_unix_timespec.
+pub func unix_date_time_from_unix_timespec(time: Timespec) -> UnixDateTime:
+    return make_unix_date_time(duration_from_timespec(time))
+
+## Ported from AK/Time.h:462 AK::UnixDateTime::earliest.
+# Earliest and latest representable UNIX timestamps.
+pub func unix_date_time_earliest() -> UnixDateTime:
+    return make_unix_date_time(duration_min())
+
+## Ported from AK/Time.h:463 AK::UnixDateTime::latest.
+pub func unix_date_time_latest() -> UnixDateTime:
+    return make_unix_date_time(duration_max())
+
+## Ported from AK/Time.h:465 AK::UnixDateTime::offset_to_epoch.
+pub func unix_date_time_offset_to_epoch(this: const UnixDateTime*) -> Duration:
+    return this.unaware_time.m_offset
+
+## Ported from AK/Time.h:467 AK::UnixDateTime::seconds_since_epoch.
+# May return an epoch offset *after* what this UnixDateTime contains, because rounding to seconds occurs.
+pub func unix_date_time_seconds_since_epoch(this: const UnixDateTime*) -> i64:
+    return duration_to_seconds(&this.unaware_time.m_offset)
+
+## Ported from AK/Time.h:468 AK::UnixDateTime::milliseconds_since_epoch.
+pub func unix_date_time_milliseconds_since_epoch(this: const UnixDateTime*) -> i64:
+    return duration_to_milliseconds(&this.unaware_time.m_offset)
+
+## Ported from AK/Time.h:469 AK::UnixDateTime::nanoseconds_since_epoch.
+pub func unix_date_time_nanoseconds_since_epoch(this: const UnixDateTime*) -> i64:
+    return duration_to_nanoseconds(&this.unaware_time.m_offset)
+
+## Ported from AK/Time.h:471 AK::UnixDateTime::truncated_seconds_since_epoch.
+# Never returns a point after this UnixDateTime, since fractional seconds are cut off.
+pub func unix_date_time_truncated_seconds_since_epoch(this: const UnixDateTime*) -> i64:
+    return duration_to_truncated_seconds(&this.unaware_time.m_offset)
+
+## Ported from AK/Time.cpp:649 AK::UnixDateTime::to_string.
+pub func unix_date_time_to_string(this: const UnixDateTime*, format_: StringView, local_time: UnixDateTimeLocalTime = UnixDateTimeLocalTime.yes) -> String!:
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    try unix_date_time_to_string_impl(this, &builder, format_, local_time)
+    return try string_builder_to_string(&builder)
+
+## Ported from AK/Time.cpp:656 AK::UnixDateTime::to_utf16_string.
+pub func unix_date_time_to_utf16_string(this: const UnixDateTime*, format_: StringView, local_time: UnixDateTimeLocalTime = UnixDateTimeLocalTime.yes) -> Utf16String:
+    var builder: StringBuilder
+    string_builder_construct_string_builder_mode(&builder, StringBuilderMode.utf16)
+    unix_date_time_to_string_impl(this, &builder, format_, local_time) else trap("MUST: UnixDateTime::to_string_impl")
+    return string_builder_to_utf16_string(&builder)
+
+## Ported from AK/Time.cpp:663 AK::UnixDateTime::to_byte_string.
+pub func unix_date_time_to_byte_string(this: const UnixDateTime*, format_: StringView, local_time: UnixDateTimeLocalTime = UnixDateTimeLocalTime.yes) -> ByteString:
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    unix_date_time_to_string_impl(this, &builder, format_, local_time) else trap("MUST: UnixDateTime::to_string_impl")
+    return string_builder_to_byte_string(&builder)
+
+## Ported from AK/Time.h:513 AK::UnixDateTime::operator+.
+# Offsetting a UNIX time by a duration yields another UNIX time.
+pub func unix_date_time_add(this: const UnixDateTime*, other: Duration) -> UnixDateTime:
+    return make_unix_date_time(duration_add(&this.unaware_time.m_offset, other))
+
+## Ported from AK/Time.h:514 AK::UnixDateTime::operator+=.
+pub func unix_date_time_add_assign(this: UnixDateTime*, other: Duration) -> UnixDateTime*:
+    this.unaware_time.m_offset = duration_add(&this.unaware_time.m_offset, other)
+    return this
+
+## Ported from AK/Time.h:520 AK::UnixDateTime::operator-.
+pub func unix_date_time_sub_duration(this: const UnixDateTime*, other: Duration) -> UnixDateTime:
+    return make_unix_date_time(duration_sub(&this.unaware_time.m_offset, other))
+
+## Ported from AK/Time.h:521 AK::UnixDateTime::operator-=.
+pub func unix_date_time_sub_assign(this: UnixDateTime*, other: Duration) -> UnixDateTime*:
+    this.unaware_time.m_offset = duration_sub(&this.unaware_time.m_offset, other)
+    return this
+
+## Ported from AK/Time.h:528 AK::UnixDateTime::operator-.
+# Subtracting two UNIX times yields their time difference.
+pub func unix_date_time_sub_unix_date_time(this: const UnixDateTime*, other: UnixDateTime) -> Duration:
+    return duration_sub(&this.unaware_time.m_offset, other.unaware_time.m_offset)
+
+## Ported from AK/Time.cpp:479 AK::UnixDateTime::now.
+pub func unix_date_time_now() -> UnixDateTime:
+    return make_unix_date_time(now_time_from_clock(0))
+
+## Ported from AK/Time.cpp:484 AK::UnixDateTime::now_coarse.
+pub func unix_date_time_now_coarse() -> UnixDateTime:
+    return make_unix_date_time(now_time_from_clock(clock_realtime_coarse()))
+
+## Ported from AK/Time.h:533 AK::UnixDateTime::operator==.
+pub func unix_date_time_eq(this: const UnixDateTime*, other: UnixDateTime) -> bool:
+    return this.unaware_time.m_offset == other.unaware_time.m_offset
+
+## Ported from AK/Time.h:537 AK::UnixDateTime::operator<=>.
+pub func unix_date_time_cmp(this: const UnixDateTime*, other: UnixDateTime) -> i32:
+    return duration_cmp(&this.unaware_time.m_offset, other.unaware_time.m_offset)
+
+## Ported from AK/Time.h:540 AK::UnixDateTime::UnixDateTime.
+pub func unix_date_time_construct_duration(this: UnixDateTime*, offset: Duration):
+    unaware_time_construct(&this.unaware_time, offset)
+
+# mark: MonotonicTime ===========================================================================
+
+# Monotonic time represents time returned from the CLOCK_MONOTONIC clock, which has an arbitrary fixed reference point.
+
+# The private constructor MonotonicTime(Duration), as a value.
+func make_monotonic_time(offset: Duration) -> MonotonicTime:
+    var t: MonotonicTime
+    monotonic_time_construct(&t, offset)
+    return t
+
+## Ported from AK/Time.cpp:437 AK::MonotonicTime::now.
+pub func monotonic_time_now() -> MonotonicTime:
+    return make_monotonic_time(now_time_from_clock(clock_monotonic()))
+
+## Ported from AK/Time.cpp:442 AK::MonotonicTime::now_coarse.
+pub func monotonic_time_now_coarse() -> MonotonicTime:
+    return make_monotonic_time(now_time_from_clock(clock_monotonic_coarse()))
+
+## Ported from AK/Time.h:562 AK::MonotonicTime::seconds.
+pub func monotonic_time_seconds(this: const MonotonicTime*) -> i64:
+    return duration_to_seconds(&this.unaware_time.m_offset)
+
+## Ported from AK/Time.h:563 AK::MonotonicTime::milliseconds.
+pub func monotonic_time_milliseconds(this: const MonotonicTime*) -> i64:
+    return duration_to_milliseconds(&this.unaware_time.m_offset)
+
+## Ported from AK/Time.h:564 AK::MonotonicTime::nanoseconds.
+pub func monotonic_time_nanoseconds(this: const MonotonicTime*) -> i64:
+    return duration_to_nanoseconds(&this.unaware_time.m_offset)
+
+## Ported from AK/Time.h:566 AK::MonotonicTime::truncated_seconds.
+# Never returns a point in the future, since fractional seconds are cut off.
+pub func monotonic_time_truncated_seconds(this: const MonotonicTime*) -> i64:
+    return duration_to_truncated_seconds(&this.unaware_time.m_offset)
+
+## Ported from AK/Time.h:567 AK::MonotonicTime::nanoseconds_within_second.
+pub func monotonic_time_nanoseconds_within_second(this: const MonotonicTime*) -> i64:
+    return unaware_time_to_timespec(&this.unaware_time).tv_nsec
+
+## Ported from AK/Time.h:569 AK::MonotonicTime::operator==.
+pub func monotonic_time_eq(this: const MonotonicTime*, other: MonotonicTime) -> bool:
+    return this.unaware_time.m_offset == other.unaware_time.m_offset
+
+## Ported from AK/Time.h:570 AK::MonotonicTime::operator<=>.
+pub func monotonic_time_cmp(this: const MonotonicTime*, other: MonotonicTime) -> i32:
+    return duration_cmp(&this.unaware_time.m_offset, other.unaware_time.m_offset)
+
+## Ported from AK/Time.h:572 AK::MonotonicTime::operator+.
+pub func monotonic_time_add(this: const MonotonicTime*, other: Duration) -> MonotonicTime:
+    return make_monotonic_time(duration_add(&this.unaware_time.m_offset, other))
+
+## Ported from AK/Time.h:573 AK::MonotonicTime::operator+=.
+pub func monotonic_time_add_assign(this: MonotonicTime*, other: Duration) -> MonotonicTime*:
+    this.unaware_time.m_offset = duration_add(&this.unaware_time.m_offset, other)
+    return this
+
+## Ported from AK/Time.h:578 AK::MonotonicTime::operator-.
+pub func monotonic_time_sub_duration(this: const MonotonicTime*, other: Duration) -> MonotonicTime:
+    return make_monotonic_time(duration_sub(&this.unaware_time.m_offset, other))
+
+## Ported from AK/Time.h:579 AK::MonotonicTime::operator-.
+pub func monotonic_time_sub_monotonic_time(this: const MonotonicTime*, other: MonotonicTime) -> Duration:
+    return duration_sub(&this.unaware_time.m_offset, other.unaware_time.m_offset)
+
+## Ported from AK/Time.h:582 AK::MonotonicTime::MonotonicTime.
+pub func monotonic_time_construct(this: MonotonicTime*, offset: Duration):
+    unaware_time_construct(&this.unaware_time, offset)
+
+# mark: timeval and timespec arithmetic =========================================================
+
+## Ported from AK/Time.h:589 AK::timeval_sub.
+pub func timeval_sub(a: Timeval, b: Timeval, result: Timeval*):
+    result.tv_sec = a.tv_sec - b.tv_sec
+    result.tv_usec = a.tv_usec - b.tv_usec
+    if result.tv_usec < 0:
+        result.tv_sec -= 1
+        result.tv_usec += 1000000
+
+## Ported from AK/Time.h:600 AK::timeval_add.
+pub func timeval_add(a: Timeval, b: Timeval, result: Timeval*):
+    result.tv_sec = a.tv_sec + b.tv_sec
+    result.tv_usec = a.tv_usec + b.tv_usec
+    if result.tv_usec >= 1000000:
+        result.tv_sec += 1
+        result.tv_usec -= 1000000
+
+## Ported from AK/Time.h:611 AK::timespec_sub.
+pub func timespec_sub(a: Timespec, b: Timespec, result: Timespec*):
+    result.tv_sec = a.tv_sec - b.tv_sec
+    result.tv_nsec = a.tv_nsec - b.tv_nsec
+    if result.tv_nsec < 0:
+        result.tv_sec -= 1
+        result.tv_nsec += 1000000000
+
+## Ported from AK/Time.h:622 AK::timespec_add.
+pub func timespec_add(a: Timespec, b: Timespec, result: Timespec*):
+    result.tv_sec = a.tv_sec + b.tv_sec
+    result.tv_nsec = a.tv_nsec + b.tv_nsec
+    if result.tv_nsec >= 1000000000:
+        result.tv_sec += 1
+        result.tv_nsec -= 1000000000
+
+## Ported from AK/Time.h:633 AK::timespec_add_timeval.
+pub func timespec_add_timeval(a: Timespec, b: Timeval, result: Timespec*):
+    result.tv_sec = a.tv_sec + b.tv_sec
+    result.tv_nsec = a.tv_nsec + b.tv_usec * 1000
+    if result.tv_nsec >= 1000000000:
+        result.tv_sec += 1
+        result.tv_nsec -= 1000000000
+
+## Ported from AK/Time.h:644 AK::timeval_to_timespec.
+pub func timeval_to_timespec(tv: Timeval, ts: Timespec*):
+    ts.tv_sec = tv.tv_sec
+    ts.tv_nsec = tv.tv_usec * 1000
+
+## Ported from AK/Time.h:651 AK::timespec_to_timeval.
+pub func timespec_to_timeval(ts: Timespec, tv: Timeval*):
+    tv.tv_sec = ts.tv_sec
+    tv.tv_usec = ts.tv_nsec // 1000
+
+# mark: TimeLiterals ============================================================================
+
+## Ported from AK/Time.h:660 AK::TimeLiterals::operator""_ns.
+pub func time_literals_literalns(nanoseconds: u64) -> Duration:
+    return duration_from_nanoseconds((i64)nanoseconds)
+
+## Ported from AK/Time.h:661 AK::TimeLiterals::operator""_us.
+pub func time_literals_literalus(microseconds: u64) -> Duration:
+    return duration_from_microseconds((i64)microseconds)
+
+## Ported from AK/Time.h:662 AK::TimeLiterals::operator""_ms.
+pub func time_literals_literalms(milliseconds: u64) -> Duration:
+    return duration_from_milliseconds((i64)milliseconds)
+
+## Ported from AK/Time.h:663 AK::TimeLiterals::operator""_sec.
+pub func time_literals_literalsec(seconds: u64) -> Duration:
+    return duration_from_seconds((i64)seconds)

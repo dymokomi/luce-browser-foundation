@@ -1,0 +1,20 @@
+#==============================================================================================
+#
+#   temporary_change - TemporaryChange<T>
+#
+#   DESCRIPTION:
+#       Port of AK/TemporaryChange.h (lines 1-38). DESIGN.md §2.6: usually written
+#       `let saved = x; x = v; defer restore(...)`; the struct form's destructor is
+#       temporary_change_restore, run with `defer`.
+#
+#==============================================================================================
+
+## Ported from AK/TemporaryChange.h:17 AK::TemporaryChange::TemporaryChange<T>.
+pub func temporary_change_construct[T](this: TemporaryChange[T]*, variable: T*, value: T):
+    this.m_variable = variable
+    this.m_old_value = *variable
+    *this.m_variable = value
+
+## AK/TemporaryChange.h:24 AK::TemporaryChange::~TemporaryChange: puts the old value back.
+pub func temporary_change_restore[T](this: TemporaryChange[T]*):
+    *this.m_variable = this.m_old_value

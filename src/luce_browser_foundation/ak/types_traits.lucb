@@ -20,17 +20,17 @@ pub struct FlyStringTraits: Traits[FlyString]:
 pub struct I32Traits: Traits[i32]:
     var empty_: u8
 
-    func hash_of(key: const i32*) -> u32: trap("unported: AK::Traits<i32>::hash")
+    func hash_of(key: const i32*) -> u32: return u32_hash((u32)*key)
 
-    func equals(a: const i32*, b: const i32*) -> bool: trap("unported: AK::Traits<i32>::equals")
+    func equals(a: const i32*, b: const i32*) -> bool: return *a == *b
 
 ## AK::Traits<i64>: AK's hash and equality for the key type.
 pub struct I64Traits: Traits[i64]:
     var empty_: u8
 
-    func hash_of(key: const i64*) -> u32: trap("unported: AK::Traits<i64>::hash")
+    func hash_of(key: const i64*) -> u32: return u64_hash((u64)*key)
 
-    func equals(a: const i64*, b: const i64*) -> bool: trap("unported: AK::Traits<i64>::equals")
+    func equals(a: const i64*, b: const i64*) -> bool: return *a == *b
 
 ## AK::Traits<String>: AK's hash and equality for the key type.
 pub struct StringTraits: Traits[String]:
@@ -44,17 +44,17 @@ pub struct StringTraits: Traits[String]:
 pub struct U32Traits: Traits[u32]:
     var empty_: u8
 
-    func hash_of(key: const u32*) -> u32: trap("unported: AK::Traits<u32>::hash")
+    func hash_of(key: const u32*) -> u32: return u32_hash(*key)
 
-    func equals(a: const u32*, b: const u32*) -> bool: trap("unported: AK::Traits<u32>::equals")
+    func equals(a: const u32*, b: const u32*) -> bool: return *a == *b
 
 ## AK::Traits<u64>: AK's hash and equality for the key type.
 pub struct U64Traits: Traits[u64]:
     var empty_: u8
 
-    func hash_of(key: const u64*) -> u32: trap("unported: AK::Traits<u64>::hash")
+    func hash_of(key: const u64*) -> u32: return u64_hash(*key)
 
-    func equals(a: const u64*, b: const u64*) -> bool: trap("unported: AK::Traits<u64>::equals")
+    func equals(a: const u64*, b: const u64*) -> bool: return *a == *b
 
 ## AK::Traits<Utf16String>: AK's hash and equality for the key type.
 pub struct Utf16StringTraits: Traits[Utf16String]:

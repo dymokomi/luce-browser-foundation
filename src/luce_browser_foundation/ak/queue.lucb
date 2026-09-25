@@ -1,0 +1,88 @@
+#==============================================================================================
+#
+#   queue - Queue<T>: a FIFO of fixed-size segments
+#
+#   DESCRIPTION:
+#       Port of AK/Queue.h (lines 1-116). The segments are Vectors of at most `segment_size`
+#       (the default 1000) values, kept in an IntrusiveList through QueueSegment.node; a
+#       segment is freed where the donor deletes it (managed memory, DESIGN.md §3.3).
+#       for_each's callback is a Function1[const T*, unit].
+#
+#==============================================================================================
+
+let queue_segment_size: usize = 1000
+
+# offsetof(QueueSegment<T>, node): the IntrusiveList's `member` (intrusive_list.lucb).
+func queue_segment_member[T]() -> usize:
+    return offsetof(QueueSegment[T], node)
+
+## Ported from AK/Queue.h:26 AK::Queue::size.
+pub func queue_size[T](this: const Queue[T]*) -> usize:
+    return this.m_size
+
+## Ported from AK/Queue.h:27 AK::Queue::is_empty.
+pub func queue_is_empty[T](this: const Queue[T]*) -> bool:
+    return this.m_size == 0
+
+## Ported from AK/Queue.h:30 AK::Queue::enqueue.
+pub func queue_enqueue[T](this: Queue[T]*, value: T):
+    if intrusive_list_is_empty(&this.m_segments) or vector_size(&(intrusive_list_last(&this.m_segments) else trap("unreachable")).data) >= queue_segment_size:
+        let segment = new QueueSegment[T] else trap("out of memory")
+        intrusive_list_append(&this.m_segments, segment, queue_segment_member[T]())
+    let last = intrusive_list_last(&this.m_segments) else trap("unreachable")
+    vector_append_t(&last.data, value)
+    this.m_size += 1
+
+## Ported from AK/Queue.h:40 AK::Queue::try_dequeue.
+pub func queue_try_dequeue[T](this: Queue[T]*) -> T!:
+    if queue_is_empty(this):
+        try ak_error_throw(ak_error_from_errno(enoent))
+    return queue_dequeue(this)
+
+## Ported from AK/Queue.h:48 AK::Queue::dequeue.
+pub func queue_dequeue[T](this: Queue[T]*) -> T:
+    assert(not queue_is_empty(this))
+    let first = intrusive_list_first(&this.m_segments) else trap("unreachable")
+    let value = *vector_at(&first.data, this.m_index_into_first)
+    this.m_index_into_first += 1
+    if this.m_index_into_first == queue_segment_size:
+        let taken = intrusive_list_take_first(&this.m_segments) else trap("unreachable")
+        free(taken)
+        this.m_index_into_first = 0
+    this.m_size -= 1
+    if this.m_size == 0 and not intrusive_list_is_empty(&this.m_segments):
+        # This is not necessary for correctness but avoids faulting in
+        # all the pages for the underlying Vector in the case where
+        # the caller repeatedly enqueues and then dequeues a single item.
+        this.m_index_into_first = 0
+        let last = intrusive_list_last(&this.m_segments) else trap("unreachable")
+        vector_clear_with_capacity(&last.data)
+    return value
+
+## Ported from AK/Queue.h:68 AK::Queue::head.
+pub func queue_head[T](this: Queue[T]*) -> T*:
+    assert(not queue_is_empty(this))
+    let first = intrusive_list_first(&this.m_segments) else trap("unreachable")
+    return vector_at(&first.data, this.m_index_into_first)
+
+## Ported from AK/Queue.h:75 AK::Queue::tail.
+pub func queue_tail[T](this: Queue[T]*) -> T*:
+    assert(not queue_is_empty(this))
+    let last = intrusive_list_last(&this.m_segments) else trap("unreachable")
+    return vector_last(&last.data)
+
+## Ported from AK/Queue.h:82 AK::Queue::for_each.
+pub func queue_for_each[T](this: const Queue[T]*, callback: Function1[const T*, unit]):
+    var first = true
+    for segment in intrusive_list_begin_const(&this.m_segments):
+        let start = this.m_index_into_first if first else 0
+        first = false
+        for i in start..<vector_size(&segment.data):
+            function1_call(&callback, vector_at_const(&segment.data, i))
+
+## Ported from AK/Queue.h:93 AK::Queue::clear.
+pub func queue_clear[T](this: Queue[T]*):
+    while let segment = intrusive_list_take_first(&this.m_segments):
+        free(segment)
+    this.m_index_into_first = 0
+    this.m_size = 0

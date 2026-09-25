@@ -1,0 +1,196 @@
+#==============================================================================================
+#
+#   tests_u_fixed_big_int - UFixedBigInt
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestUFixedBigInt.cpp. get_random<u256>() is replaced by the test
+#       runner's deterministic generator; div_anti_knuth runs 2048 of the donor's 16384
+#       rounds.
+#
+#==============================================================================================
+
+func u256_of(w0: u64, w1: u64, w2: u64, w3: u64) -> U256:
+    return U256(m_data = [w0, w1, w2, w3])
+
+func random_u256() -> U256:
+    return u256_of(testing.random(), testing.random(), testing.random(), testing.random())
+
+func u256_eq(a: U256, b: U256) -> bool:
+    return u_fixed_big_int_eq_opaque(&a, b)
+
+func check_mod(a: U256, b: U256, expected: U256):
+    assert(u256_eq(u_fixed_big_int_rem_t(&a, b), expected))
+
+test "u_fixed_big_int: one_plus_one":
+    let a = u256_of(1, 0, 0, 0)
+    let b = u256_of(1, 0, 0, 0)
+    assert(u256_eq(u_fixed_big_int_add_opaque(&a, b), u256_of(2, 0, 0, 0)))
+    assert(u_fixed_big_int_eq_integer_wrapper(&a, integer_wrapper(1)))
+
+test "u_fixed_big_int: identities":
+    var i = 0
+    while i < 32:
+        let x = random_u256()
+        if (x.m_data[3] >> 63) != 0:
+            # ignore numbers that could overflow
+            continue
+        assert(u256_eq(u_fixed_big_int_shl(&x, 0), x))
+        assert(u256_eq(u_fixed_big_int_shr(&x, 0), x))
+        assert(u256_eq(u_fixed_big_int_div_t(&x, 1u32), x))
+        let x_plus_one = u_fixed_big_int_add_integer_wrapper(&x, integer_wrapper(1))
+        assert(u256_eq(u_fixed_big_int_rem_t(&x, x_plus_one), x))
+        let shifted = u_fixed_big_int_shl(&x, 1)
+        assert(u256_eq(u_fixed_big_int_shr(&shifted, 1), x))
+        let doubled = u_fixed_big_int_mul_integer_wrapper(&x, integer_wrapper(2))
+        assert(u256_eq(u_fixed_big_int_div_integer_wrapper(&doubled, integer_wrapper(2)), x))
+        let plus_two = u_fixed_big_int_add_integer_wrapper(&x, integer_wrapper(2))
+        assert(u256_eq(u_fixed_big_int_sub_integer_wrapper(&plus_two, integer_wrapper(2)), x))
+        i += 1
+
+test "u_fixed_big_int: add_overflow_propagation":
+    let a = u256_of(u64_max, u64_max, 0, 0)
+    let b = u_fixed_big_int_add_opaque(&a, a)
+    let c = u_fixed_big_int_mul_integer_wrapper(&a, integer_wrapper(2))
+    let low = u_fixed_big_int_low[u64[4], U128](&b)
+    let high = u_fixed_big_int_high[u64[4], U128](&b)
+    assert(u_fixed_big_int_eq_opaque(&low, U128(m_data = [u64_max - 1, u64_max])))
+    assert(u_fixed_big_int_eq_integer_wrapper(&high, integer_wrapper(1)))
+    assert(u256_eq(b, u_fixed_big_int_shl(&a, 1)))
+    assert(u256_eq(b, c))
+
+test "u_fixed_big_int: simple_multiplication":
+    for _i in 0..<32:
+        let a = random_u256()
+        let zero = u_fixed_big_int_mul_integer_wrapper(&a, integer_wrapper(0))
+        assert(u_fixed_big_int_eq_integer_wrapper(&zero, integer_wrapper(0)))
+        assert(u256_eq(u_fixed_big_int_mul_integer_wrapper(&a, integer_wrapper(1)), a))
+        assert(u256_eq(u_fixed_big_int_shr(&a, 1), u_fixed_big_int_div_integer_wrapper(&a, integer_wrapper(2))))
+        if (a.m_data[3] >> 63) == 0:
+            assert(u256_eq(u_fixed_big_int_shl(&a, 1), u_fixed_big_int_mul_integer_wrapper(&a, integer_wrapper(2))))
+
+test "u_fixed_big_int: div_mod":
+    for _i in 0..<32:
+        let a = random_u256()
+        let b = random_u256()
+        var mod_: U256
+        let quotient = u_fixed_big_int_div_mod(&a, b, &mod_)
+        let product = u_fixed_big_int_mul_opaque(&quotient, b)
+        assert(u256_eq(a, u_fixed_big_int_add_opaque(&product, mod_)))
+
+let interesting_words: u64[14] = [0, 0, 1, 2, 3, 0x3ffffffffffffffe, 0x3fffffffffffffff, 0x7ffffffffffffffe, 0x7fffffffffffffff, 0x8000000000000000, 0x8000000000000001, 0xfffffffffffffffc, 0xfffffffffffffffd, 0xfffffffffffffffe]
+
+func generate_u512() -> U512:
+    var number: U512
+    for i in 0..<8:
+        let kind = testing.random() % 15
+        number.m_data[i] = testing.random() if kind == 14 else interesting_words[kind]
+    return number
+
+test "u_fixed_big_int: div_anti_knuth":
+    let a = u256_of(0, 0xffffffffffffffff, 1, 0)
+    let one = u_fixed_big_int_div_t(&a, U128(m_data = [0x8000000000000001, 0xffffffffffffffff]))
+    assert(u_fixed_big_int_eq_integer_wrapper(&one, integer_wrapper(1)))
+    let b = U128(m_data = [0xffffffff00000000, 1])
+    let also_one = u_fixed_big_int_div_t(&b, U128(m_data = [0xffffffff80000001, 0]))
+    assert(u_fixed_big_int_eq_integer_wrapper(&also_one, integer_wrapper(1)))
+
+    for _i in 0..<2048:
+        let x = generate_u512()
+        let y = generate_u512()
+        if u_fixed_big_int_eq_integer_wrapper(&y, integer_wrapper(0)):
+            continue
+        var mod_: U512
+        let quotient = u_fixed_big_int_div_mod(&x, y, &mod_)
+        let product = u_fixed_big_int_mul_opaque(&quotient, y)
+        let sum = u_fixed_big_int_add_opaque(&product, mod_)
+        assert(u_fixed_big_int_eq_opaque(&sum, x))
+        let wide = u_fixed_big_int_wide_multiply[u64[8], U512, u64[16]](&quotient, y)
+        let wide_sum = u_fixed_big_int_add_opaque(&wide, mod_)
+        assert(u_fixed_big_int_eq_opaque(&wide_sum, x))
+        assert(u_fixed_big_int_cmp_opaque(&mod_, y) < 0)
+
+test "u_fixed_big_int: shifts":
+    let value = U128(m_data = [0x1234, 0])
+    let a = u_fixed_big_int_shl(&value, 1)
+    assert(u_fixed_big_int_eq_opaque(&a, 0x2468u64))
+    let b = u_fixed_big_int_shl(&value, 4)
+    assert(u_fixed_big_int_eq_opaque(&b, 0x12340u64))
+    let c = u_fixed_big_int_shl(&value, 64)
+    assert(u_fixed_big_int_eq_opaque(&c, U128(m_data = [0, 0x1234])))
+
+test "u_fixed_big_int: constexpr_truncate":
+    var wide: U256
+    u_fixed_big_int_construct_opaque(&wide, U128(m_data = [0x8a4b08d32f8b8e48, 0x8459322f67b8e26d]), U128(m_data = [0xeea82af4312d1931, 0x654fb5cfe82dbd58]))
+    assert(u_fixed_big_int_to_t[u64[4], u64](&wide) == 0x8a4b08d32f8b8e48)
+    assert(u_fixed_big_int_to_t[u64[4], u32](&wide) == 0x2f8b8e48)
+
+test "u_fixed_big_int: bit utilities, comparisons and increments":
+    var x = U128(m_data = [0xf0, 0x1])
+    assert(u_fixed_big_int_popcnt(&x) == 5)
+    assert(u_fixed_big_int_ctz(&x) == 4)
+    assert(u_fixed_big_int_clz(&x) == 63)
+    assert(u_fixed_big_int_to_bool(&x) and not u_fixed_big_int_not(&x))
+    let y = u_fixed_big_int_bit_not(&x)
+    assert(y.m_data[0] == 0xffffffffffffff0f and y.m_data[1] == 0xfffffffffffffffe)
+    var max_ = U128(m_data = [u64_max, u64_max])
+    discard(u_fixed_big_int_inc(&max_))
+    assert(u_fixed_big_int_is_zero_constant_time(&max_))
+    discard(u_fixed_big_int_dec(&max_))
+    assert(max_.m_data[0] == u64_max and max_.m_data[1] == u64_max)
+    let old = u_fixed_big_int_inc_i32(&x, 0)
+    assert(old.m_data[0] == 0xf0 and x.m_data[0] == 0xf1)
+    var carry = true
+    let sum = u_fixed_big_int_addc(&max_, 1u64, &carry)
+    assert(carry and u_fixed_big_int_eq_integer_wrapper(&sum, integer_wrapper(1)))
+    assert(cmp_opaque(5u64, x) < 0 and cmp_integer_wrapper(integer_wrapper(7), x) < 0)
+    assert(u_fixed_big_int_is_equal_to_constant_time(&x, x))
+    discard(u_fixed_big_int_or_assign_integer_wrapper(&x, integer_wrapper(0x100)))
+    assert(x.m_data[0] == 0x1f1)
+    discard(u_fixed_big_int_rem_assign_u(&x, 10u64))
+    # (2^64 + 0x1f1) % 10 == (6 + 497) % 10
+    assert(x.m_data[0] == 3 and x.m_data[1] == 0)
+
+test "u_fixed_big_int: endian_swap":
+    let a = U128(m_data = [0x1234567890abcdef, 0xfedcba0987654321])
+    var big: BigEndian[U128]
+    big_endian_u_fixed_big_int_construct(&big, a)
+    assert(big.m_value.m_data[0] == 0x2143658709badcfe and big.m_value.m_data[1] == 0xefcdab9078563412)
+    let back = big_endian_u_fixed_big_int_to_t(&big)
+    var little: LittleEndian[U128]
+    little_endian_u_fixed_big_int_construct(&little, a)
+    assert(u_fixed_big_int_eq_opaque(&little.m_value, a))
+    assert(u_fixed_big_int_eq_opaque(&back, a))
+
+test "u_fixed_big_int: mod_hardcoded":
+    check_mod(u256_of(0x8a4b08d32f8b8e48, 0x8459322f67b8e26d, 0xeea82af4312d1931, 0x654fb5cfe82dbd58), u256_of(0x40a58652868d5d66, 0x81d674bf7d6d6861, 0xa8314900e6188a82, 0xc273ca947237b4aa), u256_of(0x8a4b08d32f8b8e48, 0x8459322f67b8e26d, 0xeea82af4312d1931, 0x654fb5cfe82dbd58))
+    check_mod(u256_of(0xda06d295caa75a3b, 0xe3ae0d460049948e, 0x9a89d29a0325f27f, 0x1c8d90ebadec5607), u256_of(0x38bd4d49ff59fdf8, 0xcba9acf09110de14, 0x51a376c68c4702fe, 0x0d1b59dec8d2338b), u256_of(0x688c3801cbf35e4b, 0x4c5ab364de27d866, 0xf742e50cea97ec82, 0x0256dd2e1c47eef0))
+    check_mod(u256_of(0xdfb56d42706bdb28, 0x6c3bd5ea790c7ef5, 0xfebec271d7c757ba, 0x7dbd745d56bc9e0e), u256_of(0x30a309a58aed2c01, 0x64d58c8b485c113d, 0xfa01f558732e9b78, 0x5862b502ebb2dbe9), u256_of(0xaf12639ce57eaf27, 0x0766495f30b06db8, 0x04bccd196498bc42, 0x255abf5a6b09c225))
+    check_mod(u256_of(0x0a8473d84131f420, 0x0471632bb018c1a2, 0x22865980ccd1014f, 0xcade79df2adf8fdf), u256_of(0xd7da811f35db7de0, 0x4e3d98062eae954f, 0x23946cd23d470d7e, 0x6645d41afdc1f2e8), u256_of(0x32a9f2b90b567640, 0xb633cb25816a2c52, 0xfef1ecae8f89f3d0, 0x6498a5c42d1d9cf6))
+    check_mod(u256_of(0x68636d8d1b7ac40b, 0xcb04084ddc684d42, 0xaa43c0f6e4e0178c, 0x49edae817f27c32a), u256_of(0xbcc52d96070b7046, 0x2f8255f3c6f8d4bd, 0x2423bb472eced919, 0x2ed9534c1570b7fa), u256_of(0xab9e3ff7146f53c5, 0x9b81b25a156f7884, 0x862005afb6113e73, 0x1b145b3569b70b30))
+    check_mod(u256_of(0xad34ce382cd00226, 0x39b1986d56a064af, 0xa9410bbd86d9ab21, 0x0fb980a5a7d4b99f), u256_of(0xa7561893be8cd299, 0x9c3cb9184f45878a, 0x1e066270a27414ef, 0xe0fbaa0b739890b8), u256_of(0xad34ce382cd00226, 0x39b1986d56a064af, 0xa9410bbd86d9ab21, 0x0fb980a5a7d4b99f))
+    check_mod(u256_of(0x69a0ab23d9f81040, 0xf509000f44fcadb3, 0x544310cc56ea051a, 0x968a003529f513c0), u256_of(0xd6db169628ba28ed, 0xcf2417c98b765531, 0x27865ebfca2d945a, 0xcbd1257363cb86a1), u256_of(0x69a0ab23d9f81040, 0xf509000f44fcadb3, 0x544310cc56ea051a, 0x968a003529f513c0))
+    check_mod(u256_of(0x5d41bcd96e47dfbd, 0x623a7c82c903789b, 0x57c3723bfcfd7eee, 0x8b1f21a0739fa6a8), u256_of(0xf918e7d73771d5c4, 0xdd40e701852f4d68, 0x7c4ac424e3836a4d, 0xcb7a0bcc58701175), u256_of(0x5d41bcd96e47dfbd, 0x623a7c82c903789b, 0x57c3723bfcfd7eee, 0x8b1f21a0739fa6a8))
+    check_mod(u256_of(0xa4394401788e848a, 0x8a907db529ba2943, 0x4f3c13b9058d17d3, 0xf17f01b5c1898104), u256_of(0x214097598f92cebe, 0x723b873f1f879305, 0x5f9352861d92ff91, 0x527c65978f7d12eb), u256_of(0x61b8154e5968e70e, 0xa6196f36eaab0339, 0x90156eacca6718b0, 0x4c863686a28f5b2d))
+    check_mod(u256_of(0x324e46a2bd4d9c0d, 0xfb8980a6353814a8, 0x3605ef999901dc37, 0xcc2493941c934b83), u256_of(0x45e1b8552ccd49b1, 0xe61bd62768189e42, 0x859e83ed2f92c211, 0xc7713b3893031cbd), u256_of(0xec6c8e4d9080525c, 0x156daa7ecd1f7665, 0xb0676bac696f1a26, 0x04b3585b89902ec5))
+    check_mod(u256_of(0x9a3b5f7c879d14f4, 0xc437119868072180, 0xea395ae2238ada4e, 0x1aa5cc44c4c9deb5), u256_of(0x9535e4674b364058, 0xbbf3d10e995c610d, 0x8fac6f8ae200290a, 0x7832f747c56ae6df), u256_of(0x9a3b5f7c879d14f4, 0xc437119868072180, 0xea395ae2238ada4e, 0x1aa5cc44c4c9deb5))
+    check_mod(u256_of(0xf2a2d399b73fd0c2, 0x02b7155ee15525ff, 0xcaaa7daf39923db6, 0x8ccb6244075bb5bb), u256_of(0xfc002da6ab396d95, 0xd7d0ebd6242b7119, 0x7f2ec32021ce7d32, 0x63cef84255b91414), u256_of(0xf6a2a5f30c06632d, 0x2ae62988bd29b4e5, 0x4b7bba8f17c3c083, 0x28fc6a01b1a2a1a7))
+    check_mod(u256_of(0xfef71dab99335163, 0xd1f1bc5f37570d67, 0x34bd2c7372eb8c4c, 0x15c0d3f1cc1613be), u256_of(0x3978824c651c6cce, 0x5631f4d483e9f3ff, 0xfd7c47d688e0d50f, 0xb3a9f99c7234d772), u256_of(0xfef71dab99335163, 0xd1f1bc5f37570d67, 0x34bd2c7372eb8c4c, 0x15c0d3f1cc1613be))
+    check_mod(u256_of(0x19d69d0229db064e, 0x612eea6e8d79807b, 0xe755c10d2b9e25ad, 0x6a84d397b8e7da54), u256_of(0x9db6a18d292bc65f, 0xbdc7ccbcdb4f046c, 0xd5be95d179cc1aa4, 0x77c81421a604eb66), u256_of(0x19d69d0229db064e, 0x612eea6e8d79807b, 0xe755c10d2b9e25ad, 0x6a84d397b8e7da54))
+    check_mod(u256_of(0xcd6a8ed6185d098f, 0xcf17b08e6e3836e5, 0x52e187a75426d99d, 0x562e1c437b33a29d), u256_of(0x0c3dd1aa87a4bd96, 0xac333d8636735a23, 0x1a30abda1015e674, 0xe968125d96bdc2e9), u256_of(0xcd6a8ed6185d098f, 0xcf17b08e6e3836e5, 0x52e187a75426d99d, 0x562e1c437b33a29d))
+    check_mod(u256_of(0x60151f3f11782d51, 0xeecbc23fa60bd168, 0x825b67c89bce81f2, 0x082fe85ba1a09583), u256_of(0x438123a283f8133a, 0x7b5936b727339a8e, 0x36f2bc572018588c, 0xbdebe2b4033d3209), u256_of(0x60151f3f11782d51, 0xeecbc23fa60bd168, 0x825b67c89bce81f2, 0x082fe85ba1a09583))
+    check_mod(u256_of(0x6a98f75458b6c9da, 0xbe935c50e782e82f, 0xf8f7479d9ba56379, 0xfd3cb6194bc5966f), u256_of(0xc0fb2a97d7368d96, 0x306534301d4eadbe, 0x30b2c8ff81066af6, 0xd23116ef8d5eacf5), u256_of(0xa99dccbc81803c44, 0x8e2e2820ca343a70, 0xc8447e9e1a9ef883, 0x2b0b9f29be66e97a))
+    check_mod(u256_of(0xf90a6805c45be556, 0x1d4a0c204a2dec7d, 0x4a8c0d194584da59, 0xcd1ab79a84dfccb6), u256_of(0xcedf80ed06c339b1, 0x3a18231b09b21a3c, 0xef2fedb7c3b237dd, 0x01d6223300a1f18a), u256_of(0x4621813fd5b5e197, 0xecd2d36715f48c20, 0x94c3fa6b6b3ea16c, 0x0141e37d3ea81178))
+    check_mod(u256_of(0x5cced259ff5b73fd, 0x223a2bc9d62d3714, 0xf1b7b34b45f3608f, 0xce2325cbc0e9734f), u256_of(0xf5dc56158c242575, 0xb3bf8578c1852fdc, 0xd97725f998d1d289, 0x053baa680c5abb16), u256_of(0xe83db511a5d9bf2a, 0xc00cd6645ae2ec6a, 0xd090ea44fdfc4d94, 0x020c2ff1df16f2d4))
+    check_mod(u256_of(0x6ce28a960af0ceb3, 0x2da9808f962b0c43, 0x67cdac05a542bd66, 0x5d3eb81aadf9479a), u256_of(0x45f549795eab7c6c, 0x5643e85f6b4399ee, 0x3b068fa03cb257df, 0x3b42cfa16517b14c), u256_of(0x26ed411cac455247, 0xd76598302ae77255, 0x2cc71c6568906586, 0x21fbe87948e1964e))
+    check_mod(u256_of(0x236f8081c4dc0d2a, 0xa7da15c4c15e83f3, 0x32c0948d497b78f0, 0xf75ddc710601d2d0), u256_of(0x326f376465b287be, 0x5e24a7c87a45f4eb, 0x1fa25aecc5a5a1f2, 0x3490287aca77c399), u256_of(0x59b2a2f02e11ee32, 0x2f4776a2d846b046, 0xb43728da32e4f127, 0x251d3a85dc22c46b))
+    check_mod(u256_of(0xf5af1d760c381629, 0x9f4d904501f9f6d6, 0xc23fe8d79d015270, 0x3982c8897a86e837), u256_of(0xd3cc875eec2d5032, 0x46e392089468f8cf, 0x91c6762130826ced, 0x9e3b011ba58b4705), u256_of(0xf5af1d760c381629, 0x9f4d904501f9f6d6, 0xc23fe8d79d015270, 0x3982c8897a86e837))
+    check_mod(u256_of(0x6b60c428cac4f505, 0xeac42ae8d7929fb7, 0x59a0ce8a7110df27, 0xc0d5952f55096e15), u256_of(0x280419bd2d8fe3e8, 0x13b50ec9c2bb7397, 0x8d8ef08f3ac8ce5e, 0x8912b53aa9279938), u256_of(0x435caa6b9d35111d, 0xd70f1c1f14d72c20, 0xcc11ddfb364810c9, 0x37c2dff4abe1d4dc))
+    check_mod(u256_of(0x8068bf135ceead51, 0xadda5b57797a3a27, 0x4c4e3fe186af2698, 0xdfbab959987cb289), u256_of(0x93c99cb4fa9f36c0, 0xe107948b8bf301d8, 0xab4e7570e6e8e177, 0xdb95d36ef24543da), u256_of(0xec9f225e624f7691, 0xccd2c6cbed87384e, 0xa0ffca709fc64520, 0x0424e5eaa6376eae))
+    check_mod(u256_of(0x036b4a64b2ab05bb, 0x6be175b3549f7440, 0x3c6839ecac5d4634, 0x6a1939f6585dd1dd), u256_of(0x329f61eaf9c14938, 0x6653276323053388, 0x7e511a9611463f4d, 0x9898a93910722fd8), u256_of(0x036b4a64b2ab05bb, 0x6be175b3549f7440, 0x3c6839ecac5d4634, 0x6a1939f6585dd1dd))
+    check_mod(u256_of(0xe5d0db9190bb01c1, 0x20510645c252e9b1, 0x3b673f98db9a3038, 0xbda4406d733b1c6c), u256_of(0x4d67af71063282f2, 0x594aa60bb2360bbd, 0x4c2759ff1b2ffbd1, 0xe29a2e0962d9bdbf), u256_of(0xe5d0db9190bb01c1, 0x20510645c252e9b1, 0x3b673f98db9a3038, 0xbda4406d733b1c6c))
+    check_mod(u256_of(0x2f833c8cd20c43f9, 0x405bd5f257ac19e1, 0xd9873917f32ca4ad, 0x582dda480fecde28), u256_of(0xb56564a5a9dbc163, 0x17b4076b2667c703, 0xdf0f26d9a66f513e, 0xb34c28d1e1a1953c), u256_of(0x2f833c8cd20c43f9, 0x405bd5f257ac19e1, 0xd9873917f32ca4ad, 0x582dda480fecde28))
+    check_mod(u256_of(0x79ceb31188bc142b, 0xb2c083d1b0d1a172, 0x87a465799728fe9f, 0xe05c1c98eaa03994), u256_of(0x548b4f12f104f995, 0x8d1d554e53ebc210, 0x4f5238bde10ce04a, 0x33da77cfa817ef7c), u256_of(0x27a176c5c4a82dd7, 0x7e4b2e9861229931, 0x4a5b828212f57d75, 0x10f23d5a4a407ba3))
+    check_mod(u256_of(0xfbcfb8e88417af84, 0xfd35ec5ad38f6f00, 0x12d5c3e4e108cc62, 0x09370460a41c637f), u256_of(0x71faedeee5e0bf52, 0x3d17ff54be8d686f, 0x02e3ab47712e3d11, 0x64da86270055e5ea), u256_of(0xfbcfb8e88417af84, 0xfd35ec5ad38f6f00, 0x12d5c3e4e108cc62, 0x09370460a41c637f))
+    check_mod(u256_of(0x690f9145f7b1f8f8, 0xe790aa66a2e08b63, 0x1d6ded50aa11aa3c, 0x601ec6f81fd1d57a), u256_of(0x1256bdca9e0d6066, 0xd19119919b026c0c, 0x17a17b7df7689c40, 0x97baf68d5f5622dd), u256_of(0x690f9145f7b1f8f8, 0xe790aa66a2e08b63, 0x1d6ded50aa11aa3c, 0x601ec6f81fd1d57a))
+    check_mod(u256_of(0x7f13e232d82a24c6, 0x23d41447dd7f5bc6, 0xd89a3ed8b30527ca, 0xa98ef2cc01e83685), u256_of(0x8d4f5b1983fc1f0e, 0xf54102ece15fb0fa, 0x17b8aec68556a16d, 0x4e1e5bea70cb9398), u256_of(0x64752bffd031e6aa, 0x39520e6e1abff9d1, 0xa928e14ba857e4ee, 0x0d523af720510f55))
+    check_mod(u256_of(0x49750d7f39d61607, 0x58bdef1c3e00d18e, 0xa651479cd1fd1933, 0xd1834bc3d654b633), u256_of(0x1bda34f5ec68ef3b, 0x12c65ce5363a7616, 0x5a79c4d85da0071a, 0xffa6b6284559d1aa), u256_of(0x49750d7f39d61607, 0x58bdef1c3e00d18e, 0xa651479cd1fd1933, 0xd1834bc3d654b633))

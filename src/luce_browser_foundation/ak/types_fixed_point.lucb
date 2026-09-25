@@ -12,5 +12,5 @@
 # mark: FixedPoint ==============================================================================
 
 ## AK::FixedPoint (AK/FixedPoint.h:31): a generic struct.
-pub struct FixedPoint[TUnderlying]:
+pub struct FixedPoint[TUnderlying, TPrecision]:
     pub var m_value: TUnderlying

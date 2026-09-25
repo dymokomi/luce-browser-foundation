@@ -1,0 +1,194 @@
+#==============================================================================================
+#
+#   red_black_tree_2 - RedBlackTree<K, V> and its iterator
+#
+#   DESCRIPTION:
+#       Port of AK/RedBlackTree.h (lines 433-608). A RedBlackTreeNode[K, V] is its base node
+#       followed by the value; the tree owns its nodes (managed memory, freed where the donor
+#       deletes them). The iterator walks in key order and is a luce-base iterator:
+#       `for value in red_black_tree_begin(&tree)`.
+#
+#==============================================================================================
+
+# The tree node holding a base node (`static_cast<Node*>`): the base node is its first field.
+func rbt_value_node[K, V](node: BaseRedBlackTreeNode[K]*?) -> RedBlackTreeNode[K, V]*?:
+    let n = node else return none
+    return (RedBlackTreeNode[K, V]*)n
+
+# mark: RedBlackTreeIterator ====================================================================
+
+## Ported from AK/RedBlackTree.h:407 AK::RedBlackTreeIterator::operator!=.
+pub func red_black_tree_iterator_ne[K, V](this: const RedBlackTreeIterator[K, V]*, other: RedBlackTreeIterator[K, V]) -> bool:
+    return this.m_node != other.m_node
+
+## Ported from AK/RedBlackTree.h:408 AK::RedBlackTreeIterator::operator++.
+pub func red_black_tree_iterator_inc[K, V](this: RedBlackTreeIterator[K, V]*) -> RedBlackTreeIterator[K, V]*:
+    let node = this.m_node else return this
+    this.m_prev = node
+    # the complexity is O(logn) for each successor call, but the total complexity for all elements comes out to O(n), meaning the amortized cost for a single call is O(1)
+    this.m_node = rbt_value_node[K, V](base_red_black_tree_successor(&node.base))
+    return this
+
+## Ported from AK/RedBlackTree.h:417 AK::RedBlackTreeIterator::operator--.
+pub func red_black_tree_iterator_dec[K, V](this: RedBlackTreeIterator[K, V]*) -> RedBlackTreeIterator[K, V]*:
+    let prev = this.m_prev else return this
+    this.m_node = prev
+    this.m_prev = rbt_value_node[K, V](base_red_black_tree_predecessor(&prev.base))
+    return this
+
+## Ported from AK/RedBlackTree.h:425 AK::RedBlackTreeIterator::operator*.
+pub func red_black_tree_iterator_deref[K, V](this: RedBlackTreeIterator[K, V]*) -> V*:
+    let node = this.m_node else trap("VERIFY: dereferencing the end of a RedBlackTree")
+    return &node.value
+
+## Ported from AK/RedBlackTree.h:426 AK::RedBlackTreeIterator::operator->.
+pub func red_black_tree_iterator_arrow[K, V](this: RedBlackTreeIterator[K, V]*) -> V*:
+    return red_black_tree_iterator_deref(this)
+
+## Ported from AK/RedBlackTree.h:427 AK::RedBlackTreeIterator::is_end.
+pub func red_black_tree_iterator_is_end[K, V](this: const RedBlackTreeIterator[K, V]*) -> bool:
+    return this.m_node == none
+
+## Ported from AK/RedBlackTree.h:428 AK::RedBlackTreeIterator::is_begin.
+pub func red_black_tree_iterator_is_begin[K, V](this: const RedBlackTreeIterator[K, V]*) -> bool:
+    return this.m_prev == none
+
+## Ported from AK/RedBlackTree.h:430 AK::RedBlackTreeIterator::key.
+pub func red_black_tree_iterator_key[K, V](this: const RedBlackTreeIterator[K, V]*) -> K:
+    let node = this.m_node else trap("VERIFY: key() of the end of a RedBlackTree")
+    return node.base.key
+
+## Ported from AK/RedBlackTree.h:434 AK::RedBlackTreeIterator::RedBlackTreeIterator.
+pub func red_black_tree_iterator_construct[K, V](this: RedBlackTreeIterator[K, V]*, node: RedBlackTreeNode[K, V]*?, prev: RedBlackTreeNode[K, V]*? = none):
+    this.m_node = node
+    this.m_prev = prev
+
+## The value the iterator is at, and the iterator moved past it; none at the end (the `for`
+## protocol over `*it` and `++it`).
+pub func red_black_tree_iterator_next[K, V](this: RedBlackTreeIterator[K, V]*) -> V*?:
+    let node = this.m_node else return none
+    discard(red_black_tree_iterator_inc(this))
+    return &node.value
+
+# mark: RedBlackTree ============================================================================
+
+## Ported from AK/RedBlackTree.h:454 AK::RedBlackTree::find.
+pub func red_black_tree_find[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K) -> V*?:
+    let node = rbt_value_node[K, V](base_red_black_tree_find(this.base.m_root, key)) else return none
+    return &node.value
+
+## Ported from AK/RedBlackTree.h:462 AK::RedBlackTree::find_largest_not_above.
+pub func red_black_tree_find_largest_not_above[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K) -> V*?:
+    let node = rbt_value_node[K, V](base_red_black_tree_find_largest_not_above(this.base.m_root, key)) else return none
+    return &node.value
+
+## Ported from AK/RedBlackTree.h:470 AK::RedBlackTree::find_smallest_not_below.
+pub func red_black_tree_find_smallest_not_below[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K) -> V*?:
+    let node = rbt_value_node[K, V](base_red_black_tree_find_smallest_not_below(this.base.m_root, key)) else return none
+    return &node.value
+
+## Ported from AK/RedBlackTree.h:478 AK::RedBlackTree::try_insert(K, V const&).
+pub func red_black_tree_try_insert[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K, value: V) -> !:
+    return try red_black_tree_try_insert_2(this, key, value)
+
+## Ported from AK/RedBlackTree.h:483 AK::RedBlackTree::insert(K, V const&).
+pub func red_black_tree_insert[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K, value: V):
+    red_black_tree_try_insert(this, key, value) else trap("MUST: RedBlackTree::insert")
+
+## Ported from AK/RedBlackTree.h:488 AK::RedBlackTree::try_insert(K, V&&).
+pub func red_black_tree_try_insert_2[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K, value: V) -> !:
+    var fresh: BaseRedBlackTreeNode[K] = ---
+    base_red_black_tree_node_construct_opaque(&fresh, key)
+    let node = new RedBlackTreeNode[K, V](base = fresh, value = value) catch:
+        return try ak_error_throw(ak_error_from_errno(enomem))
+    base_red_black_tree_insert(&this.base, &node.base)
+
+## Ported from AK/RedBlackTree.h:497 AK::RedBlackTree::insert(K, V&&).
+pub func red_black_tree_insert_2[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K, value: V):
+    red_black_tree_try_insert_2(this, key, value) else trap("MUST: RedBlackTree::insert")
+
+## Ported from AK/RedBlackTree.h:504 AK::RedBlackTree::begin.
+pub func red_black_tree_begin[K, V](this: RedBlackTree[K, V]*) -> RedBlackTreeIterator[K, V]:
+    return RedBlackTreeIterator[K, V](m_node = rbt_value_node[K, V](this.base.m_minimum), m_prev = none)
+
+## Ported from AK/RedBlackTree.h:505 AK::RedBlackTree::end.
+pub func red_black_tree_end[K, V](this: RedBlackTree[K, V]*) -> RedBlackTreeIterator[K, V]:
+    discard(this)
+    return RedBlackTreeIterator[K, V](m_node = none, m_prev = none)
+
+## Ported from AK/RedBlackTree.h:506 AK::RedBlackTree::begin_from.
+pub func red_black_tree_begin_from[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K) -> RedBlackTreeIterator[K, V]:
+    return RedBlackTreeIterator[K, V](m_node = rbt_value_node[K, V](base_red_black_tree_find(this.base.m_root, key)), m_prev = none)
+
+## Ported from AK/RedBlackTree.h:508 AK::RedBlackTree::find_largest_not_above_iterator.
+pub func red_black_tree_find_largest_not_above_iterator[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K) -> RedBlackTreeIterator[K, V]:
+    let node = rbt_value_node[K, V](base_red_black_tree_find_largest_not_above(this.base.m_root, key)) else return red_black_tree_end(this)
+    return RedBlackTreeIterator[K, V](m_node = node, m_prev = rbt_value_node[K, V](base_red_black_tree_predecessor(&node.base)))
+
+## Ported from AK/RedBlackTree.h:516 AK::RedBlackTree::find_smallest_not_below_iterator.
+pub func red_black_tree_find_smallest_not_below_iterator[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K) -> RedBlackTreeIterator[K, V]:
+    let node = rbt_value_node[K, V](base_red_black_tree_find_smallest_not_below(this.base.m_root, key)) else return red_black_tree_end(this)
+    return RedBlackTreeIterator[K, V](m_node = node, m_prev = rbt_value_node[K, V](base_red_black_tree_predecessor(&node.base)))
+
+## Ported from AK/RedBlackTree.h:526 AK::RedBlackTree::begin const.
+pub func red_black_tree_begin_const[K, V](this: const RedBlackTree[K, V]*) -> RedBlackTreeIterator[K, V]:
+    return red_black_tree_begin((RedBlackTree[K, V]*)this)
+
+## Ported from AK/RedBlackTree.h:527 AK::RedBlackTree::end const.
+pub func red_black_tree_end_const[K, V](this: const RedBlackTree[K, V]*) -> RedBlackTreeIterator[K, V]:
+    return red_black_tree_end((RedBlackTree[K, V]*)this)
+
+## Ported from AK/RedBlackTree.h:528 AK::RedBlackTree::begin_from const.
+pub func red_black_tree_begin_from_const[K: luce.Comparable, V](this: const RedBlackTree[K, V]*, key: K) -> RedBlackTreeIterator[K, V]:
+    return red_black_tree_begin_from((RedBlackTree[K, V]*)this, key)
+
+## Ported from AK/RedBlackTree.h:530 AK::RedBlackTree::find_largest_not_above_iterator const.
+pub func red_black_tree_find_largest_not_above_iterator_const[K: luce.Comparable, V](this: const RedBlackTree[K, V]*, key: K) -> RedBlackTreeIterator[K, V]:
+    return red_black_tree_find_largest_not_above_iterator((RedBlackTree[K, V]*)this, key)
+
+## Ported from AK/RedBlackTree.h:538 AK::RedBlackTree::find_smallest_not_below_iterator const.
+pub func red_black_tree_find_smallest_not_below_iterator_const[K: luce.Comparable, V](this: const RedBlackTree[K, V]*, key: K) -> RedBlackTreeIterator[K, V]:
+    return red_black_tree_find_smallest_not_below_iterator((RedBlackTree[K, V]*)this, key)
+
+## Ported from AK/RedBlackTree.h:546 AK::RedBlackTree::unsafe_remove.
+pub func red_black_tree_unsafe_remove[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K) -> V:
+    let node = base_red_black_tree_find(this.base.m_root, key) else trap("VERIFY: unsafe_remove of a missing key")
+
+    base_red_black_tree_remove(&this.base, node)
+
+    let value_node = (RedBlackTreeNode[K, V]*)node
+    let temp = value_node.value
+
+    node.right_child = none
+    node.left_child = none
+    red_black_tree_delete_node(value_node)
+
+    return temp
+
+## Ported from AK/RedBlackTree.h:562 AK::RedBlackTree::remove.
+pub func red_black_tree_remove[K: luce.Comparable, V](this: RedBlackTree[K, V]*, key: K) -> bool:
+    let node = base_red_black_tree_find(this.base.m_root, key) else return false
+
+    base_red_black_tree_remove(&this.base, node)
+
+    node.right_child = none
+    node.left_child = none
+    red_black_tree_delete_node((RedBlackTreeNode[K, V]*)node)
+
+    return true
+
+## Ported from AK/RedBlackTree.h:577 AK::RedBlackTree::clear.
+pub func red_black_tree_clear[K, V](this: RedBlackTree[K, V]*):
+    if let root = rbt_value_node[K, V](this.base.m_root):
+        red_black_tree_delete_node(root)
+    this.base.m_root = none
+    this.base.m_minimum = none
+    this.base.m_size = 0
+
+# RedBlackTree::Node::~Node through `delete`: its children first, then the node.
+func red_black_tree_delete_node[K, V](node: RedBlackTreeNode[K, V]*):
+    if let left = rbt_value_node[K, V](node.base.left_child):
+        red_black_tree_delete_node(left)
+    if let right = rbt_value_node[K, V](node.base.right_child):
+        red_black_tree_delete_node(right)
+    free(node)

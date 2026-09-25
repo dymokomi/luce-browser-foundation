@@ -1,0 +1,239 @@
+#==============================================================================================
+#
+#   trie - Trie<ValueType, MetadataT, ValueTraits>: a tree keyed by sequences of values
+#
+#   DESCRIPTION:
+#       Port of AK/Trie.h (lines 1-309). Detail::Trie (Trie2) holds a node's value, optional
+#       metadata and children (a HashMap from value to child, ValueTraits being the map's key
+#       traits); AK::Trie embeds it. The CRTP base type is dropped: the members answer
+#       Trie2 pointers, and a Trie is its Trie2. The donor's iterator ranges `(It& it, It
+#       const& end)` are a span of values with an index into it (`it` passed by pointer where
+#       the donor advances the caller's iterator). A missing-metadata provider is a
+#       Function0[M?] (ensure_child) or a Function2[Trie2*, usize, M?] (insert: the node and
+#       the index `it`); for_each_node_in_tree_order's callback is a
+#       Function1[const Trie2*, IterationDecision]. The try_clone() overloads (values that
+#       are cloned, not copied) do not apply: luce-base values copy.
+#
+#==============================================================================================
+
+# ensure_child's default provider: `[] { return OptionalNone {}; }`.
+# workaround: compiler-issues/generic_function_value (the callback is a static method)
+struct TrieNoMetadata[M]:
+    var empty_: u8
+
+    static func call(context: void*?) -> M?:
+        discard(context)
+        return none
+
+# insert's per-level provider: `[&] { return invoke_provide_missing_metadata(*last_root_node, it); }`.
+struct TrieProvideMetadata[V, M, VT: Traits[V]]:
+    var provide: Function2[Trie2[V, M, VT]*, usize, M?]
+    var node: Trie2[V, M, VT]*
+    var it: usize
+
+    static func call(context: void*?) -> M?:
+        let captures = (const TrieProvideMetadata[V, M, VT]*)(context else trap("Trie: no captures"))
+        return function2_call(&captures.provide, captures.node, captures.it)
+
+# for_each_node_in_tree_order's traversal state: whether the node's own visit happened, and
+# where the walk over its children is.
+struct TrieState[V, M, VT: Traits[V]]:
+    var did_generate_root: bool
+    var it: HashTableIterator[HashMapEntry[V, Trie2[V, M, VT]*]]
+    var end: HashTableIterator[HashMapEntry[V, Trie2[V, M, VT]*]]
+
+# mark: Detail::Trie ============================================================================
+
+## Ported from AK/Trie.h:36 AK::Detail::Trie::Trie(ValueType, Optional<MetadataType>).
+pub func trie2_construct[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, value: V, metadata: M?):
+    this.m_value = value
+    this.m_metadata = trie2_metadata_cell(metadata)
+
+# The storage of an Optional<MetadataType>: none, or a managed cell holding the metadata.
+func trie2_metadata_cell[M](metadata: M?) -> M*?:
+    let value = metadata else return none
+    let cell = alloc M[1] else trap("out of memory")
+    cell[0] = value
+    return cell.data
+
+## Ported from AK/Trie.h:43 AK::Detail::Trie::traverse_until_last_accessible_node(It&, It const&):
+## follows values[*it...] down the children as far as they exist, advancing *it.
+pub func trie2_traverse_until_last_accessible_node[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, it: usize*, values: const V[]) -> Trie2[V, M, VT]*:
+    var node = this
+    while *it < values.length:
+        let next_it = hash_map_find_k(&node.m_children, values[*it])
+        let bucket = next_it.m_bucket else return node
+        node = bucket.storage.value
+        *it += 1
+    return node
+
+## Ported from AK/Trie.h:56 AK::Detail::Trie::traverse_until_last_accessible_node const.
+pub func trie2_traverse_until_last_accessible_node_const[V, M, VT: Traits[V]](this: const Trie2[V, M, VT]*, it: usize*, values: const V[]) -> const Trie2[V, M, VT]*:
+    return trie2_traverse_until_last_accessible_node((Trie2[V, M, VT]*)this, it, values)
+
+## Ported from AK/Trie.h:59 AK::Detail::Trie::traverse_until_last_accessible_node(It const&, It const&).
+pub func trie2_traverse_until_last_accessible_node_2[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, begin: usize, values: const V[]) -> Trie2[V, M, VT]*:
+    var it = begin
+    return trie2_traverse_until_last_accessible_node(this, &it, values)
+
+## Ported from AK/Trie.h:66 AK::Detail::Trie::traverse_until_last_accessible_node(It const&, It const&) const.
+pub func trie2_traverse_until_last_accessible_node_const_2[V, M, VT: Traits[V]](this: const Trie2[V, M, VT]*, begin: usize, values: const V[]) -> const Trie2[V, M, VT]*:
+    var it = begin
+    return trie2_traverse_until_last_accessible_node((Trie2[V, M, VT]*)this, &it, values)
+
+## Ported from AK/Trie.h:72 AK::Detail::Trie::has_metadata.
+pub func trie2_has_metadata[V, M, VT: Traits[V]](this: const Trie2[V, M, VT]*) -> bool:
+    return this.m_metadata != none
+
+## Ported from AK/Trie.h:74 AK::Detail::Trie::metadata.
+pub func trie2_metadata[V, M, VT: Traits[V]](this: const Trie2[V, M, VT]*) -> M?:
+    let cell = this.m_metadata else return none
+    return *cell
+
+## Ported from AK/Trie.h:79 AK::Detail::Trie::set_metadata.
+pub func trie2_set_metadata[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, metadata: M):
+    this.m_metadata = trie2_metadata_cell[M](metadata)
+
+## Ported from AK/Trie.h:84 AK::Detail::Trie::metadata_value const.
+pub func trie2_metadata_value_const[V, M, VT: Traits[V]](this: const Trie2[V, M, VT]*) -> M:
+    let cell = this.m_metadata else trap("VERIFY: Trie node without metadata")
+    return *cell
+
+## Ported from AK/Trie.h:89 AK::Detail::Trie::metadata_value.
+pub func trie2_metadata_value[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*) -> M*:
+    return this.m_metadata else trap("VERIFY: Trie node without metadata")
+
+## Ported from AK/Trie.h:95 AK::Detail::Trie::value const.
+pub func trie2_value_const[V, M, VT: Traits[V]](this: const Trie2[V, M, VT]*) -> V:
+    return this.m_value
+
+## Ported from AK/Trie.h:96 AK::Detail::Trie::value.
+pub func trie2_value[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*) -> V*:
+    return &this.m_value
+
+## Ported from AK/Trie.h:99 AK::Detail::Trie::ensure_child: the child for `value`, made with the
+## metadata `metadata_if_missing` answers when there is none.
+pub func trie2_ensure_child[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, value: V, metadata_if_missing: Function0[M?]) -> Trie2[V, M, VT]*!:
+    let it = hash_map_find_k(&this.m_children, value)
+    if let bucket = it.m_bucket:
+        return bucket.storage.value
+    let missing_metadata = function0_call(&metadata_if_missing)
+    let node = new Trie2[V, M, VT](m_value = value, m_metadata = trie2_metadata_cell(missing_metadata), m_children = HashMap[V, Trie2[V, M, VT]*, VT]()) catch:
+        return try ak_error_throw(ak_error_from_errno(enomem))
+    discard(try hash_map_try_set(&this.m_children, value, node))
+    return node
+
+# ensure_child with the donor's default provider (no metadata).
+func trie2_ensure_child_default[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, value: V) -> Trie2[V, M, VT]*!:
+    let none_provider: func(void*?) -> M? = TrieNoMetadata[M].call
+    return try trie2_ensure_child(this, value, Function0[M?](call = none_provider, context = none))
+
+## Ported from AK/Trie.h:125 AK::Detail::Trie::insert(It&, It const&, MetadataType,
+## ProvideMetadataFunction): inserts values[*it...] below the deepest existing node, the nodes it
+## creates on the way getting `provide_missing_metadata(node, it)`, and sets the last node's
+## metadata.
+pub func trie2_insert_t_metadata_t_t_provide_metadata_function[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, it: usize*, values: const V[], metadata: M, provide_missing_metadata: Function2[Trie2[V, M, VT]*, usize, M?]) -> Trie2[V, M, VT]*!:
+    var last_root_node = trie2_traverse_until_last_accessible_node(this, it, values)
+    let provide: func(void*?) -> M? = TrieProvideMetadata[V, M, VT].call
+    while *it != values.length:
+        var captures = TrieProvideMetadata[V, M, VT](provide = provide_missing_metadata, node = last_root_node, it = *it)
+        last_root_node = try trie2_ensure_child(last_root_node, values[*it], Function0[M?](call = provide, context = &captures))
+        *it += 1
+    trie2_set_metadata(last_root_node, metadata)
+    return last_root_node
+
+## Ported from AK/Trie.h:147 AK::Detail::Trie::insert(It&, It const&) (no metadata).
+pub func trie2_insert[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, it: usize*, values: const V[]) -> Trie2[V, M, VT]*!:
+    var last_root_node = trie2_traverse_until_last_accessible_node(this, it, values)
+    while *it != values.length:
+        last_root_node = try trie2_ensure_child_default(last_root_node, values[*it])
+        *it += 1
+    return last_root_node
+
+## Ported from AK/Trie.h:161 AK::Detail::Trie::insert(It const&, It const&, MetadataType,
+## ProvideMetadataFunction).
+pub func trie2_insert_t_metadata_t_t_provide_metadata_function_2[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, begin: usize, values: const V[], metadata: M, provide_missing_metadata: Function2[Trie2[V, M, VT]*, usize, M?]) -> Trie2[V, M, VT]*!:
+    var it = begin
+    return try trie2_insert_t_metadata_t_t_provide_metadata_function(this, &it, values, metadata, provide_missing_metadata)
+
+## Ported from AK/Trie.h:170 AK::Detail::Trie::insert(It const&, It const&) (no metadata).
+pub func trie2_insert_2[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, begin: usize, values: const V[]) -> Trie2[V, M, VT]*!:
+    var it = begin
+    return try trie2_insert(this, &it, values)
+
+## Ported from AK/Trie.h:177 AK::Detail::Trie::children.
+pub func trie2_children[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*) -> HashMap[V, Trie2[V, M, VT]*, VT]*:
+    return &this.m_children
+
+## Ported from AK/Trie.h:178 AK::Detail::Trie::children const.
+pub func trie2_children_const[V, M, VT: Traits[V]](this: const Trie2[V, M, VT]*) -> const HashMap[V, Trie2[V, M, VT]*, VT]*:
+    return &this.m_children
+
+## Ported from AK/Trie.h:181 AK::Detail::Trie::for_each_node_in_tree_order: visits this node and
+## then each subtree in the children map's order, until the callback answers Break.
+pub func trie2_for_each_node_in_tree_order[V, M, VT: Traits[V]](this: const Trie2[V, M, VT]*, callback: Function1[const Trie2[V, M, VT]*, IterationDecision]) -> !:
+    var state: Vector[TrieState[V, M, VT]]
+    try vector_try_append_t(&state, TrieState[V, M, VT](did_generate_root = false, it = hash_map_begin_const(&this.m_children), end = hash_map_end_const(&this.m_children)))
+
+    var current_node: const Trie2[V, M, VT]*? = this
+    while let node = current_node:
+        if function1_call(&callback, node) == IterationDecision.break_:
+            break
+        try trie2_skip_to_next_iterator(&state, &current_node)
+
+## Ported from AK/Trie.h:213 AK::Detail::Trie::is_empty.
+pub func trie2_is_empty[V, M, VT: Traits[V]](this: const Trie2[V, M, VT]*) -> bool:
+    return hash_map_is_empty(&this.m_children)
+
+## Ported from AK/Trie.h:214 AK::Detail::Trie::clear.
+pub func trie2_clear[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*):
+    hash_map_clear(&this.m_children)
+
+## Ported from AK/Trie.h:216 AK::Detail::Trie::deep_copy.
+pub func trie2_deep_copy[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*) -> Trie2[V, M, VT]!:
+    var root = Trie2[V, M, VT](m_value = this.m_value, m_metadata = trie2_metadata_cell(try trie2_copy_metadata[V, M, VT](trie2_metadata(this))), m_children = HashMap[V, Trie2[V, M, VT]*, VT]())
+    for it in hash_map_begin(&this.m_children):
+        let copy = try trie2_deep_copy(it.value)
+        let cell = alloc Trie2[V, M, VT][1] catch:
+            return try ak_error_throw(ak_error_from_errno(enomem))
+        cell[0] = copy
+        let child = cell.data
+        discard(try hash_map_try_set(&root.m_children, it.key, child))
+    return root
+
+## Ported from AK/Trie.h:234 AK::Detail::Trie::copy_metadata.
+pub func trie2_copy_metadata[V, M, VT: Traits[V]](metadata: M?) -> M?!:
+    let value = metadata else return none
+    return value
+
+## Ported from AK/Trie.h:245 AK::Detail::Trie::skip_to_next_iterator.
+pub func trie2_skip_to_next_iterator[V, M, VT: Traits[V]](state: Vector[TrieState[V, M, VT]]*, current_node: (const Trie2[V, M, VT]*?)*) -> !:
+    let current_state = vector_last(state)
+    if current_state.did_generate_root:
+        hash_table_iterator_inc(&current_state.it)
+    else:
+        current_state.did_generate_root = true
+    if hash_table_iterator_eq(&current_state.it, current_state.end):
+        return try trie2_pop_and_get_next_iterator(state, current_node)
+
+    let child = hash_table_iterator_deref(&current_state.it).value
+    *current_node = child
+    try vector_try_append_t(state, TrieState[V, M, VT](did_generate_root = false, it = hash_map_begin_const(&child.m_children), end = hash_map_end_const(&child.m_children)))
+
+## Ported from AK/Trie.h:262 AK::Detail::Trie::pop_and_get_next_iterator.
+pub func trie2_pop_and_get_next_iterator[V, M, VT: Traits[V]](state: Vector[TrieState[V, M, VT]]*, current_node: (const Trie2[V, M, VT]*?)*) -> !:
+    discard(vector_take_last(state))
+    if vector_is_empty(state):
+        *current_node = none
+        return
+    return try trie2_skip_to_next_iterator(state, current_node)
+
+# mark: AK::Trie ================================================================================
+
+## Ported from AK/Trie.h:293 AK::Trie::Trie(ValueType, MetadataType).
+pub func trie_construct_opaque[V, M, VT: Traits[V]](this: Trie[V, M, VT]*, value: V, metadata: M):
+    trie2_construct(&this.base, value, metadata)
+
+## Ported from AK/Trie.h:299 AK::Trie::Trie(ValueType).
+pub func trie_construct[V, M, VT: Traits[V]](this: Trie[V, M, VT]*, value: V):
+    trie2_construct[V, M, VT](&this.base, value, none)

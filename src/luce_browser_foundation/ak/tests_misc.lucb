@@ -1,0 +1,193 @@
+#==============================================================================================
+#
+#   tests_misc - Random, StackInfo, TypeCasts, Result, Singleton, ScopeGuard,
+#                TemporaryChange, CopyOnWrite, DefaultDelete, Array and Variant
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestRandom.cpp and focused cases pinned to the donor headers for
+#       the files without donor tests (the ones of TestArray.cpp and TestVariant.cpp are
+#       about std::array/Variant templates, which are `T[N]` and generated enums here).
+#       The xorshift128+ values were computed with the donor's XorShift128PlusRNG.
+#
+#==============================================================================================
+
+test "random: csprng_generates_unique_values":
+    let max_failures: usize = 3
+    var failures: usize = 0
+    for i in 0..<3:
+        discard(i)
+        var first_buffer: u8[800]
+        var second_buffer: u8[800]
+        fill_with_random(first_buffer)
+        fill_with_random(second_buffer)
+        let first_u32 = get_random_uniform(800)
+        let second_u32 = get_random_uniform(800)
+        let first_u64 = get_random_uniform_64(800)
+        let second_u64 = get_random_uniform_64(800)
+        if first_buffer == second_buffer:
+            failures += 1
+        if first_u32 == second_u32:
+            failures += 1
+        if first_u64 == second_u64:
+            failures += 1
+        assert(first_u32 < 800 and first_u64 < 800)
+    assert(failures < max_failures)
+
+test "random: xorshift128+ and uuid layout":
+    var rng = XorShift128PlusRng(m_low = 1, m_high = 2)
+    assert(xor_shift128_plus_rng_advance(&rng) == 8388646)
+    assert(rng.m_low == 2 and rng.m_high == 8388643)
+    var state: u64 = 0
+    assert(xor_shift128_plus_rng_splitmix64(&rng, &state) == 0xe220a8397b1dcdaf)
+    assert(state == 0x9e3779b97f4a7c15)
+    var seeded: XorShift128PlusRng
+    xor_shift128_plus_rng_construct(&seeded)
+    let d = xor_shift128_plus_rng_get(&seeded)
+    assert(d >= 0.0 and d < 1.0)
+    var bytes: u8[16] = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x46, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]
+    var text: u8[36]
+    format_uuid(bytes, text)
+    assert((str)text[0..] == "00112233-4455-4677-8899-aabbccddeeff")
+    var values: i32[5] = [1, 2, 3, 4, 5]
+    shuffle(values[0..])
+    var sum: i32 = 0
+    for value in values:
+        sum += value
+    assert(sum == 15)
+
+test "stack_info: bounds contain the current frame":
+    var info: StackInfo
+    stack_info_construct(&info)
+    assert(stack_info_base(&info) < stack_info_top(&info))
+    assert(stack_info_top(&info) - stack_info_base(&info) == stack_info_size(&info))
+    let free_bytes = stack_info_size_free(&info)
+    assert(free_bytes > 0 and free_bytes < stack_info_size(&info))
+
+struct TestCastObject: HasClassId:
+    var class_id: u16
+
+    func class_id_of() -> u16: return self.class_id
+
+let test_cast_base_class = ClassInfo(name = "Base", first_id = 1, last_id = 3, size = 2, vtable = (const void*)&test_cast_base_class)
+let test_cast_leaf_class = ClassInfo(name = "Leaf", first_id = 3, last_id = 3, size = 2, vtable = (const void*)&test_cast_leaf_class)
+
+test "type_casts: is, as_if, as":
+    var leaf = TestCastObject(class_id = 3)
+    var base = TestCastObject(class_id = 1)
+    assert(is(&leaf, &test_cast_base_class))
+    assert(is(&leaf, &test_cast_leaf_class))
+    assert(not is(&base, &test_cast_leaf_class))
+    assert(not is_2[TestCastObject](none, &test_cast_base_class))
+    assert(is_3(&base, &test_cast_base_class))
+    assert(as_if[u16, TestCastObject](&base, &test_cast_leaf_class) == none)
+    let id = as_[u16, TestCastObject](&leaf, &test_cast_leaf_class)
+    assert(*id == 3)
+    assert(as__2[u16, TestCastObject](none, &test_cast_leaf_class) == none)
+    assert(as_if_2[u16, TestCastObject](&leaf, &test_cast_base_class) != none)
+    assert((void*)bridge_cast[u8, TestCastObject](&leaf) == (void*)&leaf)
+
+test "result: value and error":
+    var ok: Result[i32, str]
+    result_construct_t_value_t(&ok, 7)
+    assert(not result_is_error(&ok))
+    assert(result_value(&ok) == 7)
+    assert(result_release_value(&ok) == 7)
+    var failed: Result[i32, str]
+    result_construct_opaque_3(&failed, "bad")
+    assert(result_is_error(&failed))
+    assert(result_error(&failed) == "bad")
+    assert(result_release_error(&failed) == "bad")
+
+var test_singleton_value: i64 = 42
+var test_singleton_calls: i32 = 0
+
+func test_singleton_create() -> i64*:
+    test_singleton_calls += 1
+    return &test_singleton_value
+
+test "singleton: lazily created once":
+    var instance: Singleton[i64]
+    singleton_construct(&instance, test_singleton_create)
+    assert(not singleton_is_initialized(&instance))
+    assert(*singleton_deref(&instance) == 42)
+    assert(singleton_is_initialized(&instance))
+    singleton_ensure_instance(&instance)
+    assert(singleton_ptr(&instance) == (i64*?)&test_singleton_value)
+    assert(singleton_to_t_const_2(&instance) == &test_singleton_value)
+    assert(test_singleton_calls == 1)
+
+func test_scope_guard_count(context: void*?):
+    let count = (i32*)(context else trap("no context"))
+    *count += 1
+
+test "scope_guard: runs on scope exit unless disarmed":
+    var count: i32 = 0
+    if true:
+        var guard: ScopeGuard[unit]
+        scope_guard_construct(&guard, Function0[unit](call = test_scope_guard_count, context = &count))
+        defer scope_guard_run(&guard)
+        assert(count == 0)
+    assert(count == 1)
+    if true:
+        var armed: ArmedScopeGuard[unit]
+        armed_scope_guard_construct(&armed, Function0[unit](call = test_scope_guard_count, context = &count))
+        defer armed_scope_guard_run(&armed)
+        armed_scope_guard_disarm(&armed)
+    assert(count == 1)
+
+test "temporary_change: restores the old value":
+    var value: i32 = 1
+    if true:
+        var change: TemporaryChange[i32] = ---
+        temporary_change_construct(&change, &value, 2)
+        defer temporary_change_restore(&change)
+        assert(value == 2)
+    assert(value == 1)
+
+struct TestCowValue: CopyOnWriteValue[TestCowValue]:
+    var ref_counted: RefCounted[TestCowValue]
+    var data: i32
+
+    func ref_counted_base() -> RefCountedBase*: return &((TestCowValue*)&self).ref_counted.ref_counted_base
+
+    func clone() -> TestCowValue*: return test_new_cow_value(self.data)
+
+func test_new_cow_value(data: i32) -> TestCowValue*:
+    return new TestCowValue(ref_counted = RefCounted[TestCowValue](ref_counted_base = RefCountedBase(m_ref_count = 1)), data = data) else trap("out of memory")
+
+test "copy_on_write: clones a shared value before mutating it":
+    var a: CopyOnWrite[TestCowValue] = ---
+    copy_on_write_construct(&a, test_new_cow_value(1))
+    var b = copy_on_write_copy(&a)
+    assert(copy_on_write_ptr(&a) == copy_on_write_ptr(&b))
+    copy_on_write_mutable_value(&b).data = 2
+    assert(copy_on_write_value(&a).data == 1)
+    assert(copy_on_write_value(&b).data == 2)
+    assert(copy_on_write_ptr(&a) != copy_on_write_ptr(&b))
+    let before = copy_on_write_ptr(&a)
+    copy_on_write_arrow(&a).data = 3
+    assert(copy_on_write_ptr(&a) == before)
+    assert(copy_on_write_to_const_t(&a).data == 3)
+
+test "default_delete, array and variant helpers":
+    var deleter: DefaultDelete[i64]
+    let object = new i64 else trap("out of memory")
+    default_delete_call(&deleter, object)
+    default_delete_call(&deleter, none)
+    var storage: EmptyArrayStorage[i32]
+    assert(empty_array_storage_to_t(&storage) == none)
+    var constructors: VariantConstructors[i32, i64]
+    assert((void*)variant_constructors_internal_cast(&constructors) == (void*)&constructors)
+
+test "id_allocator: unique ids at or above the minimum":
+    var allocator: IdAllocator
+    id_allocator_construct(&allocator, 100)
+    var ids: HashTable[i32, I32Traits]
+    for i in 0..<50:
+        discard(i)
+        let id = id_allocator_allocate(&allocator)
+        assert(id >= 100)
+        assert(hash_table_set(&ids, id) == HashSetResult.inserted_new_entry)
+    for id in hash_table_begin(&ids):
+        id_allocator_deallocate(&allocator, *id)
+    assert(hash_table_is_empty(&allocator.m_allocated_ids))

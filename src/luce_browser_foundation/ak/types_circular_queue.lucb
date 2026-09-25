@@ -7,20 +7,25 @@
 #       AK/CircularQueue.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
 #       Regenerate rather than edit, except to fill a field the generator could not map.
 #
+#       Edited by region r01: the Capacity template argument is the field m_capacity and the
+#       storage an allocation of that many elements (circular_queue_construct); the two
+#       iterators are one generic CircularQueueIterator[T], a luce-base iterator.
+#
 #==============================================================================================
 
-# mark: CircularQueue ===========================================================================
-
-## AK::CircularQueue (AK/CircularQueue.h:16): a generic struct.
+## AK::CircularQueue (AK/CircularQueue.h:15).
 pub struct CircularQueue[T]:
-    pub var m_storage: u8*?
+    pub var m_storage: T*?
     pub var m_size: usize  # C++ default: { 0 }
     pub var m_head: usize  # C++ default: { 0 }
+    pub var m_capacity: usize
 
-## AK::CircularQueue::ConstIterator (AK/CircularQueue.h:70): opaque in this phase (not in the phase-1 closure).
-pub struct ConstIterator:
-    pub var opaque_: u8
+## AK::CircularQueue::Iterator and ConstIterator (AK/CircularQueue.h:70, 92): a queue and an
+## index into it; also a luce-base iterator yielding a pointer to each value.
+pub struct CircularQueueIterator[T]: luce.Iterable[T*, CircularQueueIterator[T]], luce.Iterator[T*]:
+    pub var m_queue: CircularQueue[T]*
+    pub var m_index: usize  # C++ default: { 0 }
 
-## AK::CircularQueue::Iterator (AK/CircularQueue.h:92): opaque in this phase (not in the phase-1 closure).
-pub struct Iterator:
-    pub var opaque_: u8
+    func iterator() -> CircularQueueIterator[T]: return self
+
+    mutating func next() -> T*?: return circular_queue_iterator_next(&self)

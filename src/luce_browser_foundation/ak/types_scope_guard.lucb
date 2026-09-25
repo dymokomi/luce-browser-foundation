@@ -13,11 +13,11 @@
 
 ## AK::ScopeGuard (AK/ScopeGuard.h:14): a generic struct.
 pub struct ScopeGuard[TCallback]:
-    pub var m_callback: TCallback
+    pub var m_callback: Function0[unit]  # the Callback (a lambda: DESIGN.md §2.7)
 
 # mark: ArmedScopeGuard =========================================================================
 
 ## AK::ArmedScopeGuard (AK/ScopeGuard.h:31): a generic struct.
 pub struct ArmedScopeGuard[TCallback]:
-    pub var m_callback: TCallback
+    pub var m_callback: Function0[unit]  # the Callback (a lambda: DESIGN.md §2.7)
     pub var m_armed: bool  # C++ default: { true }

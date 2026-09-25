@@ -1,0 +1,130 @@
+#==============================================================================================
+#
+#   bitmap - Bitmap: an owning bit array
+#
+#   DESCRIPTION:
+#       Port of AK/Bitmap.h (lines 1-189). The storage is atomic kmalloc memory (bits hold
+#       no pointers, DESIGN.md §3.3 rule 5); the destructor's kfree is not needed in
+#       managed memory. The set_range<VALUE, verify_that_all_bits_flip> template is
+#       bitmap_set_range_impl with both as parameters.
+#
+#==============================================================================================
+
+## Ported from AK/Bitmap.h:23 AK::Bitmap::create.
+pub func bitmap_create(size: usize, default_value: bool) -> Bitmap!:
+    assert(size != 0)
+
+    let data = kmalloc_atomic(ceil_div_usize(size, 8)) else try ak_error_throw(ak_error_from_errno(enomem))
+
+    var bitmap: Bitmap
+    bitmap_construct(&bitmap, (u8*)data, size, true)
+    bitmap_fill(&bitmap, default_value)
+    return bitmap
+
+## Ported from AK/Bitmap.h:38 AK::Bitmap::Bitmap.
+pub func bitmap_construct(this: Bitmap*, data: u8*?, size: usize, is_owning: bool = false):
+    bitmap_view_construct(&this.bitmap_view, data, size)
+    this.m_is_owning = is_owning
+
+## Ported from AK/Bitmap.h:68 AK::Bitmap::view.
+pub func bitmap_view(this: const Bitmap*) -> BitmapView:
+    return this.bitmap_view
+
+## Ported from AK/Bitmap.h:70 AK::Bitmap::set.
+pub func bitmap_set(this: Bitmap*, index: usize, value: bool):
+    assert(index < this.bitmap_view.m_size)
+    let data = bitmap_view_bytes(&this.bitmap_view)
+    if value:
+        data[index // 8] = data[index // 8] | (u8)((u32)1 << (u32)(index % 8))
+    else:
+        data[index // 8] = data[index // 8] & (u8)~((u32)1 << (u32)(index % 8))
+
+## Ported from AK/Bitmap.h:80 AK::Bitmap::data.
+# NOTE: There's a const method variant of this method at the parent class BitmapView.
+pub func bitmap_data(this: Bitmap*) -> u8*?:
+    return this.bitmap_view.m_data
+
+## Ported from AK/Bitmap.h:82 AK::Bitmap::grow.
+pub func bitmap_grow(this: Bitmap*, size: usize, default_value: bool):
+    assert(size > this.bitmap_view.m_size)
+
+    let previous_size_bytes = bitmap_view_size_in_bytes(&this.bitmap_view)
+    let previous_size = this.bitmap_view.m_size
+    let previous_data = this.bitmap_view.m_data
+
+    this.bitmap_view.m_size = size
+    this.bitmap_view.m_data = (u8*?)kmalloc_atomic(bitmap_view_size_in_bytes(&this.bitmap_view))
+
+    bitmap_fill(this, default_value)
+
+    if let previous = previous_data:
+        let data = bitmap_view_bytes(&this.bitmap_view)
+        memory.copy(u8[](data, previous_size_bytes), u8[](previous, previous_size_bytes), previous_size_bytes)
+        if (previous_size % 8) != 0:
+            bitmap_set_range(this, previous_size, 8 - previous_size % 8, default_value)
+        kfree(previous)
+
+# AK/Bitmap.h:107 AK::Bitmap::set_range<VALUE, verify_that_all_bits_flip>.
+func bitmap_set_range_impl(this: Bitmap*, start: usize, len: usize, value: bool, verify_that_all_bits_flip: bool):
+    assert(start < this.bitmap_view.m_size)
+    assert(start + len <= this.bitmap_view.m_size)
+    if len == 0:
+        return
+
+    let data = bitmap_view_bytes(&this.bitmap_view)
+    var first = data + start // 8
+    let last = data + (start + len) // 8
+    var byte_mask = bitmask_first_byte[start % 8]
+    if first == last:
+        byte_mask = byte_mask & bitmask_last_byte[(start + len) % 8]
+        if verify_that_all_bits_flip:
+            if value:
+                assert((*first & byte_mask) == 0)
+            else:
+                assert((*first & byte_mask) == byte_mask)
+        if value:
+            *first = *first | byte_mask
+        else:
+            *first = *first & ~byte_mask
+    else:
+        if verify_that_all_bits_flip:
+            if value:
+                assert((*first & byte_mask) == 0)
+            else:
+                assert((*first & byte_mask) == byte_mask)
+        if value:
+            *first = *first | byte_mask
+        else:
+            *first = *first & ~byte_mask
+        byte_mask = bitmask_last_byte[(start + len) % 8]
+        # With an empty mask the donor reads and writes back *last unchanged, which may be
+        # one past the end; the bits are the same without touching it.
+        if byte_mask != 0:
+            if verify_that_all_bits_flip:
+                if value:
+                    assert((*last & byte_mask) == 0)
+                else:
+                    assert((*last & byte_mask) == byte_mask)
+            if value:
+                *last = *last | byte_mask
+            else:
+                *last = *last & ~byte_mask
+        first = first + 1
+        if first < last:
+            let count = (usize)(last - first)
+            memory.set(u8[](first, count), 0xFF if value else 0x0)
+
+## Ported from AK/Bitmap.h:160 AK::Bitmap::set_range.
+pub func bitmap_set_range(this: Bitmap*, start: usize, len: usize, value: bool):
+    bitmap_set_range_impl(this, start, len, value, false)
+
+## Ported from AK/Bitmap.h:168 AK::Bitmap::set_range_and_verify_that_all_bits_flip.
+pub func bitmap_set_range_and_verify_that_all_bits_flip(this: Bitmap*, start: usize, len: usize, value: bool):
+    bitmap_set_range_impl(this, start, len, value, true)
+
+## Ported from AK/Bitmap.h:176 AK::Bitmap::fill.
+pub func bitmap_fill(this: Bitmap*, value: bool):
+    let count = bitmap_view_size_in_bytes(&this.bitmap_view)
+    if count == 0:
+        return
+    memory.set(u8[](bitmap_view_bytes(&this.bitmap_view), count), 0xff if value else 0x00)

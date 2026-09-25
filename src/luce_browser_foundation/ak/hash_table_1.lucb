@@ -1,0 +1,404 @@
+#==============================================================================================
+#
+#   hash_table_1 - HashTable<T>: iterators, construction, insertion and lookup
+#
+#   DESCRIPTION:
+#       Port of AK/HashTable.h (lines 1-512): a set with closed hashing and Robin Hood
+#       probing. The struct is support.lucb's HashTable[T, TT], TT the key's traits
+#       (DESIGN.md §2.6); the donor's IsOrdered template parameter is the table's
+#       `m_ordered` flag, set by the OrderedHashTable functions (hash_table_3), and every
+#       `if constexpr (IsOrdered)` tests it. The algorithms, and so the iteration order, are
+#       the donor's.
+#
+#       Predicates are Function1[const T*, bool]; lookups by another key type take a
+#       HashCompatibleTraits[T, K] (traits.lucb). Iterators are HashTableIterator[T]
+#       (types_hash_table), which a `for` loop can walk.
+#
+#==============================================================================================
+
+let hash_table_grow_capacity_at_least: usize = 8
+let hash_table_grow_at_load_factor_percent: usize = 70
+
+# mark: HashTableIterator =======================================================================
+
+## Ported from AK/HashTable.h:47 AK::HashTableIterator::operator==.
+pub func hash_table_iterator_eq[T](this: const HashTableIterator[T]*, other: HashTableIterator[T]) -> bool:
+    return this.m_bucket == other.m_bucket
+
+## Ported from AK/HashTable.h:48 AK::HashTableIterator::operator!=.
+pub func hash_table_iterator_ne[T](this: const HashTableIterator[T]*, other: HashTableIterator[T]) -> bool:
+    return this.m_bucket != other.m_bucket
+
+## Ported from AK/HashTable.h:49 AK::HashTableIterator::operator*.
+pub func hash_table_iterator_deref[T](this: HashTableIterator[T]*) -> T*:
+    let bucket = this.m_bucket else trap("VERIFY: dereferencing the end of a HashTable")
+    return &bucket.storage
+
+## Ported from AK/HashTable.h:50 AK::HashTableIterator::operator->.
+pub func hash_table_iterator_arrow[T](this: HashTableIterator[T]*) -> T*:
+    return hash_table_iterator_deref(this)
+
+## Ported from AK/HashTable.h:51 AK::HashTableIterator::operator++ (an ordered table's iterator
+## follows the `next` links, OrderedHashTableIterator::operator++).
+pub func hash_table_iterator_inc[T](this: HashTableIterator[T]*):
+    if this.m_ordered:
+        if let bucket = this.m_bucket:
+            this.m_bucket = bucket.next
+        return
+    hash_table_iterator_skip_to_next(this)
+
+## Ported from AK/HashTable.h:54 AK::HashTableIterator::skip_to_next.
+pub func hash_table_iterator_skip_to_next[T](this: HashTableIterator[T]*):
+    var bucket = this.m_bucket else return
+    while true:
+        bucket = bucket + 1
+        if (HashTableBucket[T]*?)bucket == this.m_end_bucket:
+            this.m_bucket = none
+            return
+        if bucket.state != (u8)BucketState.free_:
+            break
+    this.m_bucket = bucket
+
+## Ported from AK/HashTable.h:67 AK::HashTableIterator::HashTableIterator.
+pub func hash_table_iterator_construct[T](this: HashTableIterator[T]*, bucket: HashTableBucket[T]*?, end_bucket: HashTableBucket[T]*?):
+    this.m_bucket = bucket
+    this.m_end_bucket = end_bucket
+
+## The value the iterator is at, and the iterator moved past it; none at the end (the `for`
+## protocol over `*it` and `++it`).
+pub func hash_table_iterator_next[T](this: HashTableIterator[T]*) -> T*?:
+    let bucket = this.m_bucket else return none
+    hash_table_iterator_inc(this)
+    return &bucket.storage
+
+# mark: OrderedHashTableIterator ================================================================
+
+## Ported from AK/HashTable.h:82 AK::OrderedHashTableIterator::operator==.
+pub func ordered_hash_table_iterator_eq[T](this: const OrderedHashTableIterator[T]*, other: OrderedHashTableIterator[T]) -> bool:
+    return this.m_bucket == other.m_bucket
+
+## Ported from AK/HashTable.h:83 AK::OrderedHashTableIterator::operator!=.
+pub func ordered_hash_table_iterator_ne[T](this: const OrderedHashTableIterator[T]*, other: OrderedHashTableIterator[T]) -> bool:
+    return this.m_bucket != other.m_bucket
+
+## Ported from AK/HashTable.h:84 AK::OrderedHashTableIterator::operator*.
+pub func ordered_hash_table_iterator_deref[T](this: OrderedHashTableIterator[T]*) -> T*:
+    let bucket = this.m_bucket else trap("VERIFY: dereferencing the end of an OrderedHashTable")
+    return &bucket.storage
+
+## Ported from AK/HashTable.h:85 AK::OrderedHashTableIterator::operator->.
+pub func ordered_hash_table_iterator_arrow[T](this: OrderedHashTableIterator[T]*) -> T*:
+    return ordered_hash_table_iterator_deref(this)
+
+## Ported from AK/HashTable.h:86 AK::OrderedHashTableIterator::operator++.
+pub func ordered_hash_table_iterator_inc[T](this: OrderedHashTableIterator[T]*):
+    let bucket = this.m_bucket else trap("VERIFY: incrementing the end of an OrderedHashTable")
+    this.m_bucket = bucket.next
+
+## Ported from AK/HashTable.h:87 AK::OrderedHashTableIterator::operator--.
+pub func ordered_hash_table_iterator_dec[T](this: OrderedHashTableIterator[T]*):
+    let bucket = this.m_bucket else trap("VERIFY: decrementing the end of an OrderedHashTable")
+    this.m_bucket = bucket.previous
+
+## Ported from AK/HashTable.h:90 AK::OrderedHashTableIterator::OrderedHashTableIterator.
+pub func ordered_hash_table_iterator_construct[T](this: OrderedHashTableIterator[T]*, bucket: HashTableBucket[T]*?, arg1: HashTableBucket[T]*?):
+    discard(arg1)
+    this.m_bucket = bucket
+
+# mark: ReverseOrderedHashTableIterator =========================================================
+
+## Ported from AK/HashTable.h:103 AK::ReverseOrderedHashTableIterator::operator==.
+pub func reverse_ordered_hash_table_iterator_eq[T](this: const ReverseOrderedHashTableIterator[T]*, other: ReverseOrderedHashTableIterator[T]) -> bool:
+    return this.m_bucket == other.m_bucket
+
+## Ported from AK/HashTable.h:104 AK::ReverseOrderedHashTableIterator::operator!=.
+pub func reverse_ordered_hash_table_iterator_ne[T](this: const ReverseOrderedHashTableIterator[T]*, other: ReverseOrderedHashTableIterator[T]) -> bool:
+    return this.m_bucket != other.m_bucket
+
+## Ported from AK/HashTable.h:105 AK::ReverseOrderedHashTableIterator::operator*.
+pub func reverse_ordered_hash_table_iterator_deref[T](this: ReverseOrderedHashTableIterator[T]*) -> T*:
+    let bucket = this.m_bucket else trap("VERIFY: dereferencing the end of an OrderedHashTable")
+    return &bucket.storage
+
+## Ported from AK/HashTable.h:106 AK::ReverseOrderedHashTableIterator::operator->.
+pub func reverse_ordered_hash_table_iterator_arrow[T](this: ReverseOrderedHashTableIterator[T]*) -> T*:
+    return reverse_ordered_hash_table_iterator_deref(this)
+
+## Ported from AK/HashTable.h:107 AK::ReverseOrderedHashTableIterator::operator++.
+pub func reverse_ordered_hash_table_iterator_inc[T](this: ReverseOrderedHashTableIterator[T]*):
+    let bucket = this.m_bucket else trap("VERIFY: incrementing the end of an OrderedHashTable")
+    this.m_bucket = bucket.previous
+
+## Ported from AK/HashTable.h:108 AK::ReverseOrderedHashTableIterator::operator--.
+pub func reverse_ordered_hash_table_iterator_dec[T](this: ReverseOrderedHashTableIterator[T]*):
+    let bucket = this.m_bucket else trap("VERIFY: decrementing the end of an OrderedHashTable")
+    this.m_bucket = bucket.next
+
+## Ported from AK/HashTable.h:111 AK::ReverseOrderedHashTableIterator::ReverseOrderedHashTableIterator.
+pub func reverse_ordered_hash_table_iterator_construct[T](this: ReverseOrderedHashTableIterator[T]*, bucket: HashTableBucket[T]*?):
+    this.m_bucket = bucket
+
+## The value the reverse iterator is at, and the iterator moved past it (the `for` protocol).
+pub func reverse_ordered_hash_table_iterator_next[T](this: ReverseOrderedHashTableIterator[T]*) -> T*?:
+    let bucket = this.m_bucket else return none
+    this.m_bucket = bucket.previous
+    return &bucket.storage
+
+# mark: Construction and capacity ===============================================================
+
+## Ported from AK/HashTable.h:179 AK::HashTable::HashTable(size_t capacity).
+pub func hash_table_construct[T, TT: Traits[T]](this: HashTable[T, TT]*, capacity: usize):
+    hash_table_rehash(this, capacity)
+
+## Ported from AK/HashTable.h:195 AK::HashTable::HashTable(HashTable const&): the copy of `other`
+## with its own buckets (DESIGN.md §3.3 rule 2: a C++ copy of a container is a clone).
+pub func hash_table_clone[T, TT: Traits[T]](other: const HashTable[T, TT]*) -> HashTable[T, TT]:
+    var table: HashTable[T, TT]
+    table.m_ordered = other.m_ordered
+    hash_table_rehash(&table, hash_table_capacity(other))
+    for it in hash_table_begin_const(other):
+        discard(hash_table_set(&table, *it))
+    return table
+
+## Ported from AK/HashTable.h:240 AK::HashTable::is_empty.
+pub func hash_table_is_empty[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> bool:
+    return this.m_size == 0
+
+## Ported from AK/HashTable.h:241 AK::HashTable::size.
+pub func hash_table_size[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> usize:
+    return this.m_size
+
+## Ported from AK/HashTable.h:242 AK::HashTable::capacity.
+pub func hash_table_capacity[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> usize:
+    if this.m_buckets == none:
+        return 0
+    return this.m_mask + 1
+
+## Ported from AK/HashTable.h:257 AK::HashTable::try_ensure_capacity.
+pub func hash_table_try_ensure_capacity[T, TT: Traits[T]](this: HashTable[T, TT]*, capacity: usize) -> !:
+    # The user usually expects "capacity" to mean the number of values that can be stored in a
+    # container without it needing to reallocate. Our definition of "capacity" is the number of
+    # buckets we can store, but we reallocate earlier because of `grow_at_load_factor_percent`.
+    # This calculates the required internal capacity to store `capacity` number of values.
+    let required_capacity = (capacity * 100 // hash_table_grow_at_load_factor_percent) + 1
+    if required_capacity <= hash_table_capacity(this):
+        return
+    return try hash_table_try_rehash(this, required_capacity)
+
+## Ported from AK/HashTable.h:268 AK::HashTable::ensure_capacity.
+pub func hash_table_ensure_capacity[T, TT: Traits[T]](this: HashTable[T, TT]*, capacity: usize):
+    hash_table_try_ensure_capacity(this, capacity) else trap("MUST: HashTable::ensure_capacity")
+
+## Ported from AK/HashTable.h:273 AK::HashTable::contains.
+pub func hash_table_contains_t[T, TT: Traits[T]](this: const HashTable[T, TT]*, value: T) -> bool:
+    let it = hash_table_find_t_const(this, value)
+    return it.m_bucket != none
+
+## Ported from AK/HashTable.h:279 AK::HashTable::contains(K const&) for a hash-compatible key.
+pub func hash_table_contains_k[T, TT: Traits[T], K, KT: HashCompatibleTraits[T, K]](this: const HashTable[T, TT]*, value: K) -> bool:
+    let it = hash_table_find_k_const[T, TT, K, KT](this, value)
+    return it.m_bucket != none
+
+# mark: Iteration ===============================================================================
+
+## Ported from AK/HashTable.h:289 AK::HashTable::begin.
+pub func hash_table_begin[T, TT: Traits[T]](this: HashTable[T, TT]*) -> HashTableIterator[T]:
+    if this.m_ordered:
+        return HashTableIterator[T](m_bucket = this.m_head, m_end_bucket = hash_table_end_bucket(this), m_ordered = true)
+
+    for i in 0..<hash_table_capacity(this):
+        let bucket = hash_table_bucket_at(this, i)
+        if bucket.state != (u8)BucketState.free_:
+            return HashTableIterator[T](m_bucket = bucket, m_end_bucket = hash_table_end_bucket(this), m_ordered = false)
+    return hash_table_end(this)
+
+## Ported from AK/HashTable.h:300 AK::HashTable::end.
+pub func hash_table_end[T, TT: Traits[T]](this: HashTable[T, TT]*) -> HashTableIterator[T]:
+    return HashTableIterator[T](m_bucket = none, m_end_bucket = none, m_ordered = this.m_ordered)
+
+## Ported from AK/HashTable.h:309 AK::HashTable::begin const.
+pub func hash_table_begin_const[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> HashTableIterator[T]:
+    return hash_table_begin((HashTable[T, TT]*)this)
+
+## Ported from AK/HashTable.h:320 AK::HashTable::end const.
+pub func hash_table_end_const[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> HashTableIterator[T]:
+    return hash_table_end((HashTable[T, TT]*)this)
+
+## Ported from AK/HashTable.h:329 AK::HashTable::rbegin (ordered tables only).
+pub func hash_table_rbegin[T, TT: Traits[T]](this: HashTable[T, TT]*) -> ReverseOrderedHashTableIterator[T]:
+    assert(this.m_ordered)
+    return ReverseOrderedHashTableIterator[T](m_bucket = this.m_tail)
+
+## Ported from AK/HashTable.h:335 AK::HashTable::rend (ordered tables only).
+pub func hash_table_rend[T, TT: Traits[T]](this: HashTable[T, TT]*) -> ReverseOrderedHashTableIterator[T]:
+    assert(this.m_ordered)
+    return ReverseOrderedHashTableIterator[T](m_bucket = none)
+
+## Ported from AK/HashTable.h:341 AK::HashTable::in_reverse: the reverse iterator, which a `for`
+## loop walks from the last value to the first.
+pub func hash_table_in_reverse[T, TT: Traits[T]](this: HashTable[T, TT]*) -> ReverseOrderedHashTableIterator[T]:
+    return hash_table_rbegin(this)
+
+## Ported from AK/HashTable.h:348 AK::HashTable::rbegin const.
+pub func hash_table_rbegin_const[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> ReverseOrderedHashTableIterator[T]:
+    return hash_table_rbegin((HashTable[T, TT]*)this)
+
+## Ported from AK/HashTable.h:354 AK::HashTable::rend const.
+pub func hash_table_rend_const[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> ReverseOrderedHashTableIterator[T]:
+    return hash_table_rend((HashTable[T, TT]*)this)
+
+## Ported from AK/HashTable.h:360 AK::HashTable::in_reverse const.
+pub func hash_table_in_reverse_const[T, TT: Traits[T]](this: const HashTable[T, TT]*) -> ReverseOrderedHashTableIterator[T]:
+    return hash_table_rbegin_const(this)
+
+# mark: Clearing and insertion ==================================================================
+
+## Ported from AK/HashTable.h:362 AK::HashTable::clear.
+pub func hash_table_clear[T, TT: Traits[T]](this: HashTable[T, TT]*):
+    if let buckets = this.m_buckets:
+        kfree(buckets)
+    this.m_buckets = none
+    this.m_head = none
+    this.m_tail = none
+    this.m_size = 0
+    this.m_mask = 0
+
+## Ported from AK/HashTable.h:367 AK::HashTable::clear_with_capacity.
+pub func hash_table_clear_with_capacity[T, TT: Traits[T]](this: HashTable[T, TT]*):
+    let buckets = this.m_buckets else return
+
+    let bytes = hash_table_size_in_bytes[T, TT](hash_table_capacity(this))
+    memory.set(u8[]((u8*)buckets, bytes), 0)
+    this.m_size = 0
+
+    if this.m_ordered:
+        this.m_head = none
+        this.m_tail = none
+
+## Ported from AK/HashTable.h:384 AK::HashTable::try_set.
+pub func hash_table_try_set[T, TT: Traits[T]](this: HashTable[T, TT]*, value: T, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult!:
+    if hash_table_should_grow(this):
+        let capacity = hash_table_capacity(this) * 2
+        try hash_table_try_rehash(this, capacity if capacity > hash_table_grow_capacity_at_least else hash_table_grow_capacity_at_least)
+
+    return hash_table_write_value(this, value, existing_entry_behavior)
+
+## Ported from AK/HashTable.h:392 AK::HashTable::set.
+pub func hash_table_set[T, TT: Traits[T]](this: HashTable[T, TT]*, value: T, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
+    return hash_table_try_set(this, value, existing_entry_behavior) else trap("MUST: HashTable::set")
+
+## Ported from AK/HashTable.h:398 AK::HashTable::ensure(U&&): the stored value equal to `value`,
+## inserting `value` first when there is none.
+pub func hash_table_ensure_u[T, TT: Traits[T]](this: HashTable[T, TT]*, value: T, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> T*:
+    discard(hash_table_set(this, value, existing_entry_behavior))
+    let it = hash_table_find_t(this, value)
+    let bucket = it.m_bucket else trap("VERIFY: HashTable::ensure")
+    return &bucket.storage
+
+## Ported from AK/HashTable.h:404 AK::HashTable::ensure(hash, predicate, initialization_callback).
+pub func hash_table_ensure_u32[T, TT: Traits[T]](this: HashTable[T, TT]*, hash_: u32, predicate: Function1[const T*, bool], initialization_callback: Function0[T], existing_entry_behavior: HashSetExistingEntryBehavior) -> T*:
+    if hash_table_should_grow(this):
+        let capacity = hash_table_capacity(this) * 2
+        hash_table_rehash(this, capacity if capacity > hash_table_grow_capacity_at_least else hash_table_grow_capacity_at_least)
+
+    let lookup = hash_table_lookup_for_writing(this, hash_, predicate, existing_entry_behavior)
+    let bucket = lookup.bucket
+    match lookup.result:
+        .inserted_new_entry:
+            # The bucket is in a tentative state (Free, not in the ordered list). Construct the
+            # value first so that if the callback triggers traversal of this hash table,
+            # iterators skip this bucket. Commit only after construction succeeds.
+            bucket.storage = function0_call(&initialization_callback)
+            hash_table_commit_inserted_bucket(this, bucket, hash_, lookup.probe_length)
+        .replaced_existing_entry:
+            bucket.storage = function0_call(&initialization_callback)
+        .kept_existing_entry:
+            discard(bucket)
+        _:
+            trap("VERIFY_NOT_REACHED")
+    return &bucket.storage
+
+# mark: Lookup ==================================================================================
+
+## Ported from AK/HashTable.h:431 AK::HashTable::find(hash, predicate).
+pub func hash_table_find_u32_tt_unary_predicate[T, TT: Traits[T]](this: HashTable[T, TT]*, hash_: u32, predicate: Function1[const T*, bool]) -> HashTableIterator[T]:
+    return HashTableIterator[T](m_bucket = hash_table_lookup_with_hash(this, hash_, predicate), m_end_bucket = hash_table_end_bucket(this), m_ordered = this.m_ordered)
+
+# The predicate of find(T const&): `TraitsForT::equals(entry, value)`.
+# workaround: compiler-issues/generic_function_value (the callback is a static method)
+struct HashTableEqualsValue[T, TT: Traits[T]]:
+    var value: T
+
+    static func call(context: void*?, entry: const T*) -> bool:
+        let captures = (const HashTableEqualsValue[T, TT]*)(context else trap("HashTable: no captures"))
+        var traits: TT = ---
+        return traits.equals(entry, &captures.value)
+
+## Ported from AK/HashTable.h:437 AK::HashTable::find.
+pub func hash_table_find_t[T, TT: Traits[T]](this: HashTable[T, TT]*, value: T) -> HashTableIterator[T]:
+    if hash_table_is_empty(this):
+        return hash_table_end(this)
+    var traits: TT = ---
+    var captures = HashTableEqualsValue[T, TT](value = value)
+    let equals: func(void*?, const T*) -> bool = HashTableEqualsValue[T, TT].call
+    return hash_table_find_u32_tt_unary_predicate(this, traits.hash_of(&value), Function1[const T*, bool](call = equals, context = &captures))
+
+## Ported from AK/HashTable.h:445 AK::HashTable::find(hash, predicate) const.
+pub func hash_table_find_u32_tt_unary_predicate_const[T, TT: Traits[T]](this: const HashTable[T, TT]*, hash_: u32, predicate: Function1[const T*, bool]) -> HashTableIterator[T]:
+    return hash_table_find_u32_tt_unary_predicate((HashTable[T, TT]*)this, hash_, predicate)
+
+## Ported from AK/HashTable.h:451 AK::HashTable::find const.
+pub func hash_table_find_t_const[T, TT: Traits[T]](this: const HashTable[T, TT]*, value: T) -> HashTableIterator[T]:
+    return hash_table_find_t((HashTable[T, TT]*)this, value)
+
+# The predicate of find(K const&): `Traits<T>::equals(entry, value)` for a hash-compatible key.
+# workaround: compiler-issues/generic_function_value (the callback is a static method)
+struct HashTableEqualsKey[T, K, KT: HashCompatibleTraits[T, K]]:
+    var value: K
+
+    static func call(context: void*?, entry: const T*) -> bool:
+        let captures = (const HashTableEqualsKey[T, K, KT]*)(context else trap("HashTable: no captures"))
+        var traits: KT = ---
+        return traits.equals(entry, &captures.value)
+
+## Ported from AK/HashTable.h:460 AK::HashTable::find(K const&) for a hash-compatible key.
+# FIXME: Support for predicates, while guaranteeing that the predicate call
+#        does not call a non trivial constructor each time invoked
+pub func hash_table_find_k[T, TT: Traits[T], K, KT: HashCompatibleTraits[T, K]](this: HashTable[T, TT]*, value: K) -> HashTableIterator[T]:
+    if hash_table_is_empty(this):
+        return hash_table_end(this)
+    var traits: KT = ---
+    var captures = HashTableEqualsKey[T, K, KT](value = value)
+    let equals: func(void*?, const T*) -> bool = HashTableEqualsKey[T, K, KT].call
+    return hash_table_find_u32_tt_unary_predicate(this, traits.hash_of(&value), Function1[const T*, bool](call = equals, context = &captures))
+
+## Ported from AK/HashTable.h:468 AK::HashTable::find(K const&, predicate).
+pub func hash_table_find_k_tt_unary_predicate[T, TT: Traits[T], K, KT: HashCompatibleTraits[T, K]](this: HashTable[T, TT]*, value: K, predicate: Function1[const T*, bool]) -> HashTableIterator[T]:
+    if hash_table_is_empty(this):
+        return hash_table_end(this)
+    var traits: KT = ---
+    return hash_table_find_u32_tt_unary_predicate(this, traits.hash_of(&value), predicate)
+
+## Ported from AK/HashTable.h:476 AK::HashTable::find(K const&) const.
+pub func hash_table_find_k_const[T, TT: Traits[T], K, KT: HashCompatibleTraits[T, K]](this: const HashTable[T, TT]*, value: K) -> HashTableIterator[T]:
+    return hash_table_find_k[T, TT, K, KT]((HashTable[T, TT]*)this, value)
+
+## Ported from AK/HashTable.h:484 AK::HashTable::find(K const&, predicate) const.
+pub func hash_table_find_k_tt_unary_predicate_const[T, TT: Traits[T], K, KT: HashCompatibleTraits[T, K]](this: const HashTable[T, TT]*, value: K, predicate: Function1[const T*, bool]) -> HashTableIterator[T]:
+    return hash_table_find_k_tt_unary_predicate[T, TT, K, KT]((HashTable[T, TT]*)this, value, predicate)
+
+## Ported from AK/HashTable.h:488 AK::HashTable::remove.
+pub func hash_table_remove_t[T, TT: Traits[T]](this: HashTable[T, TT]*, value: T) -> bool:
+    var it = hash_table_find_t(this, value)
+    if it.m_bucket != none:
+        hash_table_remove_opaque(this, &it)
+        return true
+    return false
+
+## Ported from AK/HashTable.h:499 AK::HashTable::remove(K const&) for a hash-compatible key.
+pub func hash_table_remove_k[T, TT: Traits[T], K, KT: HashCompatibleTraits[T, K]](this: HashTable[T, TT]*, value: K) -> bool:
+    var it = hash_table_find_k[T, TT, K, KT](this, value)
+    if it.m_bucket != none:
+        hash_table_remove_opaque(this, &it)
+        return true
+    return false

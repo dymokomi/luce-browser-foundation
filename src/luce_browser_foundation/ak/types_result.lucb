@@ -13,5 +13,5 @@
 
 ## AK::Result (AK/Result.h:15): a generic struct.
 pub struct Result[TValueT, TErrorT]:
-    pub var m_result: void*?  # unmapped: Optional<ValueType>
-    pub var m_error: void*?  # unmapped: Optional<ErrorType>
+    pub var m_result: TValueT?
+    pub var m_error: TErrorT?

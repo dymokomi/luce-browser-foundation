@@ -25,10 +25,14 @@ pub struct CNSimdutfEBase64Options:
 pub struct CNSimdutfELastChunkHandlingOptions:
     pub var opaque_: u8
 
-## timespec (generated): opaque in this phase (not in the phase-1 closure).
+## timespec (<time.h>): time_t and long are 64 bits on every supported target, so this is the
+## C layout clock_gettime fills.
 pub struct Timespec:
-    pub var opaque_: u8
+    pub var tv_sec: i64
+    pub var tv_nsec: i64
 
-## timeval (generated): opaque in this phase (not in the phase-1 closure).
+## timeval (<sys/time.h>): the Linux x86-64 layout (tv_usec is a long); AK only builds and reads
+## it, never hands it to C.
 pub struct Timeval:
-    pub var opaque_: u8
+    pub var tv_sec: i64
+    pub var tv_usec: i64

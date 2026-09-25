@@ -1,0 +1,148 @@
+#==============================================================================================
+#
+#   leb128 - LEB128<ValueType>: reading little-endian base-128 integers from a Stream
+#
+#   DESCRIPTION:
+#       Port of AK/LEB128.h (lines 1-106). The struct and its conversions are generic;
+#       read_from_stream computes on the value type, so it is instantiated per type with the
+#       type as a suffix (`leb128_read_from_stream_u32`) for u32, u64, i32 and i64.
+#
+#==============================================================================================
+
+## Ported from AK/LEB128.h:20 AK::LEB128::LEB128<ValueType>.
+pub func leb128_construct[TValueType](this: Leb128[TValueType]*, value: TValueType):
+    this.m_value = value
+
+## Ported from AK/LEB128.h:25 AK::LEB128::operator ValueType.
+pub func leb128_to_t[TValueType](this: const Leb128[TValueType]*) -> TValueType:
+    return this.m_value
+
+# mark: Unsigned ================================================================================
+
+## Ported from AK/LEB128.h:27 AK::LEB128::read_from_stream (unsigned), for u32.
+pub func leb128_read_from_stream_u32(stream: Stream*) -> Leb128[u32]!:
+    # First byte is unrolled for speed
+    var byte: u8 = 0
+    while true:
+        let result = stream_read_some(stream, u8[](&byte, 1)) catch failure:
+            if failure_is_errno(failure, eagain()) or failure_is_errno(failure, eintr):
+                continue
+            error(failure.code, failure.message)
+        if result.length != 1:
+            error(ak_error, "EOF reached before expected end")
+        break
+
+    if (byte & 0x80) == 0:
+        return Leb128[u32](m_value = byte)
+
+    var result: u32 = byte & 0x7F
+    var num_bytes: usize = 1
+    while true:
+        let next_byte = try stream_read_value[u8](stream)
+        let masked: u32 = next_byte & 0x7F
+        result = result | (masked << (u32)(num_bytes * 7))
+        if num_bytes * 7 >= 32 - 7 and (next_byte >> (u8)(32 - (num_bytes * 7))) != 0:
+            if (next_byte & 0x80) != 0:
+                error(ak_error, "Read value contains more bits than fit the chosen ValueType")
+            error(ak_error, "Read byte is too large to fit the chosen ValueType")
+        num_bytes += 1
+        if (next_byte & 0x80) == 0:
+            return Leb128[u32](m_value = result)
+
+## Ported from AK/LEB128.h:27 AK::LEB128::read_from_stream (unsigned), for u64.
+pub func leb128_read_from_stream_u64(stream: Stream*) -> Leb128[u64]!:
+    # First byte is unrolled for speed
+    var byte: u8 = 0
+    while true:
+        let result = stream_read_some(stream, u8[](&byte, 1)) catch failure:
+            if failure_is_errno(failure, eagain()) or failure_is_errno(failure, eintr):
+                continue
+            error(failure.code, failure.message)
+        if result.length != 1:
+            error(ak_error, "EOF reached before expected end")
+        break
+
+    if (byte & 0x80) == 0:
+        return Leb128[u64](m_value = byte)
+
+    var result: u64 = byte & 0x7F
+    var num_bytes: usize = 1
+    while true:
+        let next_byte = try stream_read_value[u8](stream)
+        let masked: u64 = next_byte & 0x7F
+        result = result | (masked << (u64)(num_bytes * 7))
+        if num_bytes * 7 >= 64 - 7 and (next_byte >> (u8)(64 - (num_bytes * 7))) != 0:
+            if (next_byte & 0x80) != 0:
+                error(ak_error, "Read value contains more bits than fit the chosen ValueType")
+            error(ak_error, "Read byte is too large to fit the chosen ValueType")
+        num_bytes += 1
+        if (next_byte & 0x80) == 0:
+            return Leb128[u64](m_value = result)
+
+# mark: Signed ==================================================================================
+
+## Ported from AK/LEB128.h:66 AK::LEB128::read_from_stream (signed), for i32.
+pub func leb128_read_from_stream_i32(stream: Stream*) -> Leb128[i32]!:
+    let bits: u32 = 32
+
+    var result: i32 = 0
+    var shift: u32 = 0
+    var byte: u8 = 0
+
+    while true:
+        if stream_is_eof(stream):
+            error(ak_error, "Stream reached end-of-file while reading LEB128 value")
+        byte = try stream_read_value[u8](stream)
+        result = result | ((i32)(byte & 0x7F) << (i32)shift)
+
+        if shift >= bits - 7:
+            let has_continuation = (byte & 0x80) != 0
+            let sign_and_unused = (i32)((i8)(byte << 1) >> (i8)(bits - shift))
+            if has_continuation:
+                error(ak_error, "Read value contains more bits than fit the chosen ValueType")
+            if sign_and_unused != 0 and sign_and_unused != -1:
+                error(ak_error, "Read byte is too large to fit the chosen ValueType")
+            return Leb128[i32](m_value = result)
+
+        shift += 7
+        if (byte & 0x80) == 0:
+            break
+
+    # Sign extend
+    if shift < bits and (byte & 0x40) != 0:
+        result = result | (~(i32)0 << (i32)shift)
+
+    return Leb128[i32](m_value = result)
+
+## Ported from AK/LEB128.h:66 AK::LEB128::read_from_stream (signed), for i64.
+pub func leb128_read_from_stream_i64(stream: Stream*) -> Leb128[i64]!:
+    let bits: u32 = 64
+
+    var result: i64 = 0
+    var shift: u32 = 0
+    var byte: u8 = 0
+
+    while true:
+        if stream_is_eof(stream):
+            error(ak_error, "Stream reached end-of-file while reading LEB128 value")
+        byte = try stream_read_value[u8](stream)
+        result = result | ((i64)(byte & 0x7F) << (i64)shift)
+
+        if shift >= bits - 7:
+            let has_continuation = (byte & 0x80) != 0
+            let sign_and_unused = (i64)((i8)(byte << 1) >> (i8)(bits - shift))
+            if has_continuation:
+                error(ak_error, "Read value contains more bits than fit the chosen ValueType")
+            if sign_and_unused != 0 and sign_and_unused != -1:
+                error(ak_error, "Read byte is too large to fit the chosen ValueType")
+            return Leb128[i64](m_value = result)
+
+        shift += 7
+        if (byte & 0x80) == 0:
+            break
+
+    # Sign extend
+    if shift < bits and (byte & 0x40) != 0:
+        result = result | (~(i64)0 << (i64)shift)
+
+    return Leb128[i64](m_value = result)

@@ -29,7 +29,7 @@ pub struct StreamVTable:
     pub let read_until_filled: func(Stream*, u8[]) -> unit! = stream_read_until_filled_impl
     pub let read_until_eof: func(Stream*, usize) -> ByteBuffer! = stream_read_until_eof_impl
     pub let discard: func(Stream*, usize) -> unit! = stream_discard_impl
-    pub let write_some: func(Stream*, const u8[]) -> u64! = stream_write_some_impl
+    pub let write_some: func(Stream*, const u8[]) -> usize! = stream_write_some_impl
     pub let write_until_depleted_span_u8: func(Stream*, const u8[]) -> unit! = stream_write_until_depleted_span_u8_impl
     pub let is_eof: func(Stream*) -> bool = stream_is_eof_impl
     pub let is_open: func(Stream*) -> bool = stream_is_open_impl
@@ -52,7 +52,7 @@ pub func stream_discard(this: Stream*, discarded_bytes: usize) -> !:
     try ((const StreamVTable*)this.vtable).discard(this, discarded_bytes)
 
 ## Virtual: AK::Stream::write_some.
-pub func stream_write_some(this: Stream*, arg0: const u8[]) -> u64!:
+pub func stream_write_some(this: Stream*, arg0: const u8[]) -> usize!:
     return try ((const StreamVTable*)this.vtable).write_some(this, arg0)
 
 ## Virtual: AK::Stream::write_until_depleted.
@@ -75,7 +75,7 @@ pub func stream_close(this: Stream*):
 pub let stream_vtable: StreamVTable = StreamVTable(class_info = &stream_class)
 
 ## Class information of AK::Stream: name, class-id range (pre-order), size, vtable.
-pub let stream_class: ClassInfo = ClassInfo(name = "Stream", first_id = 0, last_id = 3, size = sizeof(Stream), vtable = (const void*)&stream_vtable)
+pub let stream_class: ClassInfo = ClassInfo(name = "Stream", first_id = 0, last_id = 5, size = sizeof(Stream), vtable = (const void*)&stream_vtable)
 
 ## is<AK::Stream>: the class-id range test.
 pub func is_stream[P: IsStream](p: P*) -> bool:
@@ -114,21 +114,21 @@ pub interface IsSeekableStream:
 ## Virtual functions introduced by AK::SeekableStream.
 pub struct SeekableStreamVTable:
     pub let stream_vtable: StreamVTable
-    pub let seek: func(SeekableStream*, i64, SeekMode) -> u64! = seekable_stream_seek_impl
-    pub let tell: func(SeekableStream*) -> u64! = seekable_stream_tell_impl
-    pub let size: func(SeekableStream*) -> u64! = seekable_stream_size_impl
+    pub let seek: func(SeekableStream*, i64, SeekMode) -> usize! = seekable_stream_seek_impl
+    pub let tell: func(SeekableStream*) -> usize! = seekable_stream_tell_impl
+    pub let size: func(SeekableStream*) -> usize! = seekable_stream_size_impl
     pub let truncate: func(SeekableStream*, usize) -> unit! = seekable_stream_truncate_impl
 
 ## Virtual: AK::SeekableStream::seek.
-pub func seekable_stream_seek(this: SeekableStream*, offset: i64, arg1: SeekMode) -> u64!:
+pub func seekable_stream_seek(this: SeekableStream*, offset: i64, arg1: SeekMode) -> usize!:
     return try ((const SeekableStreamVTable*)((Stream*)this).vtable).seek(this, offset, arg1)
 
 ## Virtual: AK::SeekableStream::tell.
-pub func seekable_stream_tell(this: SeekableStream*) -> u64!:
+pub func seekable_stream_tell(this: SeekableStream*) -> usize!:
     return try ((const SeekableStreamVTable*)((Stream*)this).vtable).tell(this)
 
 ## Virtual: AK::SeekableStream::size.
-pub func seekable_stream_size(this: SeekableStream*) -> u64!:
+pub func seekable_stream_size(this: SeekableStream*) -> usize!:
     return try ((const SeekableStreamVTable*)((Stream*)this).vtable).size(this)
 
 ## Virtual: AK::SeekableStream::truncate.
@@ -139,7 +139,7 @@ pub func seekable_stream_truncate(this: SeekableStream*, length: usize) -> !:
 pub let seekable_stream_vtable: SeekableStreamVTable = SeekableStreamVTable(stream_vtable = StreamVTable(class_info = &seekable_stream_class, discard = seekable_stream_discard_impl))
 
 ## Class information of AK::SeekableStream: name, class-id range (pre-order), size, vtable.
-pub let seekable_stream_class: ClassInfo = ClassInfo(name = "SeekableStream", first_id = 2, last_id = 3, size = sizeof(SeekableStream), vtable = (const void*)&seekable_stream_vtable)
+pub let seekable_stream_class: ClassInfo = ClassInfo(name = "SeekableStream", first_id = 2, last_id = 5, size = sizeof(SeekableStream), vtable = (const void*)&seekable_stream_vtable)
 
 ## is<AK::SeekableStream>: the class-id range test.
 pub func is_seekable_stream[P: IsStream](p: P*) -> bool:

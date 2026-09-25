@@ -1,0 +1,43 @@
+#==============================================================================================
+#
+#   ref_ptr - the free functions of RefPtr<T>
+#
+#   DESCRIPTION:
+#       Port of the free functions of AK/RefPtr.h (lines 300-355). DESIGN.md §2.6: RefPtr<T>
+#       is `T*?`, NonnullRefPtr<T> is `T*`; the casts are pointer casts.
+#
+#==============================================================================================
+
+## Ported from AK/RefPtr.h:305 AK::static_ptr_cast (NonnullRefPtr).
+pub func static_ptr_cast[T, U](ptr: U*) -> T*:
+    return (T*)(void*)ptr
+
+## Ported from AK/RefPtr.h:311 AK::static_ptr_cast (RefPtr).
+pub func static_ptr_cast_2[T, U](ptr: U*?) -> T*?:
+    let pointer = ptr else return none
+    return (T*)(void*)pointer
+
+## Ported from AK/RefPtr.h:317 AK::fixme_launder_const_through_pointer_cast (NonnullRefPtr<T const>).
+pub func fixme_launder_const_through_pointer_cast[T](ptr: const T*) -> T*:
+    return (T*)ptr
+
+## Ported from AK/RefPtr.h:323 AK::fixme_launder_const_through_pointer_cast (RefPtr<T const>).
+pub func fixme_launder_const_through_pointer_cast_2[T](ptr: const T*?) -> T*?:
+    let pointer = ptr else return none
+    return (T*)pointer
+
+## Ported from AK/RefPtr.h:329 AK::fixme_launder_const_through_pointer_cast (T const&).
+pub func fixme_launder_const_through_pointer_cast_3[T](ptr: const T*) -> T*:
+    return (T*)ptr
+
+## Ported from AK/RefPtr.h:336 AK::swap.
+pub func swap_4[T](a: (T*?)*, b: (T*?)*):
+    let tmp = *a
+    *a = *b
+    *b = tmp
+
+## Ported from AK/RefPtr.h:342 AK::adopt_ref_if_nonnull.
+pub func adopt_ref_if_nonnull[T](object: T*?) -> T*?:
+    if let adopted = object:
+        return adopted
+    return none

@@ -1,0 +1,173 @@
+#==============================================================================================
+#
+#   tests_std_lib_extras - StdLibExtras, TypedTransfer, Find, AllOf, AnyOf, Function
+#
+#   DESCRIPTION:
+#       Ports of Tests/AK/TestStdLibExtras.cpp (ceil_div, mix, swap), TestTypedTransfer.cpp
+#       (the overlap and relocate cases; nothing has a destructor here), TestFind.cpp,
+#       TestAllOf.cpp and TestAnyOf.cpp over a Vector, and focused cases for the Function<>
+#       helpers, min/max/clamp and the power-of-two helpers.
+#
+#==============================================================================================
+
+test "std_lib_extras: ceil_div":
+    assert(ceil_div_i32(0, 1) == 0)
+    assert(ceil_div_i32(4, 1) == 4)
+    assert(ceil_div_i32(-1, 1) == -1)
+    assert(ceil_div_i32(-4, 1) == -4)
+    assert(ceil_div_i32(0, -1) == 0)
+    assert(ceil_div_i32(1, -1) == -1)
+    assert(ceil_div_i32(4, -1) == -4)
+    assert(ceil_div_i32(-1, -1) == 1)
+    assert(ceil_div_i32(-4, -1) == 4)
+    assert(ceil_div_i32(0, 2) == 0)
+    assert(ceil_div_i32(1, 2) == 1)
+    assert(ceil_div_i32(2, 2) == 1)
+    assert(ceil_div_i32(3, 2) == 2)
+    assert(ceil_div_i32(4, 2) == 2)
+    assert(ceil_div_i32(-1, 2) == 0)
+    assert(ceil_div_i32(-2, 2) == -1)
+    assert(ceil_div_i32(-3, 2) == -1)
+    assert(ceil_div_i32(-4, 2) == -2)
+    assert(ceil_div_i32(1, -2) == 0)
+    assert(ceil_div_i32(2, -2) == -1)
+    assert(ceil_div_i32(3, -2) == -1)
+    assert(ceil_div_i32(4, -2) == -2)
+    assert(ceil_div_i32(-1, -2) == 1)
+    assert(ceil_div_i32(-2, -2) == 1)
+    assert(ceil_div_i32(-3, -2) == 2)
+    assert(ceil_div_i32(-4, -2) == 2)
+    assert(ceil_div_usize(7, 2) == 4)
+    assert(ceil_div_u64(8, 2) == 4)
+
+test "std_lib_extras: mix":
+    let a = 1.0
+    let b = 3.0
+    assert(mix_f64(a, b, 0.0) == 1.0)
+    assert(mix_f64(a, b, 0.5) == 2.0)
+    assert(mix_f64(a, b, 1.0) == 3.0)
+    assert(mix_f64(b, a, 0.0) == 3.0)
+    assert(mix_f64(b, a, 0.5) == 2.0)
+    assert(mix_f64(b, a, 1.0) == 1.0)
+
+test "std_lib_extras: swap, exchange, min, max, clamp":
+    var i: i32 = 4
+    var j: i32 = 6
+    swap_5(&i, &j)
+    assert(i == 6)
+    assert(j == 4)
+    swap_5(&i, &i)
+    assert(i == 6)
+    assert(exchange(&i, 9) == 6)
+    assert(i == 9)
+    assert(min(3, 7) == 3)
+    assert(max(3, 7) == 7)
+    assert(clamp(12, 0, 10) == 10)
+    assert(clamp(-2, 0, 10) == 0)
+    assert(clamp(5, 0, 10) == 5)
+    let nan = f64.bits(0x7ff8000000000000)
+    let with_nan = min_f64(1.0, nan)
+    assert(with_nan == 1.0)
+    assert(max_f32(1.5, 2.5) == 2.5)
+    assert(clamp_f64(3.5, 0.0, 1.0) == 1.0)
+    assert(abs_i32(-5) == 5)
+    assert(abs_i32(i32_min) == i32_min)
+    assert(abs_f64(-0.5) == 0.5)
+    assert(round_up_to_power_of_two_usize(13, 8) == 16)
+    assert(round_up_to_power_of_two_u32(16, 8) == 16)
+    assert(is_power_of_two_u64(64))
+    assert(not is_power_of_two_u64(0))
+    assert(not is_power_of_two_i32(12))
+    assert(explode_byte(0xff) == 0xffffffffffffffff)
+    assert(explode_byte(0x80) == 0x8080808080808080)
+    assert(explode_byte(0x7f) == 0x7f7f7f7f7f7f7f7f)
+    assert(explode_byte(0) == 0)
+    assert(align_up_to(13, 8) == 16)
+    assert(align_down_to(13, 8) == 8)
+
+test "typed_transfer: overlapping source and destination, relocate":
+    var actual: i32[6] = [1, 2, 3, 4, 5, 6]
+    discard(typed_transfer_copy(&actual[0], &actual[2], 4))
+    let expected_1: i32[6] = [3, 4, 5, 6, 5, 6]
+    assert(actual == expected_1)
+    actual = [1, 2, 3, 4, 5, 6]
+    discard(typed_transfer_copy(&actual[2], &actual[0], 4))
+    let expected_2: i32[6] = [1, 2, 1, 2, 3, 4]
+    assert(actual == expected_2)
+    var source: i32[4] = [10, 20, 30, 40]
+    var destination: i32[4]
+    typed_transfer_relocate(&destination[0], &source[0], 4)
+    assert(destination == source)
+    typed_transfer_relocate(&destination[0], &source[0], 0)
+    assert(typed_transfer_compare(&destination[0], &source[0], 4))
+    destination[3] = 0
+    assert(not typed_transfer_compare(&destination[0], &source[0], 4))
+
+func test_find_greater_than_five(context: void*?, value: const i32*) -> bool:
+    discard(context)
+    return *value > 5
+
+func test_find_equals(context: void*?, value: const i32*) -> bool:
+    let wanted = (const i32*)(context else trap("no captures"))
+    return *value == *wanted
+
+test "find: find, find_if, find_index, find_value":
+    var zeros: Vector[i32]
+    vector_resize(&zeros, 10)
+    let not_found = find(vector_begin(&zeros), vector_end(&zeros), 1)
+    assert(simple_iterator_eq(&not_found, vector_end(&zeros)))
+    var a: Vector[i32]
+    let values: i32[10] = [1, 2, 3, 4, 0, 6, 7, 8, 0, 0]
+    vector_construct_opaque(&a, values)
+    let begin = vector_begin(&a)
+    let expected = simple_iterator_add(&begin, 4)
+    let found = find(vector_begin(&a), vector_end(&a), 0)
+    assert(simple_iterator_eq(&expected, found))
+    var zero: i32 = 0
+    let found_if = find_if(vector_begin(&a), vector_end(&a), Function1[const i32*, bool](call = test_find_equals, context = &zero))
+    assert(simple_iterator_eq(&expected, found_if))
+    var find_me: i32 = 8
+    let eight = find_if(vector_begin(&a), vector_end(&a), Function1[const i32*, bool](call = test_find_equals, context = &find_me))
+    assert(simple_iterator_deref(&eight) == 8)
+    assert(find_index(vector_begin(&a), vector_end(&a), 0) == 4)
+    let value = find_value(&a, Function1[const i32*, bool](call = test_find_greater_than_five, context = none)) else trap("missing")
+    assert(*value == 6)
+    var absent: i32 = 12389
+    assert(find_value(&a, Function1[const i32*, bool](call = test_find_equals, context = &absent)) == none)
+
+test "all_of and any_of: vacuous truth and single exceptions":
+    var empty: Vector[i32]
+    var zero: i32 = 0
+    assert(all_of_t_container(&empty, Function1[const i32*, bool](call = test_find_equals, context = &zero)))
+    assert(not any_of_t_container(&empty, Function1[const i32*, bool](call = test_find_equals, context = &zero)))
+    var a: Vector[i32]
+    let values: i32[5] = [0, 0, 0, 1, 0]
+    vector_construct_opaque(&a, values)
+    assert(not all_of_tt_iterator(vector_begin(&a), vector_end(&a), Function1[const i32*, bool](call = test_find_equals, context = &zero)))
+    var one: i32 = 1
+    assert(any_of_tt_iterator(vector_begin(&a), vector_end(&a), Function1[const i32*, bool](call = test_find_equals, context = &one)))
+    var two: i32 = 2
+    assert(not any_of_tt_iterator(vector_begin(&a), vector_end(&a), Function1[const i32*, bool](call = test_find_equals, context = &two)))
+
+struct TestFunctionCounter:
+    var calls: i32
+
+func test_function_add(context: void*?, a: i32, b: i32) -> i32:
+    let counter = (TestFunctionCounter*)(context else trap("no captures"))
+    counter.calls += 1
+    return a + b
+
+test "function: call, is_set and clear":
+    var counter = TestFunctionCounter(calls = 0)
+    var function = Function2[i32, i32, i32](call = test_function_add, context = &counter)
+    assert(function2_is_set(&function))
+    assert(function2_call(&function, 2, 3) == 5)
+    assert(function2_call(&function, 4, 5) == 9)
+    assert(counter.calls == 2)
+    function2_clear(&function)
+    assert(not function2_is_set(&function))
+    var empty: Function0[i32]
+    assert(not function0_is_set(&empty))
+    var wrapper: CallableWrapper[i64] = ---
+    callable_wrapper_construct(&wrapper, 77)
+    assert(*(const i64*)(callable_wrapper_raw_callable(&wrapper) else trap("null")) == 77)

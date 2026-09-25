@@ -1,0 +1,361 @@
+#==============================================================================================
+#
+#   math_1 - AK's floating-point math: constants, rounding, division, roots, trigonometry
+#
+#   DESCRIPTION:
+#       Port of AK/Math.h (lines 1-735). Every template over FloatingPoint is instantiated
+#       for f32 and f64 with the type as a suffix (`sqrt_f64`), since luce-base generics
+#       cannot compute on a type parameter; `long double` is f64. Where the donor has
+#       per-architecture assembly, the port takes the branch the reference build (AArch64)
+#       runs or its libm equivalent (luce-std `math`/`math32`); the functions the donor
+#       computes itself at run time (round, cbrt, asin, acos, log2, pow, the hyperbolic
+#       functions) keep their formulas, with float instantiations widening to f64 where
+#       the C++ mixes in `long double` literals.
+#
+#==============================================================================================
+
+extern func c_rint as "rint"(x: f64) -> f64
+extern func c_rintf as "rintf"(x: f32) -> f32
+
+# mark: Constants ===============================================================================
+
+## AK::NaN<float>.
+pub let nan_f32: f32 = f32.bits(0x7fc00000)
+## AK::NaN<double>.
+pub let nan_f64: f64 = f64.bits(0x7ff8000000000000)
+## AK::Infinity<float>.
+pub let infinity_f32: f32 = f32.bits(0x7f800000)
+## AK::Infinity<double>.
+pub let infinity_f64: f64 = f64.bits(0x7ff0000000000000)
+## AK::Pi<float>.
+pub let pi_f32: f32 = (f32)3.141592653589793238462643383279502884f64
+## AK::Pi<double>.
+pub let pi_f64: f64 = 3.141592653589793238462643383279502884
+## AK::E<float>.
+pub let e_f32: f32 = (f32)2.718281828459045235360287471352662498f64
+## AK::E<double>.
+pub let e_f64: f64 = 2.718281828459045235360287471352662498
+## AK::Sqrt2<float>.
+pub let sqrt2_f32: f32 = (f32)1.414213562373095048801688724209698079f64
+## AK::Sqrt2<double>.
+pub let sqrt2_f64: f64 = 1.414213562373095048801688724209698079
+## AK::Sqrt1_2<float>.
+pub let sqrt1_2_f32: f32 = (f32)0.707106781186547524400844362104849039f64
+## AK::Sqrt1_2<double>.
+pub let sqrt1_2_f64: f64 = 0.707106781186547524400844362104849039
+## AK::L2_10<float>.
+pub let l2_10_f32: f32 = (f32)3.321928094887362347870319429489390175864f64
+## AK::L2_10<double>.
+pub let l2_10_f64: f64 = 3.321928094887362347870319429489390175864
+## AK::L2_E<float>.
+pub let l2_e_f32: f32 = (f32)1.442695040888963407359924681001892137f64
+## AK::L2_E<double>.
+pub let l2_e_f64: f64 = 1.442695040888963407359924681001892137
+
+# mark: Details =================================================================================
+
+## Ported from AK/Math.h:42 AK::Details::product_even: `value * (value - 2) * ... * 2` for an
+## even `value` (the template argument becomes a parameter).
+pub func details_product_even_x(value: usize) -> usize:
+    if value == 2:
+        return 2
+    return value * details_product_even_x(value - 2)
+
+## Ported from AK/Math.h:49 AK::Details::product_odd: `value * (value - 2) * ... * 1` for an
+## odd `value`.
+pub func details_product_odd_x(value: usize) -> usize:
+    if value == 1:
+        return 1
+    return value * details_product_odd_x(value - 2)
+
+# mark: Degrees, fabs, rounding, division, roots, trigonometry ==================================
+
+## Ported from AK/Math.h:56 AK::to_radians, for f32.
+pub func to_radians_f32(degrees: f32) -> f32:
+    return degrees * pi_f32 / 180.0
+
+## Ported from AK/Math.h:56 AK::to_radians, for f64.
+pub func to_radians_f64(degrees: f64) -> f64:
+    return degrees * pi_f64 / 180.0
+
+## Ported from AK/Math.h:62 AK::to_degrees, for f32.
+pub func to_degrees_f32(radians: f32) -> f32:
+    return radians * 180.0 / pi_f32
+
+## Ported from AK/Math.h:62 AK::to_degrees, for f64.
+pub func to_degrees_f64(radians: f64) -> f64:
+    return radians * 180.0 / pi_f64
+
+## Ported from AK/Math.h:96 AK::fabs, for f32.
+# Both GCC and Clang inline fabs by default, so this is just a cmath like wrapper
+pub func fabs_f32(x: f32) -> f32:
+    return math32.abs(x)
+
+## Ported from AK/Math.h:96 AK::fabs, for f64.
+# Both GCC and Clang inline fabs by default, so this is just a cmath like wrapper
+pub func fabs_f64(x: f64) -> f64:
+    return math.abs(x)
+
+## Ported from AK/Math.h:110 AK::Rounding::ceil, for f32 (the frintp branch).
+pub func rounding_ceil_f32(num: f32) -> f32:
+    return math32.ceil(num)
+
+## Ported from AK/Math.h:110 AK::Rounding::ceil, for f64 (the frintp branch).
+pub func rounding_ceil_f64(num: f64) -> f64:
+    return math.ceil(num)
+
+## Ported from AK/Math.h:133 AK::Rounding::floor, for f32 (the frintm branch).
+pub func rounding_floor_f32(num: f32) -> f32:
+    return math32.floor(num)
+
+## Ported from AK/Math.h:133 AK::Rounding::floor, for f64 (the frintm branch).
+pub func rounding_floor_f64(num: f64) -> f64:
+    return math.floor(num)
+
+## Ported from AK/Math.h:156 AK::Rounding::trunc, for f32 (the frintz branch).
+pub func rounding_trunc_f32(num: f32) -> f32:
+    return math32.trunc(num)
+
+## Ported from AK/Math.h:156 AK::Rounding::trunc, for f64 (the frintz branch).
+pub func rounding_trunc_f64(num: f64) -> f64:
+    return math.trunc(num)
+
+## Ported from AK/Math.h:174 AK::Rounding::rint, for f32.
+# Note: This does break tie to even (frintx/roundsd in the default rounding mode).
+pub func rounding_rint_f32(x: f32) -> f32:
+    return c_rintf(x)
+
+## Ported from AK/Math.h:174 AK::Rounding::rint, for f64.
+# Note: This does break tie to even (frintx/roundsd in the default rounding mode).
+pub func rounding_rint_f64(x: f64) -> f64:
+    return c_rint(x)
+
+## Ported from AK/Math.h:216 AK::Rounding::round, for f32.
+pub func rounding_round_f32(x: f32) -> f32:
+    # Note: This is break-tie-away-from-zero, so not the hw's understanding of
+    #       "nearest", which would be towards even.
+    if x == 0.0:
+        return x
+    if x > 0.0:
+        return rounding_floor_f32(x + 0.5)
+    return rounding_ceil_f32(x - 0.5)
+
+## Ported from AK/Math.h:216 AK::Rounding::round, for f64.
+pub func rounding_round_f64(x: f64) -> f64:
+    # Note: This is break-tie-away-from-zero, so not the hw's understanding of
+    #       "nearest", which would be towards even.
+    if x == 0.0:
+        return x
+    if x > 0.0:
+        return rounding_floor_f64(x + 0.5)
+    return rounding_ceil_f64(x - 0.5)
+
+## Ported from AK/Math.h:393 AK::Division::fmod, for f32.
+pub func division_fmod_f32(x: f32, y: f32) -> f32:
+    return math32.mod(x, y)
+
+## Ported from AK/Math.h:393 AK::Division::fmod, for f64.
+pub func division_fmod_f64(x: f64, y: f64) -> f64:
+    return math.mod(x, y)
+
+## Ported from AK/Math.h:442 AK::Division::remainder, for f32.
+pub func division_remainder_f32(x: f32, y: f32) -> f32:
+    return math32.remainder(x, y)
+
+## Ported from AK/Math.h:442 AK::Division::remainder, for f64.
+pub func division_remainder_f64(x: f64, y: f64) -> f64:
+    return math.remainder(x, y)
+
+## Ported from AK/Math.h:476 AK::sqrt, for f32 (the fsqrt branch).
+pub func sqrt_f32(x: f32) -> f32:
+    return math32.sqrt(x)
+
+## Ported from AK/Math.h:476 AK::sqrt, for f64 (the fsqrt branch).
+pub func sqrt_f64(x: f64) -> f64:
+    return math.sqrt(x)
+
+## Ported from AK/Math.h:508 AK::cbrt, for f32.
+pub func cbrt_f32(x: f32) -> f32:
+    if math32.is_infinite(x) or x == 0.0:
+        return x
+    if x < 0.0:
+        return -cbrt_f32(-x)
+
+    var r = x
+    var ex: f32 = 0.0
+
+    while (f64)(r) < 0.125:
+        r *= 8.0
+        ex -= 1.0
+    while (f64)(r) > 1.0:
+        r = (f32)((f64)(r) * 0.125)
+        ex += 1.0
+
+    r = (f32)((-0.46946116 * (f64)(r) + 1.072302) * (f64)(r) + 0.3812513)
+
+    while ex < 0.0:
+        r = (f32)((f64)(r) * 0.5)
+        ex += 1.0
+    while ex > 0.0:
+        r = (f32)((f64)(r) * 2.0)
+        ex -= 1.0
+
+    r = (f32)((2.0 / 3.0) * (f64)(r) + (1.0 / 3.0) * (f64)(x) / (f64)(r * r))
+    r = (f32)((2.0 / 3.0) * (f64)(r) + (1.0 / 3.0) * (f64)(x) / (f64)(r * r))
+    r = (f32)((2.0 / 3.0) * (f64)(r) + (1.0 / 3.0) * (f64)(x) / (f64)(r * r))
+    r = (f32)((2.0 / 3.0) * (f64)(r) + (1.0 / 3.0) * (f64)(x) / (f64)(r * r))
+
+    return r
+
+## Ported from AK/Math.h:508 AK::cbrt, for f64.
+pub func cbrt_f64(x: f64) -> f64:
+    if math.is_infinite(x) or x == 0.0:
+        return x
+    if x < 0.0:
+        return -cbrt_f64(-x)
+
+    var r = x
+    var ex: f64 = 0.0
+
+    while r < 0.125:
+        r *= 8.0
+        ex -= 1.0
+    while r > 1.0:
+        r = r * 0.125
+        ex += 1.0
+
+    r = (-0.46946116 * r + 1.072302) * r + 0.3812513
+
+    while ex < 0.0:
+        r = r * 0.5
+        ex += 1.0
+    while ex > 0.0:
+        r = r * 2.0
+        ex -= 1.0
+
+    r = (2.0 / 3.0) * r + (1.0 / 3.0) * x / (r * r)
+    r = (2.0 / 3.0) * r + (1.0 / 3.0) * x / (r * r)
+    r = (2.0 / 3.0) * r + (1.0 / 3.0) * x / (r * r)
+    r = (2.0 / 3.0) * r + (1.0 / 3.0) * x / (r * r)
+
+    return r
+
+## Ported from AK/Math.h:550 AK::Trigonometry::hypot, for f32.
+pub func trigonometry_hypot_f32(x: f32, y: f32) -> f32:
+    return sqrt_f32(x * x + y * y)
+
+## Ported from AK/Math.h:550 AK::Trigonometry::hypot, for f64.
+pub func trigonometry_hypot_f64(x: f64, y: f64) -> f64:
+    return sqrt_f64(x * x + y * y)
+
+## Ported from AK/Math.h:556 AK::Trigonometry::sin, for f32.
+pub func trigonometry_sin_f32(angle: f32) -> f32:
+    return math32.sin(angle)
+
+## Ported from AK/Math.h:556 AK::Trigonometry::sin, for f64.
+pub func trigonometry_sin_f64(angle: f64) -> f64:
+    return math.sin(angle)
+
+## Ported from AK/Math.h:579 AK::Trigonometry::cos, for f32.
+pub func trigonometry_cos_f32(angle: f32) -> f32:
+    return math32.cos(angle)
+
+## Ported from AK/Math.h:579 AK::Trigonometry::cos, for f64.
+pub func trigonometry_cos_f64(angle: f64) -> f64:
+    return math.cos(angle)
+
+## Ported from AK/Math.h:602 AK::Trigonometry::sincos, for f32.
+pub func trigonometry_sincos_f32(angle: f32, sin_val: f32*, cos_val: f32*):
+    *sin_val = trigonometry_sin_f32(angle)
+    *cos_val = trigonometry_cos_f32(angle)
+
+## Ported from AK/Math.h:602 AK::Trigonometry::sincos, for f64.
+pub func trigonometry_sincos_f64(angle: f64, sin_val: f64*, cos_val: f64*):
+    *sin_val = trigonometry_sin_f64(angle)
+    *cos_val = trigonometry_cos_f64(angle)
+
+## Ported from AK/Math.h:621 AK::Trigonometry::tan, for f32.
+pub func trigonometry_tan_f32(angle: f32) -> f32:
+    return math32.tan(angle)
+
+## Ported from AK/Math.h:621 AK::Trigonometry::tan, for f64.
+pub func trigonometry_tan_f64(angle: f64) -> f64:
+    return math.tan(angle)
+
+## Ported from AK/Math.h:645 AK::Trigonometry::atan, for f32.
+pub func trigonometry_atan_f32(value: f32) -> f32:
+    return math32.atan(value)
+
+## Ported from AK/Math.h:645 AK::Trigonometry::atan, for f64.
+pub func trigonometry_atan_f64(value: f64) -> f64:
+    return math.atan(value)
+
+## Ported from AK/Math.h:667 AK::Trigonometry::asin, for f32.
+pub func trigonometry_asin_f32(x: f32) -> f32:
+    if x > 1.0 or x < -1.0:
+        return nan_f32
+    if x > (f32)0.5f64 or x < (f32)-0.5f64:
+        return 2.0 * trigonometry_atan_f32(x / (1.0 + sqrt_f32(1.0 - x * x)))
+    let squared = x * x
+    var value = x
+    var i = x * squared
+    value += i * (f32)details_product_odd_x(1) / (f32)details_product_even_x(2) / 3.0
+    i *= squared
+    value += i * (f32)details_product_odd_x(3) / (f32)details_product_even_x(4) / 5.0
+    i *= squared
+    value += i * (f32)details_product_odd_x(5) / (f32)details_product_even_x(6) / 7.0
+    i *= squared
+    value += i * (f32)details_product_odd_x(7) / (f32)details_product_even_x(8) / 9.0
+    i *= squared
+    value += i * (f32)details_product_odd_x(9) / (f32)details_product_even_x(10) / 11.0
+    i *= squared
+    value += i * (f32)details_product_odd_x(11) / (f32)details_product_even_x(12) / 13.0
+    i *= squared
+    value += i * (f32)details_product_odd_x(13) / (f32)details_product_even_x(14) / 15.0
+    i *= squared
+    value += i * (f32)details_product_odd_x(15) / (f32)details_product_even_x(16) / 17.0
+    return value
+
+## Ported from AK/Math.h:667 AK::Trigonometry::asin, for f64.
+pub func trigonometry_asin_f64(x: f64) -> f64:
+    if x > 1.0 or x < -1.0:
+        return nan_f64
+    if x > 0.5 or x < -0.5:
+        return 2.0 * trigonometry_atan_f64(x / (1.0 + sqrt_f64(1.0 - x * x)))
+    let squared = x * x
+    var value = x
+    var i = x * squared
+    value += i * (f64)details_product_odd_x(1) / (f64)details_product_even_x(2) / 3.0
+    i *= squared
+    value += i * (f64)details_product_odd_x(3) / (f64)details_product_even_x(4) / 5.0
+    i *= squared
+    value += i * (f64)details_product_odd_x(5) / (f64)details_product_even_x(6) / 7.0
+    i *= squared
+    value += i * (f64)details_product_odd_x(7) / (f64)details_product_even_x(8) / 9.0
+    i *= squared
+    value += i * (f64)details_product_odd_x(9) / (f64)details_product_even_x(10) / 11.0
+    i *= squared
+    value += i * (f64)details_product_odd_x(11) / (f64)details_product_even_x(12) / 13.0
+    i *= squared
+    value += i * (f64)details_product_odd_x(13) / (f64)details_product_even_x(14) / 15.0
+    i *= squared
+    value += i * (f64)details_product_odd_x(15) / (f64)details_product_even_x(16) / 17.0
+    return value
+
+## Ported from AK/Math.h:696 AK::Trigonometry::acos, for f32.
+pub func trigonometry_acos_f32(value: f32) -> f32:
+    # FIXME: I am naive
+    return 0.5 * pi_f32 - trigonometry_asin_f32(value)
+
+## Ported from AK/Math.h:696 AK::Trigonometry::acos, for f64.
+pub func trigonometry_acos_f64(value: f64) -> f64:
+    # FIXME: I am naive
+    return 0.5 * pi_f64 - trigonometry_asin_f64(value)
+
+## Ported from AK/Math.h:705 AK::Trigonometry::atan2, for f32.
+pub func trigonometry_atan2_f32(y: f32, x: f32) -> f32:
+    return math32.atan2(y, x)
+
+## Ported from AK/Math.h:705 AK::Trigonometry::atan2, for f64.
+pub func trigonometry_atan2_f64(y: f64, x: f64) -> f64:
+    return math.atan2(y, x)

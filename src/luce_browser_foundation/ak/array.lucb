@@ -1,0 +1,21 @@
+#==============================================================================================
+#
+#   array - Detail::EmptyArrayStorage
+#
+#   DESCRIPTION:
+#       Port of the functions of AK/Array.h (lines 15-26). DESIGN.md §2.6: Array<T, N> is
+#       `T[N]`; only the storage of zero-sized arrays has functions.
+#
+#==============================================================================================
+
+## Ported from AK/Array.h:23 AK::Detail::EmptyArrayStorage::operator[].
+# This type serves as the storage of 0-sized `AK::Array`s: there is no element to index.
+pub func empty_array_storage_at[T](this: const EmptyArrayStorage[T]*, arg0: usize) -> T*:
+    discard(this)
+    discard(arg0)
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from AK/Array.h:24 AK::Detail::EmptyArrayStorage::operator T*.
+pub func empty_array_storage_to_t[T](this: const EmptyArrayStorage[T]*) -> T*?:
+    discard(this)
+    return none

@@ -1,0 +1,139 @@
+#==============================================================================================
+#
+#   optional - Optional<T> helpers over luce-base optionals, and SentinelOptional<T>
+#
+#   DESCRIPTION:
+#       Port of AK/Optional.h (lines 1-737). DESIGN.md §2.6: Optional<T> is luce-base's
+#       `T?` (Optional<T&> is `T*?`), whose has_value(), value() and release_value() are the
+#       language's `if let`, `else trap(...)` and plain reads. OptionalBase's other members
+#       are ported over `T?` here; a pointer to the value of a present optional points at the
+#       optional itself, where luce-base keeps the value (before its presence tag, or as the
+#       whole word for a pointer). Callbacks are Function0; a fallible callback is a function
+#       pointer returning `T!` beside its context. SentinelOptional stores "no value" as a
+#       sentinel of T that its traits (SentinelOptionalTraits[T]) name.
+#
+#==============================================================================================
+
+## AK::SentinelOptionalTraits<T>: the value that means "none", and the test for it.
+pub interface SentinelOptionalTraits[T]:
+    func sentinel_value() -> T
+
+    func is_sentinel(value: const T*) -> bool
+
+# mark: OptionalBase ============================================================================
+
+## Ported from AK/Optional.h:81 AK::OptionalBase::ptr: the value's address, or none.
+pub func optional_base_ptr[T](this: (T?)*) -> T*?:
+    if let value = *this:
+        discard(value)
+        return (T*)this
+    return none
+
+## Ported from AK/Optional.h:87 AK::OptionalBase::value_or.
+pub func optional_base_value_or[T](this: const (T?)*, fallback: T) -> T:
+    if let value = *this:
+        return value
+    return fallback
+
+## Ported from AK/Optional.h:95 AK::OptionalBase::value_or_lazy_evaluated.
+pub func optional_base_value_or_lazy_evaluated[T](this: const (T?)*, callback: Function0[T]) -> T:
+    if let value = *this:
+        return value
+    return function0_call(&callback)
+
+## Ported from AK/Optional.h:103 AK::OptionalBase::value_or_lazy_evaluated_optional.
+pub func optional_base_value_or_lazy_evaluated_optional[T](this: const (T?)*, callback: Function0[T?]) -> T?:
+    if let value = *this:
+        return value
+    return function0_call(&callback)
+
+## Ported from AK/Optional.h:111 AK::OptionalBase::try_value_or_lazy_evaluated.
+pub func optional_base_try_value_or_lazy_evaluated[T](this: const (T?)*, callback: func(void*?) -> T!, context: void*?) -> T!:
+    if let value = *this:
+        return value
+    return try callback(context)
+
+## Ported from AK/Optional.h:119 AK::OptionalBase::try_value_or_lazy_evaluated_optional.
+pub func optional_base_try_value_or_lazy_evaluated_optional[T](this: const (T?)*, callback: func(void*?) -> T?!, context: void*?) -> T?!:
+    if let value = *this:
+        return value
+    return try callback(context)
+
+## Ported from AK/Optional.h:127 AK::OptionalBase::ensure: the value, set from `callable` first
+## when there is none.
+pub func optional_base_ensure[T](this: (T?)*, callable: Function0[T]) -> T*:
+    if *this == none:
+        *this = function0_call(&callable)
+    return (T*)this
+
+## Ported from AK/Optional.h:135 AK::OptionalBase::operator*: the value (VERIFY(has_value())).
+pub func optional_base_mul[T](this: const (T?)*) -> T:
+    return *this else trap("VERIFY: Optional has no value")
+
+## Ported from AK/Optional.h:137 AK::OptionalBase::operator->: the value's address
+## (VERIFY(has_value())).
+pub func optional_base_arrow[T](this: (T?)*) -> T*:
+    return optional_base_ptr(this) else trap("VERIFY: Optional has no value")
+
+# mark: Comparison ==============================================================================
+
+## Ported from AK/Optional.h:634 AK::operator==(Optional<T1>, Optional<T2>).
+pub func eq_opaque_opaque[T: luce.Equatable](first: T?, second: T?) -> bool:
+    if let a = first:
+        if let b = second:
+            return a == b
+        return false
+    return second == none
+
+## Ported from AK/Optional.h:641 AK::operator==(Optional<T1>, T2).
+pub func eq_opaque_tt2[T: luce.Equatable](first: T?, second: T) -> bool:
+    if let a = first:
+        return a == second
+    return false
+
+## Ported from AK/Optional.h:647 AK::operator==(Optional<T>, OptionalNone).
+pub func eq_opaque_optional_none[T](first: T?, arg1: OptionalNone) -> bool:
+    discard(arg1)
+    return first == none
+
+# mark: SentinelOptional ========================================================================
+
+## Ported from AK/Optional.h:673 AK::SentinelOptional::SentinelOptional(OptionalNone), and the
+## default constructor: no value (the sentinel).
+pub func sentinel_optional_sentinel_optional_t_traits_v[T, TTraits: SentinelOptionalTraits[T]](this: SentinelOptional[T, TTraits]*, arg0: OptionalNone):
+    discard(arg0)
+    var traits: TTraits = ---
+    this.m_value = traits.sentinel_value()
+
+## Ported from AK/Optional.h:677 AK::SentinelOptional::SentinelOptional(U&&).
+pub func sentinel_optional_sentinel_optional_t_traits_u[T, TTraits: SentinelOptionalTraits[T]](this: SentinelOptional[T, TTraits]*, value: T):
+    this.m_value = value
+
+## Ported from AK/Optional.h:691 AK::SentinelOptional::clear.
+pub func sentinel_optional_clear[T, TTraits: SentinelOptionalTraits[T]](this: SentinelOptional[T, TTraits]*):
+    var traits: TTraits = ---
+    this.m_value = traits.sentinel_value()
+
+## Ported from AK/Optional.h:696 AK::SentinelOptional::has_value.
+pub func sentinel_optional_has_value[T, TTraits: SentinelOptionalTraits[T]](this: const SentinelOptional[T, TTraits]*) -> bool:
+    var traits: TTraits = ---
+    return not traits.is_sentinel(&this.m_value)
+
+## Ported from AK/Optional.h:702 AK::SentinelOptional::value (a reference to the value).
+pub func sentinel_optional_value_t_self[T, TTraits: SentinelOptionalTraits[T]](this: SentinelOptional[T, TTraits]*) -> T*:
+    assert(sentinel_optional_has_value(this))
+    return &this.m_value
+
+## Ported from AK/Optional.h:708 AK::SentinelOptional::value() &&.
+pub func sentinel_optional_value[T, TTraits: SentinelOptionalTraits[T]](this: SentinelOptional[T, TTraits]*) -> T:
+    return sentinel_optional_release_value(this)
+
+## Ported from AK/Optional.h:714 AK::SentinelOptional::unchecked_value.
+pub func sentinel_optional_unchecked_value[T, TTraits: SentinelOptionalTraits[T]](this: SentinelOptional[T, TTraits]*) -> T*:
+    return &this.m_value
+
+## Ported from AK/Optional.h:720 AK::SentinelOptional::release_value.
+pub func sentinel_optional_release_value[T, TTraits: SentinelOptionalTraits[T]](this: SentinelOptional[T, TTraits]*) -> T:
+    assert(sentinel_optional_has_value(this))
+    var traits: TTraits = ---
+    return exchange(&this.m_value, traits.sentinel_value())

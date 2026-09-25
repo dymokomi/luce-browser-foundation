@@ -14,7 +14,7 @@
 
 ## AK::AtomicRefCountedBase (AK/AtomicRefCounted.h:17).
 pub struct AtomicRefCountedBase:
-    pub var m_ref_count: u32  # C++ default: { 1 }
+    pub var m_ref_count: @u32  # C++ default: { 1 }
 
 ## The non-zero default member initializers of AK::AtomicRefCountedBase; the constructor runs them first.
 pub func atomic_ref_counted_base_init_fields(this: AtomicRefCountedBase*):

@@ -1,0 +1,262 @@
+#==============================================================================================
+#
+#   tests_integer_math - hash functions, integer math, saturating math, bit_cast, endian
+#
+#   DESCRIPTION:
+#       Ports of Tests/AK/TestHashFunctions.cpp, TestIntegerMath.cpp (exp2, log2, ceil_log2,
+#       gcd, lcm), TestSaturatingMath.cpp, TestBitCast.cpp, TestEndian.cpp and the
+#       timing_safe_compare case of TestMemory.cpp.
+#
+#==============================================================================================
+
+# mark: TestHashFunctions =======================================================================
+
+test "hash_functions: u32_hash":
+    assert(u32_hash(42) == 142593372)
+    assert(u32_hash(0) == 0)
+
+test "hash_functions: pair_int_hash":
+    assert(pair_int_hash(42, 17) == 1110885963)
+    assert(pair_int_hash(0, 0) == 0)
+
+test "hash_functions: u64_hash":
+    assert(u64_hash(42) == 2386713036)
+    assert(u64_hash(0) == 0)
+
+test "hash_functions: ptr_hash":
+    assert(ptr_hash_usize(42) == 2386713036)
+    assert(ptr_hash_usize(0) == 0)
+    assert(ptr_hash_void((void*?)42usize) == 2386713036)
+    assert(ptr_hash_void(none) == 0)
+
+test "hash_functions: deterministic_hash":
+    for i: u64 in 0..<1000:
+        assert(u64_hash(i) == u64_hash(i))
+
+test "string_hash: pinned values":
+    # Pinned against AK::string_hash / case_insensitive_string_hash.
+    let text = "Hello, friends!"
+    assert(case_insensitive_string_hash(text.bytes.data, text.length) == 2801058533)
+    assert(case_insensitive_string_hash("hello, FRIENDS!".bytes.data, 15) == 2801058533)
+    assert(string_hash("hello, friends!".bytes.data, 15) == 2801058533)
+    assert(string_hash(none, 0) == 0)
+    assert(string_hash("a".bytes.data, 1) == 3392050242)
+    assert(string_hash("ladybird".bytes.data, 8) == 473966972)
+    let units: u16[3] = [0x61, 0x62, 0x63]
+    assert(string_hash_u16(&units[0], 3) == string_hash("abc".bytes.data, 3))
+
+# mark: TestIntegerMath =========================================================================
+
+test "integer_math: exp2":
+    assert(exp2_u64(0) == 1)
+    assert(exp2_u64(1) == 2)
+    assert(exp2_i8(6) == 64)
+    assert(exp2_u8(7) == 128)
+    assert(exp2_u16(9) == 512)
+    assert(exp2_i16(14) == 16384)
+    assert(exp2_u16(15) == 32768)
+    assert(exp2_u32(17) == 131072)
+    assert(exp2_i32(30) == 1073741824)
+    assert(exp2_u32(31) == 2147483648)
+    assert(exp2_i64(32) == 4294967296)
+    assert(exp2_u64(33) == 8589934592)
+    assert(exp2_i64(62) == 4611686018427387904)
+    assert(exp2_u64(63) == 9223372036854775808)
+
+test "integer_math: log2":
+    assert(log2_u64(0) == 0)
+    assert(log2_u64(1) == 0)
+    assert(log2_i8(64) == 6)
+    assert(log2_u8(128) == 7)
+    assert(log2_u16(512) == 9)
+    assert(log2_i16(16384) == 14)
+    assert(log2_u16(32768) == 15)
+    assert(log2_i32(131072) == 17)
+    assert(log2_i32(1073741824) == 30)
+    assert(log2_u32(2147483648) == 31)
+    assert(log2_i64(4294967296) == 32)
+    assert(log2_i64(8589934592) == 33)
+    assert(log2_i64(4611686018427387904) == 62)
+    assert(log2_u64(9223372036854775808) == 63)
+
+test "integer_math: ceil_log2":
+    assert(ceil_log2_u64(0) == 0)
+    assert(ceil_log2_u64(1) == 0)
+    assert(ceil_log2_u8(2) == 1)
+    assert(ceil_log2_u8(3) == 2)
+    assert(ceil_log2_u8(6) == 3)
+    assert(ceil_log2_i8(96) == 7)
+    assert(ceil_log2_i8(127) == 7)
+    assert(ceil_log2_u8(128) == 7)
+    assert(ceil_log2_u8(255) == 8)
+    assert(ceil_log2_i16(256) == 8)
+    assert(ceil_log2_i16(257) == 9)
+    assert(ceil_log2_i16(384) == 9)
+    assert(ceil_log2_i16(24576) == 15)
+    assert(ceil_log2_i16(32767) == 15)
+    assert(ceil_log2_i32(32768) == 15)
+    assert(ceil_log2_i32(32769) == 16)
+    assert(ceil_log2_i32(98304) == 17)
+    assert(ceil_log2_i32(1610612736) == 31)
+    assert(ceil_log2_i32(2147483647) == 31)
+    assert(ceil_log2_u32(2147483648) == 31)
+    assert(ceil_log2_u32(2147483649) == 32)
+    assert(ceil_log2_u32(3221225472) == 32)
+    assert(ceil_log2_u32(4294967295) == 32)
+    assert(ceil_log2_i64(4294967296) == 32)
+    assert(ceil_log2_i64(4294967297) == 33)
+    assert(ceil_log2_i64(9223372036854775807) == 63)
+    assert(ceil_log2_u64(9223372036854775808) == 63)
+    assert(ceil_log2_u64(9223372036854775809) == 64)
+    assert(ceil_log2_u64(13835058055282163712) == 64)
+    assert(ceil_log2_u64(18446744073709551615) == 64)
+
+test "integer_math: gcd":
+    assert(gcd_i32(0, 0) == 0)
+    assert(gcd_i32(1, 1) == 1)
+    assert(gcd_i32(0, 2) == 2)
+    assert(gcd_i32(2, 0) == 2)
+    assert(gcd_i32(8, 12) == 4)
+    assert(gcd_i32(17, 23) == 1)
+    assert(gcd_i32(48, 36) == 12)
+    assert(gcd_i32(-8, 12) == 4)
+    assert(gcd_i32(8, -12) == 4)
+    assert(gcd_i32(-8, -12) == 4)
+    assert(gcd_i32(100, 100) == 100)
+    assert(gcd_i32(13, 1) == 1)
+    assert(gcd_i32(-i32_max, i32_max) == i32_max)
+
+test "integer_math: lcm":
+    assert(lcm_i32(0, 0) == 0)
+    assert(lcm_i32(0, 5) == 0)
+    assert(lcm_i32(5, 0) == 0)
+    assert(lcm_i32(1, 1) == 1)
+    assert(lcm_i32(4, 6) == 12)
+    assert(lcm_i32(7, 13) == 91)
+    assert(lcm_i32(12, 18) == 36)
+    assert(lcm_i32(-4, 6) == 12)
+    assert(lcm_i32(4, -6) == 12)
+    assert(lcm_i32(-4, -6) == 12)
+    assert(lcm_i32(10, 10) == 10)
+    assert(lcm_i32(1, 8) == 8)
+
+test "integer_math: reinterpret_as_octal":
+    assert(reinterpret_as_octal_u32(755) == 493)
+    assert(reinterpret_as_octal_u64(0) == 0)
+    assert(reinterpret_as_octal_usize(17) == 15)
+
+# mark: TestSaturatingMath ======================================================================
+
+test "saturating_math: signed add":
+    assert(saturating_add_i32(0, 0) == 0)
+    assert(saturating_add_i32(3, 4) == 7)
+    assert(saturating_add_i32(-3, -4) == -7)
+    assert(saturating_add_i32(3, -4) == -1)
+    assert(saturating_add_i32(1000000, 2000000) == 3000000)
+    assert(saturating_add_i32(i32_max, i32_min) == -1)
+    assert(saturating_add_i32(i32_min, i32_max) == -1)
+    assert(saturating_add_i32(i32_max, -i32_max) == 0)
+    assert(saturating_add_i32(i32_max - 1, 1) == i32_max)
+    assert(saturating_add_i32(i32_max, 1) == i32_max)
+    assert(saturating_add_i32(i32_max - 9, 10) == i32_max)
+    assert(saturating_add_i32(i32_min + 1, -1) == i32_min)
+    assert(saturating_add_i32(i32_min, -1) == i32_min)
+    assert(saturating_add_i32(i32_min + 9, -10) == i32_min)
+    assert(saturating_add_i32(i32_max, i32_max) == i32_max)
+    assert(saturating_add_i32(i32_min, i32_min) == i32_min)
+    assert(saturating_add_i32(0, i32_min) == i32_min)
+
+test "saturating_math: signed sub":
+    assert(saturating_sub_i32(7, 4) == 3)
+    assert(saturating_sub_i32(4, 7) == -3)
+    assert(saturating_sub_i32(-3, 4) == -7)
+    assert(saturating_sub_i32(i32_max, i32_max) == 0)
+    assert(saturating_sub_i32(i32_min, i32_min) == 0)
+    assert(saturating_sub_i32(0, i32_max) == i32_min + 1)
+    assert(saturating_sub_i32(i32_max - 1, -1) == i32_max)
+    assert(saturating_sub_i32(i32_max, -1) == i32_max)
+    assert(saturating_sub_i32(i32_max - 9, -10) == i32_max)
+    assert(saturating_sub_i32(i32_min + 1, 1) == i32_min)
+    assert(saturating_sub_i32(i32_min, 1) == i32_min)
+    assert(saturating_sub_i32(i32_min + 9, 10) == i32_min)
+    assert(saturating_sub_i32(i32_max, i32_min) == i32_max)
+    assert(saturating_sub_i32(i32_min, i32_max) == i32_min)
+
+test "saturating_math: unsigned add and sub":
+    assert(saturating_add_u32(3, 4) == 7)
+    assert(saturating_add_u32(u32_max - 1, 1) == u32_max)
+    assert(saturating_add_u32(u32_max, 1) == u32_max)
+    assert(saturating_add_u32(u32_max - 9, 10) == u32_max)
+    assert(saturating_add_u32(u32_max, u32_max) == u32_max)
+    assert(saturating_add_u32(0, u32_max) == u32_max)
+    assert(saturating_sub_u32(7, 4) == 3)
+    assert(saturating_sub_u32(4, 4) == 0)
+    assert(saturating_sub_u32(u32_max, u32_max) == 0)
+    assert(saturating_sub_u32(0, 1) == 0)
+    assert(saturating_sub_u32(9, 10) == 0)
+    assert(saturating_sub_u32(0, u32_max) == 0)
+    assert(saturating_sub_u32(u32_max, 0) == u32_max)
+
+test "saturating_math: mul":
+    assert(saturating_mul_i32(-3, 4) == -12)
+    assert(saturating_mul_i32(-3, -4) == 12)
+    assert(saturating_mul_i32(0, i32_max) == 0)
+    assert(saturating_mul_i32(-1, i32_max) == -i32_max)
+    assert(saturating_mul_i32(i32_max, 2) == i32_max)
+    assert(saturating_mul_i32(i32_max, i32_max) == i32_max)
+    assert(saturating_mul_i32(i32_min, 2) == i32_min)
+    assert(saturating_mul_i32(i32_min, i32_min) == i32_max)
+    assert(saturating_mul_i32(i32_max, -2) == i32_min)
+    assert(saturating_mul_i32(i32_max, i32_min) == i32_min)
+    assert(saturating_mul_u32(100, 200) == 20000)
+    assert(saturating_mul_u32(1, u32_max) == u32_max)
+    assert(saturating_mul_u32(u32_max, 2) == u32_max)
+    assert(saturating_mul_u32(u32_max, u32_max) == u32_max)
+
+test "saturating_math: all sizes":
+    assert(saturating_add_i8(50, 30) == 80)
+    assert(saturating_add_i8(100, 100) == i8_max)
+    assert(saturating_add_i8(-100, -100) == i8_min)
+    assert(saturating_add_i8(i8_max, i8_min) == -1)
+    assert(saturating_sub_i8(-100, 100) == i8_min)
+    assert(saturating_sub_i8(100, -100) == i8_max)
+    assert(saturating_add_i16(i16_max, 1) == i16_max)
+    assert(saturating_add_i16(i16_min, -1) == i16_min)
+    assert(saturating_sub_i16(i16_max, -1) == i16_max)
+    assert(saturating_add_i64(i64_max, 1) == i64_max)
+    assert(saturating_sub_i64(i64_min, 1) == i64_min)
+    assert(saturating_add_u8(200, 100) == u8_max)
+    assert(saturating_sub_u16(1, 2) == 0)
+    assert(saturating_add_u64(u64_max, 1) == u64_max)
+    assert(saturating_mul_usize(usize_max, 3) == usize_max)
+
+# mark: TestBitCast, TestEndian, TestMemory =====================================================
+
+test "bit_cast: double_int_conversion":
+    assert(bit_cast[u64, f64](0.0) == 0)
+    assert(bit_cast[f64, u64](0) == 0.0)
+    assert(bit_cast[u64, f64](-0.0) == (u64)1 << 63)
+    assert(bit_cast[u64, f64](19880124.0) == 0x4172f58bc0000000)
+    assert(bit_cast[f64, u64](0x4172f58bc0000000) == 19880124.0)
+
+test "endian: big and little endian round trips":
+    var big: BigEndian[u32]
+    assert(big_endian_to_t(&big) == 0)
+    big_endian_construct(&big, 42)
+    assert(big_endian_to_t(&big) == 42)
+    assert(big.m_value == 0x2a000000)
+    var little: LittleEndian[u32]
+    little_endian_construct(&little, 42)
+    assert(little_endian_to_t(&little) == 42)
+    assert(little.m_value == 42)
+    assert(convert_between_host_and_big_endian[u16](0x1234) == 0x3412)
+    assert(convert_between_host_and_network_endian[u64](0x0102030405060708) == 0x0807060504030201)
+    assert(convert_between_host_and_big_endian[u8](7) == 7)
+    assert(bitswap(0x0001) == 0x8000)
+    assert(bitswap(0x00f0) == 0x0f00)
+
+test "memory: timing_safe_compare":
+    let data_set = "abcdefghijklmnopqrstuvwxyz123456789"
+    assert(timing_safe_compare(data_set.bytes.data, data_set.bytes.data, data_set.length))
+    let reversed = "987654321zyxwvutsrqponmlkjihgfedcba"
+    assert(not timing_safe_compare(data_set.bytes.data, reversed.bytes.data, reversed.length))

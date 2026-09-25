@@ -7,6 +7,9 @@
 #       AK/CircularBuffer.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
 #       Regenerate rather than edit, except to fill a field the generator could not map.
 #
+#       Edited by the r01 port: the map traits are the donor's (IdentityHashTraits<unsigned>,
+#       Traits<size_t>) with size_t values; Match has its fields.
+#
 #==============================================================================================
 
 # mark: CircularBuffer ==========================================================================
@@ -23,12 +26,13 @@ pub struct CircularBuffer:
 ## AK::SearchableCircularBuffer (AK/CircularBuffer.h:64).
 pub struct SearchableCircularBuffer:
     pub var circular_buffer: CircularBuffer  # primary base
-    pub var m_hash_location_map: HashMap[u32, u64, U32Traits]
-    pub var m_location_chain_map: HashMap[u64, u64, U64Traits]
+    pub var m_hash_location_map: HashMap[u32, usize, U32IdentityHashTraits]
+    pub var m_location_chain_map: HashMap[usize, usize, UsizeTraits]
 
 ## AK::SearchableCircularBuffer::Match (AK/CircularBuffer.h:76): opaque in this phase (not in the phase-1 closure).
 pub struct SearchableCircularBufferMatch:
-    pub var opaque_: u8
+    pub var distance: usize
+    pub var length: usize
 
 ## AK::SearchableCircularBuffer::HASH_CHUNK_SIZE (AK/CircularBuffer.h:89).
 pub let searchable_circular_buffer_hash_chunk_size: usize = 3

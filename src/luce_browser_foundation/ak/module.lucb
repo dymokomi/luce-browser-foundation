@@ -12,3 +12,15 @@
 #       SPDX-License-Identifier: BSD-2-Clause (see LICENSE)
 #
 #==============================================================================================
+
+# Module-wide imports (imports apply to every fragment of the module, language §16.1).
+import io
+import memory
+from memory import Allocator
+import luce
+import os
+import math
+import math32
+import atomic as atomics
+import thread
+import testing

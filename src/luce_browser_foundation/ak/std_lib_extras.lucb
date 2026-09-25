@@ -1,0 +1,210 @@
+#==============================================================================================
+#
+#   std_lib_extras - min, max, clamp, swap, exchange, abs and the power-of-two helpers
+#
+#   DESCRIPTION:
+#       Port of AK/StdLibExtras.h (lines 1-185). `move` and `forward` are plain copies
+#       (DESIGN.md §3.3 rule 1) and have no function. Templates over arithmetic types are
+#       instantiated per type with the type as a suffix (`ceil_div_usize`): luce-base
+#       generics cannot compute on an unconstrained type parameter. min, max and clamp stay
+#       generic over Comparable; for floats use the `_f32`/`_f64` forms, which compare with
+#       `<` as the donor does instead of trapping on a NaN.
+#
+#==============================================================================================
+
+# mark: Power-of-two helpers ====================================================================
+
+## Ported from AK/StdLibExtras.h:19 AK::round_up_to_power_of_two, for i32.
+pub func round_up_to_power_of_two_i32(value: i32, power_of_two: i32) -> i32:
+    return ((value -% 1) & ~(power_of_two -% 1)) +% power_of_two
+
+## Ported from AK/StdLibExtras.h:19 AK::round_up_to_power_of_two, for i64.
+pub func round_up_to_power_of_two_i64(value: i64, power_of_two: i64) -> i64:
+    return ((value -% 1) & ~(power_of_two -% 1)) +% power_of_two
+
+## Ported from AK/StdLibExtras.h:19 AK::round_up_to_power_of_two, for u32.
+pub func round_up_to_power_of_two_u32(value: u32, power_of_two: u32) -> u32:
+    return ((value -% 1) & ~(power_of_two -% 1)) +% power_of_two
+
+## Ported from AK/StdLibExtras.h:19 AK::round_up_to_power_of_two, for u64.
+pub func round_up_to_power_of_two_u64(value: u64, power_of_two: u64) -> u64:
+    return ((value -% 1) & ~(power_of_two -% 1)) +% power_of_two
+
+## Ported from AK/StdLibExtras.h:19 AK::round_up_to_power_of_two, for usize.
+pub func round_up_to_power_of_two_usize(value: usize, power_of_two: usize) -> usize:
+    return ((value -% 1) & ~(power_of_two -% 1)) +% power_of_two
+
+## Ported from AK/StdLibExtras.h:26 AK::is_power_of_two, for i32.
+pub func is_power_of_two_i32(value: i32) -> bool:
+    return value != 0 and not ((value & (value -% 1)) != 0)
+
+## Ported from AK/StdLibExtras.h:26 AK::is_power_of_two, for i64.
+pub func is_power_of_two_i64(value: i64) -> bool:
+    return value != 0 and not ((value & (value -% 1)) != 0)
+
+## Ported from AK/StdLibExtras.h:26 AK::is_power_of_two, for u32.
+pub func is_power_of_two_u32(value: u32) -> bool:
+    return value != 0 and not ((value & (value -% 1)) != 0)
+
+## Ported from AK/StdLibExtras.h:26 AK::is_power_of_two, for u64.
+pub func is_power_of_two_u64(value: u64) -> bool:
+    return value != 0 and not ((value & (value -% 1)) != 0)
+
+## Ported from AK/StdLibExtras.h:26 AK::is_power_of_two, for usize.
+pub func is_power_of_two_usize(value: usize) -> bool:
+    return value != 0 and not ((value & (value -% 1)) != 0)
+
+# mark: min, max, clamp, mix ====================================================================
+
+## Ported from AK/StdLibExtras.h:59 AK::min.
+pub func min[T: luce.Comparable](a: T, b: T) -> T:
+    if b.compare(a) < 0:
+        return b
+    return a
+
+## Ported from AK/StdLibExtras.h:65 AK::max.
+pub func max[T: luce.Comparable](a: T, b: T) -> T:
+    if a.compare(b) < 0:
+        return b
+    return a
+
+## Ported from AK/StdLibExtras.h:71 AK::clamp.
+pub func clamp[T: luce.Comparable](value: T, min_: T, max_: T) -> T:
+    assert(max_.compare(min_) >= 0)
+    if value.compare(max_) > 0:
+        return max_
+    if value.compare(min_) < 0:
+        return min_
+    return value
+
+## Ported from AK/StdLibExtras.h:59 AK::min, for f32 (`b < a ? b : a`, so a NaN never traps).
+pub func min_f32(a: f32, b: f32) -> f32:
+    return b if b < a else a
+
+## Ported from AK/StdLibExtras.h:59 AK::min, for f64 (`b < a ? b : a`, so a NaN never traps).
+pub func min_f64(a: f64, b: f64) -> f64:
+    return b if b < a else a
+
+## Ported from AK/StdLibExtras.h:65 AK::max, for f32 (`a < b ? b : a`).
+pub func max_f32(a: f32, b: f32) -> f32:
+    return b if a < b else a
+
+## Ported from AK/StdLibExtras.h:65 AK::max, for f64 (`a < b ? b : a`).
+pub func max_f64(a: f64, b: f64) -> f64:
+    return b if a < b else a
+
+## Ported from AK/StdLibExtras.h:71 AK::clamp, for f32.
+pub func clamp_f32(value: f32, min_: f32, max_: f32) -> f32:
+    assert(max_ >= min_)
+    if value > max_:
+        return max_
+    if value < min_:
+        return min_
+    return value
+
+## Ported from AK/StdLibExtras.h:71 AK::clamp, for f64.
+pub func clamp_f64(value: f64, min_: f64, max_: f64) -> f64:
+    assert(max_ >= min_)
+    if value > max_:
+        return max_
+    if value < min_:
+        return min_
+    return value
+
+## Ported from AK/StdLibExtras.h:82 AK::mix (aka lerp), for f32.
+pub func mix_f32(v1: f32, v2: f32, interpolation: f32) -> f32:
+    return v1 + (v2 - v1) * interpolation
+
+## Ported from AK/StdLibExtras.h:82 AK::mix (aka lerp), for f64.
+pub func mix_f64(v1: f64, v2: f64, interpolation: f64) -> f64:
+    return v1 + (v2 - v1) * interpolation
+
+# mark: ceil_div, swap, exchange, to_underlying =================================================
+
+## Ported from AK/StdLibExtras.h:88 AK::ceil_div, for i32.
+pub func ceil_div_i32(a: i32, b: i32) -> i32:
+    var result = a // b
+    if (a % b) != 0 and (a > 0) == (b > 0):
+        result += 1
+    return result
+
+## Ported from AK/StdLibExtras.h:88 AK::ceil_div, for i64.
+pub func ceil_div_i64(a: i64, b: i64) -> i64:
+    var result = a // b
+    if (a % b) != 0 and (a > 0) == (b > 0):
+        result += 1
+    return result
+
+## Ported from AK/StdLibExtras.h:88 AK::ceil_div, for u32.
+pub func ceil_div_u32(a: u32, b: u32) -> u32:
+    var result = a // b
+    if (a % b) != 0 and (a > 0) == (b > 0):
+        result += 1
+    return result
+
+## Ported from AK/StdLibExtras.h:88 AK::ceil_div, for u64.
+pub func ceil_div_u64(a: u64, b: u64) -> u64:
+    var result = a // b
+    if (a % b) != 0 and (a > 0) == (b > 0):
+        result += 1
+    return result
+
+## Ported from AK/StdLibExtras.h:88 AK::ceil_div, for usize.
+pub func ceil_div_usize(a: usize, b: usize) -> usize:
+    var result = a // b
+    if (a % b) != 0 and (a > 0) == (b > 0):
+        result += 1
+    return result
+
+## Ported from AK/StdLibExtras.h:98 AK::swap.
+pub func swap_5[T](a: T*, b: T*):
+    if a == b:
+        return
+    let tmp = *a
+    *a = *b
+    *b = tmp
+
+## Ported from AK/StdLibExtras.h:108 AK::exchange.
+pub func exchange[T](slot: T*, value: T) -> T:
+    let old_value = *slot
+    *slot = value
+    return old_value
+
+## Ported from AK/StdLibExtras.h:119 AK::to_underlying: the representation of an integer-backed
+## enum, `R` being its backing type (`(u8)kind` is the same thing written directly).
+pub func to_underlying[V, R](value: V) -> R:
+    assert(sizeof(V) == sizeof(R))
+    var copy = value
+    return memory.read[R](&copy)
+
+## Ported from AK/StdLibExtras.h:126 AK::taint_for_optimizer.
+# An empty `asm volatile` in the donor that only hides the value from the optimizer; there is
+# nothing to hide it from here.
+pub func taint_for_optimizer[T](value: T*):
+    discard(value)
+
+# mark: abs =====================================================================================
+
+## Ported from AK/StdLibExtras.h:159 AK::abs (int). Like __builtin_abs, the minimum wraps.
+pub func abs_i32(num: i32) -> i32:
+    return (0 -% num) if num < 0 else num
+
+## Ported from AK/StdLibExtras.h:160 AK::abs (long).
+pub func abs_i64(num: i64) -> i64:
+    return (0 -% num) if num < 0 else num
+
+## Ported from AK/StdLibExtras.h:161 AK::abs (long long).
+pub func abs_i64_2(num: i64) -> i64:
+    return abs_i64(num)
+
+## Ported from AK/StdLibExtras.h:162 AK::abs (float).
+pub func abs_f32(num: f32) -> f32:
+    return f32.bits(num.bits() & 0x7fffffff)
+
+## Ported from AK/StdLibExtras.h:163 AK::abs (double).
+pub func abs_f64(num: f64) -> f64:
+    return f64.bits(num.bits() & 0x7fffffffffffffff)
+
+## Ported from AK/StdLibExtras.h:164 AK::abs (long double, which is double here).
+pub func abs_f64_2(num: f64) -> f64:
+    return abs_f64(num)

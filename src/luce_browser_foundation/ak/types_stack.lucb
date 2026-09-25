@@ -7,10 +7,12 @@
 #       (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4). Regenerate rather
 #       than edit, except to fill a field the generator could not map.
 #
+#       Edited by region r01: the stack_size template argument is the field m_stack_size
+#       (set by stack_construct).
+#
 #==============================================================================================
 
-# mark: Stack ===================================================================================
-
-## AK::Stack (AK/Stack.h:14): a generic struct.
+## AK::Stack (AK/Stack.h:14): at most m_stack_size values.
 pub struct Stack[T]:
     pub var m_stack: Vector[T]
+    pub var m_stack_size: usize

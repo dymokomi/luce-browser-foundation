@@ -1,0 +1,408 @@
+#==============================================================================================
+#
+#   vector_2 - Vector<T>: taking, fallible growth, resizing, iteration and storage
+#
+#   DESCRIPTION:
+#       Port of AK/Vector.h (lines 615-1141); see vector_1. ErrorOr<void> is `!`: the only
+#       failures are ENOMEM from the allocator and EINVAL from an out-of-range insert
+#       (ak_error_throw, DESIGN.md §2.10).
+#
+#==============================================================================================
+
+# mark: Taking elements =========================================================================
+
+## Ported from AK/Vector.h:615 AK::Vector::take_last.
+pub func vector_take_last[T](this: Vector[T]*) -> T:
+    assert(not vector_is_empty(this))
+    let value = *vector_raw_last(this)
+    this.m_size -= 1
+    return value
+
+## Ported from AK/Vector.h:645 AK::Vector::unsafe_take_last.
+pub func vector_unsafe_take_last[T](this: Vector[T]*) -> T:
+    let value = *vector_raw_last(this)
+    this.m_size -= 1
+    vector_update_metadata(this)  # We have *some* space, we just removed something that was there.
+    return value
+
+## Ported from AK/Vector.h:660 AK::Vector::take_first.
+pub func vector_take_first[T](this: Vector[T]*) -> T:
+    assert(not vector_is_empty(this))
+    let value = *vector_raw_first(this)
+    vector_remove(this, 0)
+    return value
+
+## Ported from AK/Vector.h:671 AK::Vector::take.
+pub func vector_take[T](this: Vector[T]*, index: usize) -> T:
+    let value = *vector_raw_at(this, index)
+    vector_remove(this, index)
+    return value
+
+## Ported from AK/Vector.h:681 AK::Vector::unstable_take.
+pub func vector_unstable_take[T](this: Vector[T]*, index: usize) -> T:
+    assert(index < this.m_size)
+    swap_5(vector_raw_at(this, index), vector_raw_at(this, this.m_size - 1))
+    return vector_take_last(this)
+
+# mark: Fallible insertion ======================================================================
+
+## Ported from AK/Vector.h:689 AK::Vector::try_insert.
+pub func vector_try_insert[T](this: Vector[T]*, index: usize, value: T) -> !:
+    if index > vector_size(this):
+        try ak_error_throw(ak_error_from_errno(einval))
+    if index == vector_size(this):
+        return try vector_try_append_t(this, value)
+    try vector_try_grow_capacity(this, vector_size(this) + 1)
+    this.m_size += 1
+    typed_transfer_move(vector_slot(this, index + 1), vector_slot(this, index), this.m_size - index - 1)
+    *vector_slot(this, index) = value
+    vector_update_metadata(this)  # We have *some* space, try_grow_capacity above ensured nonzero.
+
+## Ported from AK/Vector.h:715 AK::Vector::try_insert_before_matching.
+pub func vector_try_insert_before_matching[T](this: Vector[T]*, value: T, predicate: Function1[const T*, bool], first_index: usize = 0, inserted_index: usize*? = none) -> !:
+    var i = first_index
+    while i < vector_size(this):
+        if function1_call(&predicate, vector_at(this, i)):
+            try vector_try_insert(this, i, value)
+            if let out = inserted_index:
+                *out = i
+            return
+        i += 1
+    try vector_try_append_t(this, value)
+    if let out = inserted_index:
+        *out = vector_size(this) - 1
+
+## Ported from AK/Vector.h:732 AK::Vector::try_extend(Vector&&): `other` is emptied.
+pub func vector_try_extend[T](this: Vector[T]*, other: Vector[T]*) -> !:
+    if vector_is_empty(this) and vector_capacity(this) <= vector_capacity(other):
+        vector_move_assign(this, other)
+        return
+    let other_size = vector_size(other)
+    var tmp: Vector[T]
+    vector_move_assign(&tmp, other)
+    try vector_try_grow_capacity(this, vector_size(this) + other_size)
+    if let source = tmp.m_outline_buffer:
+        typed_transfer_move(vector_slot(this, this.m_size), source, other_size)
+    this.m_size += other_size
+    vector_update_metadata(this)  # We have *some* space, try_grow_capacity above ensured nonzero.
+
+## Ported from AK/Vector.h:747 AK::Vector::try_extend(Vector const&).
+pub func vector_try_extend_2[T](this: Vector[T]*, other: const Vector[T]*) -> !:
+    try vector_try_grow_capacity(this, vector_size(this) + vector_size(other))
+    if let source = other.m_outline_buffer:
+        discard(typed_transfer_copy(vector_slot(this, this.m_size), source, vector_size(other)))
+    this.m_size += other.m_size
+    vector_update_metadata(this)  # We have *some* space, try_grow_capacity above ensured nonzero.
+
+## Ported from AK/Vector.h:756 AK::Vector::try_append(T&&).
+pub func vector_try_append_t[T](this: Vector[T]*, value: T) -> !:
+    try vector_try_grow_capacity(this, vector_size(this) + 1)
+    *vector_slot(this, this.m_size) = value
+    this.m_size += 1
+    vector_update_metadata(this)  # We have *some* space, try_grow_capacity above ensured nonzero.
+
+## Ported from AK/Vector.h:768 AK::Vector::try_append(T const&).
+pub func vector_try_append_t_2[T](this: Vector[T]*, value: T) -> !:
+    return try vector_try_append_t(this, value)
+
+## Ported from AK/Vector.h:774 AK::Vector::try_append(StorageType const*, size_t).
+pub func vector_try_append_opaque[T](this: Vector[T]*, values: const T*?, count: usize) -> !:
+    if count == 0:
+        return
+    let source = values else trap("VERIFY: try_append from null")
+    try vector_try_grow_capacity(this, vector_size(this) + count)
+    discard(typed_transfer_copy(vector_slot(this, this.m_size), source, count))
+    this.m_size += count
+    vector_update_metadata(this)  # We have *some* space, try_grow_capacity above ensured nonzero.
+
+## Ported from AK/Vector.h:797 AK::Vector::try_prepend.
+pub func vector_try_prepend_u[T](this: Vector[T]*, value: T) -> !:
+    return try vector_try_insert(this, 0, value)
+
+## Ported from AK/Vector.h:803 AK::Vector::try_prepend(Vector&&): `other` is emptied.
+pub func vector_try_prepend_vector[T](this: Vector[T]*, other: Vector[T]*) -> !:
+    if vector_is_empty(other):
+        return
+
+    if vector_is_empty(this):
+        vector_move_assign(this, other)
+        return
+
+    let other_size = vector_size(other)
+    try vector_try_grow_capacity(this, vector_size(this) + other_size)
+
+    typed_transfer_move(vector_slot(this, other_size), vector_slot(this, 0), this.m_size)
+
+    var tmp: Vector[T]
+    vector_move_assign(&tmp, other)
+    if let source = tmp.m_outline_buffer:
+        typed_transfer_move(vector_slot(this, 0), source, vector_size(&tmp))
+    this.m_size += other_size
+    vector_update_metadata(this)  # We have *some* space, try_grow_capacity above ensured nonzero.
+
+## Ported from AK/Vector.h:828 AK::Vector::try_prepend(StorageType const*, size_t).
+pub func vector_try_prepend_opaque[T](this: Vector[T]*, values: const T*?, count: usize) -> !:
+    if count == 0:
+        return
+    let source = values else trap("VERIFY: try_prepend from null")
+    try vector_try_grow_capacity(this, vector_size(this) + count)
+    typed_transfer_move(vector_slot(this, count), vector_slot(this, 0), this.m_size)
+    discard(typed_transfer_copy(vector_slot(this, 0), source, count))
+    this.m_size += count
+    vector_update_metadata(this)  # We have *some* space, try_grow_capacity above ensured nonzero.
+
+# mark: Capacity and resizing ===================================================================
+
+## Ported from AK/Vector.h:840 AK::Vector::try_grow_capacity.
+pub func vector_try_grow_capacity[T](this: Vector[T]*, needed_capacity: usize) -> !:
+    if this.m_capacity >= needed_capacity:
+        return
+    return try vector_try_ensure_capacity(this, vector_padded_capacity[T](needed_capacity))
+
+## Ported from AK/Vector.h:847 AK::Vector::try_ensure_capacity.
+pub func vector_try_ensure_capacity[T](this: Vector[T]*, needed_capacity: usize) -> !:
+    if this.m_capacity >= needed_capacity:
+        return
+    let new_capacity = kmalloc_good_size(needed_capacity * sizeof(T)) // sizeof(T)
+    var allocation: void*?
+    if this.m_atomic:
+        let size = mul_usize(make_checked(new_capacity), make_checked(sizeof(T)))
+        allocation = kmalloc_atomic(checked_value(&size))
+    else:
+        allocation = kmalloc_array(make_checked(new_capacity), make_checked(sizeof(T)))
+    let new_buffer = (T*)(allocation else return try ak_error_throw(ak_error_from_errno(enomem)))
+
+    if let old_buffer = this.m_outline_buffer:
+        discard(typed_transfer_copy(new_buffer, old_buffer, this.m_size))
+        kfree(old_buffer)
+    this.m_outline_buffer = new_buffer
+    this.m_capacity = new_capacity
+    vector_update_metadata(this)  # We have *some* space, we just allocated it.
+
+## Ported from AK/Vector.h:872 AK::Vector::try_resize: new elements are zero.
+pub func vector_try_resize[T](this: Vector[T]*, new_size: usize, keep_capacity: bool = false) -> !:
+    if new_size <= vector_size(this):
+        vector_shrink(this, new_size, keep_capacity)
+        return
+
+    try vector_try_ensure_capacity(this, new_size)
+
+    # For trivial types, we can just zero the new memory. (Every luce-base value is one.)
+    let old_size = vector_size(this)
+    let bytes = (new_size - old_size) * sizeof(T)
+    memory.set(u8[]((u8*)vector_slot(this, old_size), bytes), 0)
+    this.m_size = new_size
+    vector_update_metadata(this)  # We have *some* space, try_ensure_capacity above ensured nonzero.
+
+## Ported from AK/Vector.h:895 AK::Vector::try_resize_with_default_value.
+pub func vector_try_resize_with_default_value[T](this: Vector[T]*, new_size: usize, default_value: T, keep_capacity: bool) -> !:
+    if new_size <= vector_size(this):
+        vector_shrink(this, new_size, keep_capacity)
+        return
+
+    try vector_try_ensure_capacity(this, new_size)
+
+    for i in vector_size(this)..<new_size:
+        *vector_slot(this, i) = default_value
+    this.m_size = new_size
+    vector_update_metadata(this)  # We have *some* space, try_ensure_capacity above ensured nonzero.
+
+## Ported from AK/Vector.h:912 AK::Vector::try_resize_and_keep_capacity.
+pub func vector_try_resize_and_keep_capacity[T](this: Vector[T]*, new_size: usize) -> !:
+    return try vector_try_resize(this, new_size, true)
+
+## Ported from AK/Vector.h:918 AK::Vector::grow_capacity.
+pub func vector_grow_capacity[T](this: Vector[T]*, needed_capacity: usize):
+    vector_try_grow_capacity(this, needed_capacity) else trap("MUST: Vector::grow_capacity")
+
+## Ported from AK/Vector.h:923 AK::Vector::ensure_capacity.
+pub func vector_ensure_capacity[T](this: Vector[T]*, needed_capacity: usize):
+    vector_try_ensure_capacity(this, needed_capacity) else trap("MUST: Vector::ensure_capacity")
+
+## Ported from AK/Vector.h:928 AK::Vector::shrink.
+pub func vector_shrink[T](this: Vector[T]*, new_size: usize, keep_capacity: bool = false):
+    assert(new_size <= vector_size(this))
+    if new_size == vector_size(this):
+        return
+
+    if new_size == 0:
+        if keep_capacity:
+            vector_clear_with_capacity(this)
+        else:
+            vector_clear(this)
+        return
+
+    this.m_size = new_size
+    vector_update_metadata(this)  # We have *some* space, as new_size can't be zero here.
+
+## Ported from AK/Vector.h:950 AK::Vector::unsafe_shrink.
+pub func vector_unsafe_shrink[T](this: Vector[T]*, new_size: usize):
+    this.m_size = new_size
+    vector_update_metadata(this)  # We have at least an allocation, as we are not freeing anything.
+
+## Ported from AK/Vector.h:961 AK::Vector::resize.
+pub func vector_resize[T](this: Vector[T]*, new_size: usize, keep_capacity: bool = false):
+    vector_try_resize(this, new_size, keep_capacity) else trap("MUST: Vector::resize")
+
+## Ported from AK/Vector.h:967 AK::Vector::resize_and_keep_capacity.
+pub func vector_resize_and_keep_capacity[T](this: Vector[T]*, new_size: usize):
+    vector_try_resize_and_keep_capacity(this, new_size) else trap("MUST: Vector::resize_and_keep_capacity")
+
+## Ported from AK/Vector.h:973 AK::Vector::resize_with_default_value_and_keep_capacity.
+pub func vector_resize_with_default_value_and_keep_capacity[T](this: Vector[T]*, new_size: usize, default_value: T):
+    vector_try_resize_with_default_value(this, new_size, default_value, true) else trap("MUST: Vector::resize_with_default_value")
+
+## Ported from AK/Vector.h:979 AK::Vector::resize_with_default_value.
+pub func vector_resize_with_default_value[T](this: Vector[T]*, new_size: usize, default_value: T, keep_capacity: bool = false):
+    vector_try_resize_with_default_value(this, new_size, default_value, keep_capacity) else trap("MUST: Vector::resize_with_default_value")
+
+## Ported from AK/Vector.h:985 AK::Vector::fill.
+pub func vector_fill[T](this: Vector[T]*, value: T):
+    for i in 0..<vector_size(this):
+        *vector_at(this, i) = value
+
+## Ported from AK/Vector.h:991 AK::Vector::shrink_to_fit.
+pub func vector_shrink_to_fit[T](this: Vector[T]*):
+    if vector_size(this) == vector_capacity(this):
+        return
+    var new_vector: Vector[T]
+    new_vector.m_atomic = this.m_atomic
+    vector_ensure_capacity(&new_vector, vector_size(this))
+    for element in vector_span(this):
+        vector_unchecked_append_u(&new_vector, element)
+    vector_move_assign(this, &new_vector)
+
+# mark: Iteration and searching =================================================================
+
+## Ported from AK/Vector.h:1008 AK::Vector::begin const.
+pub func vector_begin_const[T](this: const Vector[T]*) -> SimpleIterator[Vector[T], T]:
+    return simple_iterator_begin[Vector[T], T]((Vector[T]*)this)
+
+## Ported from AK/Vector.h:1009 AK::Vector::begin.
+pub func vector_begin[T](this: Vector[T]*) -> SimpleIterator[Vector[T], T]:
+    return simple_iterator_begin[Vector[T], T](this)
+
+## Ported from AK/Vector.h:1010 AK::Vector::rbegin.
+pub func vector_rbegin[T](this: Vector[T]*) -> SimpleReverseIterator[Vector[T], T]:
+    return simple_reverse_iterator_rbegin[T, Vector[T]](this)
+
+## Ported from AK/Vector.h:1011 AK::Vector::rbegin const.
+pub func vector_rbegin_const[T](this: const Vector[T]*) -> SimpleReverseIterator[Vector[T], T]:
+    return simple_reverse_iterator_rbegin[T, Vector[T]]((Vector[T]*)this)
+
+## Ported from AK/Vector.h:1013 AK::Vector::end const.
+pub func vector_end_const[T](this: const Vector[T]*) -> SimpleIterator[Vector[T], T]:
+    return simple_iterator_end[T, Vector[T]]((Vector[T]*)this)
+
+## Ported from AK/Vector.h:1014 AK::Vector::end.
+pub func vector_end[T](this: Vector[T]*) -> SimpleIterator[Vector[T], T]:
+    return simple_iterator_end[T, Vector[T]](this)
+
+## Ported from AK/Vector.h:1015 AK::Vector::rend.
+pub func vector_rend[T](this: Vector[T]*) -> SimpleReverseIterator[Vector[T], T]:
+    return simple_reverse_iterator_rend[Vector[T], T](this)
+
+## Ported from AK/Vector.h:1016 AK::Vector::rend const.
+pub func vector_rend_const[T](this: const Vector[T]*) -> SimpleReverseIterator[Vector[T], T]:
+    return simple_reverse_iterator_rend[Vector[T], T]((Vector[T]*)this)
+
+## Ported from AK/Vector.h:1018 AK::Vector::in_reverse.
+pub func vector_in_reverse[T](this: Vector[T]*) -> ReverseWrapper[Vector[T]]:
+    return reverse_wrapper_in_reverse(this)
+
+## Ported from AK/Vector.h:1023 AK::Vector::in_reverse const.
+pub func vector_in_reverse_const[T](this: const Vector[T]*) -> ReverseWrapper[Vector[T]]:
+    return reverse_wrapper_in_reverse((Vector[T]*)this)
+
+## Ported from AK/Vector.h:1029 AK::Vector::find_if const.
+pub func vector_find_if_const[T](this: const Vector[T]*, finder: Function1[const T*, bool]) -> SimpleIterator[Vector[T], T]:
+    return find_if(vector_begin_const(this), vector_end_const(this), finder)
+
+## Ported from AK/Vector.h:1035 AK::Vector::find_if.
+pub func vector_find_if[T](this: Vector[T]*, finder: Function1[const T*, bool]) -> SimpleIterator[Vector[T], T]:
+    return find_if(vector_begin(this), vector_end(this), finder)
+
+## Ported from AK/Vector.h:1040 AK::Vector::find const.
+pub func vector_find_const[T: luce.Equatable](this: const Vector[T]*, value: T) -> SimpleIterator[Vector[T], T]:
+    return find(vector_begin_const(this), vector_end_const(this), value)
+
+## Ported from AK/Vector.h:1045 AK::Vector::find.
+pub func vector_find[T: luce.Equatable](this: Vector[T]*, value: T) -> SimpleIterator[Vector[T], T]:
+    return find(vector_begin(this), vector_end(this), value)
+
+## Ported from AK/Vector.h:1050 AK::Vector::find_first_index.
+pub func vector_find_first_index[T: luce.Equatable](this: const Vector[T]*, value: T) -> usize?:
+    let index = find_index(vector_begin_const(this), vector_end_const(this), value)
+    if index < vector_size(this):
+        return index
+    return none
+
+## Ported from AK/Vector.h:1060 AK::Vector::find_first_index_if.
+pub func vector_find_first_index_if[T](this: const Vector[T]*, finder: Function1[const T*, bool]) -> usize?:
+    let maybe_result = find_if(vector_begin_const(this), vector_end_const(this), finder)
+    let end = vector_end_const(this)
+    if simple_iterator_eq(&maybe_result, end):
+        return none
+    return simple_iterator_index(&maybe_result)
+
+## Ported from AK/Vector.h:1068 AK::Vector::reverse.
+pub func vector_reverse[T](this: Vector[T]*):
+    for i in 0..<(vector_size(this) // 2):
+        swap_5(vector_at(this, i), vector_at(this, vector_size(this) - i - 1))
+
+# mark: Storage =================================================================================
+
+## Ported from AK/Vector.h:1075 AK::Vector::reset_capacity.
+pub func vector_reset_capacity[T](this: Vector[T]*):
+    this.m_capacity = 0
+
+## Ported from AK/Vector.h:1080 AK::Vector::padded_capacity.
+pub func vector_padded_capacity[T](capacity: usize) -> usize:
+    return 4 + capacity + capacity // 4
+
+## Ported from AK/Vector.h:1085 AK::Vector::slot.
+pub func vector_slot[T](this: Vector[T]*, i: usize) -> T*:
+    let data = this.m_outline_buffer else trap("VERIFY: Vector without storage")
+    return data + i
+
+## Ported from AK/Vector.h:1086 AK::Vector::slot const.
+pub func vector_slot_const[T](this: const Vector[T]*, i: usize) -> const T*:
+    let data = this.m_outline_buffer else trap("VERIFY: Vector without storage")
+    return data + i
+
+## Ported from AK/Vector.h:1088 AK::Vector::inline_buffer: the inline capacity is always 0
+## here (static_assert(inline_capacity > 0) in the donor).
+pub func vector_inline_buffer[T](this: Vector[T]*) -> T*:
+    discard(this)
+    trap("VERIFY: Vector has no inline buffer (inline capacity is dropped)")
+
+## Ported from AK/Vector.h:1093 AK::Vector::inline_buffer const.
+pub func vector_inline_buffer_const[T](this: const Vector[T]*) -> const T*:
+    discard(this)
+    trap("VERIFY: Vector has no inline buffer (inline capacity is dropped)")
+
+## Ported from AK/Vector.h:1099 AK::Vector::raw_last.
+pub func vector_raw_last[T](this: Vector[T]*) -> T*:
+    return vector_raw_at(this, vector_size(this) - 1)
+
+## Ported from AK/Vector.h:1100 AK::Vector::raw_first.
+pub func vector_raw_first[T](this: Vector[T]*) -> T*:
+    return vector_raw_at(this, 0)
+
+## Ported from AK/Vector.h:1101 AK::Vector::raw_at.
+pub func vector_raw_at[T](this: Vector[T]*, index: usize) -> T*:
+    return vector_slot(this, index)
+
+## Ported from AK/Vector.h:1104 AK::Vector::update_metadata: only fast-last-access vectors
+## keep metadata, and the port has none.
+# NOTE: Do *not* call unguarded if m_capacity can be zero.
+pub func vector_update_metadata[T](this: Vector[T]*):
+    discard(this)
+
+## Ported from AK/Vector.h:1114 AK::Vector::storage_size.
+pub func vector_storage_size[T]() -> usize:
+    return 0
+
+## Ported from AK/Vector.h:1122 AK::Vector::storage_alignment.
+pub func vector_storage_alignment[T]() -> usize:
+    return 1

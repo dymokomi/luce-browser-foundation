@@ -1,0 +1,25 @@
+#==============================================================================================
+#
+#   nonnull_own_ptr - the free functions of NonnullOwnPtr<T>
+#
+#   DESCRIPTION:
+#       Port of the free functions of AK/NonnullOwnPtr.h (lines 135-206). DESIGN.md §2.6:
+#       NonnullOwnPtr<T> is `T*` in managed memory; `make<T>(args)` is `new T(args)`.
+#
+#==============================================================================================
+
+## Ported from AK/NonnullOwnPtr.h:140 AK::adopt_own.
+pub func adopt_own[T](object: T*) -> T*:
+    return object
+
+## Ported from AK/NonnullOwnPtr.h:153 AK::adopt_nonnull_own_or_enomem.
+# Use like `adopt_nonnull_own_or_enomem(new (nothrow) T(args...))`.
+pub func adopt_nonnull_own_or_enomem[T](object: T*?) -> T*!:
+    let adopted = object else try ak_error_throw(ak_error_from_errno(enomem))
+    return adopted
+
+## Ported from AK/NonnullOwnPtr.h:176 AK::swap.
+pub func swap[T](a: T**, b: T**):
+    let tmp = *a
+    *a = *b
+    *b = tmp

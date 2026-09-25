@@ -1,0 +1,241 @@
+#==============================================================================================
+#
+#   buffered_stream_2 - InputBufferedSeekable<T> and OutputBufferedSeekable<T>
+#
+#   DESCRIPTION:
+#       Port of AK/BufferedStream.h (lines 304-474). The members are generic over the wrapped
+#       stream class T; the overrides the vtables (types_buffered_stream) call are `_impl`
+#       bodies taking the Stream or SeekableStream base, which see the object as its
+#       T = SeekableStream form (the layout is the same for every T) and run the generic
+#       member. OutputBufferedSeekable's destructor (a final flush) has no place in managed
+#       memory: close() or flush_buffer() before dropping the stream.
+#
+#==============================================================================================
+
+# mark: InputBufferedSeekable ===================================================================
+
+## Ported from AK/BufferedStream.h:312 AK::InputBufferedSeekable::create
+## (BufferedHelper::create_buffered).
+pub func input_buffered_seekable_create[T: IsSeekableStream](stream: T*, buffer_size: usize = 16384) -> InputBufferedSeekable[T]*!:
+    if buffer_size == 0:
+        try ak_error_throw(ak_error_from_errno(einval))
+    if not stream_is_open(stream.seekable_stream().stream()):
+        try ak_error_throw(ak_error_from_errno(enotconn()))
+
+    let buffer = try circular_buffer_create_empty(buffer_size)
+
+    let seekable = SeekableStream(stream_base = Stream(vtable = (const StreamVTable*)&input_buffered_seekable_vtable, class_id = input_buffered_seekable_class.first_id))
+    let result = new InputBufferedSeekable[T](seekable_stream_base = seekable, m_helper = BufferedHelper[T](m_stream = stream, m_buffer = buffer)) catch:
+        return try ak_error_throw(ak_error_from_errno(enomem))
+    input_buffered_seekable_construct(result, stream, buffer)
+    return result
+
+## Ported from AK/BufferedStream.h:320 AK::InputBufferedSeekable::read_some (override).
+pub func input_buffered_seekable_read_some[T: IsSeekableStream](this: InputBufferedSeekable[T]*, buffer: u8[]) -> u8[]!:
+    return try buffered_helper_read(&this.m_helper, buffer)
+
+## Ported from AK/BufferedStream.h:321 AK::InputBufferedSeekable::write_some (override).
+pub func input_buffered_seekable_write_some[T: IsSeekableStream](this: InputBufferedSeekable[T]*, buffer: const u8[]) -> usize!:
+    return try stream_write_some(buffered_helper_base_stream(&this.m_helper), buffer)
+
+## Ported from AK/BufferedStream.h:322 AK::InputBufferedSeekable::is_eof (override).
+pub func input_buffered_seekable_is_eof[T: IsSeekableStream](this: const InputBufferedSeekable[T]*) -> bool:
+    return buffered_helper_is_eof(&this.m_helper)
+
+## Ported from AK/BufferedStream.h:323 AK::InputBufferedSeekable::is_open (override).
+pub func input_buffered_seekable_is_open[T: IsSeekableStream](this: const InputBufferedSeekable[T]*) -> bool:
+    return stream_is_open(buffered_helper_base_stream(&this.m_helper))
+
+## Ported from AK/BufferedStream.h:324 AK::InputBufferedSeekable::close (override).
+pub func input_buffered_seekable_close[T: IsSeekableStream](this: InputBufferedSeekable[T]*):
+    stream_close(buffered_helper_base_stream(&this.m_helper))
+
+## Ported from AK/BufferedStream.h:325 AK::InputBufferedSeekable::seek (override).
+pub func input_buffered_seekable_seek[T: IsSeekableStream](this: InputBufferedSeekable[T]*, offset: i64, mode: SeekMode) -> usize!:
+    var target = offset
+    if mode == SeekMode.from_current_position:
+        # If possible, seek using the buffer alone.
+        if 0 <= target and (u64)target <= (u64)buffered_helper_buffered_data_size(&this.m_helper):
+            buffered_helper_discard_bytes(&this.m_helper, (usize)target) else trap("MUST: discard_bytes")
+            return (try seekable_stream_tell(this.m_helper.m_stream.seekable_stream())) - buffered_helper_buffered_data_size(&this.m_helper)
+
+        target = target - (i64)buffered_helper_buffered_data_size(&this.m_helper)
+
+    let result = try seekable_stream_seek(this.m_helper.m_stream.seekable_stream(), target, mode)
+    buffered_helper_clear_buffer(&this.m_helper)
+
+    return result
+
+## Ported from AK/BufferedStream.h:342 AK::InputBufferedSeekable::truncate (override).
+pub func input_buffered_seekable_truncate[T: IsSeekableStream](this: InputBufferedSeekable[T]*, length: usize) -> !:
+    return try seekable_stream_truncate(this.m_helper.m_stream.seekable_stream(), length)
+
+## Ported from AK/BufferedStream.h:347 AK::InputBufferedSeekable::read_line.
+pub func input_buffered_seekable_read_line[T: IsSeekableStream](this: InputBufferedSeekable[T]*, buffer: u8[]) -> StringView!:
+    return try buffered_helper_read_line(&this.m_helper, buffer)
+
+## Ported from AK/BufferedStream.h:348 AK::InputBufferedSeekable::can_read_line.
+pub func input_buffered_seekable_can_read_line[T: IsSeekableStream](this: InputBufferedSeekable[T]*) -> bool!:
+    return (try buffered_helper_can_read_up_to_delimiter(&this.m_helper, "\n".bytes)) or buffered_helper_is_eof_with_data_left_over(&this.m_helper)
+
+## Ported from AK/BufferedStream.h:352 AK::InputBufferedSeekable::read_until.
+pub func input_buffered_seekable_read_until[T: IsSeekableStream](this: InputBufferedSeekable[T]*, buffer: u8[], candidate: StringView) -> u8[]!:
+    return try buffered_helper_read_until(&this.m_helper, buffer, candidate)
+
+## Ported from AK/BufferedStream.h:353 AK::InputBufferedSeekable::read_until_any_of.
+pub func input_buffered_seekable_read_until_any_of[T: IsSeekableStream](this: InputBufferedSeekable[T]*, buffer: u8[], candidates: const StringView[]) -> u8[]!:
+    return try buffered_helper_read_until_any_of(&this.m_helper, buffer, candidates)
+
+## Ported from AK/BufferedStream.h:355 AK::InputBufferedSeekable::can_read_up_to_delimiter.
+pub func input_buffered_seekable_can_read_up_to_delimiter[T: IsSeekableStream](this: InputBufferedSeekable[T]*, delimiter: const u8[]) -> bool!:
+    return try buffered_helper_can_read_up_to_delimiter(&this.m_helper, delimiter)
+
+## Ported from AK/BufferedStream.h:358 AK::InputBufferedSeekable::read_line_with_resize.
+# Methods for reading stream into an auto-adjusting buffer
+pub func input_buffered_seekable_read_line_with_resize[T: IsSeekableStream](this: InputBufferedSeekable[T]*, buffer: ByteBuffer*) -> StringView!:
+    return try buffered_helper_read_line_with_resize(&this.m_helper, buffer)
+
+## Ported from AK/BufferedStream.h:359 AK::InputBufferedSeekable::read_until_with_resize.
+pub func input_buffered_seekable_read_until_with_resize[T: IsSeekableStream](this: InputBufferedSeekable[T]*, buffer: ByteBuffer*, candidate: StringView) -> u8[]!:
+    return try buffered_helper_read_until_with_resize(&this.m_helper, buffer, candidate)
+
+## Ported from AK/BufferedStream.h:361 AK::InputBufferedSeekable::read_until_any_of_with_resize.
+pub func input_buffered_seekable_read_until_any_of_with_resize[T: IsSeekableStream](this: InputBufferedSeekable[T]*, buffer: ByteBuffer*, candidates: const StringView[]) -> u8[]!:
+    return try buffered_helper_read_until_any_of_with_resize(&this.m_helper, buffer, candidates)
+
+## Ported from AK/BufferedStream.h:363 AK::InputBufferedSeekable::buffer_size.
+pub func input_buffered_seekable_buffer_size[T](this: const InputBufferedSeekable[T]*) -> usize:
+    return buffered_helper_buffer_size(&this.m_helper)
+
+## Ported from AK/BufferedStream.h:368 AK::InputBufferedSeekable::InputBufferedSeekable<T>.
+pub func input_buffered_seekable_construct[T](this: InputBufferedSeekable[T]*, stream: T*, buffer: CircularBuffer):
+    this.seekable_stream_base.stream_base.vtable = (const StreamVTable*)&input_buffered_seekable_vtable
+    this.seekable_stream_base.stream_base.class_id = input_buffered_seekable_class.first_id
+    buffered_helper_buffered_helper_t(&this.m_helper, stream, buffer)
+
+# The overrides in input_buffered_seekable_vtable: the generic members at T = SeekableStream.
+
+func input_buffered_seekable_read_some_impl(base: Stream*, buffer: u8[]) -> u8[]!:
+    return try input_buffered_seekable_read_some((InputBufferedSeekable[SeekableStream]*)base, buffer)
+
+func input_buffered_seekable_write_some_impl(base: Stream*, buffer: const u8[]) -> usize!:
+    return try input_buffered_seekable_write_some((InputBufferedSeekable[SeekableStream]*)base, buffer)
+
+func input_buffered_seekable_is_eof_impl(base: Stream*) -> bool:
+    return input_buffered_seekable_is_eof((const InputBufferedSeekable[SeekableStream]*)base)
+
+func input_buffered_seekable_is_open_impl(base: Stream*) -> bool:
+    return input_buffered_seekable_is_open((const InputBufferedSeekable[SeekableStream]*)base)
+
+func input_buffered_seekable_close_impl(base: Stream*):
+    input_buffered_seekable_close((InputBufferedSeekable[SeekableStream]*)base)
+
+func input_buffered_seekable_seek_impl(base: SeekableStream*, offset: i64, mode: SeekMode) -> usize!:
+    return try input_buffered_seekable_seek((InputBufferedSeekable[SeekableStream]*)base, offset, mode)
+
+func input_buffered_seekable_truncate_impl(base: SeekableStream*, length: usize) -> !:
+    return try input_buffered_seekable_truncate((InputBufferedSeekable[SeekableStream]*)base, length)
+
+# mark: OutputBufferedSeekable ==================================================================
+
+## Ported from AK/BufferedStream.h:379 AK::OutputBufferedSeekable::create.
+pub func output_buffered_seekable_create[T: IsSeekableStream](stream: T*, buffer_size: usize = 16384) -> OutputBufferedSeekable[T]*!:
+    if buffer_size == 0:
+        try ak_error_throw(ak_error_from_errno(einval))
+    if not stream_is_open(stream.seekable_stream().stream()):
+        try ak_error_throw(ak_error_from_errno(enotconn()))
+
+    let buffer = try circular_buffer_create_empty(buffer_size)
+
+    let seekable = SeekableStream(stream_base = Stream(vtable = (const StreamVTable*)&output_buffered_seekable_vtable, class_id = output_buffered_seekable_class.first_id))
+    let result = new OutputBufferedSeekable[T](seekable_stream_base = seekable, m_stream = stream, m_buffer = buffer) catch:
+        return try ak_error_throw(ak_error_from_errno(enomem))
+    output_buffered_seekable_construct(result, stream, buffer)
+    return result
+
+## Ported from AK/BufferedStream.h:394 AK::OutputBufferedSeekable::read_some (override).
+pub func output_buffered_seekable_read_some[T: IsSeekableStream](this: OutputBufferedSeekable[T]*, buffer: u8[]) -> u8[]!:
+    try output_buffered_seekable_flush_buffer(this)
+    return try stream_read_some(this.m_stream.seekable_stream().stream(), buffer)
+
+## Ported from AK/BufferedStream.h:400 AK::OutputBufferedSeekable::write_some (override).
+pub func output_buffered_seekable_write_some[T: IsSeekableStream](this: OutputBufferedSeekable[T]*, buffer: const u8[]) -> usize!:
+    let stream = this.m_stream.seekable_stream().stream()
+    if not stream_is_open(stream):
+        try ak_error_throw(ak_error_from_errno(enotconn()))
+
+    let written = circular_buffer_write(&this.m_buffer, buffer)
+
+    if circular_buffer_empty_space(&this.m_buffer) == 0:
+        discard(try circular_buffer_flush_to_stream(&this.m_buffer, stream))
+
+    return written
+
+## Ported from AK/BufferedStream.h:413 AK::OutputBufferedSeekable::is_eof (override).
+pub func output_buffered_seekable_is_eof[T: IsSeekableStream](this: const OutputBufferedSeekable[T]*) -> bool:
+    output_buffered_seekable_flush_buffer(this) else trap("MUST: flush_buffer")
+    return stream_is_eof(this.m_stream.seekable_stream().stream())
+
+## Ported from AK/BufferedStream.h:419 AK::OutputBufferedSeekable::is_open (override).
+pub func output_buffered_seekable_is_open[T: IsSeekableStream](this: const OutputBufferedSeekable[T]*) -> bool:
+    return stream_is_open(this.m_stream.seekable_stream().stream())
+
+## Ported from AK/BufferedStream.h:421 AK::OutputBufferedSeekable::close (override).
+pub func output_buffered_seekable_close[T: IsSeekableStream](this: OutputBufferedSeekable[T]*):
+    output_buffered_seekable_flush_buffer(this) else trap("MUST: flush_buffer")
+    stream_close(this.m_stream.seekable_stream().stream())
+
+## Ported from AK/BufferedStream.h:427 AK::OutputBufferedSeekable::flush_buffer (const in the
+## donor over mutable members).
+pub func output_buffered_seekable_flush_buffer[T: IsSeekableStream](this: const OutputBufferedSeekable[T]*) -> !:
+    let mutable_this = (OutputBufferedSeekable[T]*)this
+    while circular_buffer_used_space(&mutable_this.m_buffer) > 0:
+        discard(try circular_buffer_flush_to_stream(&mutable_this.m_buffer, mutable_this.m_stream.seekable_stream().stream()))
+
+## Ported from AK/BufferedStream.h:435 AK::OutputBufferedSeekable::tell (override).
+# Since tell() doesn't involve moving the write offset, we can skip flushing the buffer here.
+pub func output_buffered_seekable_tell[T: IsSeekableStream](this: const OutputBufferedSeekable[T]*) -> usize!:
+    return (try seekable_stream_tell(this.m_stream.seekable_stream())) + circular_buffer_used_space(&this.m_buffer)
+
+## Ported from AK/BufferedStream.h:440 AK::OutputBufferedSeekable::seek (override).
+pub func output_buffered_seekable_seek[T: IsSeekableStream](this: OutputBufferedSeekable[T]*, offset: i64, mode: SeekMode) -> usize!:
+    try output_buffered_seekable_flush_buffer(this)
+    return try seekable_stream_seek(this.m_stream.seekable_stream(), offset, mode)
+
+## Ported from AK/BufferedStream.h:446 AK::OutputBufferedSeekable::truncate (override).
+pub func output_buffered_seekable_truncate[T: IsSeekableStream](this: OutputBufferedSeekable[T]*, length: usize) -> !:
+    try output_buffered_seekable_flush_buffer(this)
+    return try seekable_stream_truncate(this.m_stream.seekable_stream(), length)
+
+## Ported from AK/BufferedStream.h:458 AK::OutputBufferedSeekable::OutputBufferedSeekable<T>.
+pub func output_buffered_seekable_construct[T](this: OutputBufferedSeekable[T]*, stream: T*, buffer: CircularBuffer):
+    this.seekable_stream_base.stream_base.vtable = (const StreamVTable*)&output_buffered_seekable_vtable
+    this.seekable_stream_base.stream_base.class_id = output_buffered_seekable_class.first_id
+    this.m_stream = stream
+    this.m_buffer = buffer
+
+# The overrides in output_buffered_seekable_vtable: the generic members at T = SeekableStream.
+
+func output_buffered_seekable_read_some_impl(base: Stream*, buffer: u8[]) -> u8[]!:
+    return try output_buffered_seekable_read_some((OutputBufferedSeekable[SeekableStream]*)base, buffer)
+
+func output_buffered_seekable_write_some_impl(base: Stream*, buffer: const u8[]) -> usize!:
+    return try output_buffered_seekable_write_some((OutputBufferedSeekable[SeekableStream]*)base, buffer)
+
+func output_buffered_seekable_is_eof_impl(base: Stream*) -> bool:
+    return output_buffered_seekable_is_eof((const OutputBufferedSeekable[SeekableStream]*)base)
+
+func output_buffered_seekable_is_open_impl(base: Stream*) -> bool:
+    return output_buffered_seekable_is_open((const OutputBufferedSeekable[SeekableStream]*)base)
+
+func output_buffered_seekable_close_impl(base: Stream*):
+    output_buffered_seekable_close((OutputBufferedSeekable[SeekableStream]*)base)
+
+func output_buffered_seekable_seek_impl(base: SeekableStream*, offset: i64, mode: SeekMode) -> usize!:
+    return try output_buffered_seekable_seek((OutputBufferedSeekable[SeekableStream]*)base, offset, mode)
+
+func output_buffered_seekable_tell_impl(base: SeekableStream*) -> usize!:
+    return try output_buffered_seekable_tell((const OutputBufferedSeekable[SeekableStream]*)base)
+
+func output_buffered_seekable_truncate_impl(base: SeekableStream*, length: usize) -> !:
+    return try output_buffered_seekable_truncate((OutputBufferedSeekable[SeekableStream]*)base, length)

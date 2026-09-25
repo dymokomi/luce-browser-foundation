@@ -1,0 +1,18 @@
+#==============================================================================================
+#
+#   any_of - whether some element of a range satisfies a predicate
+#
+#   DESCRIPTION:
+#       Port of AK/AnyOf.h (lines 1-34), over SimpleIterator ranges and IndexedContainers
+#       as find.lucb.
+#
+#==============================================================================================
+
+## Ported from AK/AnyOf.h:16 AK::any_of.
+pub func any_of_tt_iterator[T, TContainer: IndexedContainer[T]](begin: SimpleIterator[TContainer, T], end: SimpleIterator[TContainer, T], predicate: Function1[const T*, bool]) -> bool:
+    let found = find_if(begin, end, predicate)
+    return not simple_iterator_eq(&found, end)
+
+## Ported from AK/AnyOf.h:25 AK::any_of.
+pub func any_of_t_container[T, TContainer: IndexedContainer[T]](container: TContainer*, predicate: Function1[const T*, bool]) -> bool:
+    return any_of_tt_iterator(simple_iterator_begin[TContainer, T](container), simple_iterator_end[T, TContainer](container), predicate)

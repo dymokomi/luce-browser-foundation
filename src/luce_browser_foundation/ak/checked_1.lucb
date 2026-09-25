@@ -1,0 +1,299 @@
+#==============================================================================================
+#
+#   checked_1 - Checked<T>: overflow-tracking integers, the generic half and size_t
+#
+#   DESCRIPTION:
+#       Port of AK/Checked.h (lines 1-476). The struct is support.lucb's Checked[T]. What does
+#       not compute on the value (construction, value(), has_overflow(), the comparisons,
+#       make_checked) is generic; the arithmetic is instantiated per integer type because
+#       luce-base generics cannot compute on a type parameter: each instantiation carries
+#       its type as a suffix (`checked_add_usize`, `add_usize`); size_t is here, the
+#       signed ones in checked_2 and the other unsigned ones in checked_3. TypeBoundsChecker's is_within_range<D>(value) is `is_within_range_<d>`
+#       (a signed source) and `is_within_range_u64_<d>` (an unsigned one).
+#
+#==============================================================================================
+
+# mark: is_within_range =========================================================================
+
+## Ported from AK/Checked.h:108 AK::is_within_range<i32>: whether a signed value fits in i32.
+pub func is_within_range_i32(value: i64) -> bool:
+    return value >= (i64)i32_min and value <= (i64)i32_max
+
+## Ported from AK/Checked.h:108 AK::is_within_range<i64>: whether a signed value fits in i64.
+pub func is_within_range_i64(value: i64) -> bool:
+    return value >= (i64)i64_min and value <= (i64)i64_max
+
+## Ported from AK/Checked.h:108 AK::is_within_range<i32>: whether an unsigned value fits in i32.
+pub func is_within_range_u64_i32(value: u64) -> bool:
+    return value <= (u64)i32_max
+
+## Ported from AK/Checked.h:108 AK::is_within_range<i64>: whether an unsigned value fits in i64.
+pub func is_within_range_u64_i64(value: u64) -> bool:
+    return value <= (u64)i64_max
+
+## Ported from AK/Checked.h:108 AK::is_within_range<u32>: whether a signed value fits in u32.
+pub func is_within_range_u32(value: i64) -> bool:
+    return value >= 0 and (u64)value <= (u64)u32_max
+
+## Ported from AK/Checked.h:108 AK::is_within_range<u64>: whether a signed value fits in u64.
+pub func is_within_range_u64(value: i64) -> bool:
+    return value >= 0 and (u64)value <= (u64)u64_max
+
+## Ported from AK/Checked.h:108 AK::is_within_range<usize>: whether a signed value fits in usize.
+pub func is_within_range_usize(value: i64) -> bool:
+    return value >= 0 and (u64)value <= (u64)usize_max
+
+## Ported from AK/Checked.h:108 AK::is_within_range<u32>: whether an unsigned value fits in u32.
+pub func is_within_range_u64_u32(value: u64) -> bool:
+    return value <= (u64)u32_max
+
+## Ported from AK/Checked.h:108 AK::is_within_range<u64>: whether an unsigned value fits in u64.
+pub func is_within_range_u64_u64(value: u64) -> bool:
+    return value <= (u64)u64_max
+
+## Ported from AK/Checked.h:108 AK::is_within_range<usize>: whether an unsigned value fits in usize.
+pub func is_within_range_u64_usize(value: u64) -> bool:
+    return value <= (u64)usize_max
+
+# mark: Generic members =========================================================================
+
+## Ported from AK/Checked.h:118 AK::Checked::Checked<T>.
+pub func checked_construct[T](this: Checked[T]*, value: T):
+    this.m_value = value
+    this.m_overflow = false
+
+## Ported from AK/Checked.h:154 AK::Checked::has_overflow.
+pub func checked_has_overflow[T](this: const Checked[T]*) -> bool:
+    return this.m_overflow
+
+## Ported from AK/Checked.h:165 AK::Checked::value.
+pub func checked_value[T](this: const Checked[T]*) -> T:
+    assert(not this.m_overflow)
+    return this.m_value
+
+## Ported from AK/Checked.h:171 AK::Checked::value_unchecked.
+pub func checked_value_unchecked[T](this: const Checked[T]*) -> T:
+    return this.m_value
+
+## Ported from AK/Checked.h:394 AK::operator<(Checked, T).
+pub func lt_checked[T: luce.Comparable](a: Checked[T], b: T) -> bool:
+    return checked_value(&a).compare(b) < 0
+
+## Ported from AK/Checked.h:400 AK::operator>(Checked, T).
+pub func gt_checked[T: luce.Comparable](a: Checked[T], b: T) -> bool:
+    return checked_value(&a).compare(b) > 0
+
+## Ported from AK/Checked.h:406 AK::operator>=(Checked, T).
+pub func ge_checked[T: luce.Comparable](a: Checked[T], b: T) -> bool:
+    return checked_value(&a).compare(b) >= 0
+
+## Ported from AK/Checked.h:412 AK::operator<=(Checked, T).
+pub func le_checked[T: luce.Comparable](a: Checked[T], b: T) -> bool:
+    return checked_value(&a).compare(b) <= 0
+
+## Ported from AK/Checked.h:418 AK::operator==(Checked, T).
+pub func eq_checked[T: luce.Comparable](a: Checked[T], b: T) -> bool:
+    return checked_value(&a).compare(b) == 0
+
+## Ported from AK/Checked.h:424 AK::operator!=(Checked, T).
+pub func ne_checked[T: luce.Comparable](a: Checked[T], b: T) -> bool:
+    return checked_value(&a).compare(b) != 0
+
+## Ported from AK/Checked.h:430 AK::operator<(T, Checked).
+pub func lt_t[T: luce.Comparable](a: T, b: Checked[T]) -> bool:
+    return a.compare(checked_value(&b)) < 0
+
+## Ported from AK/Checked.h:436 AK::operator>(T, Checked).
+pub func gt_t[T: luce.Comparable](a: T, b: Checked[T]) -> bool:
+    return a.compare(checked_value(&b)) > 0
+
+## Ported from AK/Checked.h:442 AK::operator>=(T, Checked).
+pub func ge_t[T: luce.Comparable](a: T, b: Checked[T]) -> bool:
+    return a.compare(checked_value(&b)) >= 0
+
+## Ported from AK/Checked.h:448 AK::operator<=(T, Checked).
+pub func le_t[T: luce.Comparable](a: T, b: Checked[T]) -> bool:
+    return a.compare(checked_value(&b)) <= 0
+
+## Ported from AK/Checked.h:454 AK::operator==(T, Checked).
+pub func eq_t[T: luce.Comparable](a: T, b: Checked[T]) -> bool:
+    return a.compare(checked_value(&b)) == 0
+
+## Ported from AK/Checked.h:460 AK::operator!=(T, Checked).
+pub func ne_t[T: luce.Comparable](a: T, b: Checked[T]) -> bool:
+    return a.compare(checked_value(&b)) != 0
+
+## Ported from AK/Checked.h:466 AK::make_checked.
+pub func make_checked[T](value: T) -> Checked[T]:
+    return Checked[T](m_value = value, m_overflow = false)
+
+# mark: size_t arithmetic =======================================================================
+
+## Ported from AK/Checked.h:124 AK::Checked::Checked<T> (from another integer type), for usize:
+## the value is truncated and the overflow flag set when it does not fit.
+pub func checked_checked_t_usize(this: Checked[usize]*, value: i64):
+    this.m_overflow = not is_within_range_usize(value)
+    this.m_value = (usize)value
+
+## Ported from AK/Checked.h:124 AK::Checked::Checked<T> (from an unsigned 64-bit value), for usize.
+pub func checked_checked_t_u64_usize(this: Checked[usize]*, value: u64):
+    this.m_overflow = not is_within_range_u64_usize(value)
+    this.m_value = (usize)value
+
+## Ported from AK/Checked.h:159 AK::Checked::operator!, for usize.
+pub func checked_not_usize(this: const Checked[usize]*) -> bool:
+    assert(not this.m_overflow)
+    return this.m_value == 0
+
+## Ported from AK/Checked.h:176 AK::Checked::add, for usize.
+pub func checked_add_usize(this: Checked[usize]*, other: usize):
+    let overflowed = (this.m_value +? other) == none
+    this.m_value = this.m_value +% other
+    this.m_overflow = this.m_overflow or overflowed
+
+## Ported from AK/Checked.h:181 AK::Checked::sub, for usize.
+pub func checked_sub_usize(this: Checked[usize]*, other: usize):
+    let overflowed = (this.m_value -? other) == none
+    this.m_value = this.m_value -% other
+    this.m_overflow = this.m_overflow or overflowed
+
+## Ported from AK/Checked.h:186 AK::Checked::mul, for usize.
+pub func checked_mul_usize(this: Checked[usize]*, other: usize):
+    let overflowed = (this.m_value *? other) == none
+    this.m_value = this.m_value *% other
+    this.m_overflow = this.m_overflow or overflowed
+
+## Ported from AK/Checked.h:191 AK::Checked::div, for usize.
+pub func checked_div_usize(this: Checked[usize]*, other: usize):
+    if other == 0:
+        this.m_overflow = true
+        return
+    this.m_value = this.m_value // other
+
+## Ported from AK/Checked.h:207 AK::Checked::mod, for usize.
+pub func checked_mod_usize(this: Checked[usize]*, other: usize):
+    let initial = this.m_value
+    checked_div_usize(this, other)
+    this.m_value = this.m_value *% other
+    this.m_value = initial -% this.m_value
+
+## Ported from AK/Checked.h:215 AK::Checked::operator+=(Checked), for usize.
+pub func checked_add_assign_checked_usize(this: Checked[usize]*, other: Checked[usize]) -> Checked[usize]*:
+    this.m_overflow = this.m_overflow or other.m_overflow
+    checked_add_usize(this, checked_value_unchecked(&other))
+    return this
+
+## Ported from AK/Checked.h:222 AK::Checked::operator+=(T), for usize.
+pub func checked_add_assign_t_usize(this: Checked[usize]*, other: usize) -> Checked[usize]*:
+    checked_add_usize(this, other)
+    return this
+
+## Ported from AK/Checked.h:228 AK::Checked::operator-=(Checked), for usize.
+pub func checked_sub_assign_checked_usize(this: Checked[usize]*, other: Checked[usize]) -> Checked[usize]*:
+    this.m_overflow = this.m_overflow or other.m_overflow
+    checked_sub_usize(this, checked_value_unchecked(&other))
+    return this
+
+## Ported from AK/Checked.h:235 AK::Checked::operator-=(T), for usize.
+pub func checked_sub_assign_t_usize(this: Checked[usize]*, other: usize) -> Checked[usize]*:
+    checked_sub_usize(this, other)
+    return this
+
+## Ported from AK/Checked.h:241 AK::Checked::operator*=(Checked), for usize.
+pub func checked_mul_assign_checked_usize(this: Checked[usize]*, other: Checked[usize]) -> Checked[usize]*:
+    this.m_overflow = this.m_overflow or other.m_overflow
+    checked_mul_usize(this, checked_value_unchecked(&other))
+    return this
+
+## Ported from AK/Checked.h:248 AK::Checked::operator*=(T), for usize.
+pub func checked_mul_assign_t_usize(this: Checked[usize]*, other: usize) -> Checked[usize]*:
+    checked_mul_usize(this, other)
+    return this
+
+## Ported from AK/Checked.h:254 AK::Checked::operator/=(Checked), for usize.
+pub func checked_div_assign_checked_usize(this: Checked[usize]*, other: Checked[usize]) -> Checked[usize]*:
+    this.m_overflow = this.m_overflow or other.m_overflow
+    checked_div_usize(this, checked_value_unchecked(&other))
+    return this
+
+## Ported from AK/Checked.h:261 AK::Checked::operator/=(T), for usize.
+pub func checked_div_assign_t_usize(this: Checked[usize]*, other: usize) -> Checked[usize]*:
+    checked_div_usize(this, other)
+    return this
+
+## Ported from AK/Checked.h:267 AK::Checked::operator%=(Checked), for usize.
+pub func checked_rem_assign_checked_usize(this: Checked[usize]*, other: Checked[usize]) -> Checked[usize]*:
+    this.m_overflow = this.m_overflow or other.m_overflow
+    checked_mod_usize(this, checked_value_unchecked(&other))
+    return this
+
+## Ported from AK/Checked.h:274 AK::Checked::operator%=(T), for usize.
+pub func checked_rem_assign_t_usize(this: Checked[usize]*, other: usize) -> Checked[usize]*:
+    checked_mod_usize(this, other)
+    return this
+
+## Ported from AK/Checked.h:280 AK::Checked::operator++ (prefix), for usize.
+pub func checked_inc_usize(this: Checked[usize]*) -> Checked[usize]*:
+    checked_add_usize(this, 1)
+    return this
+
+## Ported from AK/Checked.h:286 AK::Checked::operator++ (postfix), for usize.
+pub func checked_inc_i32_usize(this: Checked[usize]*, arg0: i32) -> Checked[usize]:
+    discard(arg0)
+    let old = *this
+    checked_add_usize(this, 1)
+    return old
+
+## Ported from AK/Checked.h:293 AK::Checked::operator-- (prefix), for usize.
+pub func checked_dec_usize(this: Checked[usize]*) -> Checked[usize]*:
+    checked_sub_usize(this, 1)
+    return this
+
+## Ported from AK/Checked.h:299 AK::Checked::operator-- (postfix), for usize.
+pub func checked_dec_i32_usize(this: Checked[usize]*, arg0: i32) -> Checked[usize]:
+    discard(arg0)
+    let old = *this
+    checked_sub_usize(this, 1)
+    return old
+
+## Ported from AK/Checked.h:307 AK::Checked::addition_would_overflow, for usize.
+pub func checked_addition_would_overflow_usize(u: usize, v: usize) -> bool:
+    return (u +? v) == none
+
+## Ported from AK/Checked.h:327 AK::Checked::subtraction_would_overflow, for usize.
+pub func checked_subtraction_would_overflow_usize(u: usize, v: usize) -> bool:
+    return (u -? v) == none
+
+## Ported from AK/Checked.h:338 AK::Checked::multiplication_would_overflow, for usize.
+pub func checked_multiplication_would_overflow_usize(u: usize, v: usize) -> bool:
+    return (u *? v) == none
+
+## Ported from AK/Checked.h:354 AK::operator+(Checked, Checked), for usize.
+pub func add_usize(a: Checked[usize], b: Checked[usize]) -> Checked[usize]:
+    var c = a
+    discard(checked_add_assign_checked_usize(&c, b))
+    return c
+
+## Ported from AK/Checked.h:362 AK::operator-(Checked, Checked), for usize.
+pub func sub_usize(a: Checked[usize], b: Checked[usize]) -> Checked[usize]:
+    var c = a
+    discard(checked_sub_assign_checked_usize(&c, b))
+    return c
+
+## Ported from AK/Checked.h:370 AK::operator*(Checked, Checked), for usize.
+pub func mul_usize(a: Checked[usize], b: Checked[usize]) -> Checked[usize]:
+    var c = a
+    discard(checked_mul_assign_checked_usize(&c, b))
+    return c
+
+## Ported from AK/Checked.h:378 AK::operator/(Checked, Checked), for usize.
+pub func div_usize(a: Checked[usize], b: Checked[usize]) -> Checked[usize]:
+    var c = a
+    discard(checked_div_assign_checked_usize(&c, b))
+    return c
+
+## Ported from AK/Checked.h:386 AK::operator%(Checked, Checked), for usize.
+pub func rem_usize(a: Checked[usize], b: Checked[usize]) -> Checked[usize]:
+    var c = a
+    discard(checked_rem_assign_checked_usize(&c, b))
+    return c

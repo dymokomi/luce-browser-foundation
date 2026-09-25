@@ -1,0 +1,68 @@
+#==============================================================================================
+#
+#   binary_search - binary search over a sorted span
+#
+#   DESCRIPTION:
+#       Port of AK/BinarySearch.h (lines 1-72). The haystack is a span; the comparator is a
+#       Function2[const N*, const T*, i32] of the needle and an element (negative, zero or
+#       positive); default_comparator() gives DefaultComparator's `>`/`<` comparison.
+#
+#==============================================================================================
+
+## Ported from AK/BinarySearch.h:16 AK::DefaultComparator::operator(): 1 when lhs > rhs, -1 when
+## lhs < rhs, else 0.
+pub func default_comparator_call[T: luce.Comparable](this: DefaultComparator*, lhs: const T*, rhs: const T*) -> i32:
+    discard(this)
+    # workaround: compiler-issues/float_bits_through_pointer (a float method is not called
+    # through the pointer)
+    let left = *lhs
+    let order = left.compare(*rhs)
+    if order > 0:
+        return 1
+    if order < 0:
+        return -1
+    return 0
+
+# DefaultComparator as a callback.
+# workaround: compiler-issues/generic_function_value (the callback is a static method)
+struct BinarySearchDefaultComparator[T: luce.Comparable]:
+    var unused: u8
+
+    static func call(context: void*?, lhs: const T*, rhs: const T*) -> i32:
+        discard(context)
+        var comparator = DefaultComparator(empty_ = 0)
+        return default_comparator_call(&comparator, lhs, rhs)
+
+## DefaultComparator as the comparator argument of binary_search.
+pub func default_comparator[T: luce.Comparable]() -> Function2[const T*, const T*, i32]:
+    let call: func(void*?, const T*, const T*) -> i32 = BinarySearchDefaultComparator[T].call
+    return Function2[const T*, const T*, i32](call = call, context = none)
+
+## Ported from AK/BinarySearch.h:29 AK::binary_search: the element comparing equal to `needle`,
+## or none; `nearby_index` receives its index, or where the search ended.
+pub func binary_search[T, N](haystack: const T[], needle: N, nearby_index: usize*?, comparator: Function2[const N*, const T*, i32]) -> const T*?:
+    if haystack.length == 0:
+        if let index = nearby_index:
+            *index = 0
+        return none
+
+    var low: usize = 0
+    var high = haystack.length - 1
+    while low <= high:
+        let middle = low + (high - low) // 2
+        let comparison = function2_call(&comparator, &needle, &haystack[middle])
+        if comparison < 0:
+            if middle != 0:
+                high = middle - 1
+            else:
+                break
+        elif comparison > 0:
+            low = middle + 1
+        else:
+            if let index = nearby_index:
+                *index = middle
+            return &haystack[middle]
+
+    if let index = nearby_index:
+        *index = low if low < high else high
+    return none

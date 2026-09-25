@@ -7,6 +7,8 @@
 #       AK/MemoryStream.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
 #       Regenerate rather than edit, except to fill a field the generator could not map.
 #
+#       Edited by the r01 port: AllocatingMemoryStream::Chunk has its fields.
+#
 #==============================================================================================
 
 # mark: FixedMemoryStream =======================================================================
@@ -107,6 +109,7 @@ pub func as_allocating_memory_stream[P: IsStream](p: P*) -> AllocatingMemoryStre
 ## AK::AllocatingMemoryStream::CHUNK_SIZE (AK/MemoryStream.h:95).
 pub let allocating_memory_stream_chunk_size: usize = 4096
 
-## AK::AllocatingMemoryStream::Chunk (AK/MemoryStream.h:115): opaque in this phase (not in the phase-1 closure).
+## AK::AllocatingMemoryStream::Chunk (AK/MemoryStream.h:115): one fixed-size chunk of the list.
 pub struct AllocatingMemoryStreamChunk:
-    pub var opaque_: u8
+    pub var data: u8[4096]
+    pub var next: AllocatingMemoryStreamChunk*?  # OwnPtr<Chunk>

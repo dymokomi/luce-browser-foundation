@@ -1,0 +1,51 @@
+#==============================================================================================
+#
+#   typed_transfer - moving, copying, comparing and relocating runs of values
+#
+#   DESCRIPTION:
+#       Port of AK/TypedTransfer.h (lines 1-105). luce-base values are plain data: moving or
+#       copying one is copying its bytes, and nothing has a destructor (DESIGN.md §3.3), so
+#       every type takes the donor's trivial branches (memmove, memcpy, no-op delete_).
+#       compare() compares with `==` (the donor's memcmp would miscompare struct padding).
+#
+#==============================================================================================
+
+## Ported from AK/TypedTransfer.h:16 AK::TypedTransfer::move.
+pub func typed_transfer_move[T](destination: T*, source: const T*, count: usize):
+    if count == 0:
+        return
+    let bytes = count * sizeof(T)
+    memory.move(u8[]((u8*)destination, bytes), u8[]((u8*)source, bytes), bytes)
+
+## Ported from AK/TypedTransfer.h:34 AK::TypedTransfer::copy.
+pub func typed_transfer_copy[T](destination: T*, source: const T*, count: usize) -> usize:
+    if count == 0:
+        return 0
+    if count == 1:
+        *destination = *source
+    else:
+        let bytes = count * sizeof(T)
+        memory.move(u8[]((u8*)destination, bytes), u8[]((u8*)source, bytes), bytes)
+    return count
+
+## Ported from AK/TypedTransfer.h:56 AK::TypedTransfer::compare.
+pub func typed_transfer_compare[T: luce.Equatable](a: const T*, b: const T*, count: usize) -> bool:
+    if count == 0 or a == b:
+        return true
+    for i in 0..<count:
+        if a[i] != b[i]:
+            return false
+    return true
+
+## Ported from AK/TypedTransfer.h:73 AK::TypedTransfer::relocate.
+pub func typed_transfer_relocate[T](destination: T*, source: T*, count: usize):
+    assert(source + count <= destination or destination + count <= source)
+    if count == 0:
+        return
+    let bytes = count * sizeof(T)
+    memory.copy(u8[]((u8*)destination, bytes), u8[]((u8*)source, bytes), bytes)
+
+## Ported from AK/TypedTransfer.h:91 AK::TypedTransfer::delete_: nothing to destroy.
+pub func typed_transfer_delete[T](ptr: T*, count: usize):
+    discard(ptr)
+    discard(count)

@@ -1,0 +1,332 @@
+#==============================================================================================
+#
+#   memory_stream - FixedMemoryStream and AllocatingMemoryStream
+#
+#   DESCRIPTION:
+#       Port of AK/MemoryStream.h (lines 1-143) and AK/MemoryStream.cpp (lines 1-282).
+#       The vtables and class information are in types_memory_stream; the constructors
+#       install them (the C++ vptr). AllocatingMemoryStream's chunks are a singly-linked list
+#       in managed memory: the donor's OwnPtr links are plain pointers and nothing is freed
+#       (DESIGN.md §3.3), so its destructor has nothing to do.
+#
+#==============================================================================================
+
+# mark: FixedMemoryStream =======================================================================
+
+## Ported from AK/MemoryStream.cpp:14 AK::FixedMemoryStream::FixedMemoryStream(Bytes, Mode).
+pub func fixed_memory_stream_construct_fixed_memory_stream_mode(this: FixedMemoryStream*, bytes: u8[], mode: FixedMemoryStreamMode = FixedMemoryStreamMode.read_write):
+    this.stream().vtable = (const StreamVTable*)&fixed_memory_stream_vtable
+    this.stream().class_id = fixed_memory_stream_class.first_id
+    this.m_bytes = bytes
+    this.m_offset = 0
+    this.m_writing_enabled = mode == FixedMemoryStreamMode.read_write
+
+## Ported from AK/MemoryStream.cpp:20 AK::FixedMemoryStream::FixedMemoryStream(ReadonlyBytes).
+pub func fixed_memory_stream_construct(this: FixedMemoryStream*, bytes: const u8[]):
+    this.stream().vtable = (const StreamVTable*)&fixed_memory_stream_vtable
+    this.stream().class_id = fixed_memory_stream_class.first_id
+    this.m_bytes = (u8[])bytes
+    this.m_offset = 0
+    this.m_writing_enabled = false
+
+## Ported from AK/MemoryStream.cpp:26 AK::FixedMemoryStream::is_eof (override).
+pub func fixed_memory_stream_is_eof_impl(base: Stream*) -> bool:
+    let this = (FixedMemoryStream*)base
+    return this.m_offset >= this.m_bytes.length
+
+## Ported from AK/MemoryStream.cpp:31 AK::FixedMemoryStream::is_open (override).
+pub func fixed_memory_stream_is_open_impl(base: Stream*) -> bool:
+    discard(base)
+    return true
+
+## Ported from AK/MemoryStream.cpp:36 AK::FixedMemoryStream::close (override).
+pub func fixed_memory_stream_close_impl(base: Stream*):
+    # FIXME: It doesn't make sense to close a memory stream. Therefore, we don't do anything here. Is that fine?
+    discard(base)
+
+## Ported from AK/MemoryStream.cpp:41 AK::FixedMemoryStream::truncate (override).
+pub func fixed_memory_stream_truncate_impl(base: SeekableStream*, arg0: usize) -> !:
+    discard(base)
+    discard(arg0)
+    try ak_error_throw(ak_error_from_errno(ebadf))
+
+## Ported from AK/MemoryStream.h:33 AK::FixedMemoryStream::read_some (override).
+pub func fixed_memory_stream_read_some_impl(base: Stream*, bytes: u8[]) -> u8[]!:
+    let this = (FixedMemoryStream*)base
+    let read = bytes_copy_trimmed_to(this.m_bytes[this.m_offset..], bytes)
+    this.m_offset += read
+    return bytes[0..<read]
+
+## Ported from AK/MemoryStream.cpp:46 AK::FixedMemoryStream::read_until_filled (override).
+pub func fixed_memory_stream_read_until_filled_impl(base: Stream*, bytes: u8[]) -> !:
+    let this = (FixedMemoryStream*)base
+    if fixed_memory_stream_remaining(this) < bytes.length:
+        error(ak_error, "Can't read past the end of the stream memory")
+
+    discard(bytes_copy_trimmed_to(this.m_bytes[this.m_offset..], bytes))
+    this.m_offset += bytes.length
+
+## Ported from AK/MemoryStream.cpp:57 AK::FixedMemoryStream::seek (override).
+pub func fixed_memory_stream_seek_impl(base: SeekableStream*, offset: i64, seek_mode: SeekMode) -> usize!:
+    let this = (FixedMemoryStream*)base
+    match seek_mode:
+        .set_position:
+            if offset > (i64)this.m_bytes.length:
+                error(ak_error, "Offset past the end of the stream memory")
+
+            this.m_offset = (usize)offset
+        .from_current_position:
+            if offset + (i64)this.m_offset > (i64)this.m_bytes.length:
+                error(ak_error, "Offset past the end of the stream memory")
+
+            this.m_offset = (usize)((i64)this.m_offset + offset)
+        .from_end_position:
+            if -offset > (i64)this.m_bytes.length:
+                error(ak_error, "Offset past the start of the stream memory")
+
+            this.m_offset = (usize)((i64)this.m_bytes.length + offset)
+        _:
+            trap("VERIFY_NOT_REACHED")
+    return this.m_offset
+
+## Ported from AK/MemoryStream.cpp:82 AK::FixedMemoryStream::write_some (override).
+pub func fixed_memory_stream_write_some_impl(base: Stream*, bytes: const u8[]) -> usize!:
+    let this = (FixedMemoryStream*)base
+    # MemoryStream isn't based on file-descriptors, but since most other
+    # Stream implementations are, the interface specifies EBADF as the
+    # "we don't support this particular operation" error code.
+    if not this.m_writing_enabled:
+        try ak_error_throw(ak_error_from_errno(ebadf))
+
+    # FIXME: Can this not error?
+    let nwritten = bytes_copy_trimmed_to(bytes, this.m_bytes[this.m_offset..])
+    this.m_offset += nwritten
+    return nwritten
+
+## Ported from AK/MemoryStream.cpp:96 AK::FixedMemoryStream::write_until_depleted (override).
+pub func fixed_memory_stream_write_until_depleted_span_u8_impl(base: Stream*, bytes: const u8[]) -> !:
+    let this = (FixedMemoryStream*)base
+    if fixed_memory_stream_remaining(this) < bytes.length:
+        error(ak_error, "Write of entire buffer ends past the memory area")
+
+    discard(try stream_write_some(base, bytes))
+
+## Ported from AK/MemoryStream.cpp:105 AK::FixedMemoryStream::offset.
+pub func fixed_memory_stream_offset(this: FixedMemoryStream*) -> usize:
+    return this.m_offset
+
+## Ported from AK/MemoryStream.cpp:110 AK::FixedMemoryStream::remaining.
+pub func fixed_memory_stream_remaining(this: FixedMemoryStream*) -> usize:
+    return this.m_bytes.length - this.m_offset
+
+## Ported from AK/MemoryStream.h:54 AK::FixedMemoryStream::read_in_place: a value read by
+## pointing into the stream's underlying data instead of copying it.
+# Of course, only use this if you know the lifetime of the data will exceed the value's.
+# FIXME: Would be nicer to be able to return T& but Variant (and thus ErrorOr) can't hold references.
+pub func fixed_memory_stream_read_in_place[T](this: FixedMemoryStream*) -> T*!:
+    # IsConst<T> is not expressible here: every read_in_place asks for a writable value.
+    if not this.m_writing_enabled:
+        error(ak_error, "Tried to obtain a non-const reference from a read-only FixedMemoryStream")
+
+    let value = (T*)(this.m_bytes.data + this.m_offset)
+    try stream_discard(this.stream(), sizeof(T))
+    return value
+
+## Ported from AK/MemoryStream.h:70 AK::FixedMemoryStream::read_in_place(size_t): a span of
+## values pointing into the stream's underlying data.
+# Of course, only use this if you know the lifetime of the data will exceed the span's.
+pub func fixed_memory_stream_read_in_place_usize[T](this: FixedMemoryStream*, count: usize) -> T[]!:
+    if not this.m_writing_enabled:
+        error(ak_error, "Tried to obtain a non-const span from a read-only FixedMemoryStream")
+
+    let span = T[]((T*)(this.m_bytes.data + this.m_offset), count)
+    try stream_discard(this.stream(), sizeof(T) * count)
+    return span
+
+## FixedMemoryStream::read_in_place<T const>(): the const form, allowed on read-only streams.
+pub func fixed_memory_stream_read_in_place_const[T](this: FixedMemoryStream*) -> const T*!:
+    let value = (const T*)(this.m_bytes.data + this.m_offset)
+    try stream_discard(this.stream(), sizeof(T))
+    return value
+
+## FixedMemoryStream::read_in_place<T const>(size_t): the const form, allowed on read-only
+## streams.
+pub func fixed_memory_stream_read_in_place_const_usize[T](this: FixedMemoryStream*, count: usize) -> const T[]!:
+    let span = T[]((T*)(this.m_bytes.data + this.m_offset), count)
+    try stream_discard(this.stream(), sizeof(T) * count)
+    return span
+
+# mark: AllocatingMemoryStream ==================================================================
+
+## AllocatingMemoryStream's constructor (`AllocatingMemoryStream() = default`): an empty stream
+## with its vtable installed.
+pub func allocating_memory_stream_construct(this: AllocatingMemoryStream*):
+    this.stream().vtable = (const StreamVTable*)&allocating_memory_stream_vtable
+    this.stream().class_id = allocating_memory_stream_class.first_id
+    this.m_head = none
+    this.m_tail = none
+    this.m_head_read_offset = 0
+    this.m_tail_write_offset = 0
+    this.m_used_buffer_size = 0
+
+## Ported from AK/MemoryStream.cpp:122 AK::AllocatingMemoryStream::used_buffer_size.
+pub func allocating_memory_stream_used_buffer_size(this: AllocatingMemoryStream*) -> usize:
+    return this.m_used_buffer_size
+
+## Ported from AK/MemoryStream.cpp:127 AK::AllocatingMemoryStream::is_eof (override).
+pub func allocating_memory_stream_is_eof_impl(base: Stream*) -> bool:
+    let this = (AllocatingMemoryStream*)base
+    return this.m_used_buffer_size == 0
+
+## Ported from AK/MemoryStream.cpp:132 AK::AllocatingMemoryStream::is_open (override).
+pub func allocating_memory_stream_is_open_impl(base: Stream*) -> bool:
+    discard(base)
+    return true
+
+## Ported from AK/MemoryStream.cpp:137 AK::AllocatingMemoryStream::close (override).
+pub func allocating_memory_stream_close_impl(base: Stream*):
+    discard(base)
+
+## Ported from AK/MemoryStream.cpp:141 AK::AllocatingMemoryStream::append_new_chunk.
+pub func allocating_memory_stream_append_new_chunk(this: AllocatingMemoryStream*) -> !:
+    let new_chunk = new AllocatingMemoryStreamChunk catch:
+        return try ak_error_throw(ak_error_from_errno(enomem))
+
+    if let tail = this.m_tail:
+        tail.next = new_chunk
+        this.m_tail = tail.next
+    else:
+        this.m_head = new_chunk
+        this.m_tail = this.m_head
+    this.m_tail_write_offset = 0
+
+## Ported from AK/MemoryStream.cpp:158 AK::AllocatingMemoryStream::pop_head_chunk.
+pub func allocating_memory_stream_pop_head_chunk(this: AllocatingMemoryStream*):
+    let head = this.m_head else trap("VERIFY: pop_head_chunk without a head")
+    if this.m_head == this.m_tail:
+        this.m_head = none
+        this.m_tail = none
+        this.m_tail_write_offset = 0
+    else:
+        this.m_head = head.next
+    this.m_head_read_offset = 0
+
+# The number of bytes written into `chunk` (`chunk == m_tail ? m_tail_write_offset : CHUNK_SIZE`).
+func allocating_memory_stream_chunk_end(this: const AllocatingMemoryStream*, chunk: const AllocatingMemoryStreamChunk*) -> usize:
+    if (const AllocatingMemoryStreamChunk*?)chunk == this.m_tail:
+        return this.m_tail_write_offset
+    return allocating_memory_stream_chunk_size
+
+## Ported from AK/MemoryStream.cpp:171 AK::AllocatingMemoryStream::peek_some_contiguous.
+pub func allocating_memory_stream_peek_some_contiguous(this: AllocatingMemoryStream*) -> const u8[]:
+    let head = this.m_head else return empty_span[u8]()
+    let end = allocating_memory_stream_chunk_end(this, head)
+    return head.data[this.m_head_read_offset..<end]
+
+## Ported from AK/MemoryStream.cpp:179 AK::AllocatingMemoryStream::peek_some.
+pub func allocating_memory_stream_peek_some(this: AllocatingMemoryStream*, bytes: u8[]):
+    var read_bytes: usize = 0
+    var chunk = this.m_head
+    var chunk_offset = this.m_head_read_offset
+
+    while read_bytes < bytes.length:
+        let current = chunk else break
+        let end = allocating_memory_stream_chunk_end(this, current)
+        let available = current.data[chunk_offset..<end]
+
+        let copied = bytes_copy_trimmed_to(available, bytes[read_bytes..])
+        read_bytes += copied
+
+        if copied < available.length:
+            break
+
+        chunk = current.next
+        chunk_offset = 0
+
+## Ported from AK/MemoryStream.cpp:200 AK::AllocatingMemoryStream::read_some (override).
+pub func allocating_memory_stream_read_some_impl(base: Stream*, bytes: u8[]) -> u8[]!:
+    let this = (AllocatingMemoryStream*)base
+    var read_bytes: usize = 0
+
+    while read_bytes < bytes.length:
+        let head = this.m_head else break
+        let end = allocating_memory_stream_chunk_end(this, head)
+        let available = head.data[this.m_head_read_offset..<end]
+
+        let copied = bytes_copy_trimmed_to(available, bytes[read_bytes..])
+        read_bytes += copied
+        this.m_head_read_offset += copied
+        this.m_used_buffer_size -= copied
+
+        if this.m_head_read_offset == end:
+            allocating_memory_stream_pop_head_chunk(this)
+
+    return bytes[0..<read_bytes]
+
+## Ported from AK/MemoryStream.cpp:220 AK::AllocatingMemoryStream::write_some (override).
+pub func allocating_memory_stream_write_some_impl(base: Stream*, bytes: const u8[]) -> usize!:
+    let this = (AllocatingMemoryStream*)base
+    var written_bytes: usize = 0
+
+    while written_bytes < bytes.length:
+        if this.m_tail == none or this.m_tail_write_offset == allocating_memory_stream_chunk_size:
+            try allocating_memory_stream_append_new_chunk(this)
+
+        let tail = this.m_tail else trap("unreachable")
+        let tail_remaining = tail.data[this.m_tail_write_offset..]
+        let copied = bytes_copy_trimmed_to(bytes[written_bytes..], tail_remaining)
+
+        this.m_tail_write_offset += copied
+        written_bytes += copied
+        this.m_used_buffer_size += copied
+
+    return written_bytes
+
+## Ported from AK/MemoryStream.cpp:239 AK::AllocatingMemoryStream::discard (override).
+pub func allocating_memory_stream_discard_impl(base: Stream*, count: usize) -> !:
+    let this = (AllocatingMemoryStream*)base
+    if count > this.m_used_buffer_size:
+        error(ak_error, "Number of discarded bytes is higher than the number of allocated bytes")
+
+    this.m_used_buffer_size -= count
+
+    var remaining = count
+    while remaining > 0:
+        let head = this.m_head else trap("VERIFY: discard past the last chunk")
+        let end = allocating_memory_stream_chunk_end(this, head)
+        let available = end - this.m_head_read_offset
+        let to_consume = min(available, remaining)
+
+        this.m_head_read_offset += to_consume
+        remaining -= to_consume
+
+        if this.m_head_read_offset == end:
+            allocating_memory_stream_pop_head_chunk(this)
+
+## Ported from AK/MemoryStream.cpp:262 AK::AllocatingMemoryStream::offset_of.
+pub func allocating_memory_stream_offset_of(this: AllocatingMemoryStream*, needle: const u8[]) -> (usize?)!:
+    let head = this.m_head else return none
+
+    var chunk_count: usize = 0
+    var chunk = this.m_head
+    while let current = chunk:
+        chunk_count += 1
+        chunk = current.next
+
+    let search_spans = new (const u8[])[chunk_count] catch:
+        return try ak_error_throw(ak_error_from_errno(enomem))
+    var i: usize = 0
+    chunk = this.m_head
+    while let current = chunk:
+        let start = this.m_head_read_offset if current == head else 0
+        let end = allocating_memory_stream_chunk_end(this, current)
+        search_spans[i] = current.data[start..<end]
+        chunk = current.next
+        i += 1
+
+    return memmem_spans(search_spans, needle)
+
+## Ported from AK/MemoryStream.h:117 AK::AllocatingMemoryStream::Chunk::Chunk.
+# User-provided default ctor so `new Chunk()` does not zero-init the data array.
+pub func allocating_memory_stream_chunk_construct(this: AllocatingMemoryStreamChunk*):
+    this.next = none

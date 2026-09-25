@@ -7,44 +7,53 @@
 #       AK/IntrusiveList.h (Ladybird 47c82b38d0) by the skeleton generator (DESIGN.md §4.4).
 #       Regenerate rather than edit, except to fill a field the generator could not map.
 #
+#       Edited by region r01: the node links are typed; the list's storage records the
+#       member offset (the donor's pointer-to-member template argument), which the inserting
+#       functions take as a parameter; the iterators are generic luce-base iterators.
+#
 #==============================================================================================
-
-# mark: ExtractIntrusiveListTypes ===============================================================
-
-## AK::Detail::ExtractIntrusiveListTypes (AK/IntrusiveList.h:21).
-pub struct ExtractIntrusiveListTypes:
-    pub var empty_: u8
 
 # mark: IntrusiveListStorage ====================================================================
 
-## AK::Detail::IntrusiveListStorage (AK/IntrusiveList.h:32): a generic struct.
+## AK::Detail::IntrusiveListStorage (AK/IntrusiveList.h:30): the first and last node, and
+## `m_member`, the offset of the node inside a T (offsetof(T, node field): the donor's
+## `member` template argument, recorded by the first insertion).
 pub struct IntrusiveListStorage[T, TContainer]:
-    pub var m_first: void*?  # unmapped: SubstitutedIntrusiveListNode<T, Container>
-    pub var m_last: void*?  # unmapped: SubstitutedIntrusiveListNode<T, Container>
+    pub var m_first: IntrusiveListNode[T, TContainer]*?  # C++ default: { nullptr }
+    pub var m_last: IntrusiveListNode[T, TContainer]*?  # C++ default: { nullptr }
+    pub var m_member: usize
 
 # mark: IntrusiveList ===========================================================================
 
-## AK::Detail::IntrusiveList (AK/IntrusiveList.h:44): a generic struct.
+## AK::Detail::IntrusiveList (AK/IntrusiveList.h:43): a zero IntrusiveList is empty.
 pub struct IntrusiveList[T, TContainer]:
     pub var m_storage: IntrusiveListStorage[T, TContainer]
 
-## AK::Detail::IntrusiveList::Iterator (AK/IntrusiveList.h:66): opaque in this phase (not in the phase-1 closure).
-pub struct IntrusiveListIterator:
-    pub var opaque_: u8
+## AK::Detail::IntrusiveList::Iterator and ConstIterator (AK/IntrusiveList.h:54, 119): the value
+## an iteration is at (none at the end) and the member offset; also a luce-base iterator.
+pub struct IntrusiveListIterator[T, TContainer]: luce.Iterable[T*, IntrusiveListIterator[T, TContainer]], luce.Iterator[T*]:
+    pub var m_value: T*?  # C++ default: { nullptr }
+    pub var m_member: usize
 
-## AK::Detail::IntrusiveList::ReverseIterator (AK/IntrusiveList.h:93): opaque in this phase (not in the phase-1 closure).
-pub struct ReverseIterator:
-    pub var opaque_: u8
+    func iterator() -> IntrusiveListIterator[T, TContainer]: return self
 
-## AK::Detail::IntrusiveList::ConstIterator (AK/IntrusiveList.h:119): opaque in this phase (not in the phase-1 closure).
-pub struct IntrusiveListConstIterator:
-    pub var opaque_: u8
+    mutating func next() -> T*?: return intrusive_list_iterator_next(&self)
+
+## AK::Detail::IntrusiveList::ReverseIterator (AK/IntrusiveList.h:93): walks backwards; also a
+## luce-base iterator.
+pub struct IntrusiveListReverseIterator[T, TContainer]: luce.Iterable[T*, IntrusiveListReverseIterator[T, TContainer]], luce.Iterator[T*]:
+    pub var m_value: T*?  # C++ default: { nullptr }
+    pub var m_member: usize
+
+    func iterator() -> IntrusiveListReverseIterator[T, TContainer]: return self
+
+    mutating func next() -> T*?: return intrusive_list_reverse_iterator_next(&self)
 
 # mark: IntrusiveListNode =======================================================================
 
-## AK::Detail::IntrusiveListNode (AK/IntrusiveList.h:153): a generic struct.
+## AK::Detail::IntrusiveListNode (AK/IntrusiveList.h:151): a node embedded in a T.
 pub struct IntrusiveListNode[T, TContainer]:
     pub var m_storage: IntrusiveListStorage[T, TContainer]*?  # C++ default: nullptr
-    pub var m_next: void*?  # unmapped: SubstitutedIntrusiveListNode<T, Container>
-    pub var m_prev: void*?  # unmapped: SubstitutedIntrusiveListNode<T, Container>
+    pub var m_next: IntrusiveListNode[T, TContainer]*?
+    pub var m_prev: IntrusiveListNode[T, TContainer]*?
     pub var m_self: SelfReferenceIfNeeded[TContainer]

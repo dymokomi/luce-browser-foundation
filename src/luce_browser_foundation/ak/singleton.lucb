@@ -1,0 +1,80 @@
+#==============================================================================================
+#
+#   singleton - Singleton<T>: a lazily created, thread-safe single instance
+#
+#   DESCRIPTION:
+#       Port of AK/Singleton.h (lines 1-117). The InitFunction template argument
+#       (SingletonInstanceCreator<T>::create, `new T()`, by default) is the m_init field,
+#       set with singleton_construct, because a generic body cannot construct a T.
+#       `(T*)0x1` marks "being created"; sched_yield waits for the creator.
+#
+#==============================================================================================
+
+extern func sched_yield() -> i32
+
+# The "someone is creating it" marker, (T*)0x1.
+let singleton_creating: usize = 1
+
+# FlatPtr(obj): the address of a possibly null instance pointer.
+func singleton_address[T](obj: T*?) -> usize:
+    let pointer = obj else return 0
+    return (usize)pointer
+
+## Singleton<T, InitFunction>: the instance is created by `init` on first use.
+pub func singleton_construct[T](this: Singleton[T]*, init: func() -> T*):
+    this.m_obj.store(none, .relaxed)
+    this.m_init = init
+
+## Ported from AK/Singleton.h:42 AK::Singleton::get (allow_create = true).
+pub func singleton_get[T](this: const Singleton[T]*) -> T*:
+    let obj_var = &((Singleton[T]*)this).m_obj
+    var obj = obj_var.load(.acquire)
+    let address: usize = singleton_address(obj)
+    if address <= 0x1:
+        # If this is the first time, see if we get to initialize it
+        if obj == none:
+            let (exchanged, observed) = obj_var.cas(none, (T*?)singleton_creating, .acq_rel, .acquire)
+            if exchanged:
+                # We're the first one
+                let init = this.m_init else trap("Singleton: no InitFunction")
+                let created = init()
+                obj_var.store(created, .release)
+                return created
+            obj = observed
+        # Someone else was faster, wait until they're done
+        while singleton_address(obj) == singleton_creating:
+            discard(sched_yield())
+            obj = obj_var.load(.acquire)
+        # We should always return an instance if we allow creating one
+        assert(obj != none)
+        assert(singleton_address(obj) != singleton_creating)
+    return obj else trap("VERIFY: Singleton instance")
+
+## Ported from AK/Singleton.h:73 AK::Singleton::ptr.
+pub func singleton_ptr[T](this: const Singleton[T]*) -> T*?:
+    return singleton_get(this)
+
+## Ported from AK/Singleton.h:78 AK::Singleton::operator->.
+pub func singleton_arrow[T](this: const Singleton[T]*) -> T*?:
+    return singleton_ptr(this)
+
+## Ported from AK/Singleton.h:83 AK::Singleton::operator*.
+pub func singleton_deref[T](this: const Singleton[T]*) -> T*:
+    return singleton_get(this)
+
+## Ported from AK/Singleton.h:88 AK::Singleton::operator T*.
+pub func singleton_to_t_const[T](this: const Singleton[T]*) -> T*?:
+    return singleton_ptr(this)
+
+## Ported from AK/Singleton.h:93 AK::Singleton::operator T&.
+pub func singleton_to_t_const_2[T](this: const Singleton[T]*) -> T*:
+    return singleton_get(this)
+
+## Ported from AK/Singleton.h:98 AK::Singleton::is_initialized.
+pub func singleton_is_initialized[T](this: const Singleton[T]*) -> bool:
+    let obj = ((Singleton[T]*)this).m_obj.load(.acquire)
+    return singleton_address(obj) > 0x1
+
+## Ported from AK/Singleton.h:104 AK::Singleton::ensure_instance.
+pub func singleton_ensure_instance[T](this: Singleton[T]*):
+    discard(singleton_ptr(this))

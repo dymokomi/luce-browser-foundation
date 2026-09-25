@@ -1,0 +1,86 @@
+#==============================================================================================
+#
+#   tests_trie - Trie<ValueType, MetadataT>
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestTrie.cpp. The metadata of normal_behavior (a ByteString built
+#       by formatting the parent's metadata with the next character) is the length of the
+#       prefix a node spells; the word itself is compared through that length.
+#
+#==============================================================================================
+
+type TestDictionary = Trie2[u8, usize, U8Traits]
+
+# The missing-metadata provider: the parent's prefix length plus one.
+func test_trie_provide(context: void*?, parent: TestDictionary*, it: usize) -> usize?:
+    discard(context)
+    discard(it)
+    return trie2_metadata_value_const(parent) + 1
+
+struct TestTrieCounter:
+    var count: usize
+
+func test_trie_count(context: void*?, node: const TestDictionary*) -> IterationDecision:
+    discard(node)
+    let captures = (TestTrieCounter*)(context else trap("no captures"))
+    captures.count += 1
+    return IterationDecision.continue_
+
+test "trie: normal_behavior":
+    var dictionary: Trie[u8, usize, U8Traits]
+    trie_construct_opaque(&dictionary, '/', 0)
+    let data: str[4] = ["test", "example", "foo", "foobar"]
+    let total_chars: usize = 18  # root (1), 'test' (4), 'example' (7), 'foo' (3), 'foobar' (3, "foo" already stored).
+    for view in data:
+        var it: usize = 0
+        discard(trie2_insert_t_metadata_t_t_provide_metadata_function(&dictionary.base, &it, view.bytes, view.length, Function2[TestDictionary*, usize, usize?](call = test_trie_provide, context = none)) else trap("MUST"))
+
+    var counter = TestTrieCounter(count = 0)
+    trie2_for_each_node_in_tree_order(&dictionary.base, Function1[const TestDictionary*, IterationDecision](call = test_trie_count, context = &counter)) else trap("MUST")
+    assert(counter.count == total_chars)
+
+    for view in data:
+        var it: usize = 0
+        let node = trie2_traverse_until_last_accessible_node(&dictionary.base, &it, view.bytes)
+        assert(it == view.length)
+        assert(trie2_has_metadata(node))
+        assert(trie2_metadata_value_const(node) == view.length)
+
+    let test_data_with_prefix_in_dict: str[6] = ["testx", "exampley", "fooa", "foobarb", "fox", "text"]
+    for view in test_data_with_prefix_in_dict:
+        var it: usize = 0
+        let node = trie2_traverse_until_last_accessible_node(&dictionary.base, &it, view.bytes)
+        assert(it != view.length)
+        assert(trie2_metadata(node) != none)
+        assert(trie2_metadata_value_const(node) == it)
+
+struct TestTrieWalk:
+    var index: i32
+    var is_root: bool
+
+func test_trie_walk(context: void*?, node: const Trie2[i32, i32, I32Traits]*) -> IterationDecision:
+    let captures = (TestTrieWalk*)(context else trap("no captures"))
+    if captures.is_root:
+        captures.is_root = false
+        return IterationDecision.continue_
+    assert(trie2_value_const(node) == captures.index)
+    captures.index += 1
+    return IterationDecision.continue_
+
+test "trie: iterate":
+    var bunch_of_numbers: Trie[i32, i32, I32Traits]
+    trie_construct(&bunch_of_numbers, 0)
+    var input: i32[64]
+    for i in 0..<64usize:
+        input[i] = (i32)i
+    discard(trie2_insert_2(&bunch_of_numbers.base, 0, input) else trap("MUST"))
+    # Iteration order is preorder (order between adjacent nodes is not defined, but parents come before children)
+    # in this case, the tree is linear.
+    var walk = TestTrieWalk(index = 0, is_root = true)
+    trie2_for_each_node_in_tree_order(&bunch_of_numbers.base, Function1[const Trie2[i32, i32, I32Traits]*, IterationDecision](call = test_trie_walk, context = &walk)) else trap("MUST")
+    assert(walk.index == 64)
+    assert(not trie2_is_empty(&bunch_of_numbers.base))
+    var copy = trie2_deep_copy(&bunch_of_numbers.base) else trap("MUST")
+    trie2_clear(&bunch_of_numbers.base)
+    assert(trie2_is_empty(&bunch_of_numbers.base))
+    assert(not trie2_is_empty(&copy))

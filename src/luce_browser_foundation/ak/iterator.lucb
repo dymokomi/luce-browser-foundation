@@ -1,0 +1,105 @@
+#==============================================================================================
+#
+#   iterator - SimpleIterator<Container, ValueType>: an index into an indexable container
+#
+#   DESCRIPTION:
+#       Port of AK/Iterator.h (lines 1-128). The donor's iterator reaches the container
+#       through its operator[] and size(); luce-base generics reach it through the
+#       IndexedContainer interface, which Vector implements (support.lucb). The iterator's
+#       own members compare, step and dereference as the donor's do. Plain loops over a
+#       Vector use its span (`for item in vector_span(&v)`), which is what the donor's
+#       range-for over begin()/end() visits.
+#
+#==============================================================================================
+
+## A container SimpleIterator can walk: its number of elements and a pointer to one of them
+## (the donor's `container.size()` and `container[index]`).
+pub interface IndexedContainer[T]:
+    func size() -> usize
+
+    func at(index: usize) -> T*
+
+## Ported from AK/Iterator.h:22 AK::SimpleIterator::is_end.
+pub func simple_iterator_is_end[TValueType, TContainer: IndexedContainer[TValueType]](this: const SimpleIterator[TContainer, TValueType]*) -> bool:
+    let container = this.m_container else trap("VERIFY: SimpleIterator without a container")
+    return this.m_index == simple_iterator_end[TValueType, TContainer](container).m_index
+
+## Ported from AK/Iterator.h:23 AK::SimpleIterator::index.
+pub func simple_iterator_index[TContainer, TValueType](this: const SimpleIterator[TContainer, TValueType]*) -> usize:
+    return this.m_index
+
+## AK/Iterator.h:25 AK::SimpleIterator::operator== (defaulted): the same container and index.
+pub func simple_iterator_eq[TContainer, TValueType](this: const SimpleIterator[TContainer, TValueType]*, other: SimpleIterator[TContainer, TValueType]) -> bool:
+    return this.m_container == other.m_container and this.m_index == other.m_index
+
+## Ported from AK/Iterator.h:28 AK::SimpleIterator::operator+.
+pub func simple_iterator_add[TContainer, TValueType](this: const SimpleIterator[TContainer, TValueType]*, delta: isize) -> SimpleIterator[TContainer, TValueType]:
+    return SimpleIterator[TContainer, TValueType](m_container = this.m_container, m_index = (usize)((isize)this.m_index + delta))
+
+## Ported from AK/Iterator.h:31 AK::SimpleIterator::operator+=.
+pub func simple_iterator_add_assign[TContainer, TValueType](this: SimpleIterator[TContainer, TValueType]*, delta: isize) -> SimpleIterator[TContainer, TValueType]*:
+    this.m_index = (usize)((isize)this.m_index + delta)
+    return this
+
+## Ported from AK/Iterator.h:37 AK::SimpleIterator::operator-.
+pub func simple_iterator_sub_isize[TContainer, TValueType](this: const SimpleIterator[TContainer, TValueType]*, delta: isize) -> SimpleIterator[TContainer, TValueType]:
+    return SimpleIterator[TContainer, TValueType](m_container = this.m_container, m_index = (usize)((isize)this.m_index - delta))
+
+## Ported from AK/Iterator.h:40 AK::SimpleIterator::operator-=.
+pub func simple_iterator_sub_assign[TContainer, TValueType](this: SimpleIterator[TContainer, TValueType]*, delta: isize) -> SimpleIterator[TContainer, TValueType]*:
+    this.m_index = (usize)((isize)this.m_index - delta)
+    return this
+
+## Ported from AK/Iterator.h:46 AK::SimpleIterator::operator[].
+pub func simple_iterator_at[TValueType, TContainer: IndexedContainer[TValueType]](this: const SimpleIterator[TContainer, TValueType]*, delta: isize) -> TValueType*:
+    let container = this.m_container else trap("VERIFY: SimpleIterator without a container")
+    return container.at((usize)((isize)this.m_index + delta))
+
+## Ported from AK/Iterator.h:58 AK::SimpleIterator::operator-(SimpleIterator).
+pub func simple_iterator_sub_simple_iterator[TContainer, TValueType](this: const SimpleIterator[TContainer, TValueType]*, other: SimpleIterator[TContainer, TValueType]) -> isize:
+    return (isize)this.m_index - (isize)other.m_index
+
+## Ported from AK/Iterator.h:60 AK::SimpleIterator::operator++ (prefix).
+pub func simple_iterator_inc[TContainer, TValueType](this: SimpleIterator[TContainer, TValueType]*) -> SimpleIterator[TContainer, TValueType]*:
+    this.m_index += 1
+    return this
+
+## Ported from AK/Iterator.h:65 AK::SimpleIterator::operator++ (postfix).
+pub func simple_iterator_inc_i32[TContainer, TValueType](this: SimpleIterator[TContainer, TValueType]*, arg0: i32) -> SimpleIterator[TContainer, TValueType]:
+    discard(arg0)
+    this.m_index += 1
+    return SimpleIterator[TContainer, TValueType](m_container = this.m_container, m_index = this.m_index - 1)
+
+## Ported from AK/Iterator.h:71 AK::SimpleIterator::operator-- (prefix).
+pub func simple_iterator_dec[TContainer, TValueType](this: SimpleIterator[TContainer, TValueType]*) -> SimpleIterator[TContainer, TValueType]*:
+    this.m_index -= 1
+    return this
+
+## Ported from AK/Iterator.h:76 AK::SimpleIterator::operator-- (postfix).
+pub func simple_iterator_dec_i32[TContainer, TValueType](this: SimpleIterator[TContainer, TValueType]*, arg0: i32) -> SimpleIterator[TContainer, TValueType]:
+    discard(arg0)
+    this.m_index -= 1
+    return SimpleIterator[TContainer, TValueType](m_container = this.m_container, m_index = this.m_index + 1)
+
+## Ported from AK/Iterator.h:82 AK::SimpleIterator::operator*.
+pub func simple_iterator_deref[TValueType, TContainer: IndexedContainer[TValueType]](this: const SimpleIterator[TContainer, TValueType]*) -> TValueType:
+    let container = this.m_container else trap("VERIFY: SimpleIterator without a container")
+    return *container.at(this.m_index)
+
+## Ported from AK/Iterator.h:94 AK::SimpleIterator::operator->.
+pub func simple_iterator_arrow[TValueType, TContainer: IndexedContainer[TValueType]](this: const SimpleIterator[TContainer, TValueType]*) -> TValueType*:
+    let container = this.m_container else trap("VERIFY: SimpleIterator without a container")
+    return container.at(this.m_index)
+
+## Ported from AK/Iterator.h:109 AK::SimpleIterator::begin.
+pub func simple_iterator_begin[TContainer, TValueType](container: TContainer*) -> SimpleIterator[TContainer, TValueType]:
+    return SimpleIterator[TContainer, TValueType](m_container = container, m_index = 0)
+
+## Ported from AK/Iterator.h:110 AK::SimpleIterator::end.
+pub func simple_iterator_end[TValueType, TContainer: IndexedContainer[TValueType]](container: TContainer*) -> SimpleIterator[TContainer, TValueType]:
+    return SimpleIterator[TContainer, TValueType](m_container = container, m_index = container.size())
+
+## Ported from AK/Iterator.h:119 AK::SimpleIterator::SimpleIterator.
+pub func simple_iterator_construct[TContainer, TValueType](this: SimpleIterator[TContainer, TValueType]*, container: TContainer*, index: usize):
+    this.m_container = container
+    this.m_index = index

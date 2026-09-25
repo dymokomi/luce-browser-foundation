@@ -18,5 +18,5 @@ types_weak.lucb
 types_weak_block.lucb
 types_weak_container.lucb
 types_weak_hash_set.lucb
-stub_r01_ak_core.lucb
+weakable.lucb
 stub_r04_gc.lucb

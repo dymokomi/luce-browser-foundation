@@ -1,0 +1,54 @@
+#==============================================================================================
+#
+#   weakable - WeakLink and Weakable<T>
+#
+#   DESCRIPTION:
+#       Port of AK/Weakable.h (lines 1-90). A Weakable object owns at most one WeakLink,
+#       created on the first make_weak_ptr and revoked when the object revokes its weak
+#       pointers (the donor also does it in ~Weakable; in managed memory a revoking owner
+#       calls weakable_revoke_weak_ptrs, or the cell's finalizer does, DESIGN.md §3.3).
+#       make_weak_ptr returns a gc.Weak (DESIGN.md §2.6) and so lives in the gc module
+#       (gc/weakable.lucb); weakable_ensure_link is its AK half.
+#
+#==============================================================================================
+
+## Ported from AK/Weakable.h:27 AK::WeakLink::strong_ref.
+# RefPtr<T> is `T*?` (DESIGN.md §2.6).
+pub func weak_link_strong_ref[T](this: const WeakLink*) -> T*?:
+    return (T*?)this.m_ptr
+
+## Ported from AK/Weakable.h:34 AK::WeakLink::unsafe_ptr.
+pub func weak_link_unsafe_ptr[T](this: const WeakLink*) -> T*?:
+    return (T*?)this.m_ptr
+
+## Ported from AK/Weakable.h:39 AK::WeakLink::is_null.
+pub func weak_link_is_null(this: const WeakLink*) -> bool:
+    return this.m_ptr == none
+
+## Ported from AK/Weakable.h:41 AK::WeakLink::revoke.
+pub func weak_link_revoke(this: WeakLink*):
+    this.m_ptr = none
+
+## Ported from AK/Weakable.h:45 AK::WeakLink::WeakLink.
+pub func weak_link_weak_link[T](this: WeakLink*, weakable: T*):
+    ref_counted_base_init_fields(&this.ref_counted.ref_counted_base)
+    this.m_ptr = weakable
+
+## The first half of AK/Weakable.h:60 AK::Weakable::make_weak_ptr: the object's WeakLink,
+## created on first use (`m_link = adopt_ref(*new (nothrow) WeakLink(...))`). `this` is the
+## Weakable base at the start of the object, so it is the object's address.
+pub func weakable_ensure_link[T](this: const Weakable[T]*) -> WeakLink*:
+    let that = (Weakable[T]*)this
+    if let link = that.m_link:
+        return link
+    let link = new WeakLink(ref_counted = RefCounted[WeakLink](ref_counted_base = RefCountedBase(m_ref_count = 1)), m_ptr = none) else trap("out of memory")
+    weak_link_weak_link(link, (T*)(void*)that)
+    that.m_link = link
+    return link
+
+## Ported from AK/Weakable.h:76 AK::Weakable::revoke_weak_ptrs.
+pub func weakable_revoke_weak_ptrs[T](this: const Weakable[T]*):
+    let that = (Weakable[T]*)this
+    let link = that.m_link else return
+    that.m_link = none
+    weak_link_revoke(link)

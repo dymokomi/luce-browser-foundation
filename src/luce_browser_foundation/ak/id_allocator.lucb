@@ -1,0 +1,30 @@
+#==============================================================================================
+#
+#   id_allocator - IDAllocator: random unique ids from a minimum up to INT32_MAX
+#
+#   DESCRIPTION:
+#       Port of AK/IDAllocator.h (lines 1-56).
+#
+#==============================================================================================
+
+# This class manages a pool of random ID's in the range N (default of 1) to INT32_MAX
+
+## Ported from AK/IDAllocator.h:21 AK::IDAllocator::IDAllocator(int minimum_value).
+pub func id_allocator_construct(this: IdAllocator*, minimum_value: i32):
+    this.m_minimum_value = minimum_value
+
+## Ported from AK/IDAllocator.h:28 AK::IDAllocator::allocate.
+pub func id_allocator_allocate(this: IdAllocator*) -> i32:
+    assert(hash_table_size(&this.m_allocated_ids) < (usize)(i32_max - 2))
+    var id: i32 = 0
+    while true:
+        id = (i32)get_random_uniform((u32)i32_max)
+        if id < this.m_minimum_value:
+            continue
+        if hash_table_set(&this.m_allocated_ids, id) == HashSetResult.inserted_new_entry:
+            break
+    return id
+
+## Ported from AK/IDAllocator.h:42 AK::IDAllocator::deallocate.
+pub func id_allocator_deallocate(this: IdAllocator*, id: i32):
+    discard(hash_table_remove_t(&this.m_allocated_ids, id))

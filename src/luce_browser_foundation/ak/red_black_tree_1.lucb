@@ -1,0 +1,374 @@
+#==============================================================================================
+#
+#   red_black_tree_1 - BaseRedBlackTree<K>: the balancing shared by RedBlackTree and
+#                      IntrusiveRedBlackTree
+#
+#   DESCRIPTION:
+#       Port of AK/RedBlackTree.h (lines 1-432). K is an integral key compared with
+#       `compare` (`K: Comparable`). Nodes are BaseRedBlackTreeNode[K]; the trees that derive
+#       from the base embed it (and their nodes embed the base node) as their first field, so
+#       the base functions are reached through a cast, as the donor's static_casts do.
+#
+#==============================================================================================
+
+# The node's key compared with `key`: negative, zero or positive.
+func red_black_tree_key_compare[K: luce.Comparable](a: K, b: K) -> i64:
+    return a.compare(b)
+
+## Ported from AK/RedBlackTree.h:22 AK::BaseRedBlackTree::size.
+pub func base_red_black_tree_size[K](this: const BaseRedBlackTree[K]*) -> usize:
+    return this.m_size
+
+## Ported from AK/RedBlackTree.h:23 AK::BaseRedBlackTree::is_empty.
+pub func base_red_black_tree_is_empty[K](this: const BaseRedBlackTree[K]*) -> bool:
+    return this.m_size == 0
+
+## Ported from AK/RedBlackTree.h:38 AK::BaseRedBlackTree::Node::Node(K key).
+pub func base_red_black_tree_node_construct_opaque[K](this: BaseRedBlackTreeNode[K]*, key: K):
+    this.left_child = none
+    this.right_child = none
+    this.parent = none
+    this.color = RedBlackTreeColor.red
+    this.key = key
+
+## Ported from AK/RedBlackTree.h:42 AK::BaseRedBlackTree::Node::Node(): the key is left as is.
+pub func base_red_black_tree_node_construct[K](this: BaseRedBlackTreeNode[K]*):
+    this.left_child = none
+    this.right_child = none
+    this.parent = none
+    this.color = RedBlackTreeColor.red
+
+## Ported from AK/RedBlackTree.h:52 AK::BaseRedBlackTree::rotate_left.
+pub func base_red_black_tree_rotate_left[K](this: BaseRedBlackTree[K]*, subtree_root: BaseRedBlackTreeNode[K]*):
+    let pivot = subtree_root.right_child else trap("VERIFY: rotate_left without a right child")
+    let parent = subtree_root.parent
+
+    # stage 1 - subtree_root's right child is now pivot's left child
+    subtree_root.right_child = pivot.left_child
+    if let right = subtree_root.right_child:
+        right.parent = subtree_root
+
+    # stage 2 - pivot's left child is now subtree_root
+    pivot.left_child = subtree_root
+    subtree_root.parent = pivot
+
+    # stage 3 - update pivot's parent
+    pivot.parent = parent
+    if let p = parent:
+        if p.left_child == (BaseRedBlackTreeNode[K]*?)subtree_root:  # we are the left child
+            p.left_child = pivot
+        # we are the right child
+        else:
+            p.right_child = pivot
+    # new root
+    else:
+        this.m_root = pivot
+
+## Ported from AK/RedBlackTree.h:79 AK::BaseRedBlackTree::rotate_right.
+pub func base_red_black_tree_rotate_right[K](this: BaseRedBlackTree[K]*, subtree_root: BaseRedBlackTreeNode[K]*):
+    let pivot = subtree_root.left_child else trap("VERIFY: rotate_right without a left child")
+    let parent = subtree_root.parent
+
+    # stage 1 - subtree_root's left child is now pivot's right child
+    subtree_root.left_child = pivot.right_child
+    if let left = subtree_root.left_child:
+        left.parent = subtree_root
+
+    # stage 2 - pivot's right child is now subtree_root
+    pivot.right_child = subtree_root
+    subtree_root.parent = pivot
+
+    # stage 3 - update pivot's parent
+    pivot.parent = parent
+    if let p = parent:
+        if p.left_child == (BaseRedBlackTreeNode[K]*?)subtree_root:  # we are the left child
+            p.left_child = pivot
+        # we are the right child
+        else:
+            p.right_child = pivot
+    # new root
+    else:
+        this.m_root = pivot
+
+## Ported from AK/RedBlackTree.h:106 AK::BaseRedBlackTree::find.
+pub func base_red_black_tree_find[K: luce.Comparable](node: BaseRedBlackTreeNode[K]*?, key: K) -> BaseRedBlackTreeNode[K]*?:
+    var current = node
+    while let n = current:
+        if red_black_tree_key_compare(n.key, key) == 0:
+            break
+        if red_black_tree_key_compare(key, n.key) < 0:
+            current = n.left_child
+        else:
+            current = n.right_child
+    return current
+
+## Ported from AK/RedBlackTree.h:118 AK::BaseRedBlackTree::find_largest_not_above.
+pub func base_red_black_tree_find_largest_not_above[K: luce.Comparable](node: BaseRedBlackTreeNode[K]*?, key: K) -> BaseRedBlackTreeNode[K]*?:
+    var candidate: BaseRedBlackTreeNode[K]*? = none
+    var current = node
+    while let n = current:
+        if red_black_tree_key_compare(key, n.key) == 0:
+            return n
+        if red_black_tree_key_compare(key, n.key) < 0:
+            current = n.left_child
+        else:
+            candidate = n
+            current = n.right_child
+    return candidate
+
+## Ported from AK/RedBlackTree.h:134 AK::BaseRedBlackTree::find_smallest_not_below.
+pub func base_red_black_tree_find_smallest_not_below[K: luce.Comparable](node: BaseRedBlackTreeNode[K]*?, key: K) -> BaseRedBlackTreeNode[K]*?:
+    var candidate: BaseRedBlackTreeNode[K]*? = none
+    var current = node
+    while let n = current:
+        if red_black_tree_key_compare(n.key, key) == 0:
+            return n
+
+        if red_black_tree_key_compare(n.key, key) <= 0:
+            current = n.right_child
+        else:
+            candidate = n
+            current = n.left_child
+    return candidate
+
+## Ported from AK/RedBlackTree.h:151 AK::BaseRedBlackTree::insert.
+pub func base_red_black_tree_insert[K: luce.Comparable](this: BaseRedBlackTree[K]*, node: BaseRedBlackTreeNode[K]*):
+    var parent: BaseRedBlackTreeNode[K]*? = none
+    var temp = this.m_root
+    while let t = temp:
+        parent = t
+        if red_black_tree_key_compare(node.key, t.key) < 0:
+            temp = t.left_child
+        else:
+            temp = t.right_child
+    if parent == none:  # new root
+        node.color = RedBlackTreeColor.black
+        this.m_root = node
+        this.m_size = 1
+        this.m_minimum = node
+        return
+    let p = parent else trap("unreachable")
+    if red_black_tree_key_compare(node.key, p.key) < 0:  # we are the left child
+        p.left_child = node
+    # we are the right child
+    else:
+        p.right_child = node
+    node.parent = p
+
+    if p.parent != none:  # no fixups to be done for a height <= 2 tree
+        base_red_black_tree_insert_fixups(this, node)
+
+    this.m_size += 1
+    let minimum = this.m_minimum else trap("VERIFY: tree without a minimum")
+    if minimum.left_child == (BaseRedBlackTreeNode[K]*?)node:
+        this.m_minimum = node
+
+# The parent of a node that is known to have one.
+func rbt_parent[K](node: BaseRedBlackTreeNode[K]*) -> BaseRedBlackTreeNode[K]*:
+    return node.parent else trap("VERIFY: red-black tree node without a parent")
+
+## Ported from AK/RedBlackTree.h:184 AK::BaseRedBlackTree::insert_fixups.
+pub func base_red_black_tree_insert_fixups[K](this: BaseRedBlackTree[K]*, node_: BaseRedBlackTreeNode[K]*):
+    assert(node_.color == RedBlackTreeColor.red)
+    var node = node_
+    while true:
+        let node_parent = node.parent else break
+        if node_parent.color != RedBlackTreeColor.red:
+            break
+        let grand_parent = rbt_parent(node_parent)
+        if grand_parent.right_child == (BaseRedBlackTreeNode[K]*?)node_parent:
+            let uncle = grand_parent.left_child
+            if not rbt_is_black(uncle):
+                node_parent.color = RedBlackTreeColor.black
+                rbt_node(uncle).color = RedBlackTreeColor.black
+                grand_parent.color = RedBlackTreeColor.red
+                node = grand_parent
+            else:
+                if node_parent.left_child == (BaseRedBlackTreeNode[K]*?)node:
+                    node = node_parent
+                    base_red_black_tree_rotate_right(this, node)
+                rbt_parent(node).color = RedBlackTreeColor.black
+                grand_parent.color = RedBlackTreeColor.red
+                base_red_black_tree_rotate_left(this, grand_parent)
+        else:
+            let uncle = grand_parent.right_child
+            if not rbt_is_black(uncle):
+                node_parent.color = RedBlackTreeColor.black
+                rbt_node(uncle).color = RedBlackTreeColor.black
+                grand_parent.color = RedBlackTreeColor.red
+                node = grand_parent
+            else:
+                if node_parent.right_child == (BaseRedBlackTreeNode[K]*?)node:
+                    node = node_parent
+                    base_red_black_tree_rotate_left(this, node)
+                rbt_parent(node).color = RedBlackTreeColor.black
+                grand_parent.color = RedBlackTreeColor.red
+                base_red_black_tree_rotate_right(this, grand_parent)
+    let root = this.m_root else trap("VERIFY: tree without a root")
+    root.color = RedBlackTreeColor.black  # the root should always be black
+
+## Ported from AK/RedBlackTree.h:226 AK::BaseRedBlackTree::remove.
+pub func base_red_black_tree_remove[K](this: BaseRedBlackTree[K]*, node: BaseRedBlackTreeNode[K]*):
+    let self_node: BaseRedBlackTreeNode[K]*? = node
+
+    # special case: deleting the only node
+    if this.m_size == 1:
+        this.m_root = none
+        this.m_minimum = none
+        this.m_size = 0
+        return
+
+    if this.m_minimum == self_node:
+        this.m_minimum = base_red_black_tree_successor(node)
+
+    # removal assumes the node has 0 or 1 child, so if we have 2, relink with the successor first (by definition the successor has no left child)
+    # FIXME: since we dont know how a value is represented in the node, we can't simply swap the values and keys, and instead we relink the nodes
+    #  in place, this is quite a bit more expensive, as well as much less readable, is there a better way?
+    if node.left_child != none and node.right_child != none:
+        let node_left = node.left_child else trap("unreachable")
+        let node_right = node.right_child else trap("unreachable")
+        # this is always non-null as all nodes besides the maximum node have a successor, and the maximum node has no right child
+        let successor_node = base_red_black_tree_successor(node) else trap("VERIFY: no successor")
+        let neighbor_swap = successor_node.parent == self_node
+        node_left.parent = successor_node
+        if not neighbor_swap:
+            node_right.parent = successor_node
+        if let parent = node.parent:
+            if parent.left_child == self_node:
+                parent.left_child = successor_node
+            else:
+                parent.right_child = successor_node
+        else:
+            this.m_root = successor_node
+        if let successor_right = successor_node.right_child:
+            successor_right.parent = node
+        if neighbor_swap:
+            successor_node.parent = node.parent
+            node.parent = successor_node
+        else:
+            if let successor_parent = successor_node.parent:
+                if successor_parent.left_child == (BaseRedBlackTreeNode[K]*?)successor_node:
+                    successor_parent.left_child = node
+                else:
+                    successor_parent.right_child = node
+            else:
+                this.m_root = node
+            swap_5(&node.parent, &successor_node.parent)
+        swap_5(&node.left_child, &successor_node.left_child)
+        if neighbor_swap:
+            node.right_child = successor_node.right_child
+            successor_node.right_child = node
+        else:
+            swap_5(&node.right_child, &successor_node.right_child)
+        swap_5(&node.color, &successor_node.color)
+
+    let child = node.left_child if node.left_child != none else node.right_child
+
+    if let c = child:
+        c.parent = node.parent
+    if let parent = node.parent:
+        if parent.left_child == self_node:
+            parent.left_child = child
+        else:
+            parent.right_child = child
+    else:
+        this.m_root = child
+
+    # if the node is red then child must be black, and just replacing the node with its child should result in a valid tree (no change to black height)
+    if node.color != RedBlackTreeColor.red:
+        base_red_black_tree_remove_fixups(this, child, node.parent)
+
+    this.m_size -= 1
+
+# Whether a possibly-null node is black (a null node counts as black).
+func rbt_is_black[K](node: BaseRedBlackTreeNode[K]*?) -> bool:
+    let n = node else return true
+    return n.color == RedBlackTreeColor.black
+
+# The node, known to be non-null.
+func rbt_node[K](node: BaseRedBlackTreeNode[K]*?) -> BaseRedBlackTreeNode[K]*:
+    return node else trap("VERIFY: red-black tree node is null")
+
+## Ported from AK/RedBlackTree.h:307 AK::BaseRedBlackTree::remove_fixups.
+# We maintain parent as a separate argument since node might be null
+pub func base_red_black_tree_remove_fixups[K](this: BaseRedBlackTree[K]*, node_: BaseRedBlackTreeNode[K]*?, parent_: BaseRedBlackTreeNode[K]*?):
+    var node = node_
+    var parent = parent_
+    while node != this.m_root and rbt_is_black(node):
+        let p = rbt_node(parent)
+        if p.left_child == node:
+            var sibling = rbt_node(p.right_child)
+            if sibling.color == RedBlackTreeColor.red:
+                sibling.color = RedBlackTreeColor.black
+                p.color = RedBlackTreeColor.red
+                base_red_black_tree_rotate_left(this, p)
+                sibling = rbt_node(p.right_child)
+            if rbt_is_black(sibling.left_child) and rbt_is_black(sibling.right_child):
+                sibling.color = RedBlackTreeColor.red
+                node = p
+            else:
+                if rbt_is_black(sibling.right_child):
+                    rbt_node(sibling.left_child).color = RedBlackTreeColor.black  # null check?
+                    sibling.color = RedBlackTreeColor.red
+                    base_red_black_tree_rotate_right(this, sibling)
+                    sibling = rbt_node(p.right_child)
+                sibling.color = p.color
+                p.color = RedBlackTreeColor.black
+                rbt_node(sibling.right_child).color = RedBlackTreeColor.black  # null check?
+                base_red_black_tree_rotate_left(this, p)
+                node = this.m_root  # fixed
+        else:
+            var sibling = rbt_node(p.left_child)
+            if sibling.color == RedBlackTreeColor.red:
+                sibling.color = RedBlackTreeColor.black
+                p.color = RedBlackTreeColor.red
+                base_red_black_tree_rotate_right(this, p)
+                sibling = rbt_node(p.left_child)
+            if rbt_is_black(sibling.left_child) and rbt_is_black(sibling.right_child):
+                sibling.color = RedBlackTreeColor.red
+                node = p
+            else:
+                if rbt_is_black(sibling.left_child):
+                    rbt_node(sibling.right_child).color = RedBlackTreeColor.black  # null check?
+                    sibling.color = RedBlackTreeColor.red
+                    base_red_black_tree_rotate_left(this, sibling)
+                    sibling = rbt_node(p.left_child)
+                sibling.color = p.color
+                p.color = RedBlackTreeColor.black
+                rbt_node(sibling.left_child).color = RedBlackTreeColor.black  # null check?
+                base_red_black_tree_rotate_right(this, p)
+                node = this.m_root  # fixed
+        parent = rbt_node(node).parent
+    rbt_node(node).color = RedBlackTreeColor.black  # by this point node can't be null
+
+## Ported from AK/RedBlackTree.h:364 AK::BaseRedBlackTree::successor.
+pub func base_red_black_tree_successor[K](node_: BaseRedBlackTreeNode[K]*) -> BaseRedBlackTreeNode[K]*?:
+    var node = node_
+    if let right = node.right_child:
+        node = right
+        while let left = node.left_child:
+            node = left
+        return node
+    var temp = node.parent
+    while let t = temp:
+        if t.right_child != (BaseRedBlackTreeNode[K]*?)node:
+            break
+        node = t
+        temp = t.parent
+    return temp
+
+## Ported from AK/RedBlackTree.h:381 AK::BaseRedBlackTree::predecessor.
+pub func base_red_black_tree_predecessor[K](node_: BaseRedBlackTreeNode[K]*) -> BaseRedBlackTreeNode[K]*?:
+    var node = node_
+    if let left = node.left_child:
+        node = left
+        while let right = node.right_child:
+            node = right
+        return node
+    var temp = node.parent
+    while let t = temp:
+        if t.left_child != (BaseRedBlackTreeNode[K]*?)node:
+            break
+        node = t
+        temp = t.parent
+    return temp

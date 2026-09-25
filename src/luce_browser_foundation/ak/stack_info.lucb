@@ -1,0 +1,95 @@
+#==============================================================================================
+#
+#   stack_info - the bounds of the current thread's stack
+#
+#   DESCRIPTION:
+#       Port of AK/StackInfo.h (lines 1-36) and AK/StackInfo.cpp (lines 1-121), the macOS
+#       and the Linux/glibc branches. size_free reads the stack pointer with `asm` in place
+#       of __builtin_frame_address(0) (DESIGN.md §3.4).
+#
+#==============================================================================================
+
+extern func pthread_self() -> void*
+extern func pthread_get_stackaddr_np(thread: void*) -> void*
+extern func pthread_get_stacksize_np(thread: void*) -> usize
+extern func pthread_main_np() -> i32
+extern func pthread_attr_init(attr: void*) -> i32
+extern func pthread_getattr_np(thread: void*, attr: void*) -> i32
+extern func pthread_attr_getstack(attr: void*, stack_address: void*, stack_size: usize*) -> i32
+extern func pthread_attr_destroy(attr: void*) -> i32
+extern func getrlimit(resource: i32, rlp: void*) -> i32
+
+# struct rlimit.
+struct StackInfoRlimit:
+    var rlim_cur: u64
+    var rlim_max: u64
+
+# RLIMIT_STACK on macOS and Linux.
+let stack_info_rlimit_stack: i32 = 3
+# RLIM_INFINITY on macOS ((1 << 63) - 1).
+let stack_info_rlim_infinity_macos: u64 = 0x7fffffffffffffff
+
+## Ported from AK/StackInfo.cpp:29 AK::StackInfo::StackInfo.
+pub func stack_info_construct(this: StackInfo*):
+    if os.macos:
+        # NOTE: !! On MacOS, pthread_get_stackaddr_np gives the TOP of the stack, not the bottom!
+        let top_of_stack = (usize)pthread_get_stackaddr_np(pthread_self())
+        this.m_size = pthread_get_stacksize_np(pthread_self())
+        # https://github.com/rust-lang/rust/issues/43347#issuecomment-316783599
+        # https://developer.apple.com/library/archive/qa/qa1419/_index.html
+        #
+        # MacOS seems inconsistent on what stack size is given for the main thread.
+        # According to the Apple docs, default for main thread is 8MB, and default for
+        # other threads is 512KB
+        if pthread_main_np() == 1:
+            # Apparently the main thread's stack size is not reported correctly on macOS
+            # but we can use getrlimit to get the correct value.
+            var limit: StackInfoRlimit
+            discard(getrlimit(stack_info_rlimit_stack, &limit))
+            if limit.rlim_cur == stack_info_rlim_infinity_macos:
+                this.m_size = (usize)(8 * mi_b)
+            else:
+                this.m_size = (usize)limit.rlim_cur
+        this.m_base = top_of_stack - this.m_size
+    else:
+        # pthread_attr_t is 56 bytes on 64-bit glibc.
+        var attr: u8[64]
+        discard(pthread_attr_init(&attr[0]))
+        let rc = pthread_getattr_np(pthread_self(), &attr[0])
+        if rc != 0:
+            trap(f"pthread_getattr_np: {rc}")
+        var base: usize
+        var size: usize
+        let rc2 = pthread_attr_getstack(&attr[0], &base, &size)
+        if rc2 != 0:
+            trap(f"pthread_attr_getstack: {rc2}")
+        this.m_base = base
+        this.m_size = size
+        discard(pthread_attr_destroy(&attr[0]))
+    this.m_top = this.m_base + this.m_size
+
+## Ported from AK/StackInfo.h:17 AK::StackInfo::base.
+pub func stack_info_base(this: const StackInfo*) -> usize:
+    return this.m_base
+
+## Ported from AK/StackInfo.h:18 AK::StackInfo::top.
+pub func stack_info_top(this: const StackInfo*) -> usize:
+    return this.m_top
+
+## Ported from AK/StackInfo.h:19 AK::StackInfo::size.
+pub func stack_info_size(this: const StackInfo*) -> usize:
+    return this.m_size
+
+# The current stack pointer (__builtin_frame_address(0) of the caller, near enough).
+func stack_info_current_stack_pointer() -> usize:
+    var value: usize
+    asm arm64 (out("x0") value):
+        mov x0, sp
+    asm x86_64 (out("rax") value):
+        mov %rsp, %rax
+    return value
+
+## Ported from AK/StackInfo.h:20 AK::StackInfo::size_free.
+pub func stack_info_size_free(this: const StackInfo*) -> usize:
+    let p = stack_info_current_stack_pointer()
+    return p - this.m_base

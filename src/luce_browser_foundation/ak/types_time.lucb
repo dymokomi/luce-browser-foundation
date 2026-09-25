@@ -11,19 +11,19 @@
 
 ## AK::ms_per_day (AK/Time.h:32).
 # C++ initializer: 86'400'000
-pub var ms_per_day: f64
+pub let ms_per_day: f64 = 86400000.0
 
 ## AK::seconds_per_day (AK/Time.h:33).
 # C++ initializer: 86'400
-pub var seconds_per_day: f64
+pub let seconds_per_day: f64 = 86400.0
 
 ## AK::seconds_per_year (AK/Time.h:34).
 # C++ initializer: 60.0 * 60.0 * 24.0 * 365.2425
-pub var seconds_per_year: f64
+pub let seconds_per_year: f64 = 60.0 * 60.0 * 24.0 * 365.2425
 
 ## AK::seconds_per_hour (AK/Time.h:35).
 # C++ initializer: 3'600
-pub var seconds_per_hour: i32
+pub let seconds_per_hour: i32 = 3600
 
 ## AK::seconds_per_minute (AK/Time.h:36).
 pub let seconds_per_minute: i32 = 60

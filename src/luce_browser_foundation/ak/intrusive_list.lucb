@@ -1,0 +1,244 @@
+#==============================================================================================
+#
+#   intrusive_list - IntrusiveList<&T::member>: a list threaded through nodes inside its values
+#
+#   DESCRIPTION:
+#       Port of AK/IntrusiveList.h (lines 1-453) and AK/IntrusiveDetails.h. The donor's list
+#       type carries a pointer-to-member template argument naming the IntrusiveListNode field
+#       of T; luce-base has no such argument, so it is `member`, the field's offset
+#       (`offsetof(HeapBlock, m_list_node)`), passed to the members that take a T and look at
+#       its node (append, prepend, insert_before, remove, contains, next, prev) and recorded in
+#       the list's storage by the first insertion, from where the members that only hold nodes
+#       (first, last, take_first, begin, ...) take it. node_to_value is container_of: the
+#       node's address minus the offset (DESIGN.md §2.6).
+#
+#       Container is always a raw pointer here (T*?; RefPtr and OwnPtr are pointers,
+#       DESIGN.md §2.6), so `IsRaw` holds and the self reference is never set. first(), last()
+#       and take_*() answer `T*?`.
+#
+#==============================================================================================
+
+# mark: IntrusiveList ===========================================================================
+
+# The node of `n` (`n.*member`).
+func intrusive_list_node_of[T, TContainer](n: const T*, member: usize) -> IntrusiveListNode[T, TContainer]*:
+    return (IntrusiveListNode[T, TContainer]*)((u8*)n + member)
+
+## Ported from AK/IntrusiveList.h:191 AK::Detail::IntrusiveList::clear.
+pub func intrusive_list_clear[T, TContainer](this: IntrusiveList[T, TContainer]*):
+    while let first = this.m_storage.m_first:
+        intrusive_list_node_remove(first)
+
+## Ported from AK/IntrusiveList.h:198 AK::Detail::IntrusiveList::is_empty.
+pub func intrusive_list_is_empty[T, TContainer](this: const IntrusiveList[T, TContainer]*) -> bool:
+    return this.m_storage.m_first == none
+
+## Ported from AK/IntrusiveList.h:204 AK::Detail::IntrusiveList::size_slow.
+pub func intrusive_list_size_slow[T, TContainer](this: const IntrusiveList[T, TContainer]*) -> usize:
+    var size: usize = 0
+    for it in intrusive_list_begin_const(this):
+        discard(it)
+        size += 1
+    return size
+
+## Ported from AK/IntrusiveList.h:215 AK::Detail::IntrusiveList::append.
+pub func intrusive_list_append[T, TContainer](this: IntrusiveList[T, TContainer]*, n: T*, member: usize):
+    intrusive_list_remove(this, n, member)
+
+    this.m_storage.m_member = member
+    let nnode = intrusive_list_node_of[T, TContainer](n, member)
+    nnode.m_storage = &this.m_storage
+    nnode.m_prev = this.m_storage.m_last
+    nnode.m_next = none
+
+    if let last = this.m_storage.m_last:
+        last.m_next = nnode
+    this.m_storage.m_last = nnode
+    if this.m_storage.m_first == none:
+        this.m_storage.m_first = nnode
+
+## Ported from AK/IntrusiveList.h:234 AK::Detail::IntrusiveList::prepend.
+pub func intrusive_list_prepend[T, TContainer](this: IntrusiveList[T, TContainer]*, n: T*, member: usize):
+    intrusive_list_remove(this, n, member)
+
+    this.m_storage.m_member = member
+    let nnode = intrusive_list_node_of[T, TContainer](n, member)
+    nnode.m_storage = &this.m_storage
+    nnode.m_prev = none
+    nnode.m_next = this.m_storage.m_first
+
+    if let first = this.m_storage.m_first:
+        first.m_prev = nnode
+    this.m_storage.m_first = nnode
+    if this.m_storage.m_last == none:
+        this.m_storage.m_last = nnode
+
+## Ported from AK/IntrusiveList.h:253 AK::Detail::IntrusiveList::insert_before.
+pub func intrusive_list_insert_before[T, TContainer](this: IntrusiveList[T, TContainer]*, bn: T*, n: T*, member: usize):
+    intrusive_list_remove(this, n, member)
+
+    this.m_storage.m_member = member
+    let new_node = intrusive_list_node_of[T, TContainer](n, member)
+    let before_node = intrusive_list_node_of[T, TContainer](bn, member)
+    new_node.m_storage = &this.m_storage
+    new_node.m_next = before_node
+    new_node.m_prev = before_node.m_prev
+    if let prev = before_node.m_prev:
+        prev.m_next = new_node
+    before_node.m_prev = new_node
+
+    if this.m_storage.m_first == (IntrusiveListNode[T, TContainer]*?)before_node:
+        this.m_storage.m_first = new_node
+
+## Ported from AK/IntrusiveList.h:275 AK::Detail::IntrusiveList::remove.
+pub func intrusive_list_remove[T, TContainer](this: IntrusiveList[T, TContainer]*, n: T*, member: usize):
+    discard(this)
+    let nnode = intrusive_list_node_of[T, TContainer](n, member)
+    if nnode.m_storage != none:
+        intrusive_list_node_remove(nnode)
+
+## Ported from AK/IntrusiveList.h:283 AK::Detail::IntrusiveList::contains.
+pub func intrusive_list_contains[T, TContainer](this: const IntrusiveList[T, TContainer]*, n: const T*, member: usize) -> bool:
+    let nnode = intrusive_list_node_of[T, TContainer](n, member)
+    return nnode.m_storage == (const IntrusiveListStorage[T, TContainer]*?)&this.m_storage
+
+## Ported from AK/IntrusiveList.h:290 AK::Detail::IntrusiveList::first.
+pub func intrusive_list_first[T, TContainer](this: const IntrusiveList[T, TContainer]*) -> T*?:
+    let first = this.m_storage.m_first else return none
+    return intrusive_list_node_to_value(first, this.m_storage.m_member)
+
+## Ported from AK/IntrusiveList.h:316 AK::Detail::IntrusiveList::last.
+pub func intrusive_list_last[T, TContainer](this: const IntrusiveList[T, TContainer]*) -> T*?:
+    let last = this.m_storage.m_last else return none
+    return intrusive_list_node_to_value(last, this.m_storage.m_member)
+
+## Ported from AK/IntrusiveList.h:296 AK::Detail::IntrusiveList::take_first.
+pub func intrusive_list_take_first[T, TContainer](this: IntrusiveList[T, TContainer]*) -> T*?:
+    if let ptr = intrusive_list_first(this):
+        intrusive_list_remove(this, ptr, this.m_storage.m_member)
+        return ptr
+    return none
+
+## Ported from AK/IntrusiveList.h:306 AK::Detail::IntrusiveList::take_last.
+pub func intrusive_list_take_last[T, TContainer](this: IntrusiveList[T, TContainer]*) -> T*?:
+    if let ptr = intrusive_list_last(this):
+        intrusive_list_remove(this, ptr, this.m_storage.m_member)
+        return ptr
+    return none
+
+## Ported from AK/IntrusiveList.h:354 AK::Detail::IntrusiveList::begin.
+pub func intrusive_list_begin[T, TContainer](this: IntrusiveList[T, TContainer]*) -> IntrusiveListIterator[T, TContainer]:
+    return intrusive_list_begin_const(this)
+
+## Ported from AK/IntrusiveList.h:91 AK::Detail::IntrusiveList::end.
+pub func intrusive_list_end[T, TContainer](this: IntrusiveList[T, TContainer]*) -> IntrusiveListIterator[T, TContainer]:
+    return IntrusiveListIterator[T, TContainer](m_value = none, m_member = this.m_storage.m_member)
+
+## Ported from AK/IntrusiveList.h:360 AK::Detail::IntrusiveList::rbegin.
+pub func intrusive_list_rbegin[T, TContainer](this: IntrusiveList[T, TContainer]*) -> IntrusiveListReverseIterator[T, TContainer]:
+    return IntrusiveListReverseIterator[T, TContainer](m_value = intrusive_list_last(this), m_member = this.m_storage.m_member)
+
+## Ported from AK/IntrusiveList.h:117 AK::Detail::IntrusiveList::rend.
+pub func intrusive_list_rend[T, TContainer](this: IntrusiveList[T, TContainer]*) -> IntrusiveListReverseIterator[T, TContainer]:
+    return IntrusiveListReverseIterator[T, TContainer](m_value = none, m_member = this.m_storage.m_member)
+
+## Ported from AK/IntrusiveList.h:366 AK::Detail::IntrusiveList::begin const.
+pub func intrusive_list_begin_const[T, TContainer](this: const IntrusiveList[T, TContainer]*) -> IntrusiveListIterator[T, TContainer]:
+    return IntrusiveListIterator[T, TContainer](m_value = intrusive_list_first(this), m_member = this.m_storage.m_member)
+
+## Ported from AK/IntrusiveList.h:141 AK::Detail::IntrusiveList::end const.
+pub func intrusive_list_end_const[T, TContainer](this: const IntrusiveList[T, TContainer]*) -> IntrusiveListIterator[T, TContainer]:
+    return IntrusiveListIterator[T, TContainer](m_value = none, m_member = this.m_storage.m_member)
+
+## Ported from AK/IntrusiveList.h:338 AK::Detail::IntrusiveList::next.
+pub func intrusive_list_next[T, TContainer](current: T*, member: usize) -> T*?:
+    let nextnode = intrusive_list_node_of[T, TContainer](current, member).m_next else return none
+    return intrusive_list_node_to_value(nextnode, member)
+
+## Ported from AK/IntrusiveList.h:346 AK::Detail::IntrusiveList::prev.
+pub func intrusive_list_prev[T, TContainer](current: T*, member: usize) -> T*?:
+    let prevnode = intrusive_list_node_of[T, TContainer](current, member).m_prev else return none
+    return intrusive_list_node_to_value(prevnode, member)
+
+## Ported from AK/IntrusiveList.h:322 AK::Detail::IntrusiveList::next (const).
+pub func intrusive_list_next_2[T, TContainer](current: const T*, member: usize) -> const T*?:
+    return intrusive_list_next[T, TContainer]((T*)current, member)
+
+## Ported from AK/IntrusiveList.h:330 AK::Detail::IntrusiveList::prev (const).
+pub func intrusive_list_prev_2[T, TContainer](current: const T*, member: usize) -> const T*?:
+    return intrusive_list_prev[T, TContainer]((T*)current, member)
+
+## Ported from AK/IntrusiveList.h:372 AK::Detail::IntrusiveList::node_to_value: the T holding
+## `node` at offset `member` (container_of).
+# Note: `node` is a reference that resides in some part of the actual value (of type T), the
+#       placement (i.e. offset) of which is described by the pointer-to-data-member parameter
+#       named `member`.
+#       This function effectively takes in the address of the data member, and returns the address
+#       of the value (of type T) holding that member.
+pub func intrusive_list_node_to_value[T, TContainer](node: IntrusiveListNode[T, TContainer]*, member: usize) -> T*:
+    return (T*)((u8*)node - member)
+
+# mark: Iterators ===============================================================================
+
+## Ported from AK/IntrusiveList.h:76 AK::Detail::IntrusiveList::Iterator::operator*.
+pub func intrusive_list_iterator_deref[T, TContainer](this: IntrusiveListIterator[T, TContainer]*) -> T*:
+    return this.m_value else trap("VERIFY: dereferencing the end of an IntrusiveList")
+
+## Ported from AK/IntrusiveList.h:78 AK::Detail::IntrusiveList::Iterator::operator==.
+pub func intrusive_list_iterator_eq[T, TContainer](this: const IntrusiveListIterator[T, TContainer]*, other: IntrusiveListIterator[T, TContainer]) -> bool:
+    return other.m_value == this.m_value
+
+## Ported from AK/IntrusiveList.h:79 AK::Detail::IntrusiveList::Iterator::operator++.
+pub func intrusive_list_iterator_inc[T, TContainer](this: IntrusiveListIterator[T, TContainer]*) -> IntrusiveListIterator[T, TContainer]*:
+    let value = this.m_value else trap("VERIFY: incrementing the end of an IntrusiveList")
+    this.m_value = intrusive_list_next[T, TContainer](value, this.m_member)
+    return this
+
+## Ported from AK/IntrusiveList.h:176 AK::Detail::IntrusiveList::Iterator::erase: removes the
+## value the iterator is at and moves it to the next one.
+pub func intrusive_list_iterator_erase[T, TContainer](this: IntrusiveListIterator[T, TContainer]*) -> IntrusiveListIterator[T, TContainer]*:
+    let old = this.m_value else trap("VERIFY: erasing the end of an IntrusiveList")
+    this.m_value = intrusive_list_next[T, TContainer](old, this.m_member)
+    intrusive_list_node_remove(intrusive_list_node_of[T, TContainer](old, this.m_member))
+    return this
+
+## The value the iterator is at, and the iterator moved past it; none at the end (the `for`
+## protocol). The next value is read before the body runs, so the body may remove the value.
+pub func intrusive_list_iterator_next[T, TContainer](this: IntrusiveListIterator[T, TContainer]*) -> T*?:
+    let value = this.m_value else return none
+    this.m_value = intrusive_list_next[T, TContainer](value, this.m_member)
+    return value
+
+## Ported from AK/IntrusiveList.h:106 AK::Detail::IntrusiveList::ReverseIterator::operator++.
+pub func intrusive_list_reverse_iterator_inc[T, TContainer](this: IntrusiveListReverseIterator[T, TContainer]*) -> IntrusiveListReverseIterator[T, TContainer]*:
+    let value = this.m_value else trap("VERIFY: incrementing the end of an IntrusiveList")
+    this.m_value = intrusive_list_prev[T, TContainer](value, this.m_member)
+    return this
+
+## The value the reverse iterator is at, and the iterator moved past it (the `for` protocol).
+pub func intrusive_list_reverse_iterator_next[T, TContainer](this: IntrusiveListReverseIterator[T, TContainer]*) -> T*?:
+    let value = this.m_value else return none
+    this.m_value = intrusive_list_prev[T, TContainer](value, this.m_member)
+    return value
+
+# mark: IntrusiveListNode =======================================================================
+
+## Ported from AK/IntrusiveList.h:397 AK::Detail::IntrusiveListNode::remove.
+pub func intrusive_list_node_remove[T, TContainer](this: IntrusiveListNode[T, TContainer]*):
+    let storage = this.m_storage else trap("VERIFY: removing an IntrusiveListNode that is in no list")
+    let self_node: IntrusiveListNode[T, TContainer]*? = this
+    if storage.m_first == self_node:
+        storage.m_first = this.m_next
+    if storage.m_last == self_node:
+        storage.m_last = this.m_prev
+    if let prev = this.m_prev:
+        prev.m_next = this.m_next
+    if let next = this.m_next:
+        next.m_prev = this.m_prev
+    this.m_prev = none
+    this.m_next = none
+    this.m_storage = none
+
+## Ported from AK/IntrusiveList.h:416 AK::Detail::IntrusiveListNode::is_in_list.
+pub func intrusive_list_node_is_in_list[T, TContainer](this: const IntrusiveListNode[T, TContainer]*) -> bool:
+    return this.m_storage != none

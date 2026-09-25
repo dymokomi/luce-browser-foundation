@@ -1,0 +1,117 @@
+#==============================================================================================
+#
+#   tests_optional - Optional<T> helpers, SentinelOptional<T> and enumerate
+#
+#   DESCRIPTION:
+#       Ports of the cases of Tests/AK/TestOptional.cpp that exercise the ported members
+#       (the comparisons, value_or, sentinel_optional) and of Tests/AK/TestEnumerate.cpp.
+#       Presence, value() and moves are luce-base's own optionals.
+#
+#==============================================================================================
+
+# SentinelInt of TestOptional.cpp: u32::max is the sentinel.
+struct TestSentinelInt:
+    var value: u32
+
+struct TestSentinelIntTraits: SentinelOptionalTraits[TestSentinelInt]:
+    var empty_: u8
+
+    func sentinel_value() -> TestSentinelInt: return TestSentinelInt(value = u32_max)
+
+    func is_sentinel(value: const TestSentinelInt*) -> bool: return value.value == u32_max
+
+func test_optional_make_ninety_nine(context: void*?) -> i32:
+    discard(context)
+    return 99
+
+func test_optional_fail(context: void*?) -> i32!:
+    discard(context)
+    error(ak_error, "callback failed")
+
+test "optional: comparisons":
+    let opt0: str? = none
+    let opt1: str? = none
+    assert(eq_opaque_opaque(opt0, opt1))
+    let foo: str? = "foo"
+    let also_foo: str? = "foo"
+    let bar: str? = "bar"
+    assert(not eq_opaque_opaque(opt0, foo))
+    assert(eq_opaque_opaque(foo, also_foo))
+    assert(not eq_opaque_opaque(foo, bar))
+    assert(not eq_opaque_tt2(opt0, ""))
+    assert(eq_opaque_tt2(foo, "foo"))
+    assert(not eq_opaque_tt2(foo, "bar"))
+    let none_u8: u8? = none
+    let seven: u8? = 7
+    assert(not eq_opaque_tt2(none_u8, 0))
+    assert(eq_opaque_tt2(seven, 7))
+    assert(eq_opaque_optional_none(none_u8, OptionalNone(empty_ = 0)))
+    assert(not eq_opaque_optional_none(seven, OptionalNone(empty_ = 0)))
+
+test "optional: value_or, lazy evaluation, ensure, ptr":
+    var empty: i32? = none
+    var five: i32? = 5
+    assert(optional_base_value_or(&empty, 3) == 3)
+    assert(optional_base_value_or(&five, 3) == 5)
+    let lazy = Function0[i32](call = test_optional_make_ninety_nine, context = none)
+    assert(optional_base_value_or_lazy_evaluated(&empty, lazy) == 99)
+    assert(optional_base_value_or_lazy_evaluated(&five, lazy) == 5)
+    assert(optional_base_ptr(&empty) == none)
+    let pointer = optional_base_ptr(&five) else trap("missing")
+    *pointer = 6
+    assert(five == 6)
+    assert(optional_base_mul(&five) == 6)
+    *optional_base_arrow(&five) = 7
+    assert(five == 7)
+    let ensured = optional_base_ensure(&empty, lazy)
+    assert(*ensured == 99)
+    assert(empty == 99)
+    var missing: i32? = none
+    let recovered = optional_base_try_value_or_lazy_evaluated(&missing, test_optional_fail, none) catch failure:
+        assert(failure.code == ak_error)
+        recover -1
+    assert(recovered == -1)
+    let present = optional_base_try_value_or_lazy_evaluated(&five, test_optional_fail, none) else trap("failed")
+    assert(present == 7)
+
+test "optional: sentinel_optional":
+    var empty: SentinelOptional[TestSentinelInt, TestSentinelIntTraits] = ---
+    sentinel_optional_sentinel_optional_t_traits_v(&empty, OptionalNone(empty_ = 0))
+    assert(not sentinel_optional_has_value(&empty))
+    var with_value: SentinelOptional[TestSentinelInt, TestSentinelIntTraits] = ---
+    sentinel_optional_sentinel_optional_t_traits_u(&with_value, TestSentinelInt(value = 42))
+    assert(sentinel_optional_has_value(&with_value))
+    assert(sentinel_optional_value_t_self(&with_value).value == 42)
+    sentinel_optional_clear(&with_value)
+    assert(not sentinel_optional_has_value(&with_value))
+    var a: SentinelOptional[TestSentinelInt, TestSentinelIntTraits] = ---
+    sentinel_optional_sentinel_optional_t_traits_u(&a, TestSentinelInt(value = 7))
+    var b = a
+    assert(sentinel_optional_has_value(&b))
+    assert(sentinel_optional_unchecked_value(&b).value == 7)
+    var opt: SentinelOptional[TestSentinelInt, TestSentinelIntTraits] = ---
+    sentinel_optional_sentinel_optional_t_traits_u(&opt, TestSentinelInt(value = 5))
+    let released = sentinel_optional_release_value(&opt)
+    assert(released.value == 5)
+    assert(not sentinel_optional_has_value(&opt))
+
+struct TestIndexAndValue:
+    var index: usize
+    var value: i32
+
+test "enumerate":
+    var values: Vector[i32]
+    let initial: i32[4] = [9, 8, 7, 6]
+    vector_construct_opaque(&values, initial)
+    var result: Vector[TestIndexAndValue]
+    for item in enumerate[i32, Vector[i32]](&values):
+        vector_append_t(&result, TestIndexAndValue(index = item.index, value = *item.value))
+        *item.value = (i32)item.index
+    assert(vector_size(&result) == 4)
+    for i in 0..<4usize:
+        assert(vector_at(&result, i).index == i)
+        assert(vector_at(&result, i).value == initial[i])
+        assert(*vector_at(&values, i) == (i32)i)
+    var enumerator = Enumerator[Vector[i32]*](iterable = &values)
+    let end = enumerator_end[i32, Vector[i32]](&enumerator)
+    assert(end.index == 4)

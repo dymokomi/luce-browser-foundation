@@ -1,0 +1,173 @@
+#==============================================================================================
+#
+#   tests_singly_linked_list - SinglyLinkedList<T, SizePolicy>
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestSinglyLinkedList.cpp, including the size-policy call counting
+#       (TestSizeCalculationPolicy, whose counters are module globals as in the donor).
+#
+#==============================================================================================
+
+type TestIntList = SinglyLinkedList[i32, DefaultSizeCalculationPolicy[i32]]
+
+func test_sll_make_list() -> TestIntList:
+    var list: TestIntList
+    for i: i32 in 0..<10:
+        singly_linked_list_append(&list, i)
+    return list
+
+func test_sll_equals(context: void*?, value: const i32*) -> bool:
+    let target = (const i32*)(context else trap("no captures"))
+    return *value == *target
+
+test "singly_linked_list: should_find_mutable":
+    var sut = test_sll_make_list()
+    var it = singly_linked_list_find(&sut, 4)
+    assert(*singly_linked_list_iterator_deref(&it) == 4)
+    let missing = singly_linked_list_find(&sut, 42)
+    assert(singly_linked_list_iterator_eq(&missing, singly_linked_list_end(&sut)))
+
+test "singly_linked_list: should_find_mutable_with_predicate":
+    var sut = test_sll_make_list()
+    var four: i32 = 4
+    var it = singly_linked_list_find_if(&sut, Function1[const i32*, bool](call = test_sll_equals, context = &four))
+    assert(*singly_linked_list_iterator_deref(&it) == 4)
+    var forty_two: i32 = 42
+    let missing = singly_linked_list_find_if(&sut, Function1[const i32*, bool](call = test_sll_equals, context = &forty_two))
+    assert(singly_linked_list_iterator_eq(&missing, singly_linked_list_end(&sut)))
+
+test "singly_linked_list: should_find_const":
+    let sut = test_sll_make_list()
+    var it = singly_linked_list_find_const(&sut, 4)
+    assert(*singly_linked_list_iterator_deref(&it) == 4)
+    let missing = singly_linked_list_find_const(&sut, 42)
+    assert(singly_linked_list_iterator_eq(&missing, singly_linked_list_end_const(&sut)))
+    assert(singly_linked_list_contains_slow(&sut, 7))
+    assert(singly_linked_list_size(&sut) == 10)
+
+test "singly_linked_list: removal_during_iteration":
+    var list = test_sll_make_list()
+    var size = singly_linked_list_size(&list)
+    var it = singly_linked_list_begin(&list)
+    while singly_linked_list_iterator_ne(&it, singly_linked_list_end(&list)):
+        assert(singly_linked_list_size(&list) == size)
+        it = singly_linked_list_remove(&list, it)
+        size -= 1
+    assert(singly_linked_list_is_empty(&list))
+
+var calls_to_increase: usize
+var calls_to_decrease: usize
+var calls_to_reset: usize
+var calls_to_get_size: usize
+
+func test_sll_setup():
+    calls_to_increase = 0
+    calls_to_decrease = 0
+    calls_to_reset = 0
+    calls_to_get_size = 0
+
+struct TestSizeCalculationPolicy: SizeCalculationPolicy[i32]:
+    var empty_: u8
+
+    mutating func increase_size(value: const i32*): test_sll_increase(value)
+
+    mutating func decrease_size(value: const i32*): test_sll_decrease(value)
+
+    mutating func reset(): test_sll_reset()
+
+    func size(head: const SinglyLinkedListNode[i32]*?) -> usize: return test_sll_get_size(head)
+
+func test_sll_increase(value: const i32*):
+    discard(value)
+    calls_to_increase += 1
+
+func test_sll_decrease(value: const i32*):
+    discard(value)
+    calls_to_decrease += 1
+
+func test_sll_reset():
+    calls_to_reset += 1
+
+func test_sll_get_size(head: const SinglyLinkedListNode[i32]*?) -> usize:
+    discard(head)
+    calls_to_get_size += 1
+    return 42
+
+type TestPolicyList = SinglyLinkedList[i32, TestSizeCalculationPolicy]
+
+test "singly_linked_list: size policy calls":
+    test_sll_setup()
+    var list: TestPolicyList
+    singly_linked_list_append(&list, 0)
+    assert(calls_to_increase == 1)
+    discard(singly_linked_list_remove(&list, singly_linked_list_begin(&list)))
+    assert(calls_to_decrease == 1)
+    singly_linked_list_append(&list, 0)
+    singly_linked_list_clear(&list)
+    assert(calls_to_reset == 1)
+    assert(singly_linked_list_size(&list) == 42)
+    assert(calls_to_get_size == 1)
+    singly_linked_list_append(&list, 0)
+    discard(singly_linked_list_take_first(&list))
+    assert(calls_to_decrease == 2)
+
+test "singly_linked_list: size policy calls on the fallible and positional inserts":
+    test_sll_setup()
+    var list: TestPolicyList
+    singly_linked_list_try_append(&list, 0) else trap("MUST")
+    assert(calls_to_increase == 1)
+    singly_linked_list_try_prepend(&list, 0) else trap("MUST")
+    assert(calls_to_increase == 2)
+    singly_linked_list_try_insert_before(&list, singly_linked_list_begin(&list), 42) else trap("MUST")
+    assert(calls_to_increase == 3)
+    singly_linked_list_try_insert_after(&list, singly_linked_list_begin(&list), 42) else trap("MUST")
+    assert(calls_to_increase == 4)
+    singly_linked_list_insert_before(&list, singly_linked_list_begin(&list), 42)
+    assert(calls_to_increase == 5)
+    singly_linked_list_insert_after(&list, singly_linked_list_begin(&list), 42)
+    assert(calls_to_increase == 6)
+
+test "singly_linked_list: remove_does_not_leave_dangling_iterator":
+    var list: TestIntList
+    singly_linked_list_append(&list, 1)
+    singly_linked_list_append(&list, 2)
+    var it = singly_linked_list_begin(&list)
+    it = singly_linked_list_remove(&list, it)  # remove first element
+    assert(singly_linked_list_iterator_ne(&it, singly_linked_list_end(&list)))
+    assert(*singly_linked_list_iterator_deref(&it) == 2)
+    it = singly_linked_list_remove(&list, it)
+    assert(singly_linked_list_iterator_eq(&it, singly_linked_list_end(&list)))
+    assert(singly_linked_list_is_empty(&list))
+
+test "singly_linked_list: remove_consecutive_mid_list_nodes":
+    var list: TestIntList
+    for i: i32 in 1..=4:
+        singly_linked_list_append(&list, i)
+    var it = singly_linked_list_begin(&list)
+    discard(singly_linked_list_iterator_inc(&it))
+    it = singly_linked_list_remove(&list, it)
+    assert(*singly_linked_list_iterator_deref(&it) == 3)
+    it = singly_linked_list_remove(&list, it)
+    assert(*singly_linked_list_iterator_deref(&it) == 4)
+    it = singly_linked_list_begin(&list)
+    assert(*singly_linked_list_iterator_deref(&it) == 1)
+    discard(singly_linked_list_iterator_inc(&it))
+    assert(*singly_linked_list_iterator_deref(&it) == 4)
+    discard(singly_linked_list_iterator_inc(&it))
+    assert(singly_linked_list_iterator_eq(&it, singly_linked_list_end(&list)))
+    var sum: i32 = 0
+    for value in singly_linked_list_begin(&list):
+        sum += *value
+    assert(sum == 5)
+    assert(*singly_linked_list_last(&list) == 4)
+
+test "singly_linked_list: counting policy":
+    var list: SinglyLinkedList[i32, CountingSizeCalculationPolicy[i32]]
+    for i: i32 in 0..<5:
+        singly_linked_list_prepend(&list, i)
+    assert(singly_linked_list_size(&list) == 5)
+    assert(singly_linked_list_first_const(&list) == 4)
+    discard(singly_linked_list_take_first(&list))
+    assert(singly_linked_list_size(&list) == 4)
+    singly_linked_list_clear(&list)
+    assert(singly_linked_list_size(&list) == 0)
