@@ -1927,6 +1927,8 @@ AK::TimeLiterals::operator""_ns	luce-browser-foundation	ak	time_literals_literal
 AK::TimeLiterals::operator""_sec	luce-browser-foundation	ak	time_literals_literalsec	AK/Time.h:663	stub
 AK::TimeLiterals::operator""_us	luce-browser-foundation	ak	time_literals_literalus	AK/Time.h:661	stub
 AK::TrailingCodePointTransformation	luce-browser-foundation	ak	TrailingCodePointTransformation	AK/StringUtils.h:59	enum
+AK::Traits<URL::Origin>	luce-browser-foundation	web_url	OriginTraits	Libraries/LibURL/Origin.h:85	struct
+AK::Traits<URL::Origin>::hash	luce-browser-foundation	web_url	origin_traits_hash	Libraries/LibURL/Origin.cpp:137	ported
 AK::TriState	luce-browser-foundation	ak	TriState	AK/Types.h:187	enum
 AK::Trie	luce-browser-foundation	ak	Trie	AK/Trie.h:288	generic struct
 AK::Trie::Trie<ValueType, MetadataT, ValueTraits, BaseT, MapType>	luce-browser-foundation	ak	trie_construct	AK/Trie.h:299	construct
@@ -3198,10 +3200,15 @@ URL::ExcludeFragment	luce-browser-foundation	web_url	ExcludeFragment	Libraries/L
 URL::Host	luce-browser-foundation	web_url	Host	Libraries/LibURL/Host.h:21	struct
 URL::Host::Host	luce-browser-foundation	web_url	host_construct_host_variant_type	Libraries/LibURL/Host.cpp:15	construct
 URL::Host::Host	luce-browser-foundation	web_url	host_construct_string	Libraries/LibURL/Host.cpp:20	construct
-URL::Host::get	luce-browser-foundation	web_url	host_get	Libraries/LibURL/Host.h:34	stub
-URL::Host::has	luce-browser-foundation	web_url	host_has	Libraries/LibURL/Host.h:31	stub
+URL::Host::get<IPv4Address>	luce-browser-foundation	web_url	host_get_i_pv4_address	Libraries/LibURL/Host.h:34	ported
+URL::Host::get<IPv6Address>	luce-browser-foundation	web_url	host_get_i_pv6_address	Libraries/LibURL/Host.h:34	ported
+URL::Host::get<String>	luce-browser-foundation	web_url	host_get_string	Libraries/LibURL/Host.h:34	ported
+URL::Host::has<IPv4Address>	luce-browser-foundation	web_url	host_has_i_pv4_address	Libraries/LibURL/Host.h:31	ported
+URL::Host::has<IPv6Address>	luce-browser-foundation	web_url	host_has_i_pv6_address	Libraries/LibURL/Host.h:31	ported
+URL::Host::has<String>	luce-browser-foundation	web_url	host_has_string	Libraries/LibURL/Host.h:31	ported
 URL::Host::is_domain	luce-browser-foundation	web_url	host_is_domain	Libraries/LibURL/Host.cpp:147	stub
 URL::Host::is_empty_host	luce-browser-foundation	web_url	host_is_empty_host	Libraries/LibURL/Host.cpp:154	stub
+URL::Host::operator==	luce-browser-foundation	web_url	host_eq	Libraries/LibURL/Host.h:36	ported
 URL::Host::public_suffix	luce-browser-foundation	web_url	host_public_suffix	Libraries/LibURL/Host.cpp:183	stub
 URL::Host::registrable_domain	luce-browser-foundation	web_url	host_registrable_domain	Libraries/LibURL/Host.cpp:220	stub
 URL::Host::serialize	luce-browser-foundation	web_url	host_serialize	Libraries/LibURL/Host.cpp:161	stub
@@ -3211,6 +3218,7 @@ URL::Origin::OpaqueData	luce-browser-foundation	web_url	OriginOpaqueData	Librari
 URL::Origin::OpaqueData::Type	luce-browser-foundation	web_url	OriginOpaqueDataType	Libraries/LibURL/Origin.h:21	enum
 URL::Origin::Origin	luce-browser-foundation	web_url	origin_construct_optional_string	Libraries/LibURL/Origin.cpp:19	construct
 URL::Origin::Origin	luce-browser-foundation	web_url	origin_construct_origin_opaque_data	Libraries/LibURL/Origin.h:31	construct
+URL::Origin::Origin	luce-browser-foundation	web_url	origin_tuple	Libraries/LibURL/Origin.cpp:19	construct
 URL::Origin::Tuple	luce-browser-foundation	web_url	OriginTuple	Libraries/LibURL/Origin.h:70	struct
 URL::Origin::create_opaque	luce-browser-foundation	web_url	origin_create_opaque	Libraries/LibURL/Origin.cpp:14	stub
 URL::Origin::domain	luce-browser-foundation	web_url	origin_domain	Libraries/LibURL/Origin.h:46	stub
@@ -3235,7 +3243,7 @@ URL::Parser::percent_encode_after_encoding	luce-browser-foundation	web_url	parse
 URL::Parser::shorten_urls_path	luce-browser-foundation	web_url	parser_shorten_urls_path	Libraries/LibURL/Parser.cpp:625	stub
 URL::Parser::state_name	luce-browser-foundation	web_url	parser_state_name	Libraries/LibURL/Parser.h:48	stub
 URL::Pattern::Component	luce-browser-foundation	web_url	Component	Libraries/LibURL/Pattern/Component.h:19	struct
-URL::Pattern::Component::ExecutionResult	luce-browser-foundation	web_url	ComponentExecutionResult	Libraries/LibURL/Pattern/Component.h:28	opaque
+URL::Pattern::Component::ExecutionResult	luce-browser-foundation	web_url	ComponentExecutionResult	Libraries/LibURL/Pattern/Component.h:28	struct
 URL::Pattern::Component::Result	luce-browser-foundation	web_url	ComponentResult	Libraries/LibURL/Pattern/Component.h:23	struct
 URL::Pattern::Component::compile	luce-browser-foundation	web_url	component_compile	Libraries/LibURL/Pattern/Component.cpp:218	stub
 URL::Pattern::Component::create_match_result	luce-browser-foundation	web_url	component_create_match_result	Libraries/LibURL/Pattern/Component.cpp:304	stub
@@ -3294,7 +3302,10 @@ URL::Pattern::Pattern::port_component	luce-browser-foundation	web_url	pattern_po
 URL::Pattern::Pattern::protocol_component	luce-browser-foundation	web_url	pattern_protocol_component	Libraries/LibURL/Pattern/Pattern.h:52	stub
 URL::Pattern::Pattern::search_component	luce-browser-foundation	web_url	pattern_search_component	Libraries/LibURL/Pattern/Pattern.h:58	stub
 URL::Pattern::Pattern::username_component	luce-browser-foundation	web_url	pattern_username_component	Libraries/LibURL/Pattern/Pattern.h:53	stub
+URL::Pattern::PatternErrorOr	luce-browser-foundation	web_url	pattern_error	Libraries/LibURL/Pattern/PatternError.h:21	variable
+URL::Pattern::PatternErrorOr::release_error	luce-browser-foundation	web_url	pattern_take_error_info	Libraries/LibURL/Pattern/PatternError.h:21	helper
 URL::Pattern::PatternParser	luce-browser-foundation	web_url	PatternParser	Libraries/LibURL/Pattern/PatternParser.h:18	struct
+URL::Pattern::PatternParser::EncodingCallback	luce-browser-foundation	web_url	EncodingCallback	Libraries/LibURL/Pattern/PatternParser.h:25	type
 URL::Pattern::PatternParser::PatternParser	luce-browser-foundation	web_url	pattern_parser_construct	Libraries/LibURL/Pattern/PatternParser.cpp:13	construct
 URL::Pattern::PatternParser::add_a_part	luce-browser-foundation	web_url	pattern_parser_add_a_part	Libraries/LibURL/Pattern/PatternParser.cpp:96	stub
 URL::Pattern::PatternParser::consume_a_required_token	luce-browser-foundation	web_url	pattern_parser_consume_a_required_token	Libraries/LibURL/Pattern/PatternParser.cpp:20	stub
@@ -3359,6 +3370,7 @@ URL::PublicSuffixData	luce-browser-foundation	web_url	PublicSuffixData	Build/Lib
 URL::PublicSuffixData::PublicSuffixData	luce-browser-foundation	web_url	public_suffix_data_construct	Build/Libraries/LibURL/PublicSuffixData.h:11	construct
 URL::PublicSuffixData::get_public_suffix	luce-browser-foundation	web_url	public_suffix_data_get_public_suffix	Build/Libraries/LibURL/PublicSuffixData.h:26	stub
 URL::PublicSuffixData::is_public_suffix	luce-browser-foundation	web_url	public_suffix_data_is_public_suffix	Build/Libraries/LibURL/PublicSuffixData.h:25	stub
+URL::PublicSuffixData::s_public_suffixes	luce-browser-foundation	web_url	s_public_suffixes	Build/Libraries/LibURL/PublicSuffixData.cpp:8	variable
 URL::PublicSuffixData::the	luce-browser-foundation	web_url	public_suffix_data_the	Build/Libraries/LibURL/PublicSuffixData.h:17	stub
 URL::SchemeAndHost	luce-browser-foundation	web_url	SchemeAndHost	Libraries/LibURL/Site.h:17	struct
 URL::Site	luce-browser-foundation	web_url	Site	Libraries/LibURL/Site.h:24	struct
@@ -3368,8 +3380,9 @@ URL::Site::obtain	luce-browser-foundation	web_url	site_obtain	Libraries/LibURL/S
 URL::Site::serialize	luce-browser-foundation	web_url	site_serialize	Libraries/LibURL/Site.cpp:61	stub
 URL::SpaceAsPlus	luce-browser-foundation	web_url	SpaceAsPlus	Libraries/LibURL/URL.h:73	enum
 URL::URL	luce-browser-foundation	web_url	Url	Libraries/LibURL/URL.h:82	struct
-URL::URL::Data	luce-browser-foundation	web_url	UrlData	Libraries/LibURL/URL.h:156	opaque
+URL::URL::Data	luce-browser-foundation	web_url	UrlData	Libraries/LibURL/URL.h:156	struct
 URL::URL::Data::clone	luce-browser-foundation	web_url	url_data_clone	Libraries/LibURL/URL.h:157	stub
+URL::URL::URL	luce-browser-foundation	web_url	url_empty	Libraries/LibURL/URL.h:87	construct
 URL::URL::about	luce-browser-foundation	web_url	url_about	Libraries/LibURL/URL.cpp:469	stub
 URL::URL::append_path	luce-browser-foundation	web_url	url_append_path	Libraries/LibURL/URL.cpp:95	stub
 URL::URL::append_slash	luce-browser-foundation	web_url	url_append_slash	Libraries/LibURL/URL.h:124	stub
@@ -3714,7 +3727,13 @@ optional_string_view_from_ffi	luce-browser-foundation	web_unicode	optional_strin
 pair_int_hash	luce-browser-foundation	ak	pair_int_hash	AK/HashFunctions.h:33	stub
 ptr_hash	luce-browser-foundation	ak	ptr_hash_usize	AK/HashFunctions.h:38	stub
 ptr_hash	luce-browser-foundation	ak	ptr_hash_void	AK/HashFunctions.h:46	stub
-regex::ECMAScriptRegex	luce-browser-foundation	web_url	RegexEcmaScriptRegex	Libraries/LibRegex/ECMAScriptRegex.h:41	opaque
+regex::ECMAScriptCompileFlags	luce-browser-foundation	web_url	RegexEcmaScriptCompileFlags	Libraries/LibRegex/ECMAScriptRegex.h:25	struct
+regex::ECMAScriptRegex	luce-browser-foundation	web_url	RegexEcmaScriptRegex	Libraries/LibRegex/ECMAScriptRegex.h:41	struct
+regex::ECMAScriptRegex::capture_slot	luce-browser-foundation	web_url	regex_ecma_script_regex_capture_slot	Libraries/LibRegex/ECMAScriptRegex.h:58	ported
+regex::ECMAScriptRegex::compile	luce-browser-foundation	web_url	regex_ecma_script_regex_compile	Libraries/LibRegex/ECMAScriptRegex.h:45	ported
+regex::ECMAScriptRegex::exec	luce-browser-foundation	web_url	regex_ecma_script_regex_exec	Libraries/LibRegex/ECMAScriptRegex.h:53	ported
+regex::ECMAScriptRegex::test	luce-browser-foundation	web_url	regex_ecma_script_regex_test	Libraries/LibRegex/ECMAScriptRegex.h:61	ported
+regex::MatchResult	luce-browser-foundation	web_url	RegexMatchResult	Libraries/LibRegex/ECMAScriptRegex.h:19	enum
 resolve_property	luce-browser-foundation	web_unicode	resolve_property	Libraries/LibUnicode/CharacterTypes.cpp:690	stub
 string_view_from_ffi	luce-browser-foundation	web_unicode	string_view_from_ffi	Libraries/LibUnicode/CharacterTypes.cpp:648	stub
 timespec	luce-browser-foundation	ak	Timespec	generated	opaque
