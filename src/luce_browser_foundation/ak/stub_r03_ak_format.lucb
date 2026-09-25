@@ -97,7 +97,7 @@ pub func format_parser_consume_replacement_field(this: FormatParser*, index: usi
 
 ## Ported from AK/Format.cpp:65 AK::(anonymous)::convert_unsigned_to_string.
 # internal linkage in C++: make it private when it is ported.
-pub func convert_unsigned_to_string(value: u64, buffer: u8[128]*, base_: u8, upper_case: bool, use_separator: bool) -> usize:
+pub func convert_unsigned_to_string(value: u64, buffer: (u8[128])*, base_: u8, upper_case: bool, use_separator: bool) -> usize:
     trap("unported: AK::(anonymous)::convert_unsigned_to_string")
 
 ## Ported from AK/Format.h:85 AK::TypeErasedParameter::TypeErasedParameter.
