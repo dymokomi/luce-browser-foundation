@@ -1,0 +1,343 @@
+#==============================================================================================
+#
+#   fixed_point_2 - FixedPoint<precision, u32>
+#
+#   DESCRIPTION:
+#       Port of AK/FixedPoint.h (lines 28-400) for the u32 underlying type; see fixed_point_1.
+#
+#==============================================================================================
+
+# mark: FixedPoint<precision, u32> ==============================================================
+
+# radix_mask for u32: the fraction bits.
+func fixed_point_radix_mask_u32(precision: usize) -> u32:
+    return ((u32)1 << (u32)precision) -% 1
+
+## Ported from AK/FixedPoint.h:41 AK::FixedPoint::FixedPoint(Integral), for u32: `value` in the
+## integer part.
+pub func fixed_point_fixed_point_precision_underlying_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, value: i64):
+    let precision = fixed_point_precision[P]()
+    this.m_value = (u32)value << (u32)precision
+
+## Ported from AK/FixedPoint.h:46 AK::FixedPoint::FixedPoint(FloatingPoint), for u32 and f64:
+## rounded to nearest, ties to even.
+pub func fixed_point_construct_f64_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, value: f64):
+    let precision = fixed_point_precision[P]()
+    this.m_value = rounding_round_to_f64_u32(value * (f64)((u32)1 << (u32)precision))
+
+## Ported from AK/FixedPoint.h:46 AK::FixedPoint::FixedPoint(FloatingPoint), for u32 and f32.
+pub func fixed_point_construct_f32_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, value: f32):
+    let precision = fixed_point_precision[P]()
+    this.m_value = rounding_round_to_f32_u32(value * (f32)((u32)1 << (u32)precision))
+
+## Ported from AK/FixedPoint.h:59 AK::FixedPoint::operator F, for u32 and f64.
+pub func fixed_point_to_f64_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> f64:
+    let precision = fixed_point_precision[P]()
+    return (f64)this.m_value * pow_f64(0.5, (f64)precision)
+
+## Ported from AK/FixedPoint.h:59 AK::FixedPoint::operator F, for u32 and f32.
+pub func fixed_point_to_f32_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> f32:
+    let precision = fixed_point_precision[P]()
+    return (f32)this.m_value * pow_f32(0.5, (f32)precision)
+
+## Ported from AK/FixedPoint.h:65 AK::FixedPoint::operator I, for u32: the truncated integer part.
+pub func fixed_point_to_integer_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> u32:
+    let precision = fixed_point_precision[P]()
+    let truncated = fixed_point_trunc_u32(this)
+    return truncated.m_value >> (u32)precision
+
+## Ported from AK/FixedPoint.h:70 AK::FixedPoint::create_raw, for u32.
+pub func fixed_point_create_raw_u32[P: FixedPointPrecision](value: u32) -> FixedPoint[u32, P]:
+    return FixedPoint[u32, P](m_value = value)
+
+## Ported from AK/FixedPoint.h:77 AK::FixedPoint::raw, for u32.
+pub func fixed_point_raw_const_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> u32:
+    return this.m_value
+
+## Ported from AK/FixedPoint.h:81 AK::FixedPoint::raw, for u32.
+pub func fixed_point_raw_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*) -> u32*:
+    return &this.m_value
+
+## Ported from AK/FixedPoint.h:86 AK::FixedPoint::fract, for u32.
+pub func fixed_point_fract_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> FixedPoint[u32, P]:
+    let precision = fixed_point_precision[P]()
+    return fixed_point_create_raw_u32[P](this.m_value & fixed_point_radix_mask_u32(precision))
+
+## Ported from AK/FixedPoint.h:91 AK::FixedPoint::clamp, for u32.
+pub func fixed_point_clamp_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, minimum: FixedPoint[u32, P], maximum: FixedPoint[u32, P]) -> FixedPoint[u32, P]:
+    if fixed_point_lt_fixed_point_u32(this, minimum):
+        return minimum
+    if fixed_point_gt_fixed_point_u32(this, maximum):
+        return maximum
+    return *this
+
+## Ported from AK/FixedPoint.h:100 AK::FixedPoint::rint, for u32.
+pub func fixed_point_rint_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> FixedPoint[u32, P]:
+    let precision = fixed_point_precision[P]()
+    let radix_mask = fixed_point_radix_mask_u32(precision)
+    # Note: Round fair, break tie to even
+    var value = this.m_value >> (u32)precision
+
+    # Note: For negative numbers the ordering are reversed,
+    #       and they were already decremented by the shift, so we need to
+    #       add 1 when we see a fract values behind the `.5`s place set,
+    #       because that means they are smaller than .5
+    # fract(m_value) >= .5?
+    if (this.m_value & ((u32)1 << (u32)(precision - 1))) != 0:
+        # fract(m_value) > .5?
+        if (this.m_value & (radix_mask >> 1)) != 0:
+            # yes: round "up";
+            value = value +% 1
+        else:
+            #  no: round to even;
+            value = value +% (value & 1)
+    var result: FixedPoint[u32, P] = ---
+    fixed_point_fixed_point_precision_underlying_u32(&result, (i64)value)
+    return result
+
+## Ported from AK/FixedPoint.h:122 AK::FixedPoint::floor, for u32.
+pub func fixed_point_floor_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> FixedPoint[u32, P]:
+    let precision = fixed_point_precision[P]()
+    return fixed_point_create_raw_u32[P](this.m_value & ~fixed_point_radix_mask_u32(precision))
+
+## Ported from AK/FixedPoint.h:126 AK::FixedPoint::ceil, for u32.
+pub func fixed_point_ceil_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> FixedPoint[u32, P]:
+    let precision = fixed_point_precision[P]()
+    let radix_mask = fixed_point_radix_mask_u32(precision)
+    let one: u32 = (u32)1 << (u32)precision
+    return fixed_point_create_raw_u32[P]((this.m_value & ~radix_mask) +% (one if (this.m_value & radix_mask) != 0 else 0))
+
+## Ported from AK/FixedPoint.h:131 AK::FixedPoint::trunc, for u32.
+pub func fixed_point_trunc_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> FixedPoint[u32, P]:
+    let precision = fixed_point_precision[P]()
+    let radix_mask = fixed_point_radix_mask_u32(precision)
+    let one: u32 = (u32)1 << (u32)precision
+    var adjustment: u32 = 0
+    if (this.m_value & radix_mask) != 0:
+        adjustment = 0 if this.m_value > 0 else one
+    return fixed_point_create_raw_u32[P]((this.m_value & ~radix_mask) +% adjustment)
+
+## Ported from AK/FixedPoint.h:139 AK::FixedPoint::lrint, for u32.
+pub func fixed_point_lrint_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> u32:
+    let precision = fixed_point_precision[P]()
+    let rounded = fixed_point_rint_u32(this)
+    return rounded.m_value >> (u32)precision
+
+## Ported from AK/FixedPoint.h:140 AK::FixedPoint::lfloor, for u32.
+pub func fixed_point_lfloor_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> u32:
+    let precision = fixed_point_precision[P]()
+    return this.m_value >> (u32)precision
+
+## Ported from AK/FixedPoint.h:141 AK::FixedPoint::lceil, for u32.
+pub func fixed_point_lceil_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> u32:
+    let precision = fixed_point_precision[P]()
+    let radix_mask = fixed_point_radix_mask_u32(precision)
+    return (this.m_value >> (u32)precision) +% (1 if (this.m_value & radix_mask) != 0 else 0)
+
+## Ported from AK/FixedPoint.h:146 AK::FixedPoint::ltrunc, for u32.
+pub func fixed_point_ltrunc_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> u32:
+    let precision = fixed_point_precision[P]()
+    let radix_mask = fixed_point_radix_mask_u32(precision)
+    var adjustment: u32 = 0
+    if (this.m_value & radix_mask) != 0:
+        adjustment = 0 if this.m_value > 0 else 1
+    return (this.m_value >> (u32)precision) +% adjustment
+
+## Ported from AK/FixedPoint.h:155 AK::FixedPoint::log2, for u32.
+# http://www.claysturner.com/dsp/BinaryLogarithm.pdf
+pub func fixed_point_log2_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*) -> FixedPoint[u32, P]:
+    let precision = fixed_point_precision[P]()
+    # 0.5
+    var b = fixed_point_create_raw_u32[P]((u32)1 << (u32)(precision - 1))
+    var y: FixedPoint[u32, P] = ---
+    fixed_point_fixed_point_precision_underlying_u32(&y, 0)
+    var x = *this
+
+    # FIXME: There's no negative infinity.
+    if x.m_value <= 0:
+        return fixed_point_create_raw_u32[P](u32_min)
+
+    if fixed_point_ne_i_u32(&x, 1):
+        let shift_amount = (i32)log2_u32(x.m_value) - (i32)precision
+        if shift_amount > 0:
+            discard(fixed_point_shr_assign_u32(&x, (i64)shift_amount))
+        else:
+            discard(fixed_point_shl_assign_u32(&x, (i64)-shift_amount))
+        discard(fixed_point_add_assign_i_u32(&y, (i64)shift_amount))
+
+    for _i in 0..<precision:
+        discard(fixed_point_mul_assign_fixed_point_u32(&x, x))
+        if fixed_point_ge_i_u32(&x, 2):
+            discard(fixed_point_shr_assign_u32(&x, 1))
+            discard(fixed_point_add_assign_fixed_point_u32(&y, b))
+        discard(fixed_point_shr_assign_u32(&b, 1))
+
+    return y
+
+## Ported from AK/FixedPoint.h:199 AK::FixedPoint::operator+(FixedPoint), for u32.
+pub func fixed_point_add_fixed_point_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> FixedPoint[u32, P]:
+    return fixed_point_create_raw_u32[P](this.m_value +% other.m_value)
+
+## Ported from AK/FixedPoint.h:203 AK::FixedPoint::operator-(FixedPoint), for u32.
+pub func fixed_point_sub_fixed_point_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> FixedPoint[u32, P]:
+    return fixed_point_create_raw_u32[P](this.m_value -% other.m_value)
+
+## Ported from AK/FixedPoint.h:207 AK::FixedPoint::operator*(FixedPoint), for u32 (the
+## __SIZEOF_INT128__ branch: MulRes is i64).
+pub func fixed_point_mul_fixed_point_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> FixedPoint[u32, P]:
+    let precision = fixed_point_precision[P]()
+    # FIXME: Figure out a nicer way to use more narrow types and avoid __int128
+    var value = (i64)this.m_value
+    value = value *% (i64)other.m_value
+
+    var ret = fixed_point_create_raw_u32[P]((u32)(value >> (i64)precision))
+    # Rounding:
+    # If last bit cut off is 1:
+    if (value & (i64)((u32)1 << (u32)(precision - 1))) != 0:
+        # If the bit after is 1 as well
+        if (value & (i64)(fixed_point_radix_mask_u32(precision) >> 1)) != 0:
+            # We round away from 0
+            ret.m_value = ret.m_value +% 1
+        else:
+            # Otherwise we round to the next even value
+            # Which means we add the least significant bit of the raw return value
+            ret.m_value = ret.m_value +% (ret.m_value & 1)
+    return ret
+
+## Ported from AK/FixedPoint.h:240 AK::FixedPoint::operator/(FixedPoint), for u32 (DivRes is i64).
+pub func fixed_point_div_fixed_point_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> FixedPoint[u32, P]:
+    let precision = fixed_point_precision[P]()
+    # FIXME: Figure out a nicer way to use more narrow types and avoid __int128
+    var value = (i64)this.m_value
+    value = value << (i64)precision
+    value = value // (i64)other.m_value
+
+    return fixed_point_create_raw_u32[P]((u32)value)
+
+## Ported from AK/FixedPoint.h:273 AK::FixedPoint::operator+(Integral), for u32.
+pub func fixed_point_add_i_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]:
+    let precision = fixed_point_precision[P]()
+    return fixed_point_create_raw_u32[P](this.m_value +% ((u32)other << (u32)precision))
+
+## Ported from AK/FixedPoint.h:278 AK::FixedPoint::operator-(Integral), for u32.
+pub func fixed_point_sub_i_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]:
+    let precision = fixed_point_precision[P]()
+    return fixed_point_create_raw_u32[P](this.m_value -% ((u32)other << (u32)precision))
+
+## Ported from AK/FixedPoint.h:283 AK::FixedPoint::operator*(Integral), for u32.
+pub func fixed_point_mul_i_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]:
+    return fixed_point_create_raw_u32[P](this.m_value *% (u32)other)
+
+## Ported from AK/FixedPoint.h:288 AK::FixedPoint::operator/(Integral), for u32.
+pub func fixed_point_div_i_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]:
+    return fixed_point_create_raw_u32[P](this.m_value // (u32)other)
+
+## Ported from AK/FixedPoint.h:293 AK::FixedPoint::operator>>(Integral), for u32.
+pub func fixed_point_shr_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]:
+    return fixed_point_create_raw_u32[P](this.m_value >> (u32)other)
+
+## Ported from AK/FixedPoint.h:298 AK::FixedPoint::operator<<(Integral), for u32.
+pub func fixed_point_shl_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]:
+    return fixed_point_create_raw_u32[P](this.m_value << (u32)other)
+
+## Ported from AK/FixedPoint.h:303 AK::FixedPoint::operator+=(FixedPoint), for u32.
+pub func fixed_point_add_assign_fixed_point_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> FixedPoint[u32, P]*:
+    this.m_value = this.m_value +% other.m_value
+    return this
+
+## Ported from AK/FixedPoint.h:308 AK::FixedPoint::operator-=(FixedPoint), for u32.
+pub func fixed_point_sub_assign_fixed_point_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> FixedPoint[u32, P]*:
+    this.m_value = this.m_value -% other.m_value
+    return this
+
+## Ported from AK/FixedPoint.h:313 AK::FixedPoint::operator*=(FixedPoint), for u32.
+pub func fixed_point_mul_assign_fixed_point_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> FixedPoint[u32, P]*:
+    *this = fixed_point_mul_fixed_point_u32(this, other)
+    return this
+
+## Ported from AK/FixedPoint.h:318 AK::FixedPoint::operator/=(FixedPoint), for u32.
+pub func fixed_point_div_assign_fixed_point_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> FixedPoint[u32, P]*:
+    *this = fixed_point_div_fixed_point_u32(this, other)
+    return this
+
+## Ported from AK/FixedPoint.h:325 AK::FixedPoint::operator+=(Integral), for u32.
+pub func fixed_point_add_assign_i_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]*:
+    *this = fixed_point_add_i_u32(this, other)
+    return this
+
+## Ported from AK/FixedPoint.h:331 AK::FixedPoint::operator-=(Integral), for u32.
+pub func fixed_point_sub_assign_i_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]*:
+    *this = fixed_point_sub_i_u32(this, other)
+    return this
+
+## Ported from AK/FixedPoint.h:337 AK::FixedPoint::operator*=(Integral), for u32.
+pub func fixed_point_mul_assign_i_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]*:
+    *this = fixed_point_mul_i_u32(this, other)
+    return this
+
+## Ported from AK/FixedPoint.h:343 AK::FixedPoint::operator/=(Integral), for u32.
+pub func fixed_point_div_assign_i_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]*:
+    *this = fixed_point_div_i_u32(this, other)
+    return this
+
+## Ported from AK/FixedPoint.h:349 AK::FixedPoint::operator>>=(Integral), for u32.
+pub func fixed_point_shr_assign_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]*:
+    *this = fixed_point_shr_u32(this, other)
+    return this
+
+## Ported from AK/FixedPoint.h:355 AK::FixedPoint::operator<<=(Integral), for u32.
+pub func fixed_point_shl_assign_u32[P: FixedPointPrecision](this: FixedPoint[u32, P]*, other: i64) -> FixedPoint[u32, P]*:
+    *this = fixed_point_shl_u32(this, other)
+    return this
+
+## Ported from AK/FixedPoint.h:361 AK::FixedPoint::operator==(FixedPoint), for u32.
+pub func fixed_point_eq_fixed_point_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> bool:
+    return this.m_value == other.m_value
+
+## Ported from AK/FixedPoint.h:362 AK::FixedPoint::operator!=(FixedPoint), for u32.
+pub func fixed_point_ne_fixed_point_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> bool:
+    return this.m_value != other.m_value
+
+## Ported from AK/FixedPoint.h:363 AK::FixedPoint::operator>(FixedPoint), for u32.
+pub func fixed_point_gt_fixed_point_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> bool:
+    return this.m_value > other.m_value
+
+## Ported from AK/FixedPoint.h:364 AK::FixedPoint::operator>=(FixedPoint), for u32.
+pub func fixed_point_ge_fixed_point_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> bool:
+    return this.m_value >= other.m_value
+
+## Ported from AK/FixedPoint.h:365 AK::FixedPoint::operator<(FixedPoint), for u32.
+pub func fixed_point_lt_fixed_point_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> bool:
+    return this.m_value < other.m_value
+
+## Ported from AK/FixedPoint.h:366 AK::FixedPoint::operator<=(FixedPoint), for u32.
+pub func fixed_point_le_fixed_point_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: FixedPoint[u32, P]) -> bool:
+    return this.m_value <= other.m_value
+
+## Ported from AK/FixedPoint.h:370 AK::FixedPoint::operator==(Integral), for u32.
+# FIXME: There are probably better ways to do these
+pub func fixed_point_eq_i_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> bool:
+    let precision = fixed_point_precision[P]()
+    return (u32)(this.m_value >> (u32)precision) == (u32)other and (this.m_value & fixed_point_radix_mask_u32(precision)) == 0
+
+## Ported from AK/FixedPoint.h:375 AK::FixedPoint::operator!=(Integral), for u32.
+pub func fixed_point_ne_i_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> bool:
+    let precision = fixed_point_precision[P]()
+    return (u32)(this.m_value >> (u32)precision) != (u32)other or (this.m_value & fixed_point_radix_mask_u32(precision)) != 0
+
+## Ported from AK/FixedPoint.h:380 AK::FixedPoint::operator>(Integral), for u32.
+pub func fixed_point_gt_i_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> bool:
+    return not fixed_point_le_i_u32(this, other)
+
+## Ported from AK/FixedPoint.h:385 AK::FixedPoint::operator>=(Integral), for u32.
+pub func fixed_point_ge_i_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> bool:
+    return not fixed_point_lt_i_u32(this, other)
+
+## Ported from AK/FixedPoint.h:390 AK::FixedPoint::operator<(Integral), for u32.
+pub func fixed_point_lt_i_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> bool:
+    let precision = fixed_point_precision[P]()
+    return (u32)(this.m_value >> (u32)precision) < (u32)other or this.m_value < ((u32)other << (u32)precision)
+
+## Ported from AK/FixedPoint.h:395 AK::FixedPoint::operator<=(Integral), for u32.
+pub func fixed_point_le_i_u32[P: FixedPointPrecision](this: const FixedPoint[u32, P]*, other: i64) -> bool:
+    return fixed_point_lt_i_u32(this, other) or fixed_point_eq_i_u32(this, other)

@@ -1,0 +1,268 @@
+#==============================================================================================
+#
+#   fixed_point_5 - FixedPoint: casts between instantiations
+#
+#   DESCRIPTION:
+#       Port of AK/FixedPoint.h (lines 52-57, 441-462: the converting constructor, the
+#       conversion operator and cast_to) for every pair of the instantiated underlying
+#       types; see fixed_point_1.
+#
+#==============================================================================================
+
+# mark: Casts between instantiations ============================================================
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, i32> to FixedPoint<PD, i32>.
+pub func fixed_point_cast_to_i32_from_i32[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[i32, PS]*) -> FixedPoint[i32, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (i32)(this.m_value >> (i32)precision) << (i32)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_i32(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (i32)(fraction >> (i32)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((i32)fraction << (i32)(other_precision - precision))
+    else:
+        raw_value = raw_value | (i32)fraction
+
+    return FixedPoint[i32, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, i32> to FixedPoint<PD, u32>.
+pub func fixed_point_cast_to_u32_from_i32[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[i32, PS]*) -> FixedPoint[u32, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u32)(this.m_value >> (i32)precision) << (u32)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_i32(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u32)(fraction >> (i32)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u32)fraction << (u32)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u32)fraction
+
+    return FixedPoint[u32, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, i32> to FixedPoint<PD, u64>.
+pub func fixed_point_cast_to_u64_from_i32[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[i32, PS]*) -> FixedPoint[u64, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u64)(this.m_value >> (i32)precision) << (u64)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_i32(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u64)(fraction >> (i32)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u64)fraction << (u64)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u64)fraction
+
+    return FixedPoint[u64, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, i32> to FixedPoint<PD, u8>.
+pub func fixed_point_cast_to_u8_from_i32[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[i32, PS]*) -> FixedPoint[u8, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u8)(this.m_value >> (i32)precision) << (u8)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_i32(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u8)(fraction >> (i32)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u8)fraction << (u8)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u8)fraction
+
+    return FixedPoint[u8, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u32> to FixedPoint<PD, i32>.
+pub func fixed_point_cast_to_i32_from_u32[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u32, PS]*) -> FixedPoint[i32, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (i32)(this.m_value >> (u32)precision) << (i32)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u32(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (i32)(fraction >> (u32)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((i32)fraction << (i32)(other_precision - precision))
+    else:
+        raw_value = raw_value | (i32)fraction
+
+    return FixedPoint[i32, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u32> to FixedPoint<PD, u32>.
+pub func fixed_point_cast_to_u32_from_u32[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u32, PS]*) -> FixedPoint[u32, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u32)(this.m_value >> (u32)precision) << (u32)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u32(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u32)(fraction >> (u32)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u32)fraction << (u32)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u32)fraction
+
+    return FixedPoint[u32, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u32> to FixedPoint<PD, u64>.
+pub func fixed_point_cast_to_u64_from_u32[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u32, PS]*) -> FixedPoint[u64, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u64)(this.m_value >> (u32)precision) << (u64)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u32(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u64)(fraction >> (u32)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u64)fraction << (u64)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u64)fraction
+
+    return FixedPoint[u64, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u32> to FixedPoint<PD, u8>.
+pub func fixed_point_cast_to_u8_from_u32[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u32, PS]*) -> FixedPoint[u8, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u8)(this.m_value >> (u32)precision) << (u8)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u32(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u8)(fraction >> (u32)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u8)fraction << (u8)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u8)fraction
+
+    return FixedPoint[u8, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u64> to FixedPoint<PD, i32>.
+pub func fixed_point_cast_to_i32_from_u64[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u64, PS]*) -> FixedPoint[i32, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (i32)(this.m_value >> (u64)precision) << (i32)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u64(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (i32)(fraction >> (u64)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((i32)fraction << (i32)(other_precision - precision))
+    else:
+        raw_value = raw_value | (i32)fraction
+
+    return FixedPoint[i32, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u64> to FixedPoint<PD, u32>.
+pub func fixed_point_cast_to_u32_from_u64[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u64, PS]*) -> FixedPoint[u32, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u32)(this.m_value >> (u64)precision) << (u32)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u64(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u32)(fraction >> (u64)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u32)fraction << (u32)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u32)fraction
+
+    return FixedPoint[u32, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u64> to FixedPoint<PD, u64>.
+pub func fixed_point_cast_to_u64_from_u64[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u64, PS]*) -> FixedPoint[u64, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u64)(this.m_value >> (u64)precision) << (u64)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u64(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u64)(fraction >> (u64)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u64)fraction << (u64)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u64)fraction
+
+    return FixedPoint[u64, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u64> to FixedPoint<PD, u8>.
+pub func fixed_point_cast_to_u8_from_u64[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u64, PS]*) -> FixedPoint[u8, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u8)(this.m_value >> (u64)precision) << (u8)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u64(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u8)(fraction >> (u64)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u8)fraction << (u8)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u8)fraction
+
+    return FixedPoint[u8, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u8> to FixedPoint<PD, i32>.
+pub func fixed_point_cast_to_i32_from_u8[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u8, PS]*) -> FixedPoint[i32, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (i32)(this.m_value >> (u8)precision) << (i32)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u8(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (i32)(fraction >> (u8)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((i32)fraction << (i32)(other_precision - precision))
+    else:
+        raw_value = raw_value | (i32)fraction
+
+    return FixedPoint[i32, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u8> to FixedPoint<PD, u32>.
+pub func fixed_point_cast_to_u32_from_u8[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u8, PS]*) -> FixedPoint[u32, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u32)(this.m_value >> (u8)precision) << (u32)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u8(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u32)(fraction >> (u8)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u32)fraction << (u32)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u32)fraction
+
+    return FixedPoint[u32, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u8> to FixedPoint<PD, u64>.
+pub func fixed_point_cast_to_u64_from_u8[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u8, PS]*) -> FixedPoint[u64, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u64)(this.m_value >> (u8)precision) << (u64)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u8(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u64)(fraction >> (u8)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u64)fraction << (u64)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u64)fraction
+
+    return FixedPoint[u64, PD](m_value = raw_value)
+
+## Ported from AK/FixedPoint.h:52 AK::FixedPoint::FixedPoint(FixedPoint<P, U>) and
+## AK/FixedPoint.h:452 cast_to, from FixedPoint<PS, u8> to FixedPoint<PD, u8>.
+pub func fixed_point_cast_to_u8_from_u8[PS: FixedPointPrecision, PD: FixedPointPrecision](this: const FixedPoint[u8, PS]*) -> FixedPoint[u8, PD]:
+    let precision = fixed_point_precision[PS]()
+    let other_precision = fixed_point_precision[PD]()
+    var raw_value = (u8)(this.m_value >> (u8)precision) << (u8)other_precision
+    let fraction = this.m_value & fixed_point_radix_mask_u8(precision)
+    if precision > other_precision:
+        raw_value = raw_value | (u8)(fraction >> (u8)(precision - other_precision))
+    elif precision < other_precision:
+        raw_value = raw_value | ((u8)fraction << (u8)(other_precision - precision))
+    else:
+        raw_value = raw_value | (u8)fraction
+
+    return FixedPoint[u8, PD](m_value = raw_value)

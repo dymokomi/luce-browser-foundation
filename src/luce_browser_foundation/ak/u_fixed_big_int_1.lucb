@@ -1,0 +1,464 @@
+#==============================================================================================
+#
+#   u_fixed_big_int_1 - the word and storage operations under UFixedBigInt
+#
+#   DESCRIPTION:
+#       Port of the parts of AK/BigIntBase.h (lines 154-677: IntegerWrapper, add_words,
+#       sub_words, wide_multiply, dword, div_mod_words and the unsigned StorageOperations)
+#       and AK/UFixedBigIntDivision.h (lines 1-80) that AK/UFixedBigInt.h is built on. No
+#       region owns BigIntBase.h, so these are private helpers of the UFixedBigInt port.
+#
+#       Storages are spans of u64 words, least significant first, as on the donor's 64-bit
+#       targets (NativeWord is u64). UFixedBigInt only uses unsigned storages, so the sign
+#       extension of the donor's signed storages is not needed. There is no 128-bit type:
+#       NativeDoubleWord arithmetic is done on (low, high) word pairs, and the 128/64
+#       division of div_mod_words is Hacker's Delight's divlu.
+#
+#==============================================================================================
+
+# mark: IntegerWrapper ==========================================================================
+
+## BigIntBase.h:160 AK::Detail::IntegerWrapper::IntegerWrapper(int): a non-negative int as a
+## one-word storage (the donor rejects a negative value at compile time; here it traps).
+pub func integer_wrapper(value: i32) -> IntegerWrapper:
+    assert(value >= 0, "Requested implicit conversion of an integer to the unsigned one will underflow.")
+    return IntegerWrapper(m_data = [(u64)value])
+
+# mark: Words ===================================================================================
+
+# BigIntBase.h:189 add_words: word1 + word2 + carry, with the carry out.
+func add_words(word1: u64, word2: u64, carry: bool*) -> u64:
+    var output = word1 +% word2
+    var ncarry = output < word1
+    if *carry:
+        output = output +% 1
+        if output == 0:
+            ncarry = true
+    *carry = ncarry
+    return output
+
+# BigIntBase.h:232 sub_words: word1 - word2 - carry, with the borrow out.
+func sub_words(word1: u64, word2: u64, carry: bool*) -> u64:
+    var output = word1 -% word2
+    var ncarry = word2 > word1
+    if *carry:
+        if output == 0:
+            ncarry = true
+        output = output -% 1
+    *carry = ncarry
+    return output
+
+# BigIntBase.h:275 wide_multiply: the double word word1 * word2 as (low, high).
+func wide_multiply_words(word1: u64, word2: u64) -> (u64, u64):
+    let a_low = word1 & 0xffffffff
+    let a_high = word1 >> 32
+    let b_low = word2 & 0xffffffff
+    let b_high = word2 >> 32
+    let low_low = a_low * b_low
+    let low_high = a_low * b_high
+    let high_low = a_high * b_low
+    let high_high = a_high * b_high
+    let middle = (low_low >> 32) + (low_high & 0xffffffff) + (high_low & 0xffffffff)
+    let low = (middle << 32) | (low_low & 0xffffffff)
+    let high = high_high + (low_high >> 32) + (high_low >> 32) + (middle >> 32)
+    return (low, high)
+
+# Compare two double words given as (low, high): whether a > b.
+func dword_greater(a_low: u64, a_high: u64, b_low: u64, b_high: u64) -> bool:
+    if a_high != b_high:
+        return a_high > b_high
+    return a_low > b_low
+
+# BigIntBase.h:290 div_mod_words: ((dividend_high << 64) + dividend_low) / divisor; the quotient
+# must fit in a word (dividend_high < divisor).
+func div_mod_words(dividend_low: u64, dividend_high: u64, divisor: u64, remainder: u64*) -> u64:
+    assert(dividend_high < divisor)
+    let s = (u64)count_leading_zeroes_u64(divisor)
+    let v = divisor << s
+    let vn1 = v >> 32
+    let vn0 = v & 0xffffffff
+    let un32 = (dividend_high << s) | ((dividend_low >> (64 - s)) if s > 0 else 0)
+    let un10 = dividend_low << s
+    let un1 = un10 >> 32
+    let un0 = un10 & 0xffffffff
+
+    var q1 = un32 // vn1
+    var rhat = un32 - q1 * vn1
+    while q1 >= 0x100000000 or q1 *% vn0 > ((rhat << 32) | un1):
+        q1 -= 1
+        rhat += vn1
+        if rhat >= 0x100000000:
+            break
+
+    let un21 = ((un32 << 32) | un1) -% q1 *% v
+    var q0 = un21 // vn1
+    rhat = un21 - q0 * vn1
+    while q0 >= 0x100000000 or q0 *% vn0 > ((rhat << 32) | un0):
+        q0 -= 1
+        rhat += vn1
+        if rhat >= 0x100000000:
+            break
+
+    *remainder = (((un21 << 32) | un0) -% q0 *% v) >> s
+    return (q1 << 32) | q0
+
+# BuiltinWrappers.h popcount for a word.
+func popcount_u64(value: u64) -> usize:
+    var count: usize = 0
+    var bits = value
+    while bits != 0:
+        bits = bits & (bits - 1)
+        count += 1
+    return count
+
+# BuiltinWrappers.h count_trailing_zeroes for a nonzero word.
+func count_trailing_zeroes_u64(value: u64) -> usize:
+    assert(value != 0)
+    var count: usize = 0
+    var bits = value
+    while (bits & 1) == 0:
+        bits = bits >> 1
+        count += 1
+    return count
+
+# mark: StorageOperations =======================================================================
+
+# BigIntBase.h:305 StorageOperations::copy (unsigned storages: the fill is zero).
+func storage_copy(operand: const u64[], result: u64[], offset: usize = 0):
+    let size1 = operand.length
+    for i in 0..<result.length:
+        result[i] = operand[i + offset] if i + offset < size1 else 0
+
+# BigIntBase.h:314 StorageOperations::set.
+func storage_set(value: u64, result: u64[]):
+    result[0] = value
+    for i in 1..<result.length:
+        result[i] = 0
+
+# BigIntBase.h:322 StorageOperations::compare (unsigned storages).
+# `is_for_inequality' is a hint to compiler that we do not need to differentiate between < and >.
+func storage_compare(operand1: const u64[], operand2: const u64[], is_for_inequality: bool) -> i32:
+    let size1 = operand1.length
+    let size2 = operand2.length
+    var differ_in_high_bits = false
+
+    if size1 > size2:
+        var i = size1
+        while i > size2:
+            i -= 1
+            if operand1[i] != 0:
+                differ_in_high_bits = true
+    elif size1 < size2:
+        var i = size2
+        while i > size1:
+            i -= 1
+            if operand2[i] != 0:
+                differ_in_high_bits = true
+
+    if differ_in_high_bits:
+        return 1 if size1 > size2 else -1
+
+    var i = size2 if size1 > size2 else size1
+    while i > 0:
+        i -= 1
+        let word1 = operand1[i]
+        let word2 = operand2[i]
+
+        if is_for_inequality:
+            if word1 != word2:
+                return 1
+        else:
+            if word1 > word2:
+                return 1
+            if word1 < word2:
+                return -1
+    return 0
+
+# BigIntBase.h:370 StorageOperations::Bitwise.
+enum StorageBitwise as u8:
+    and_ = 0
+    or_ = 1
+    xor_ = 2
+    invert = 3
+
+# BigIntBase.h:379 StorageOperations::compute_bitwise.
+func storage_compute_bitwise(operation: StorageBitwise, operand1: const u64[], operand2: const u64[], result: u64[]):
+    let size1 = operand1.length
+    let size2 = operand2.length
+
+    for i in 0..<result.length:
+        let word1: u64 = operand1[i] if i < size1 else 0
+        let word2: u64 = operand2[i] if i < size2 else 0
+
+        match operation:
+            .and_: result[i] = word1 & word2
+            .or_: result[i] = word1 | word2
+            .xor_: result[i] = word1 ^ word2
+            _: result[i] = ~word1
+
+# BigIntBase.h:407 StorageOperations::compute_inplace_bitwise.
+func storage_compute_inplace_bitwise(operation: StorageBitwise, operand2: const u64[], result: u64[]):
+    let min_size = result.length if result.length < operand2.length else operand2.length
+
+    for i in 0..<min_size:
+        match operation:
+            .and_: result[i] = result[i] & operand2[i]
+            .or_: result[i] = result[i] | operand2[i]
+            _: result[i] = result[i] ^ operand2[i]
+
+# BigIntBase.h:426 StorageOperations::shift_left.
+# Requirements for the next two functions:
+#  - shift < result.size() * word_size;
+#  - result.size() == operand.size().
+func storage_shift_left(operand: const u64[], shift: usize, result: u64[]):
+    let size = operand.length
+    let offset = shift // 64
+    let remainder = (u64)(shift % 64)
+
+    if shift % 64 == 0:
+        var i = size
+        while i > offset:
+            i -= 1
+            result[i] = operand[i - offset]
+        for j in 0..<offset:
+            result[j] = 0
+    else:
+        var i = size - 1
+        while i > offset:
+            result[i] = (operand[i - offset] << remainder) | (operand[i - offset - 1] >> (64 - remainder))
+            i -= 1
+        result[offset] = operand[0] << remainder
+        for j in 0..<offset:
+            result[j] = 0
+
+# BigIntBase.h:445 StorageOperations::shift_right.
+func storage_shift_right(operand: const u64[], shift: usize, result: u64[]):
+    let size = operand.length
+    let offset = shift // 64
+    let remainder = (u64)(shift % 64)
+
+    if shift % 64 == 0:
+        for i in 0..<size - offset:
+            result[i] = operand[i + offset]
+        for i in size - offset..<size:
+            result[i] = 0
+    else:
+        for i in 0..<size - offset - 1:
+            result[i] = (operand[i + offset] >> remainder) | (operand[i + offset + 1] << (64 - remainder))
+        result[size - offset - 1] = operand[size - 1] >> remainder
+        for i in size - offset..<size:
+            result[i] = 0
+
+# BigIntBase.h:474 StorageOperations::add (unsigned storages).
+# Return value: 0 iff no overflow has happened (the carry or borrow out of the result).
+func storage_add(subtract: bool, operand1: const u64[], operand2: const u64[], result: u64[], carry_in: bool = false) -> i32:
+    var carry = carry_in
+    let size1 = operand1.length
+    let size2 = operand2.length
+
+    for i in 0..<result.length:
+        let word1: u64 = operand1[i] if i < size1 else 0
+        let word2: u64 = operand2[i] if i < size2 else 0
+
+        if not subtract:
+            result[i] = add_words(word1, word2, &carry)
+        else:
+            result[i] = sub_words(word1, word2, &carry)
+
+    if not subtract:
+        return (i32)carry
+    return -(i32)carry
+
+# BigIntBase.h:498 StorageOperations::increment (unsigned storages).
+func storage_increment(subtract: bool, operand: u64[]) -> i32:
+    var carry = true
+
+    for i in 0..<operand.length:
+        if not subtract:
+            operand[i] = add_words(operand[i], 0, &carry)
+        else:
+            operand[i] = sub_words(operand[i], 0, &carry)
+
+    if not subtract:
+        return (i32)carry
+    return -(i32)carry
+
+# BigIntBase.h:532 StorageOperations::baseline_mul (unsigned operands: no sign normalization,
+# no allocation).
+func storage_baseline_mul(operand1: const u64[], operand2: const u64[], result: u64[]):
+    var size1 = operand1.length
+    var size2 = operand2.length
+    let size = result.length
+
+    if size1 == 1 and size2 == 1:
+        # We do not want to compete with the cleverness of the compiler of multiplying NativeWords.
+        let (low, high) = wide_multiply_words(operand1[0], operand2[0])
+        result[0] = low
+        if size > 1:
+            result[1] = high
+            for i in 2..<size:
+                result[i] = 0
+        return
+
+    if size1 < size2:
+        storage_baseline_mul(operand2, operand1, result)
+        return
+    # Now size1 >= size2
+
+    size1 = size1 if size1 < size else size
+    size2 = size2 if size2 < size else size
+
+    # Do schoolbook O(size1 * size2).
+    # The double-word carry is kept as (carry_low, carry_high).
+    var carry_low: u64 = 0
+    var carry_high: u64 = 0
+    for i in 0..<size:
+        result[i] = carry_low
+        carry_low = carry_high
+        carry_high = 0
+
+        let start_index = i - size2 + 1 if i >= size2 else 0
+        let end_index = i + 1 if i + 1 < size1 else size1
+
+        var j = start_index
+        while j < end_index:
+            let (x_low, x_high) = wide_multiply_words(operand1[j], operand2[i - j])
+
+            var ncarry = false
+            result[i] = add_words(result[i], x_low, &ncarry)
+            # carry += (x >> word_size) + ncarry
+            var c = false
+            carry_low = add_words(carry_low, x_high, &c)
+            carry_high = carry_high + (u64)c
+            c = false
+            carry_low = add_words(carry_low, (u64)ncarry, &c)
+            carry_high = carry_high + (u64)c
+            j += 1
+
+# The is_qhat_too_large lambda of div_mod_internal: qhat * divisor_second > dword(dividend_low, rhat).
+func knuth_is_qhat_too_large(qhat: u64, divisor_second: u64, dividend_low: u64, rhat: u64) -> bool:
+    let (product_low, product_high) = wide_multiply_words(qhat, divisor_second)
+    return dword_greater(product_low, product_high, dividend_low, rhat)
+
+# BigIntBase.h:614 StorageOperations::div_mod_internal: Knuth's algorithm D on normalized
+# copies. `dividend` has at least dividend_len + 1 words.
+func storage_div_mod_internal(restore_remainder: bool, dividend: u64[], divisor: u64[], quotient: u64[], remainder: u64[], dividend_len: usize, divisor_len: usize):
+    # Knuth's algorithm D
+    # D1. Normalize
+    let shift = (usize)count_leading_zeroes_u64(divisor[divisor_len - 1])
+    storage_shift_left(dividend, shift, dividend)
+    storage_shift_left(divisor, shift, divisor)
+
+    let divisor_approx = divisor[divisor_len - 1]
+
+    var i = dividend_len + 1
+    while i > divisor_len:
+        i -= 1
+        # D3. Calculate qhat
+        var qhat: u64
+        assert(dividend[i] <= divisor_approx)
+        if dividend[i] == divisor_approx:
+            qhat = u64_max
+        else:
+            var rhat: u64 = 0
+            qhat = div_mod_words(dividend[i - 1], dividend[i], divisor_approx, &rhat)
+
+            if knuth_is_qhat_too_large(qhat, divisor[divisor_len - 2], dividend[i - 2], rhat):
+                qhat -= 1
+                var carry = false
+                rhat = add_words(rhat, divisor_approx, &carry)
+                if not carry and knuth_is_qhat_too_large(qhat, divisor[divisor_len - 2], dividend[i - 2], rhat):
+                    qhat -= 1
+
+        # D4. Multiply & subtract
+        var mul_carry: u64 = 0
+        var sub_carry = false
+        for j in 0..<divisor_len:
+            let (product_low, product_high) = wide_multiply_words(qhat, divisor[j])
+            var c = false
+            let mul_low = add_words(product_low, mul_carry, &c)
+            let mul_high = product_high + (u64)c
+            let index = i + j - divisor_len
+            dividend[index] = sub_words(dividend[index], mul_low, &sub_carry)
+            mul_carry = mul_high
+        dividend[i] = sub_words(dividend[i], mul_carry, &sub_carry)
+
+        if sub_carry:
+            # D6. Add back
+            let dividend_part = dividend[i - divisor_len..<i + 1]
+            let overflow = storage_add(false, dividend_part, divisor[0..<divisor_len], dividend_part)
+            assert(overflow == 1)
+
+        quotient[i - divisor_len] = qhat - (u64)sub_carry
+
+    for j in dividend_len - divisor_len + 1..<quotient.length:
+        quotient[j] = 0
+
+    # D8. Unnormalize
+    if restore_remainder:
+        storage_shift_right(dividend[0..<remainder.length], shift, remainder)
+
+# The largest UFixedBigInt (u4096) in words, plus the extra word Knuth's algorithm needs.
+let max_big_int_words: usize = 65
+
+## Ported from AK/UFixedBigIntDivision.h:15 AK::Detail::div_mod_internal: quotient and
+## (when `restore_remainder`) remainder of operand1 / operand2.
+pub func div_mod_internal(restore_remainder: bool, operand1: const u64[], operand2: const u64[], quotient: u64[], remainder: u64[]):
+    var dividend_len = operand1.length
+    var divisor_len = operand2.length
+    while divisor_len > 0 and operand2[divisor_len - 1] == 0:
+        divisor_len -= 1
+    while dividend_len > 0 and operand1[dividend_len - 1] == 0:
+        dividend_len -= 1
+
+    # FIXME: Should raise SIGFPE instead
+    assert(divisor_len != 0)  # VERIFY(divisor != 0)
+
+    # Fast paths
+    if divisor_len == 1 and operand2[0] == 1:  # divisor == 1
+        storage_copy(operand1, quotient)
+        if restore_remainder:
+            storage_set(0, remainder)
+        return
+
+    if dividend_len < divisor_len:  # dividend < divisor
+        storage_set(0, quotient)
+        if restore_remainder:
+            storage_copy(operand1, remainder)
+        return
+
+    if divisor_len == 1 and dividend_len == 1:  # NativeWord / NativeWord
+        storage_set(operand1[0] // operand2[0], quotient)
+        if restore_remainder:
+            storage_set(operand1[0] % operand2[0], remainder)
+        return
+
+    if divisor_len == 1:  # BigInt by NativeWord
+        # u = dword(operand1[len - 2], operand1[len - 1]); top = u / divisor; carry = u % divisor
+        let divisor = operand2[0]
+        let top_high = operand1[dividend_len - 1] // divisor
+        var carry: u64 = 0
+        let top_low = div_mod_words(operand1[dividend_len - 2], operand1[dividend_len - 1] % divisor, divisor, &carry)
+        quotient[dividend_len - 1] = top_high
+        quotient[dividend_len - 2] = top_low
+
+        var i = dividend_len - 2
+        while i > 0:
+            i -= 1
+            quotient[i] = div_mod_words(operand1[i], carry, divisor, &carry)
+        for j in dividend_len..<quotient.length:
+            quotient[j] = 0
+        if restore_remainder:
+            storage_set(carry, remainder)
+        return
+
+    # Knuth's algorithm D
+    assert(operand1.length + 1 <= max_big_int_words and operand2.length <= max_big_int_words)
+    var dividend_storage: u64[65]
+    let dividend = dividend_storage[0..<operand1.length + 1]
+    storage_copy(operand1, dividend)
+    var divisor_storage: u64[65]
+    let divisor = divisor_storage[0..<operand2.length]
+    storage_copy(operand2, divisor)
+
+    storage_div_mod_internal(restore_remainder, dividend, divisor, quotient, remainder, dividend_len, divisor_len)

@@ -130,6 +130,16 @@ ordered_hash_map.lucb
 time_1.lucb
 time_2.lucb
 time_3.lucb
+math_1.lucb
+math_2.lucb
+u_fixed_big_int_1.lucb
+u_fixed_big_int_2.lucb
+fixed_point_1.lucb
+fixed_point_2.lucb
+fixed_point_3.lucb
+fixed_point_4.lucb
+fixed_point_5.lucb
+math_3.lucb
 stub_r01_ak_core.lucb
 stub_r02_ak_text.lucb
 stub_r03_ak_format.lucb
@@ -139,3 +149,6 @@ tests_checked.lucb
 tests_vector.lucb
 tests_hash_table.lucb
 tests_time.lucb
+tests_u_fixed_big_int.lucb
+tests_fixed_point.lucb
+tests_math.lucb

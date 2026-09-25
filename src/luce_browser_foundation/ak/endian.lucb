@@ -9,12 +9,15 @@
 #==============================================================================================
 
 # The value with its bytes in reverse order (__builtin_bswap16/32/64).
+# workaround: compiler-issues/generic_sizeof_branch (sizeof(T) is bound to a local before a
+# condition tests it)
 func byte_swap[T](value: T) -> T:
-    assert(sizeof(T) == 1 or sizeof(T) == 2 or sizeof(T) == 4 or sizeof(T) == 8, "Cannot byte-swap values larger than 64-bits")
+    let size = sizeof(T)
+    assert(size == 1 or size == 2 or size == 4 or size == 8, "Cannot byte-swap values larger than 64-bits")
     var copy = value
-    let bytes = u8[]((u8*)&copy, sizeof(T))
+    let bytes = u8[]((u8*)&copy, size)
     var low: usize = 0
-    var high = sizeof(T) - 1
+    var high = size - 1
     while low < high:
         let tmp = bytes[low]
         bytes[low] = bytes[high]
@@ -24,15 +27,19 @@ func byte_swap[T](value: T) -> T:
     return copy
 
 ## Ported from AK/Endian.h:28 AK::convert_between_host_and_little_endian.
+# workaround: compiler-issues/generic_sizeof_branch
 pub func convert_between_host_and_little_endian[T](value: T) -> T:
-    if host_is_little_endian or sizeof(T) == 1:
+    let size = sizeof(T)
+    if host_is_little_endian or size == 1:
         return value
     else:
         return byte_swap(value)
 
 ## Ported from AK/Endian.h:43 AK::convert_between_host_and_big_endian.
+# workaround: compiler-issues/generic_sizeof_branch
 pub func convert_between_host_and_big_endian[T](value: T) -> T:
-    if sizeof(T) == 1 or not host_is_little_endian:
+    let size = sizeof(T)
+    if size == 1 or not host_is_little_endian:
         return value
     else:
         return byte_swap(value)

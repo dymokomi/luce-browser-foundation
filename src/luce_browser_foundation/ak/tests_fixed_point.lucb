@@ -1,0 +1,196 @@
+#==============================================================================================
+#
+#   tests_fixed_point - FixedPoint
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestFixedPoint.cpp (arithmetic, rounding, logarithm, comparison and
+#       cast; the formatter cases belong to AK/Format). `Type` is FixedPoint<4>.
+#
+#==============================================================================================
+
+type TestFixed4 = FixedPoint[i32, FixedPointPrecision4]
+
+func fixed4(value: f64) -> TestFixed4:
+    var result: TestFixed4 = ---
+    fixed_point_construct_f64_i32(&result, value)
+    return result
+
+func fixed4_int(value: i64) -> TestFixed4:
+    var result: TestFixed4 = ---
+    fixed_point_fixed_point_precision_underlying_i32(&result, value)
+    return result
+
+func fixed4_eq(a: TestFixed4, b: TestFixed4) -> bool:
+    return fixed_point_eq_fixed_point_i32(&a, b)
+
+test "fixed_point: arithmetic":
+    let half = fixed4(0.5)
+    assert(fixed4_eq(fixed_point_add_fixed_point_i32(&half, fixed4(0.5)), fixed4_int(1)))
+    let one = fixed4_int(1)
+    let one_and_half = fixed_point_add_fixed_point_i32(&one, fixed4(0.5))
+    assert(fixed4_eq(one_and_half, fixed4(1.5)))
+    assert(fixed_point_to_f32_i32(&one_and_half) == 1.5)
+    # FIXME: Test for rounded multiply
+    assert(fixed4_eq(fixed_point_mul_fixed_point_i32(&one, fixed4(0.5)), fixed4(0.5)))
+    let eighth = fixed4(0.125)
+    assert(fixed4_eq(fixed_point_mul_fixed_point_i32(&eighth, fixed4(3.75)), fixed4(0.125 * 3.75)))
+    assert(fixed4_eq(fixed_point_mul_fixed_point_i32(&eighth, fixed4(-3.75)), fixed4(0.125 * -3.75)))
+    assert(fixed4_eq(fixed_point_div_fixed_point_i32(&one, fixed4(0.5)), fixed4_int(2)))
+
+func check_rounding(value: f64, rint: f64, floor: f64, ceil: f64, trunc: f64):
+    let x = fixed4(value)
+    assert(fixed4_eq(fixed_point_rint_i32(&x), fixed4(rint)))
+    assert(fixed4_eq(fixed_point_floor_i32(&x), fixed4(floor)))
+    assert(fixed4_eq(fixed_point_ceil_i32(&x), fixed4(ceil)))
+    assert(fixed4_eq(fixed_point_trunc_i32(&x), fixed4(trunc)))
+    assert(fixed_point_lrint_i32(&x) == (i32)rint)
+    assert(fixed_point_lfloor_i32(&x) == (i32)floor)
+    assert(fixed_point_lceil_i32(&x) == (i32)ceil)
+    assert(fixed_point_ltrunc_i32(&x) == (i32)trunc)
+
+test "fixed_point: rounding":
+    check_rounding(0.5, 0.0, 0.0, 1.0, 0.0)
+    check_rounding(1.5, 2.0, 1.0, 2.0, 1.0)
+    check_rounding(-0.5, 0.0, -1.0, 0.0, 0.0)
+    check_rounding(-1.5, -2.0, -2.0, -1.0, -1.0)
+    var x = fixed4(0.75)
+    assert(fixed4_eq(fixed_point_trunc_i32(&x), fixed4_int(0)))
+    x = fixed4(1.25)
+    assert(fixed4_eq(fixed_point_trunc_i32(&x), fixed4_int(1)))
+    x = fixed4(-0.75)
+    assert(fixed4_eq(fixed_point_trunc_i32(&x), fixed4_int(0)))
+    x = fixed4(-1.25)
+    assert(fixed4_eq(fixed_point_trunc_i32(&x), fixed4_int(-1)))
+    x = fixed4(2.75)
+    assert(fixed4_eq(fixed_point_rint_i32(&x), fixed4_int(3)))
+    x = fixed4(-1.25)
+    assert(fixed4_eq(fixed_point_rint_i32(&x), fixed4_int(-1)))
+    x = fixed4(-1.6)
+    var r = fixed_point_rint_i32(&x)
+    assert(fixed_point_eq_i_i32(&r, -2))
+    x = fixed4(-1.4)
+    r = fixed_point_rint_i32(&x)
+    assert(fixed_point_eq_i_i32(&r, -1))
+    x = fixed4(1.6)
+    r = fixed_point_rint_i32(&x)
+    assert(fixed_point_eq_i_i32(&r, 2))
+    x = fixed4(1.4)
+    r = fixed_point_rint_i32(&x)
+    assert(fixed_point_eq_i_i32(&r, 1))
+
+    # Check that sRGB TRC curve parameters match the s15fixed16 values stored in Gimp's built-in profile.
+    # (This only requires that the FixedPoint<> constructor rounds before truncating to the fixed-point value,
+    # as it should anyways.)
+    var s15: FixedPoint[i32, FixedPointPrecision16] = ---
+    fixed_point_construct_f64_i32(&s15, 2.4)
+    assert(s15.m_value == 0x26666)
+    fixed_point_construct_f64_i32(&s15, 1.0 / 1.055)
+    assert(s15.m_value == 0xf2a7)
+    fixed_point_construct_f64_i32(&s15, 0.055 / 1.055)
+    assert(s15.m_value == 0xd59)
+    fixed_point_construct_f64_i32(&s15, 1.0 / 12.92)
+    assert(s15.m_value == 0x13d0)
+    fixed_point_construct_f64_i32(&s15, 0.04045)
+    assert(s15.m_value == 0xa5b)
+
+test "fixed_point: logarithm":
+    var x = fixed4_int(0)
+    var l = fixed_point_log2_i32(&x)
+    assert(l.m_value == i32_min)
+    x = fixed4_int(1)
+    assert(fixed4_eq(fixed_point_log2_i32(&x), fixed4_int(0)))
+    x = fixed4_int(2)
+    assert(fixed4_eq(fixed_point_log2_i32(&x), fixed4_int(1)))
+    x = fixed4_int(8)
+    assert(fixed4_eq(fixed_point_log2_i32(&x), fixed4_int(3)))
+    x = fixed4(0.5)
+    assert(fixed4_eq(fixed_point_log2_i32(&x), fixed4_int(-1)))
+    x = fixed4(22.627416997969520780827019587355)
+    assert(fixed4_eq(fixed_point_log2_i32(&x), fixed4(4.4375)))
+    x = fixed4_int(3088)
+    assert(fixed4_eq(fixed_point_log2_i32(&x), fixed4(11.592457037268080419637304576833)))
+
+test "fixed_point: comparison":
+    var x = fixed4_int(0)
+    assert(fixed_point_lt_i_i32(&x, 1))
+    assert(fixed_point_le_i_i32(&x, 1))
+    assert(fixed_point_le_i_i32(&x, 0))
+    x = fixed4_int(-10)
+    assert(fixed_point_le_i_i32(&x, -10))
+    x = fixed4(4.25)
+    assert(fixed_point_gt_i_i32(&x, 4))
+    assert(fixed_point_ge_i_i32(&x, 4))
+    assert(fixed_point_le_i_i32(&x, 5))
+    assert(fixed_point_lt_i_i32(&x, 5))
+    x = fixed4(1.5)
+    assert(fixed_point_gt_i_i32(&x, 1))
+    var small: FixedPoint[u8, FixedPointPrecision4] = ---
+    fixed_point_fixed_point_precision_underlying_u8(&small, 2)
+    assert(not fixed_point_gt_i_u8(&small, 128))
+    assert(not fixed_point_ge_i_u8(&small, 128))
+    x = fixed4(-6.25)
+    assert(fixed_point_lt_i_i32(&x, -6))
+    assert(fixed_point_le_i_i32(&x, -6))
+    x = fixed4(-6.75)
+    assert(fixed_point_gt_i_i32(&x, -7))
+    assert(fixed_point_ge_i_i32(&x, -7))
+    x = fixed4_int(17)
+    assert(fixed_point_eq_i_i32(&x, 17))
+    x = fixed4_int(-8)
+    assert(fixed_point_ne_i_i32(&x, -9))
+
+func between(value: f64, low: f64, high: f64) -> bool:
+    return value >= low and value <= high
+
+test "fixed_point: cast":
+    var wide: FixedPoint[u64, FixedPointPrecision32] = ---
+    fixed_point_construct_f64_u64(&wide, 123.4567)
+    var down16 = fixed_point_cast_to_u32_from_u64[FixedPointPrecision32, FixedPointPrecision16](&wide)
+    assert(between(fixed_point_to_f64_u32(&down16), 123.4566, 123.4568))
+    fixed_point_construct_f64_u64(&wide, 321.7654)
+    down16 = fixed_point_cast_to_u32_from_u64[FixedPointPrecision32, FixedPointPrecision16](&wide)
+    assert(between(fixed_point_to_f64_u32(&down16), 321.7653, 321.7655))
+
+    fixed_point_construct_f64_u64(&wide, 4567.123456)
+    var down6 = fixed_point_cast_to_u32_from_u64[FixedPointPrecision32, FixedPointPrecision6](&wide)
+    assert(between(fixed_point_to_f64_u32(&down6), 4567.1, 4567.2))
+    fixed_point_construct_f64_u64(&wide, 7654.654321)
+    down6 = fixed_point_cast_to_u32_from_u64[FixedPointPrecision32, FixedPointPrecision6](&wide)
+    assert(between(fixed_point_to_f64_u32(&down6), 7654.64, 7654.66))
+    fixed_point_construct_f64_u64(&wide, 4567.987654)
+    down6 = fixed_point_cast_to_u32_from_u64[FixedPointPrecision32, FixedPointPrecision6](&wide)
+    assert(between(fixed_point_to_f64_u32(&down6), 4567.9, 4567.99))
+
+    var narrow16: FixedPoint[u32, FixedPointPrecision16] = ---
+    fixed_point_construct_f64_u32(&narrow16, 123.4567)
+    var up = fixed_point_cast_to_u64_from_u32[FixedPointPrecision16, FixedPointPrecision32](&narrow16)
+    assert(between(fixed_point_to_f64_u64(&up), 123.4566, 123.4568))
+    var narrow6: FixedPoint[u32, FixedPointPrecision6] = ---
+    fixed_point_construct_f64_u32(&narrow6, 4567.123456)
+    up = fixed_point_cast_to_u64_from_u32[FixedPointPrecision6, FixedPointPrecision32](&narrow6)
+    assert(between(fixed_point_to_f64_u64(&up), 4567.1, 4567.2))
+    fixed_point_construct_f64_u32(&narrow6, 7654.456789)
+    up = fixed_point_cast_to_u64_from_u32[FixedPointPrecision6, FixedPointPrecision32](&narrow6)
+    assert(between(fixed_point_to_f64_u64(&up), 7654.45, 7654.46))
+
+test "fixed_point: u64 multiply and divide, integral operators":
+    var a: FixedPoint[u64, FixedPointPrecision32] = ---
+    fixed_point_construct_f64_u64(&a, 1.5)
+    var b: FixedPoint[u64, FixedPointPrecision32] = ---
+    fixed_point_construct_f64_u64(&b, 2.25)
+    let product = fixed_point_mul_fixed_point_u64(&a, b)
+    assert(fixed_point_to_f64_u64(&product) == 3.375)
+    let quotient = fixed_point_div_fixed_point_u64(&b, a)
+    assert(fixed_point_to_f64_u64(&quotient) == 1.5)
+    var x = fixed4(2.5)
+    discard(fixed_point_add_assign_i_i32(&x, 3))
+    assert(fixed4_eq(x, fixed4(5.5)))
+    discard(fixed_point_mul_assign_i_i32(&x, 2))
+    assert(fixed_point_eq_i_i32(&x, 11))
+    let negated = fixed_point_neg_i32(&x)
+    assert(fixed_point_signbit_i32(&negated) and not fixed_point_signbit_i32(&x))
+    let clamped = fixed_point_clamp_i32(&x, fixed4_int(0), fixed4_int(10))
+    assert(fixed_point_eq_i_i32(&clamped, 10))
+    let fraction = fixed_point_fract_i32(&negated)
+    assert(fixed_point_eq_i_i32(&fraction, 0))
+    assert(fixed_point_to_integer_i32(&negated) == -11)

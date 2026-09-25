@@ -1,0 +1,81 @@
+#==============================================================================================
+#
+#   tests_math - AK/Math.h
+#
+#   DESCRIPTION:
+#       Port of the clamp_to case of Tests/AK/TestIntegerMath.cpp, and cases pinned to the
+#       donor's AK/Math.h compiled on this machine (the bits of each result, for the
+#       functions AK computes itself: log2, pow, cbrt, asin, acos, round, the hyperbolic
+#       functions, round_to).
+#
+#==============================================================================================
+
+test "math: clamp_to":
+    assert(clamp_to_i32_u32(1000000) == 1000000)
+    assert(clamp_to_i32_u64(u64_max) == i32_max)
+    assert(clamp_to_u32_i32(-10) == 0)
+    assert(clamp_to_u32_i32(10) == 10)
+    assert(clamp_to_i32_i64(i64_min) == i32_min)
+    assert(clamp_to_i32_i64(i64_max) == i32_max)
+    assert(clamp_to_i64_f64(-9223372036854775808.0) == i64_min)
+    assert(clamp_to_i64_f64(9223372036854775807.0) == i64_max)
+    assert(clamp_to_i32_f64(2.5) == 2)
+    assert(clamp_to_u32_f32(-3.0) == 0)
+
+test "math: log2 and pow":
+    assert(exponentials_log2_f64(10.0).bits() == 0x400a934f0979a371)
+    assert(exponentials_log2_f64(3.0).bits() == 0x3ff95c01a39fbd69)
+    assert(exponentials_log2_f32(10.0).bits() == 0x40549a78)
+    assert(exponentials_log2_f64(8.0) == 3.0)
+    assert(exponentials_log2_f64(0.0) == -infinity_f64)
+    let not_a_number = exponentials_log2_f64(-1.0)
+    assert(not_a_number != not_a_number)
+    assert(pow_f64(2.5, 1.5).bits() == 0x400f9f6e4990f226)
+    assert(pow_f64(2.5, 3.0).bits() == 0x402f400000000000)
+    assert(pow_f64(2.0, -2.0) == 0.25)
+    assert(pow_f64(0.0, 3.0) == 0.0)
+    assert(pow_f64(5.0, 0.0) == 1.0)
+
+test "math: cbrt, asin, acos":
+    assert(cbrt_f64(27.0).bits() == 0x4008000000000000)
+    assert(cbrt_f64(10.0).bits() == 0x40013c484138704e)
+    assert(cbrt_f32(27.0).bits() == 0x40400000)
+    assert(cbrt_f64(-27.0) == -3.0)
+    assert(trigonometry_asin_f64(0.3).bits() == 0x3fd380159e14a074)
+    assert(trigonometry_asin_f32(0.3).bits() == 0x3e9c00ad)
+    assert(trigonometry_asin_f64(0.7).bits() == 0x3fe8d00e692afd96)
+    assert(trigonometry_acos_f64(0.3).bits() == 0x3ff441f5ecbf04fb)
+    let out_of_range = trigonometry_asin_f64(2.0)
+    assert(out_of_range != out_of_range)
+
+test "math: rounding":
+    assert(rounding_round_f64(2.5) == 3.0)
+    assert(rounding_round_f64(-2.5) == -3.0)
+    assert(rounding_round_f32(0.4) == 0.0)
+    assert(rounding_rint_f64(2.5) == 2.0)
+    assert(rounding_ceil_f64(1.2) == 2.0)
+    assert(rounding_floor_f64(-1.2) == -2.0)
+    assert(rounding_trunc_f64(-1.7) == -1.0)
+    assert(rounding_round_to_f64_i32(2.5) == 2)
+    assert(rounding_round_to_f64_i32(3.5) == 4)
+    assert(rounding_round_to_f64_i32(-2.5) == -2)
+    assert(rounding_round_to_f32_i64(1.5) == 2)
+    assert(rounding_round_to_f64_u32(7.5) == 8)
+    assert(division_fmod_f64(7.0, 3.0) == 1.0)
+    assert(division_remainder_f64(7.0, 4.0) == -1.0)
+
+test "math: hyperbolic and trigonometry":
+    assert(hyperbolic_sinh_f64(1.0).bits() == 0x3ff2cd9fc44eb982)
+    assert(hyperbolic_cosh_f64(1.0).bits() == 0x3ff8b07551d9f550)
+    assert(hyperbolic_tanh_f64(1.0).bits() == 0x3fe85efab514f394)
+    assert(hyperbolic_asinh_f64(1.0).bits() == 0x3fec34366179d426)
+    assert(hyperbolic_atanh_f64(0.3).bits() == 0x3fd3cf2b50617c97)
+    assert(to_radians_f64(180.0).bits() == 0x400921fb54442d18)
+    assert(to_degrees_f64(pi_f64) == 180.0)
+    var s: f64 = 0.0
+    var c: f64 = 0.0
+    trigonometry_sincos_f64(0.0, &s, &c)
+    assert(s == 0.0 and c == 1.0)
+    assert(trigonometry_hypot_f64(3.0, 4.0) == 5.0)
+    assert(details_product_even_x(6) == 48)
+    assert(details_product_odd_x(7) == 105)

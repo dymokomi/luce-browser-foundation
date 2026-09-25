@@ -1,0 +1,578 @@
+#==============================================================================================
+#
+#   u_fixed_big_int_2 - UFixedBigInt: fixed-size unsigned integers wider than 64 bits
+#
+#   DESCRIPTION:
+#       Port of AK/UFixedBigInt.h (lines 1-662). luce-base has no value generics, so
+#       UFixedBigInt<bit_size> is the generated `UFixedBigInt[TStorage]` whose storage is an
+#       array of u64 words (`U128` = `UFixedBigInt[u64[2]]` ... `U4096`); every member works
+#       for any storage by viewing it as a span of words. The bit size is the storage's
+#       (the donor's u128 ... u4096 are all word-aligned).
+#
+#       A `UFixedInt auto` operand is a type parameter `T` that is a builtin unsigned integer
+#       or another UFixedBigInt: its words are read from its bytes (get_storage_of). Where the
+#       C++ result type is computed from the operands' bit sizes, the result is the receiver's
+#       type (the operand must not be wider), except wide_multiply, low() and high(), which
+#       take the result type as a type parameter. IntegerWrapper is the non-negative `int`
+#       operand, made with `integer_wrapper(value)`.
+#
+#==============================================================================================
+
+## AK's u128.
+pub type U128 = UFixedBigInt[u64[2]]
+## AK's u256.
+pub type U256 = UFixedBigInt[u64[4]]
+## AK's u384.
+pub type U384 = UFixedBigInt[u64[6]]
+## AK's u512.
+pub type U512 = UFixedBigInt[u64[8]]
+## AK's u768.
+pub type U768 = UFixedBigInt[u64[12]]
+## AK's u1024.
+pub type U1024 = UFixedBigInt[u64[16]]
+## AK's u1536.
+pub type U1536 = UFixedBigInt[u64[24]]
+## AK's u2048.
+pub type U2048 = UFixedBigInt[u64[32]]
+## AK's u4096.
+pub type U4096 = UFixedBigInt[u64[64]]
+
+# mark: Storage access ==========================================================================
+
+# The words of a UFixedBigInt (get_storage_of).
+func fbi_words[TStorage](this: const UFixedBigInt[TStorage]*) -> u64[]:
+    assert(sizeof(TStorage) % 8 == 0)
+    return u64[]((u64*)&this.m_data, sizeof(TStorage) // 8)
+
+# BigIntBase.h:170 get_storage_of for a UFixedInt value: its words, least significant first. A
+# builtin integer narrower than a word is widened into `small`.
+func storage_of[T](value: const T*, small: u64*) -> u64[]:
+    # workaround: compiler-issues/generic_sizeof_branch (bind sizeof(T) before testing it)
+    let size = sizeof(T)
+    if size % 8 == 0:
+        return u64[]((u64*)value, size // 8)
+    else:
+        *small = 0
+        memory.copy(u8[]((u8*)small, sizeof(T)), u8[]((u8*)value, sizeof(T)), sizeof(T))
+        return u64[](small, 1)
+
+# The words of an IntegerWrapper.
+func integer_wrapper_words(value: const IntegerWrapper*) -> u64[]:
+    return u64[]((u64*)&value.m_data[0], 1)
+
+# mark: Construction and conversion =============================================================
+
+## Ported from AK/UFixedBigInt.h:82 AK::Detail::UFixedBigInt::UFixedBigInt(IntegerWrapper).
+pub func u_fixed_big_int_construct_integer_wrapper[TStorage](this: UFixedBigInt[TStorage]*, value: IntegerWrapper):
+    storage_copy(integer_wrapper_words(&value), fbi_words(this))
+
+## Ported from AK/UFixedBigInt.h:83 AK::Detail::UFixedBigInt::UFixedBigInt(int).
+pub func u_fixed_big_int_construct_i32[TStorage](this: UFixedBigInt[TStorage]*, value: i32):
+    let wrapper = integer_wrapper(value)
+    storage_copy(integer_wrapper_words(&wrapper), fbi_words(this))
+
+## Ported from AK/UFixedBigInt.h:89 AK::Detail::UFixedBigInt::UFixedBigInt(UFixedInt): from a
+## builtin unsigned integer or another UFixedBigInt, truncated or zero-extended (both the
+## explicit narrowing and the implicit widening constructor).
+pub func u_fixed_big_int_u_fixed_big_int_bit_size_storage[TStorage, T](this: UFixedBigInt[TStorage]*, value: T):
+    var small: u64
+    storage_copy(storage_of(&value, &small), fbi_words(this))
+
+## Ported from AK/UFixedBigInt.h:100 AK::Detail::UFixedBigInt::UFixedBigInt(low, high): from its
+## two halves, each a u64 (for u128) or a UFixedBigInt of half the size.
+pub func u_fixed_big_int_construct_opaque[TStorage, TPart](this: UFixedBigInt[TStorage]*, low: TPart, high: TPart):
+    let words = fbi_words(this)
+    assert(words.length % 2 == 0 and sizeof(TPart) * 2 == sizeof(TStorage))
+    let part_size = words.length // 2
+    var small_low: u64
+    var small_high: u64
+    let low_storage = storage_of(&low, &small_low)
+    let high_storage = storage_of(&high, &small_high)
+    for i in 0..<part_size:
+        words[i] = low_storage[i]
+    for i in 0..<part_size:
+        words[i + part_size] = high_storage[i]
+
+## Ported from AK/UFixedBigInt.h:137 AK::Detail::UFixedBigInt::operator T: to a builtin unsigned
+## integer (the low bits) or another UFixedBigInt (truncated or zero-extended).
+pub func u_fixed_big_int_to_t[TStorage, T](this: const UFixedBigInt[TStorage]*) -> T:
+    var result: T = ---
+    let bytes = u8[]((u8*)&result, sizeof(T))
+    memory.set(bytes, 0)
+    # workaround: compiler-issues/generic_sizeof_branch
+    let size = sizeof(T)
+    let storage_size = sizeof(TStorage)
+    let count = size if size < storage_size else storage_size
+    memory.copy(bytes[0..<count], u8[]((u8*)&this.m_data, count), count)
+    return result
+
+## Ported from AK/UFixedBigInt.h:156 AK::Detail::UFixedBigInt::low: the low half, as `TPart`
+## (u64 for a u128, the UFixedBigInt of half the size otherwise).
+pub func u_fixed_big_int_low[TStorage, TPart](this: const UFixedBigInt[TStorage]*) -> TPart:
+    assert(sizeof(TPart) * 2 == sizeof(TStorage))
+    return memory.read[TPart]((void*)&this.m_data)
+
+## Ported from AK/UFixedBigInt.h:170 AK::Detail::UFixedBigInt::high: the high half, as `TPart`.
+pub func u_fixed_big_int_high[TStorage, TPart](this: const UFixedBigInt[TStorage]*) -> TPart:
+    assert(sizeof(TPart) * 2 == sizeof(TStorage))
+    return memory.read[TPart]((void*)((u8*)&this.m_data + sizeof(TPart)))
+
+## Ported from AK/UFixedBigInt.h:184 AK::Detail::UFixedBigInt::bytes.
+pub func u_fixed_big_int_bytes[TStorage](this: UFixedBigInt[TStorage]*) -> u8[]:
+    return u8[]((u8*)this, sizeof(TStorage))
+
+## Ported from AK/UFixedBigInt.h:189 AK::Detail::UFixedBigInt::bytes.
+pub func u_fixed_big_int_bytes_const[TStorage](this: const UFixedBigInt[TStorage]*) -> const u8[]:
+    return u8[]((u8*)this, sizeof(TStorage))
+
+## Ported from AK/UFixedBigInt.h:194 AK::Detail::UFixedBigInt::span: the words.
+pub func u_fixed_big_int_span[TStorage](this: UFixedBigInt[TStorage]*) -> u64[]:
+    return fbi_words(this)
+
+## Ported from AK/UFixedBigInt.h:199 AK::Detail::UFixedBigInt::span: the words.
+pub func u_fixed_big_int_span_const[TStorage](this: const UFixedBigInt[TStorage]*) -> const u64[]:
+    return fbi_words(this)
+
+# mark: Binary utils ============================================================================
+
+## Ported from AK/UFixedBigInt.h:205 AK::Detail::UFixedBigInt::popcnt.
+pub func u_fixed_big_int_popcnt[TStorage](this: const UFixedBigInt[TStorage]*) -> usize:
+    var result: usize = 0
+    for word in fbi_words(this):
+        result += popcount_u64(word)
+    return result
+
+## Ported from AK/UFixedBigInt.h:213 AK::Detail::UFixedBigInt::ctz.
+pub func u_fixed_big_int_ctz[TStorage](this: const UFixedBigInt[TStorage]*) -> usize:
+    var result: usize = 0
+    for word in fbi_words(this):
+        if word != 0:
+            result += count_trailing_zeroes_u64(word)
+            break
+        else:
+            result += 64
+    return result
+
+## Ported from AK/UFixedBigInt.h:227 AK::Detail::UFixedBigInt::clz.
+pub func u_fixed_big_int_clz[TStorage](this: const UFixedBigInt[TStorage]*) -> usize:
+    let words = fbi_words(this)
+    var result: usize = 0
+    var i = words.length
+    while i > 0:
+        i -= 1
+        if words[i] != 0:
+            result += (usize)count_leading_zeroes_u64(words[i])
+            break
+        else:
+            result += 64
+    # + bit_size - native_word_size * static_size, which is zero for word-aligned sizes.
+    return result
+
+# mark: Comparisons =============================================================================
+
+## Ported from AK/UFixedBigInt.h:242 AK::Detail::UFixedBigInt::operator!.
+pub func u_fixed_big_int_not[TStorage](this: const UFixedBigInt[TStorage]*) -> bool:
+    var result = true
+    for word in fbi_words(this):
+        result = result and word == 0
+    return result
+
+## Ported from AK/UFixedBigInt.h:250 AK::Detail::UFixedBigInt::operator bool.
+pub func u_fixed_big_int_to_bool[TStorage](this: const UFixedBigInt[TStorage]*) -> bool:
+    var result = false
+    for word in fbi_words(this):
+        result = result or word != 0
+    return result
+
+## Ported from AK/UFixedBigInt.h:258 AK::Detail::UFixedBigInt::operator==(UFixedInt).
+pub func u_fixed_big_int_eq_opaque[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T) -> bool:
+    var small: u64
+    return storage_compare(fbi_words(this), storage_of(&other, &small), true) == 0
+
+## Ported from AK/UFixedBigInt.h:263 AK::Detail::UFixedBigInt::operator==(IntegerWrapper).
+pub func u_fixed_big_int_eq_integer_wrapper[TStorage](this: const UFixedBigInt[TStorage]*, other: IntegerWrapper) -> bool:
+    return storage_compare(fbi_words(this), integer_wrapper_words(&other), true) == 0
+
+## Ported from AK/UFixedBigInt.h:268 AK::Detail::UFixedBigInt::operator<=>(UFixedInt).
+pub func u_fixed_big_int_cmp_opaque[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T) -> i32:
+    var small: u64
+    return storage_compare(fbi_words(this), storage_of(&other, &small), false)
+
+## Ported from AK/UFixedBigInt.h:273 AK::Detail::UFixedBigInt::operator<=>(IntegerWrapper).
+pub func u_fixed_big_int_cmp_integer_wrapper[TStorage](this: const UFixedBigInt[TStorage]*, other: IntegerWrapper) -> i32:
+    return storage_compare(fbi_words(this), integer_wrapper_words(&other), false)
+
+# mark: Bitwise operators =======================================================================
+
+## Ported from AK/UFixedBigInt.h:307 AK::Detail::UFixedBigInt::operator^(IntegerWrapper).
+pub func u_fixed_big_int_bit_xor_integer_wrapper[TStorage](this: const UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, storage_xor)
+
+## Ported from AK/UFixedBigInt.h:307 AK::Detail::UFixedBigInt::operator^(UFixedInt).
+pub func u_fixed_big_int_bit_xor_opaque[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, storage_xor)
+
+## Ported from AK/UFixedBigInt.h:308 AK::Detail::UFixedBigInt::operator&(IntegerWrapper).
+pub func u_fixed_big_int_bit_and_integer_wrapper[TStorage](this: const UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, storage_and)
+
+## Ported from AK/UFixedBigInt.h:308 AK::Detail::UFixedBigInt::operator&(UFixedInt).
+pub func u_fixed_big_int_bit_and_opaque[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, storage_and)
+
+## Ported from AK/UFixedBigInt.h:309 AK::Detail::UFixedBigInt::operator|(IntegerWrapper).
+pub func u_fixed_big_int_bit_or_integer_wrapper[TStorage](this: const UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, storage_or)
+
+## Ported from AK/UFixedBigInt.h:309 AK::Detail::UFixedBigInt::operator|(UFixedInt).
+pub func u_fixed_big_int_bit_or_opaque[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, storage_or)
+
+## Ported from AK/UFixedBigInt.h:310 AK::Detail::UFixedBigInt::operator^=(IntegerWrapper).
+pub func u_fixed_big_int_xor_assign_integer_wrapper[TStorage](this: UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]*:
+    u_fixed_big_int_do_standard_compound_assignment(this, other, storage_inplace_xor)
+    return this
+
+## Ported from AK/UFixedBigInt.h:310 AK::Detail::UFixedBigInt::operator^=(UFixedInt).
+pub func u_fixed_big_int_xor_assign_opaque[TStorage, T](this: UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]*:
+    u_fixed_big_int_do_standard_compound_assignment(this, other, storage_inplace_xor)
+    return this
+
+## Ported from AK/UFixedBigInt.h:311 AK::Detail::UFixedBigInt::operator&=(IntegerWrapper).
+pub func u_fixed_big_int_and_assign_integer_wrapper[TStorage](this: UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]*:
+    u_fixed_big_int_do_standard_compound_assignment(this, other, storage_inplace_and)
+    return this
+
+## Ported from AK/UFixedBigInt.h:311 AK::Detail::UFixedBigInt::operator&=(UFixedInt).
+pub func u_fixed_big_int_and_assign_opaque[TStorage, T](this: UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]*:
+    u_fixed_big_int_do_standard_compound_assignment(this, other, storage_inplace_and)
+    return this
+
+## Ported from AK/UFixedBigInt.h:312 AK::Detail::UFixedBigInt::operator|=(IntegerWrapper).
+pub func u_fixed_big_int_or_assign_integer_wrapper[TStorage](this: UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]*:
+    u_fixed_big_int_do_standard_compound_assignment(this, other, storage_inplace_or)
+    return this
+
+## Ported from AK/UFixedBigInt.h:312 AK::Detail::UFixedBigInt::operator|=(UFixedInt).
+pub func u_fixed_big_int_or_assign_opaque[TStorage, T](this: UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]*:
+    u_fixed_big_int_do_standard_compound_assignment(this, other, storage_inplace_or)
+    return this
+
+## Ported from AK/UFixedBigInt.h:314 AK::Detail::UFixedBigInt::operator~.
+pub func u_fixed_big_int_bit_not[TStorage](this: const UFixedBigInt[TStorage]*) -> UFixedBigInt[TStorage]:
+    var result: UFixedBigInt[TStorage] = ---
+    let words = fbi_words(this)
+    storage_compute_bitwise(StorageBitwise.invert, words, words, fbi_words(&result))
+    return result
+
+## Ported from AK/UFixedBigInt.h:321 AK::Detail::UFixedBigInt::operator<<.
+pub func u_fixed_big_int_shl[TStorage](this: const UFixedBigInt[TStorage]*, shift: usize) -> UFixedBigInt[TStorage]:
+    var result: UFixedBigInt[TStorage] = ---
+    storage_shift_left(fbi_words(this), shift, fbi_words(&result))
+    return result
+
+## Ported from AK/UFixedBigInt.h:328 AK::Detail::UFixedBigInt::operator<<=.
+pub func u_fixed_big_int_shl_assign[TStorage](this: UFixedBigInt[TStorage]*, shift: usize) -> UFixedBigInt[TStorage]*:
+    storage_shift_left(fbi_words(this), shift, fbi_words(this))
+    return this
+
+## Ported from AK/UFixedBigInt.h:334 AK::Detail::UFixedBigInt::operator>>.
+pub func u_fixed_big_int_shr[TStorage](this: const UFixedBigInt[TStorage]*, shift: usize) -> UFixedBigInt[TStorage]:
+    var result: UFixedBigInt[TStorage] = ---
+    storage_shift_right(fbi_words(this), shift, fbi_words(&result))
+    return result
+
+## Ported from AK/UFixedBigInt.h:341 AK::Detail::UFixedBigInt::operator>>=.
+pub func u_fixed_big_int_shr_assign[TStorage](this: UFixedBigInt[TStorage]*, shift: usize) -> UFixedBigInt[TStorage]*:
+    storage_shift_right(fbi_words(this), shift, fbi_words(this))
+    return this
+
+# mark: Arithmetic ==============================================================================
+
+## Ported from AK/UFixedBigInt.h:349 AK::Detail::UFixedBigInt::addc: this + other + carry, the
+## carry out stored back.
+pub func u_fixed_big_int_addc[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T, carry: bool*) -> UFixedBigInt[TStorage]:
+    assert(sizeof(T) <= sizeof(TStorage))
+    var result: UFixedBigInt[TStorage] = ---
+    var small: u64
+    *carry = storage_add(false, fbi_words(this), storage_of(&other, &small), fbi_words(&result), *carry) != 0
+    return result
+
+## Ported from AK/UFixedBigInt.h:357 AK::Detail::UFixedBigInt::subc: this - other - borrow, the
+## borrow out stored back.
+pub func u_fixed_big_int_subc[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T, borrow: bool*) -> UFixedBigInt[TStorage]:
+    assert(sizeof(T) <= sizeof(TStorage))
+    var result: UFixedBigInt[TStorage] = ---
+    var small: u64
+    *borrow = storage_add(true, fbi_words(this), storage_of(&other, &small), fbi_words(&result), *borrow) != 0
+    return result
+
+## Ported from AK/UFixedBigInt.h:364 AK::Detail::UFixedBigInt::operator+(IntegerWrapper).
+pub func u_fixed_big_int_add_integer_wrapper[TStorage](this: const UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, storage_plus)
+
+## Ported from AK/UFixedBigInt.h:364 AK::Detail::UFixedBigInt::operator+(UFixedInt).
+pub func u_fixed_big_int_add_opaque[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, storage_plus)
+
+## Ported from AK/UFixedBigInt.h:365 AK::Detail::UFixedBigInt::operator-(IntegerWrapper).
+pub func u_fixed_big_int_sub_integer_wrapper[TStorage](this: const UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, storage_minus)
+
+## Ported from AK/UFixedBigInt.h:365 AK::Detail::UFixedBigInt::operator-(UFixedInt).
+pub func u_fixed_big_int_sub_opaque[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, storage_minus)
+
+## Ported from AK/UFixedBigInt.h:366 AK::Detail::UFixedBigInt::operator+=(IntegerWrapper).
+pub func u_fixed_big_int_add_assign_integer_wrapper[TStorage](this: UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]*:
+    u_fixed_big_int_do_standard_compound_assignment(this, other, storage_plus)
+    return this
+
+## Ported from AK/UFixedBigInt.h:366 AK::Detail::UFixedBigInt::operator+=(UFixedInt).
+pub func u_fixed_big_int_add_assign_opaque[TStorage, T](this: UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]*:
+    u_fixed_big_int_do_standard_compound_assignment(this, other, storage_plus)
+    return this
+
+## Ported from AK/UFixedBigInt.h:367 AK::Detail::UFixedBigInt::operator-=(IntegerWrapper).
+pub func u_fixed_big_int_sub_assign_integer_wrapper[TStorage](this: UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]*:
+    u_fixed_big_int_do_standard_compound_assignment(this, other, storage_minus)
+    return this
+
+## Ported from AK/UFixedBigInt.h:367 AK::Detail::UFixedBigInt::operator-=(UFixedInt).
+pub func u_fixed_big_int_sub_assign_opaque[TStorage, T](this: UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]*:
+    u_fixed_big_int_do_standard_compound_assignment(this, other, storage_minus)
+    return this
+
+## Ported from AK/UFixedBigInt.h:369 AK::Detail::UFixedBigInt::operator++ (prefix).
+pub func u_fixed_big_int_inc[TStorage](this: UFixedBigInt[TStorage]*) -> UFixedBigInt[TStorage]*:
+    discard(storage_increment(false, fbi_words(this)))
+    return this
+
+## Ported from AK/UFixedBigInt.h:375 AK::Detail::UFixedBigInt::operator-- (prefix).
+pub func u_fixed_big_int_dec[TStorage](this: UFixedBigInt[TStorage]*) -> UFixedBigInt[TStorage]*:
+    discard(storage_increment(true, fbi_words(this)))
+    return this
+
+## Ported from AK/UFixedBigInt.h:381 AK::Detail::UFixedBigInt::operator++ (postfix).
+pub func u_fixed_big_int_inc_i32[TStorage](this: UFixedBigInt[TStorage]*, arg0: i32) -> UFixedBigInt[TStorage]:
+    discard(arg0)
+    let result = *this
+    discard(storage_increment(false, fbi_words(this)))
+    return result
+
+## Ported from AK/UFixedBigInt.h:388 AK::Detail::UFixedBigInt::operator-- (postfix).
+pub func u_fixed_big_int_dec_i32[TStorage](this: UFixedBigInt[TStorage]*, arg0: i32) -> UFixedBigInt[TStorage]:
+    discard(arg0)
+    let result = *this
+    discard(storage_increment(true, fbi_words(this)))
+    return result
+
+## Ported from AK/UFixedBigInt.h:395 AK::Detail::UFixedBigInt::operator*(IntegerWrapper).
+pub func u_fixed_big_int_mul_integer_wrapper[TStorage](this: const UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, mul_internal)
+
+## Ported from AK/UFixedBigInt.h:395 AK::Detail::UFixedBigInt::operator*(UFixedInt).
+pub func u_fixed_big_int_mul_opaque[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_do_standard_binary_operation(this, other, mul_internal)
+
+## Ported from AK/UFixedBigInt.h:397 AK::Detail::UFixedBigInt::operator*=(UFixedInt).
+pub func u_fixed_big_int_mul_assign_opaque[TStorage, T](this: UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]*:
+    *this = u_fixed_big_int_mul_opaque(this, other)
+    return this
+
+## Ported from AK/UFixedBigInt.h:398 AK::Detail::UFixedBigInt::operator*=(IntegerWrapper).
+pub func u_fixed_big_int_mul_assign_integer_wrapper[TStorage](this: UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]*:
+    *this = u_fixed_big_int_mul_integer_wrapper(this, other)
+    return this
+
+## Ported from AK/UFixedBigInt.h:401 AK::Detail::UFixedBigInt::wide_multiply: the full product,
+## as the UFixedBigInt with storage `TResult` (bit_size + the operand's bit size).
+pub func u_fixed_big_int_wide_multiply[TStorage, T, TResult](this: const UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TResult]:
+    var result: UFixedBigInt[TResult] = ---
+    var small: u64
+    mul_internal(fbi_words(this), storage_of(&other, &small), fbi_words(&result))
+    return result
+
+## Ported from AK/UFixedBigInt.h:409 AK::Detail::UFixedBigInt::div_mod: the quotient, the
+## remainder stored in `remainder` (a UFixedBigInt).
+pub func u_fixed_big_int_div_mod[TStorage, T](this: const UFixedBigInt[TStorage]*, divisor: T, remainder: T*) -> UFixedBigInt[TStorage]:
+    var quotient: UFixedBigInt[TStorage] = ---
+    var resulting_remainder: T = ---
+    var small: u64
+    div_mod_internal(true, fbi_words(this), storage_of(&divisor, &small), fbi_words(&quotient), u64[]((u64*)&resulting_remainder, sizeof(T) // 8))
+    *remainder = resulting_remainder
+    return quotient
+
+## Ported from AK/UFixedBigInt.h:419 AK::Detail::UFixedBigInt::operator/(UFixedInt).
+pub func u_fixed_big_int_div_t[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]:
+    var quotient: UFixedBigInt[TStorage] = ---
+    var small: u64
+    let divisor = storage_of(&other, &small)
+    var remainder_storage: u64[64]  # unused
+    div_mod_internal(false, fbi_words(this), divisor, fbi_words(&quotient), remainder_storage[0..<divisor.length])
+    return quotient
+
+## Ported from AK/UFixedBigInt.h:428 AK::Detail::UFixedBigInt::operator%(UFixedInt): the remainder,
+## of the divisor's type.
+pub func u_fixed_big_int_rem_t[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T) -> T:
+    var quotient: UFixedBigInt[TStorage] = ---  # unused
+    var small: u64
+    let divisor = storage_of(&other, &small)
+    var remainder_storage: u64[64]
+    div_mod_internal(true, fbi_words(this), divisor, fbi_words(&quotient), remainder_storage[0..<divisor.length])
+    var remainder: T = ---
+    memory.copy(u8[]((u8*)&remainder, sizeof(T)), u8[]((u8*)&remainder_storage[0], sizeof(T)), sizeof(T))
+    return remainder
+
+## Ported from AK/UFixedBigInt.h:436 AK::Detail::UFixedBigInt::operator/(IntegerWrapper).
+pub func u_fixed_big_int_div_integer_wrapper[TStorage](this: const UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_div_t(this, other.m_data)
+
+## Ported from AK/UFixedBigInt.h:437 AK::Detail::UFixedBigInt::operator%(IntegerWrapper): the
+## remainder as a one-word UFixedBigInt (UFixedBigInt<32>).
+pub func u_fixed_big_int_rem_integer_wrapper[TStorage](this: const UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[u64[1]]:
+    return UFixedBigInt[u64[1]](m_data = u_fixed_big_int_rem_t(this, other.m_data))
+
+## Ported from AK/UFixedBigInt.h:440 AK::Detail::UFixedBigInt::operator/=(UFixedInt).
+pub func u_fixed_big_int_div_assign_t[TStorage, T](this: UFixedBigInt[TStorage]*, other: T) -> UFixedBigInt[TStorage]*:
+    *this = u_fixed_big_int_div_t(this, other)
+    return this
+
+## Ported from AK/UFixedBigInt.h:441 AK::Detail::UFixedBigInt::operator/=(IntegerWrapper).
+pub func u_fixed_big_int_div_assign_integer_wrapper[TStorage](this: UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]*:
+    *this = u_fixed_big_int_div_integer_wrapper(this, other)
+    return this
+
+## Ported from AK/UFixedBigInt.h:444 AK::Detail::UFixedBigInt::operator%=(Unsigned): the remainder
+## by a builtin unsigned integer.
+pub func u_fixed_big_int_rem_assign_u[TStorage, U](this: UFixedBigInt[TStorage]*, other: U) -> UFixedBigInt[TStorage]*:
+    let remainder = u_fixed_big_int_rem_t(this, other)
+    u_fixed_big_int_u_fixed_big_int_bit_size_storage(this, remainder)
+    return this
+
+## Ported from AK/UFixedBigInt.h:445 AK::Detail::UFixedBigInt::operator%=(IntegerWrapper).
+pub func u_fixed_big_int_rem_assign_integer_wrapper[TStorage](this: UFixedBigInt[TStorage]*, other: IntegerWrapper) -> UFixedBigInt[TStorage]*:
+    let remainder = u_fixed_big_int_rem_integer_wrapper(this, other)
+    u_fixed_big_int_u_fixed_big_int_bit_size_storage(this, remainder)
+    return this
+
+# mark: Constant-time helpers ===================================================================
+
+## Ported from AK/UFixedBigInt.h:454 AK::Detail::UFixedBigInt::is_zero_constant_time.
+# These functions are intended to be used in LibCrypto for equality checks without branching.
+pub func u_fixed_big_int_is_zero_constant_time[TStorage](this: const UFixedBigInt[TStorage]*) -> bool:
+    var fold: u64 = 0
+    for word in fbi_words(this):
+        fold = fold | word
+    return fold == 0
+
+## Ported from AK/UFixedBigInt.h:462 AK::Detail::UFixedBigInt::is_equal_to_constant_time.
+pub func u_fixed_big_int_is_equal_to_constant_time[TStorage](this: const UFixedBigInt[TStorage]*, other: UFixedBigInt[TStorage]) -> bool:
+    let words = fbi_words(this)
+    let other_words = fbi_words(&other)
+    var fold: u64 = 0
+    for i in 0..<words.length:
+        fold = fold | (words[i] ^ other_words[i])
+    return fold == 0
+
+# mark: Operation helpers =======================================================================
+
+# The storage functions the DEFINE_STANDARD_* macros pass as `function(a, b, c)`.
+type StorageBinaryFunction = func(const u64[], const u64[], u64[]) -> unit
+
+func storage_xor(a: const u64[], b: const u64[], c: u64[]):
+    storage_compute_bitwise(StorageBitwise.xor_, a, b, c)
+
+func storage_and(a: const u64[], b: const u64[], c: u64[]):
+    storage_compute_bitwise(StorageBitwise.and_, a, b, c)
+
+func storage_or(a: const u64[], b: const u64[], c: u64[]):
+    storage_compute_bitwise(StorageBitwise.or_, a, b, c)
+
+func storage_inplace_xor(a: const u64[], b: const u64[], c: u64[]):
+    discard(a)
+    storage_compute_inplace_bitwise(StorageBitwise.xor_, b, c)
+
+func storage_inplace_and(a: const u64[], b: const u64[], c: u64[]):
+    discard(a)
+    storage_compute_inplace_bitwise(StorageBitwise.and_, b, c)
+
+func storage_inplace_or(a: const u64[], b: const u64[], c: u64[]):
+    discard(a)
+    storage_compute_inplace_bitwise(StorageBitwise.or_, b, c)
+
+func storage_plus(a: const u64[], b: const u64[], c: u64[]):
+    discard(storage_add(false, a, b, c))
+
+func storage_minus(a: const u64[], b: const u64[], c: u64[]):
+    discard(storage_add(true, a, b, c))
+
+## Ported from AK/UFixedBigInt.h:60 AK::Detail::mul_internal: result = operand1 * operand2,
+## truncated to the result's words (StorageOperations::baseline_mul).
+pub func mul_internal(operand1: const u64[], operand2: const u64[], result: u64[]):
+    storage_baseline_mul(operand1, operand2, result)
+
+## Ported from AK/UFixedBigInt.h:472 AK::Detail::UFixedBigInt::do_standard_binary_operation:
+## `function(this, other, result)` into a new value (the operand must not be wider).
+pub func u_fixed_big_int_do_standard_binary_operation[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T, function: StorageBinaryFunction) -> UFixedBigInt[TStorage]:
+    assert(sizeof(T) <= sizeof(TStorage), "Requested operation requires integer size to be expanded.")
+    var result: UFixedBigInt[TStorage] = ---
+    var small: u64
+    function(fbi_words(this), storage_of(&other, &small), fbi_words(&result))
+    return result
+
+## Ported from AK/UFixedBigInt.h:480 AK::Detail::UFixedBigInt::do_standard_compound_assignment.
+pub func u_fixed_big_int_do_standard_compound_assignment[TStorage, T](this: UFixedBigInt[TStorage]*, other: T, function: StorageBinaryFunction):
+    assert(sizeof(T) <= sizeof(TStorage), "Requested operation requires integer size to be expanded.")
+    var small: u64
+    function(fbi_words(this), storage_of(&other, &small), fbi_words(this))
+
+# mark: LittleEndian and BigEndian of a UFixedBigInt ============================================
+
+# UFixedBigInt.h:525/565 byte_swap_if_not_{little,big}_endian: reverse the order of the words
+# and byte-swap each one (on this little-endian host only the big-endian direction swaps).
+func u_fixed_big_int_byte_swap_words[TStorage](value: UFixedBigInt[TStorage]) -> UFixedBigInt[TStorage]:
+    var result = value
+    let words = fbi_words(&result)
+    let count = words.length
+    for i in 0..<count // 2:
+        let front = words[i]
+        words[i] = convert_between_host_and_big_endian(words[count - i - 1])
+        words[count - i - 1] = convert_between_host_and_big_endian(front)
+    if count % 2 != 0:
+        words[count // 2] = convert_between_host_and_big_endian(words[count // 2])
+    return result
+
+## Ported from AK/UFixedBigInt.h:540 AK::LittleEndian<UFixedBigInt<N>>::LittleEndian.
+pub func little_endian_u_fixed_big_int_construct[TStorage](this: LittleEndian[UFixedBigInt[TStorage]]*, value: UFixedBigInt[TStorage]):
+    this.m_value = value
+
+## Ported from AK/UFixedBigInt.h:545 AK::LittleEndian<UFixedBigInt<N>>::operator UFixedBigInt.
+pub func little_endian_u_fixed_big_int_to_t[TStorage](this: const LittleEndian[UFixedBigInt[TStorage]]*) -> UFixedBigInt[TStorage]:
+    return this.m_value
+
+## Ported from AK/UFixedBigInt.h:580 AK::BigEndian<UFixedBigInt<N>>::BigEndian.
+pub func big_endian_u_fixed_big_int_construct[TStorage](this: BigEndian[UFixedBigInt[TStorage]]*, value: UFixedBigInt[TStorage]):
+    this.m_value = u_fixed_big_int_byte_swap_words(value)
+
+## Ported from AK/UFixedBigInt.h:585 AK::BigEndian<UFixedBigInt<N>>::operator UFixedBigInt.
+pub func big_endian_u_fixed_big_int_to_t[TStorage](this: const BigEndian[UFixedBigInt[TStorage]]*) -> UFixedBigInt[TStorage]:
+    return u_fixed_big_int_byte_swap_words(this.m_value)
+
+# mark: Free comparisons ========================================================================
+
+## Ported from AK/UFixedBigInt.h:497 AK::Detail::operator==(BuiltInUFixedInt, NotBuiltInUFixedInt).
+pub func eq_opaque_opaque_2[T, TStorage](a: T, b: UFixedBigInt[TStorage]) -> bool:
+    return u_fixed_big_int_eq_opaque(&b, a)
+
+## Ported from AK/UFixedBigInt.h:498 AK::Detail::operator<=>(BuiltInUFixedInt, NotBuiltInUFixedInt).
+pub func cmp_opaque[T, TStorage](a: T, b: UFixedBigInt[TStorage]) -> i32:
+    return -u_fixed_big_int_cmp_opaque(&b, a)
+
+## Ported from AK/UFixedBigInt.h:499 AK::Detail::operator==(IntegerWrapper, NotBuiltInUFixedInt).
+pub func eq_integer_wrapper[TStorage](a: IntegerWrapper, b: UFixedBigInt[TStorage]) -> bool:
+    return u_fixed_big_int_eq_integer_wrapper(&b, a)
+
+## Ported from AK/UFixedBigInt.h:500 AK::Detail::operator<=>(IntegerWrapper, NotBuiltInUFixedInt).
+pub func cmp_integer_wrapper[TStorage](a: IntegerWrapper, b: UFixedBigInt[TStorage]) -> i32:
+    return -u_fixed_big_int_cmp_integer_wrapper(&b, a)

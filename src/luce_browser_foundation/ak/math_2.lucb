@@ -1,0 +1,307 @@
+#==============================================================================================
+#
+#   math_2 - AK's floating-point math: logarithms, exponentials, hyperbolic functions, pow,
+#            and round_to
+#
+#   DESCRIPTION:
+#       Port of AK/Math.h (lines 736-1020), instantiated for f32 and f64 as in math_1, and
+#       Rounding::round_to (lines 229-386) per integer destination type
+#       (`rounding_round_to_f64_i32`); clamp_to is in math_3.
+#
+#       round_to rounds to nearest, ties to even (cvtss2si/cvtsd2si and fcvtns in the
+#       default rounding mode); an out-of-range value saturates as on AArch64. The unsigned
+#       destinations go through i64 as the x86-64 branch does.
+#
+#==============================================================================================
+
+# mark: Exponentials, hyperbolic functions, pow =================================================
+
+## Ported from AK/Math.h:740 AK::Exponentials::log2, for f32.
+pub func exponentials_log2_f32(x: f32) -> f32:
+    # References:
+    # Gist comparing some implementations
+    # * https://gist.github.com/Hendiadyoin1/f58346d66637deb9156ef360aa158bf9
+
+    if x == 0.0:
+        return -infinity_f32
+    if x <= 0.0 or x != x:
+        return nan_f32
+
+    # FloatExtractor<T>: the IEEE fields of x.
+    let bits = x.bits()
+    let exponent = (f32)((i64)((bits >> 23) & 0xff) - 127)
+    let mantissa = bits & 0x7fffff
+
+    # When the mantissa shows 0b00 (implicitly 1.0) we are on a power of 2
+    if mantissa == 0:
+        return exponent
+
+    # FIXME: Handle denormalized numbers separately
+
+    # (1 <= mantissa < 2)
+    var m = f32.bits((bits & 0x80000000) | (((u32)127) << 23) | mantissa)
+
+    # This is a reconstruction of one of Sun's algorithms
+    # They use a transformation to lower the problem space,
+    # while keeping the precision, and a 14th degree polynomial,
+    # which is mirrored at sqrt(2)
+    # TODO: Sun has some more algorithms for this and other math functions,
+    #       leveraging LUTs, investigate those, if they are better in performance and/or precision.
+    #       These seem to be related to crLibM's implementations, for which papers and references
+    #       are available.
+    # FIXME: Dynamically adjust the amount of precision between floats and doubles
+    #        AKA floats might need less accuracy here, in comparison to doubles
+
+    var inverted = false
+    # m > sqrt(2)
+    if m > sqrt2_f32:
+        inverted = true
+        m = 2.0 / m
+    let s = (m - 1.0) / (m + 1.0)
+    # ln((1 + s) / (1 - s)) == ln(m)
+    let s2 = s * s
+    let high_approx = s2 * ((f32)0.6666666666666735130f64 + s2 * ((f32)0.3999999999940941908f64 + s2 * ((f32)0.2857142874366239149f64 + s2 * ((f32)0.2222219843214978396f64 + s2 * ((f32)0.1818357216161805012f64 + s2 * ((f32)0.1531383769920937332f64 + s2 * (f32)0.1479819860511658591f64))))))
+
+    # ln(m) == 2 * s + s * high_approx
+    # log2(m) == log2(e) * ln(m)
+    var log2_mantissa = l2_e_f32 * (2.0 * s + s * high_approx)
+    if inverted:
+        log2_mantissa = 1.0 - log2_mantissa
+    return exponent + log2_mantissa
+
+## Ported from AK/Math.h:740 AK::Exponentials::log2, for f64.
+pub func exponentials_log2_f64(x: f64) -> f64:
+    # References:
+    # Gist comparing some implementations
+    # * https://gist.github.com/Hendiadyoin1/f58346d66637deb9156ef360aa158bf9
+
+    if x == 0.0:
+        return -infinity_f64
+    if x <= 0.0 or x != x:
+        return nan_f64
+
+    # FloatExtractor<T>: the IEEE fields of x.
+    let bits = x.bits()
+    let exponent = (f64)((i64)((bits >> 52) & 0x7ff) - 1023)
+    let mantissa = bits & 0xfffffffffffff
+
+    # When the mantissa shows 0b00 (implicitly 1.0) we are on a power of 2
+    if mantissa == 0:
+        return exponent
+
+    # FIXME: Handle denormalized numbers separately
+
+    # (1 <= mantissa < 2)
+    var m = f64.bits((bits & 0x8000000000000000) | (((u64)1023) << 52) | mantissa)
+
+    # This is a reconstruction of one of Sun's algorithms
+    # They use a transformation to lower the problem space,
+    # while keeping the precision, and a 14th degree polynomial,
+    # which is mirrored at sqrt(2)
+    # TODO: Sun has some more algorithms for this and other math functions,
+    #       leveraging LUTs, investigate those, if they are better in performance and/or precision.
+    #       These seem to be related to crLibM's implementations, for which papers and references
+    #       are available.
+    # FIXME: Dynamically adjust the amount of precision between floats and doubles
+    #        AKA floats might need less accuracy here, in comparison to doubles
+
+    var inverted = false
+    # m > sqrt(2)
+    if m > sqrt2_f64:
+        inverted = true
+        m = 2.0 / m
+    let s = (m - 1.0) / (m + 1.0)
+    # ln((1 + s) / (1 - s)) == ln(m)
+    let s2 = s * s
+    let high_approx = s2 * (0.6666666666666735130 + s2 * (0.3999999999940941908 + s2 * (0.2857142874366239149 + s2 * (0.2222219843214978396 + s2 * (0.1818357216161805012 + s2 * (0.1531383769920937332 + s2 * 0.1479819860511658591))))))
+
+    # ln(m) == 2 * s + s * high_approx
+    # log2(m) == log2(e) * ln(m)
+    var log2_mantissa = l2_e_f64 * (2.0 * s + s * high_approx)
+    if inverted:
+        log2_mantissa = 1.0 - log2_mantissa
+    return exponent + log2_mantissa
+
+## Ported from AK/Math.h:829 AK::Exponentials::log, for f32.
+pub func exponentials_log_f32(x: f32) -> f32:
+    return math32.log(x)
+
+## Ported from AK/Math.h:829 AK::Exponentials::log, for f64.
+pub func exponentials_log_f64(x: f64) -> f64:
+    return math.log(x)
+
+## Ported from AK/Math.h:851 AK::Exponentials::log10, for f32.
+pub func exponentials_log10_f32(x: f32) -> f32:
+    return math32.log10(x)
+
+## Ported from AK/Math.h:851 AK::Exponentials::log10, for f64.
+pub func exponentials_log10_f64(x: f64) -> f64:
+    return math.log10(x)
+
+## Ported from AK/Math.h:873 AK::Exponentials::exp, for f32.
+pub func exponentials_exp_f32(exponent: f32) -> f32:
+    return math32.exp(exponent)
+
+## Ported from AK/Math.h:873 AK::Exponentials::exp, for f64.
+pub func exponentials_exp_f64(exponent: f64) -> f64:
+    return math.exp(exponent)
+
+## Ported from AK/Math.h:901 AK::Exponentials::exp2, for f32.
+pub func exponentials_exp2_f32(exponent: f32) -> f32:
+    return math32.exp2(exponent)
+
+## Ported from AK/Math.h:901 AK::Exponentials::exp2, for f64.
+pub func exponentials_exp2_f64(exponent: f64) -> f64:
+    return math.exp2(exponent)
+
+## Ported from AK/Math.h:937 AK::Hyperbolic::sinh, for f32.
+pub func hyperbolic_sinh_f32(x: f32) -> f32:
+    let exponentiated = exponentials_exp_f32(x)
+    if x > 0.0:
+        return (exponentiated * exponentiated - 1.0) / 2.0 / exponentiated
+    return (exponentiated - 1.0 / exponentiated) / 2.0
+
+## Ported from AK/Math.h:937 AK::Hyperbolic::sinh, for f64.
+pub func hyperbolic_sinh_f64(x: f64) -> f64:
+    let exponentiated = exponentials_exp_f64(x)
+    if x > 0.0:
+        return (exponentiated * exponentiated - 1.0) / 2.0 / exponentiated
+    return (exponentiated - 1.0 / exponentiated) / 2.0
+
+## Ported from AK/Math.h:946 AK::Hyperbolic::cosh, for f32.
+pub func hyperbolic_cosh_f32(x: f32) -> f32:
+    let exponentiated = exponentials_exp_f32(-x)
+    if x < 0.0:
+        return (1.0 + exponentiated * exponentiated) / 2.0 / exponentiated
+    return (1.0 / exponentiated + exponentiated) / 2.0
+
+## Ported from AK/Math.h:946 AK::Hyperbolic::cosh, for f64.
+pub func hyperbolic_cosh_f64(x: f64) -> f64:
+    let exponentiated = exponentials_exp_f64(-x)
+    if x < 0.0:
+        return (1.0 + exponentiated * exponentiated) / 2.0 / exponentiated
+    return (1.0 / exponentiated + exponentiated) / 2.0
+
+## Ported from AK/Math.h:957 AK::Hyperbolic::tanh, for f32.
+pub func hyperbolic_tanh_f32(x: f32) -> f32:
+    if x > 0.0:
+        let exponentiated = exponentials_exp_f32(2.0 * x)
+        return (exponentiated - 1.0) / (exponentiated + 1.0)
+    let plus_x = exponentials_exp_f32(x)
+    let minus_x = 1.0 / plus_x
+    return (plus_x - minus_x) / (plus_x + minus_x)
+
+## Ported from AK/Math.h:957 AK::Hyperbolic::tanh, for f64.
+pub func hyperbolic_tanh_f64(x: f64) -> f64:
+    if x > 0.0:
+        let exponentiated = exponentials_exp_f64(2.0 * x)
+        return (exponentiated - 1.0) / (exponentiated + 1.0)
+    let plus_x = exponentials_exp_f64(x)
+    let minus_x = 1.0 / plus_x
+    return (plus_x - minus_x) / (plus_x + minus_x)
+
+## Ported from AK/Math.h:969 AK::Hyperbolic::asinh, for f32.
+pub func hyperbolic_asinh_f32(x: f32) -> f32:
+    return exponentials_log_f32(x + sqrt_f32(x * x + 1.0))
+
+## Ported from AK/Math.h:969 AK::Hyperbolic::asinh, for f64.
+pub func hyperbolic_asinh_f64(x: f64) -> f64:
+    return exponentials_log_f64(x + sqrt_f64(x * x + 1.0))
+
+## Ported from AK/Math.h:975 AK::Hyperbolic::acosh, for f32.
+pub func hyperbolic_acosh_f32(x: f32) -> f32:
+    return exponentials_log_f32(x + sqrt_f32(x * x - 1.0))
+
+## Ported from AK/Math.h:975 AK::Hyperbolic::acosh, for f64.
+pub func hyperbolic_acosh_f64(x: f64) -> f64:
+    return exponentials_log_f64(x + sqrt_f64(x * x - 1.0))
+
+## Ported from AK/Math.h:981 AK::Hyperbolic::atanh, for f32.
+pub func hyperbolic_atanh_f32(x: f32) -> f32:
+    return exponentials_log_f32((1.0 + x) / (1.0 - x)) / 2.0
+
+## Ported from AK/Math.h:981 AK::Hyperbolic::atanh, for f64.
+pub func hyperbolic_atanh_f64(x: f64) -> f64:
+    return exponentials_log_f64((1.0 + x) / (1.0 - x)) / 2.0
+
+## Ported from AK/Math.h:996 AK::pow, for f32.
+pub func pow_f32(x: f32, y: f32) -> f32:
+    # FIXME: I am naive
+    if y != y:
+        return y
+    if y == 0.0:
+        return 1.0
+    if x == 0.0:
+        return 0.0
+    if y == 1.0:
+        return x
+    let y_as_int = (i32)y
+    if y == (f32)y_as_int:
+        var result = x
+        var i: i32 = 0
+        while (f32)i < fabs_f32(y) - 1.0:
+            result *= x
+            i += 1
+        if y < 0.0:
+            result = (f32)(1.0 / (f64)(result))
+        return result
+
+    return exponentials_exp2_f32(y * exponentials_log2_f32(x))
+
+## Ported from AK/Math.h:996 AK::pow, for f64.
+pub func pow_f64(x: f64, y: f64) -> f64:
+    # FIXME: I am naive
+    if y != y:
+        return y
+    if y == 0.0:
+        return 1.0
+    if x == 0.0:
+        return 0.0
+    if y == 1.0:
+        return x
+    let y_as_int = (i32)y
+    if y == (f64)y_as_int:
+        var result = x
+        var i: i32 = 0
+        while (f64)i < fabs_f64(y) - 1.0:
+            result *= x
+            i += 1
+        if y < 0.0:
+            result = 1.0 / result
+        return result
+
+    return exponentials_exp2_f64(y * exponentials_log2_f64(x))
+
+# mark: round_to ================================================================================
+
+## Ported from AK/Math.h:301 AK::Rounding::round_to<i32>(f32).
+pub func rounding_round_to_f32_i32(value: f32) -> i32:
+    return (i32)c_rintf(value)
+
+## Ported from AK/Math.h:301 AK::Rounding::round_to<i64>(f32).
+pub func rounding_round_to_f32_i64(value: f32) -> i64:
+    return (i64)c_rintf(value)
+
+## Ported from AK/Math.h:301 AK::Rounding::round_to<u32>(f32).
+pub func rounding_round_to_f32_u32(value: f32) -> u32:
+    return (u32)(i64)c_rintf(value)
+
+## Ported from AK/Math.h:301 AK::Rounding::round_to<u64>(f32).
+pub func rounding_round_to_f32_u64(value: f32) -> u64:
+    return (u64)(i64)c_rintf(value)
+
+## Ported from AK/Math.h:318 AK::Rounding::round_to<i32>(f64).
+pub func rounding_round_to_f64_i32(value: f64) -> i32:
+    return (i32)c_rint(value)
+
+## Ported from AK/Math.h:318 AK::Rounding::round_to<i64>(f64).
+pub func rounding_round_to_f64_i64(value: f64) -> i64:
+    return (i64)c_rint(value)
+
+## Ported from AK/Math.h:318 AK::Rounding::round_to<u32>(f64).
+pub func rounding_round_to_f64_u32(value: f64) -> u32:
+    return (u32)(i64)c_rint(value)
+
+## Ported from AK/Math.h:318 AK::Rounding::round_to<u64>(f64).
+pub func rounding_round_to_f64_u64(value: f64) -> u64:
+    return (u64)(i64)c_rint(value)
