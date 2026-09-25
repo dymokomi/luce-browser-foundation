@@ -1,0 +1,14 @@
+#==============================================================================================
+#
+#   bit_cast - reinterpret the bytes of a value as another type of the same size
+#
+#   DESCRIPTION:
+#       Port of AK/BitCast.h (lines 1-31): the __builtin_memcpy branch.
+#
+#==============================================================================================
+
+## Ported from AK/BitCast.h:14 AK::bit_cast.
+pub func bit_cast[T, U](a: U) -> T:
+    assert(sizeof(T) == sizeof(U))
+    var source = a
+    return memory.read[T](&source)

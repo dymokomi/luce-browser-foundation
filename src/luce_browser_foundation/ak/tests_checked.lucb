@@ -1,0 +1,172 @@
+#==============================================================================================
+#
+#   tests_checked - Checked<T>
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestChecked.cpp (the operator, overflow-detection and
+#       operations-with-overflowed cases) and of the Checked cases of kmalloc_array.
+#
+#==============================================================================================
+
+test "checked: operator_identity":
+    let a = make_checked[i32](4)
+    assert(eq_checked(a, 4))
+    assert(not eq_checked(a, 5))
+    assert(not ne_checked(a, 4))
+    assert(ne_checked(a, 5))
+
+test "checked: operator_incr":
+    var a = make_checked[i32](4)
+    assert(checked_value(checked_inc_i32(&a)) == 5)
+    assert(checked_value(checked_inc_i32(&a)) == 6)
+    assert(checked_value(checked_inc_i32(&a)) == 7)
+    var old = checked_inc_i32_i32(&a, 0)
+    assert(checked_value(&old) == 7)
+    old = checked_inc_i32_i32(&a, 0)
+    assert(checked_value(&old) == 8)
+    old = checked_inc_i32_i32(&a, 0)
+    assert(checked_value(&old) == 9)
+    assert(eq_checked(a, 10))
+
+test "checked: operator_decr":
+    var a = make_checked[u32](5)
+    assert(checked_value(checked_dec_u32(&a)) == 4)
+    assert(checked_value(checked_dec_u32(&a)) == 3)
+    var old = checked_dec_i32_u32(&a, 0)
+    assert(checked_value(&old) == 3)
+    old = checked_dec_i32_u32(&a, 0)
+    assert(checked_value(&old) == 2)
+    old = checked_dec_i32_u32(&a, 0)
+    assert(checked_value(&old) == 1)
+    assert(eq_checked(a, 0))
+    assert(not checked_has_overflow(&a))
+    discard(checked_dec_i32_u32(&a, 0))
+    assert(checked_has_overflow(&a))
+
+test "checked: operator_cmp":
+    let a = make_checked[i32](4)
+    assert(gt_checked(a, 3))
+    assert(not lt_checked(a, 3))
+    assert(ge_checked(a, 3))
+    assert(not le_checked(a, 3))
+    assert(not gt_checked(a, 4))
+    assert(not lt_checked(a, 4))
+    assert(ge_checked(a, 4))
+    assert(le_checked(a, 4))
+    assert(lt_checked(a, 5))
+    assert(le_checked(a, 5))
+    assert(lt_t[i32](3, a))
+    assert(ge_t[i32](4, a))
+    assert(eq_t[i32](4, a))
+    assert(ne_t[i32](5, a))
+
+test "checked: operator_arith":
+    let a = make_checked[i32](12)
+    let b = make_checked[i32](345)
+    assert(eq_checked(add_i32(a, b), 357))
+    assert(eq_checked(add_i32(b, a), 357))
+    assert(eq_checked(sub_i32(a, b), -333))
+    assert(eq_checked(sub_i32(b, a), 333))
+    assert(eq_checked(mul_i32(a, b), 4140))
+    assert(eq_checked(mul_i32(b, a), 4140))
+    assert(eq_checked(div_i32(a, b), 0))
+    assert(eq_checked(div_i32(b, a), 28))
+    assert(eq_checked(rem_i32(b, a), 9))
+
+test "checked: detects_signed_overflow":
+    var c = add_i32(make_checked[i32](0x40000000), make_checked[i32](0x3fffffff))
+    assert(not checked_has_overflow(&c))
+    c = add_i32(make_checked[i32](0x40000000), make_checked[i32](0x40000000))
+    assert(checked_has_overflow(&c))
+    c = add_i32(make_checked[i32](-0x40000000), make_checked[i32](-0x40000000))
+    assert(not checked_has_overflow(&c))
+    c = add_i32(make_checked[i32](-0x40000001), make_checked[i32](-0x40000000))
+    assert(checked_has_overflow(&c))
+    c = sub_i32(make_checked[i32](0x40000000), make_checked[i32](-0x3fffffff))
+    assert(not checked_has_overflow(&c))
+    c = sub_i32(make_checked[i32](0x40000000), make_checked[i32](-0x40000000))
+    assert(checked_has_overflow(&c))
+    c = sub_i32(make_checked[i32](-0x40000000), make_checked[i32](0x40000001))
+    assert(checked_has_overflow(&c))
+    var d = add_i64(make_checked[i64](0x4000000000000000), make_checked[i64](0x3fffffffffffffff))
+    assert(not checked_has_overflow(&d))
+    d = add_i64(make_checked[i64](0x4000000000000000), make_checked[i64](0x4000000000000000))
+    assert(checked_has_overflow(&d))
+    d = sub_i64(make_checked[i64](-0x4000000000000000), make_checked[i64](0x4000000000000001))
+    assert(checked_has_overflow(&d))
+    c = div_i32(make_checked[i32](i32_min), make_checked[i32](-1))
+    assert(checked_has_overflow(&c))
+    d = div_i64(make_checked[i64](i64_min), make_checked[i64](-1))
+    assert(checked_has_overflow(&d))
+
+test "checked: detects_unsigned_overflow":
+    var c = add_u32(make_checked[u32](0x40000000), make_checked[u32](0x40000000))
+    assert(not checked_has_overflow(&c))
+    c = add_u32(make_checked[u32](0xf0000000), make_checked[u32](0x0fffffff))
+    assert(not checked_has_overflow(&c))
+    c = add_u32(make_checked[u32](0xf0000000), make_checked[u32](0x10000000))
+    assert(checked_has_overflow(&c))
+    c = sub_u32(make_checked[u32](0x40000000), make_checked[u32](0x40000000))
+    assert(not checked_has_overflow(&c))
+    c = sub_u32(make_checked[u32](0x40000000), make_checked[u32](0x40000001))
+    assert(checked_has_overflow(&c))
+    var d = add_u64(make_checked[u64](0xf000000000000000), make_checked[u64](0x1000000000000000))
+    assert(checked_has_overflow(&d))
+    d = sub_u64(make_checked[u64](0x4000000000000000), make_checked[u64](0x4000000000000001))
+    assert(checked_has_overflow(&d))
+
+test "checked: operations_with_overflowed":
+    var overflowed: Checked[u32]
+    checked_checked_t_u64_u32(&overflowed, 0x100000000)
+    assert(checked_has_overflow(&overflowed))
+    var ff = make_checked[u32](0xff)
+    var c = add_u32(overflowed, ff)
+    assert(checked_has_overflow(&c))
+    c = add_u32(ff, overflowed)
+    assert(checked_has_overflow(&c))
+    assert(checked_has_overflow(checked_add_assign_checked_u32(&overflowed, ff)))
+    c = sub_u32(ff, overflowed)
+    assert(checked_has_overflow(&c))
+    c = mul_u32(overflowed, ff)
+    assert(checked_has_overflow(&c))
+    c = div_u32(ff, overflowed)
+    assert(checked_has_overflow(&c))
+    c = rem_u32(overflowed, ff)
+    assert(checked_has_overflow(&c))
+    assert(checked_has_overflow(checked_rem_assign_checked_u32(&overflowed, ff)))
+    ff = make_checked[u32](0)
+    c = div_u32(make_checked[u32](10), ff)
+    assert(checked_has_overflow(&c))
+
+test "checked: would_overflow and is_within_range":
+    assert(checked_addition_would_overflow_u32(u32_max, 1))
+    assert(not checked_addition_would_overflow_u32(u32_max - 1, 1))
+    assert(checked_subtraction_would_overflow_usize(0, 1))
+    assert(checked_multiplication_would_overflow_i32(65536, 65536))
+    assert(not checked_multiplication_would_overflow_i64(65536, 65536))
+    assert(is_within_range_u32(4294967295))
+    assert(not is_within_range_u32(4294967296))
+    assert(not is_within_range_u32(-1))
+    assert(is_within_range_i32(-2147483648))
+    assert(not is_within_range_u64_i64(0x8000000000000000))
+    assert(is_within_range_u64_usize(u64_max))
+
+test "kmalloc: kmalloc_array, krealloc and kfree":
+    let pointer = kmalloc_array(make_checked[usize](4), make_checked[usize](8)) else trap("null")
+    let words = (u64*)pointer
+    for i in 0..<4usize:
+        words[i] = (u64)i * 3
+    let grown = krealloc(pointer, 64) else trap("null")
+    let grown_words = (u64*)grown
+    assert(grown_words[3] == 9)
+    let zeroed = kcalloc(16, 4) else trap("null")
+    assert(((u32*)zeroed)[15] == 0)
+    kfree(grown)
+    kfree(zeroed)
+    kfree(none)
+    let aligned = ladybird_rust_alloc_zeroed(100, 64) else trap("null")
+    assert(((usize)aligned % 64) == 0)
+    ladybird_rust_dealloc(aligned, 64)
+    let atomic = alloc_atomic(10)
+    atomic[9] = 1
+    kfree(atomic.data)

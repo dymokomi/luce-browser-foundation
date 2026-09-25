@@ -1,0 +1,196 @@
+#==============================================================================================
+#
+#   kmalloc - AK's allocation entry points, over the current allocator
+#
+#   DESCRIPTION:
+#       Port of AK/kmalloc.h (lines 1-68) and AK/kmalloc.cpp (lines 60-229, the non-Serenity
+#       branch built on the system allocator).
+#
+#       DESIGN.md §3.3: AK storage lives on the collected heap. LibGC's heap is made the
+#       thread's current allocator (`with heap:`), so these functions allocate from
+#       `memory.allocator`; until the gc module is in charge that is simply whatever
+#       allocator is current (the C heap in programs, the per-test buffer in tests). Atomic
+#       storage (bytes, pixels: never scanned for pointers, §3.3 rule 5) goes through
+#       `atomic_allocator`, the thread-local allocator view the gc module installs (§4.1.1),
+#       falling back to the current allocator while none is installed.
+#
+#       luce-base's Allocator.release needs the block it returns, which C's free() does not,
+#       so every block starts with a small header recording its extent: that is what lets
+#       kfree(ptr) and krealloc(ptr, size) keep the donor's signatures.
+#
+#==============================================================================================
+
+## The allocator ak's atomic (pointer-free) storage comes from. The gc module installs its
+## heap's atomic-blob view here (DESIGN.md §3.3 rule 5, §4.1.1); none means the current
+## allocator.
+pub local var atomic_allocator: Allocator?
+
+# The bytes in front of every block: where the allocation starts, how long it is, and which
+# allocator it came from. It sits immediately before the pointer handed out.
+struct KmallocHeader:
+    var offset: usize  # from the start of the allocation to the pointer handed out
+    var total: usize  # the allocation's length, header and padding included
+    var atomic: bool  # allocated through atomic_allocator
+    var padding: u8[7]
+
+let kmalloc_header_size: usize = 32
+assert(sizeof(KmallocHeader) <= 32)
+
+# alignof(std::max_align_t) on the donor's targets.
+let max_align: usize = 16
+
+# mark: Allocation with a header ================================================================
+
+# Allocates `size` bytes aligned to `alignment` behind a header; zeroes them when `zeroed`.
+func kmalloc_impl(size: usize, alignment: usize, zeroed: bool, atomic: bool) -> void*?:
+    let align = alignment if alignment > max_align else max_align
+    let offset = align_up_to(kmalloc_header_size, align)
+    let total = offset + (size if size > 0 else 1)
+    var block: u8[]
+    var from_atomic = false
+    if atomic:
+        if let view = atomic_allocator:
+            var parent = view
+            block = alloc(total, align) in parent catch:
+                return none
+            from_atomic = true
+    if not from_atomic:
+        block = alloc(total, align) catch:
+            return none
+    if zeroed:
+        memory.set(block, 0)
+    let pointer = (void*)((u8*)block.data + offset)
+    let header = (KmallocHeader*)((u8*)pointer - sizeof(KmallocHeader))
+    *header = KmallocHeader(offset = offset, total = total, atomic = from_atomic)
+    return pointer
+
+func kmalloc_header(ptr: void*) -> KmallocHeader*:
+    return (KmallocHeader*)((u8*)ptr - sizeof(KmallocHeader))
+
+# The usable size of a block from kmalloc_impl.
+func kmalloc_usable_size(ptr: void*) -> usize:
+    let header = kmalloc_header(ptr)
+    return header.total - header.offset
+
+func kfree_impl(ptr: void*?):
+    let pointer = ptr else return
+    let header = kmalloc_header(pointer)
+    let block = u8[]((u8*)pointer - header.offset, header.total)
+    if header.atomic:
+        if let view = atomic_allocator:
+            var parent = view
+            free(block) in parent
+            return
+    free(block)
+
+func krealloc_impl(ptr: void*?, size: usize, alignment: usize) -> void*?:
+    let pointer = ptr else return kmalloc_impl(size, alignment, false, false)
+    let header = kmalloc_header(pointer)
+    let new_pointer = kmalloc_impl(size, alignment, false, header.atomic) else return none
+    let old_size = kmalloc_usable_size(pointer)
+    let count = old_size if old_size < size else size
+    memory.copy(u8[]((u8*)new_pointer, count), u8[]((u8*)pointer, count), count)
+    kfree_impl(pointer)
+    return new_pointer
+
+## Allocates `size` bytes of atomic storage (never scanned for pointers: string bytes,
+## byte buffers, pixels; DESIGN.md §3.3 rule 5) through `atomic_allocator`. Free it with
+## kfree. None when the allocator refuses.
+pub func kmalloc_atomic(size: usize) -> void*?:
+    return kmalloc_impl(size, max_align, false, true)
+
+## Allocates `size` bytes of atomic storage as a span and traps when the allocator refuses:
+## the `ak.alloc_atomic` of DESIGN.md §3.3.
+pub func alloc_atomic(size: usize) -> u8[]:
+    let pointer = kmalloc_atomic(size) else trap("out of memory")
+    return u8[]((u8*)pointer, size)
+
+# mark: kmalloc.cpp =============================================================================
+
+## Ported from AK/kmalloc.cpp:84 allocation_needs_explicit_alignment.
+pub func allocation_needs_explicit_alignment(alignment: usize) -> bool:
+    return alignment > max_align
+
+## Ported from AK/kmalloc.cpp:169 ak_kcalloc.
+pub func ak_kcalloc(count: usize, size: usize) -> void*?:
+    let bytes = count *? size else return none
+    return kmalloc_impl(bytes, max_align, true, false)
+
+## Ported from AK/kmalloc.cpp:174 ak_kmalloc.
+pub func ak_kmalloc(size: usize) -> void*?:
+    return kmalloc_impl(size, max_align, false, false)
+
+## Ported from AK/kmalloc.cpp:179 ak_krealloc.
+pub func ak_krealloc(ptr: void*?, size: usize) -> void*?:
+    return krealloc_impl(ptr, size, max_align)
+
+## Ported from AK/kmalloc.cpp:184 ak_kmalloc_good_size.
+pub func ak_kmalloc_good_size(size: usize) -> usize:
+    return size
+
+## Ported from AK/kmalloc.cpp:189 ak_kfree.
+pub func ak_kfree(ptr: void*?):
+    kfree_impl(ptr)
+
+## Ported from AK/kmalloc.cpp:201 ladybird_rust_alloc.
+pub func ladybird_rust_alloc(size: usize, alignment: usize) -> void*?:
+    if allocation_needs_explicit_alignment(alignment):
+        return kmalloc_impl(size, alignment, false, false)
+    return ak_kmalloc(size)
+
+## Ported from AK/kmalloc.cpp:208 ladybird_rust_alloc_zeroed.
+pub func ladybird_rust_alloc_zeroed(size: usize, alignment: usize) -> void*?:
+    if allocation_needs_explicit_alignment(alignment):
+        return kmalloc_impl(size, alignment, true, false)
+    return ak_kcalloc(1, size)
+
+## Ported from AK/kmalloc.cpp:215 ladybird_rust_dealloc.
+pub func ladybird_rust_dealloc(ptr: void*?, alignment: usize):
+    discard(alignment)
+    kfree_impl(ptr)
+
+## Ported from AK/kmalloc.cpp:220 ladybird_rust_realloc.
+pub func ladybird_rust_realloc(ptr: void*?, old_size: usize, new_size: usize, alignment: usize) -> void*?:
+    if not allocation_needs_explicit_alignment(alignment):
+        return ak_krealloc(ptr, new_size)
+
+    let new_ptr = kmalloc_impl(new_size, alignment, false, false) else return none
+    if let old = ptr:
+        let count = old_size if old_size < new_size else new_size
+        memory.copy(u8[]((u8*)new_ptr, count), u8[]((u8*)old, count), count)
+    kfree_impl(ptr)
+    return new_ptr
+
+# mark: kmalloc.h ===============================================================================
+
+## Ported from AK/kmalloc.h:28 kcalloc.
+pub func kcalloc(count: usize, size: usize) -> void*?:
+    return ak_kcalloc(count, size)
+
+## Ported from AK/kmalloc.h:33 kfree.
+pub func kfree(ptr: void*?):
+    ak_kfree(ptr)
+
+## Ported from AK/kmalloc.h:38 kmalloc.
+pub func kmalloc(size: usize) -> void*?:
+    return ak_kmalloc(size)
+
+## Ported from AK/kmalloc.h:43 krealloc.
+pub func krealloc(ptr: void*?, size: usize) -> void*?:
+    return ak_krealloc(ptr, size)
+
+## Ported from AK/kmalloc.h:48 kmalloc_good_size.
+pub func kmalloc_good_size(size: usize) -> usize:
+    return ak_kmalloc_good_size(size)
+
+## Ported from AK/kmalloc.h:56 kmalloc_array.
+pub func kmalloc_array(a: Checked[usize], b: Checked[usize]) -> void*?:
+    let size = mul_usize(a, b)
+    assert(not checked_has_overflow(&size))
+    return kmalloc(checked_value(&size))
+
+## Ported from AK/kmalloc.h:63 kmalloc_array.
+pub func kmalloc_array_checked(a: Checked[usize], b: Checked[usize], c_: Checked[usize]) -> void*?:
+    let size = mul_usize(mul_usize(a, b), c_)
+    assert(not checked_has_overflow(&size))
+    return kmalloc(checked_value(&size))

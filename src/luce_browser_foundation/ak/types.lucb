@@ -1,0 +1,25 @@
+#==============================================================================================
+#
+#   types - explode_byte, align_up_to, align_down_to
+#
+#   DESCRIPTION:
+#       Port of the functions of AK/Types.h (lines 163-185). The size constants (KiB ... EiB)
+#       and the TriState and MemoryOrder enums are in types_types.
+#
+#==============================================================================================
+
+## Ported from AK/Types.h:163 AK::explode_byte.
+# FlatPtr is 64 bits on every target luce-browser builds for.
+pub func explode_byte(b: u8) -> usize:
+    let value: usize = b
+    return value << 56 | value << 48 | value << 40 | value << 32 | value << 24 | value << 16 | value << 8 | value
+
+assert(sizeof(usize) == 8)
+
+## Ported from AK/Types.h:177 AK::align_up_to.
+pub func align_up_to(value: usize, alignment: usize) -> usize:
+    return (value + (alignment - 1)) & ~(alignment - 1)
+
+## Ported from AK/Types.h:182 AK::align_down_to.
+pub func align_down_to(value: usize, alignment: usize) -> usize:
+    return value & ~(alignment - 1)

@@ -1,0 +1,38 @@
+#==============================================================================================
+#
+#   memory - secure_zero and timing_safe_compare
+#
+#   DESCRIPTION:
+#       Port of AK/Memory.h (lines 1-50).
+#
+#==============================================================================================
+
+## Ported from AK/Memory.h:15 AK::secure_zero.
+pub func secure_zero(ptr: void*?, size: usize):
+    let pointer = ptr else return
+    # The volatile stores are here to avoid the compiler optimizing away the memset when we
+    # rely on it for wiping secrets (the donor's empty asm memory barrier).
+    let bytes = (volatile u8*)pointer
+    for i in 0..<size:
+        bytes[i] = 0
+
+## Ported from AK/Memory.h:29 AK::timing_safe_compare.
+# Naive implementation of a constant time buffer comparison function.
+# The goal being to not use any conditional branching so calls are
+# guarded against potential timing attacks.
+#
+# See OpenBSD's timingsafe_memcmp for more advanced implementations.
+pub func timing_safe_compare(b1: const void*?, b2: const void*?, len: usize) -> bool:
+    var res: u8 = 0
+    if len == 0:
+        return true
+    let c1 = (const u8*)(b1 else trap("timing_safe_compare: null"))
+    let c2 = (const u8*)(b2 else trap("timing_safe_compare: null"))
+
+    for i in 0..<len:
+        res = res | (c1[i] ^ c2[i])
+
+    # FIXME: !res can potentially inject branches depending
+    # on which toolchain is being used for compilation. Ideally
+    # we would use a more advanced algorithm.
+    return res == 0

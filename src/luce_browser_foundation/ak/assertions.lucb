@@ -1,0 +1,69 @@
+#==============================================================================================
+#
+#   assertions - VERIFY/ASSERT failure reporting and the assertion handler hook
+#
+#   DESCRIPTION:
+#       Port of AK/Assertions.cpp (lines 1-189) and the declarations of AK/Assertions.h.
+#       VERIFY(c) is `assert(c)` and VERIFY_NOT_REACHED() is `trap("VERIFY_NOT_REACHED")`
+#       (DESIGN.md §2.10); these functions are what AK code calls by name. C strings are
+#       `str`. Backtraces: luce-base prints the trap position itself, so dump_backtrace
+#       takes the build-without-backtrace branch of the donor.
+#
+#==============================================================================================
+
+extern func isatty(fd: i32) -> i32
+
+## Ported from AK/Assertions.cpp:46 dump_backtrace.
+# The donor's branch for builds without cpptrace or <execinfo.h>: luce-base's trap report
+# names the position, and there is no symbolizer to call.
+pub func dump_backtrace(frames_to_skip: u32 = 1, max_depth: u32 = 100):
+    discard(frames_to_skip)
+    discard(max_depth)
+    io.stderr().write("dump_backtrace() is not supported with the current compilation options.\n") catch:
+        recover 0
+
+## Ported from AK/Assertions.cpp:109 ak_colorize_output.
+pub func ak_colorize_output() -> bool:
+    return isatty(2) == 1
+
+## Ported from AK/Assertions.cpp:130 ak_trap.
+pub func ak_trap() -> never:
+    trap("ak_trap")
+
+## A handler the program may install in place of the donor's weak `ak_assertion_handler`
+## symbol; it is called with the message before a failed VERIFY or ASSERT traps.
+pub var custom_assertion_handler: (func(str) -> unit)?
+
+## Ported from AK/Assertions.cpp:140 ak_assertion_handler.
+# The declaration of the weak symbol: calls the installed handler, if any.
+pub func ak_assertion_handler(message: str):
+    if let handler = custom_assertion_handler:
+        handler(message)
+
+## Ported from AK/Assertions.cpp:144 get_custom_assertion_handler.
+func get_custom_assertion_handler() -> (func(str) -> unit)?:
+    return custom_assertion_handler
+
+## Ported from AK/Assertions.cpp:164 ak_verification_failed.
+pub func ak_verification_failed(message: str) -> never:
+    if let assertion_handler = get_custom_assertion_handler():
+        assertion_handler(message)
+    if ak_colorize_output():
+        io.stderr().write(f"\u{1b}[31;1mVERIFICATION FAILED\u{1b}[0m: {message}\n") catch:
+            recover 0
+    else:
+        io.stderr().write(f"VERIFICATION FAILED: {message}\n") catch:
+            recover 0
+    ak_trap()
+
+## Ported from AK/Assertions.cpp:177 ak_assertion_failed.
+pub func ak_assertion_failed(message: str) -> never:
+    if let assertion_handler = get_custom_assertion_handler():
+        assertion_handler(message)
+    if ak_colorize_output():
+        io.stderr().write(f"\u{1b}[31;1mASSERTION FAILED\u{1b}[0m: {message}\n") catch:
+            recover 0
+    else:
+        io.stderr().write(f"ASSERTION FAILED: {message}\n") catch:
+            recover 0
+    ak_trap()

@@ -1,0 +1,58 @@
+#==============================================================================================
+#
+#   string_hash - AK's string hash (one-at-a-time) and its ASCII case-insensitive form
+#
+#   DESCRIPTION:
+#       Port of AK/StringHash.h (lines 1-58). The template over char and char16_t is
+#       `string_hash` (bytes) and `string_hash_u16` (UTF-16 code units).
+#
+#==============================================================================================
+
+## Ported from AK/StringHash.h:19 AK::string_hash (char).
+# FIXME: This hashing algorithm isn't well-known and may not be good at all.
+#        We can't use SipHash since that depends on runtime parameters,
+#        but some string hashes like IPC endpoint magic numbers need to be deterministic.
+#        Maybe use a SipHash with a statically-known key?
+pub func string_hash(characters: const u8*?, length: usize, seed: u32 = 0) -> u32:
+    var h = seed
+    if let chars = characters:
+        for i in 0..<length:
+            h = h +% (u32)chars[i]
+            h = h +% (h << 10)
+            h = h ^ (h >> 6)
+    h = h +% (h << 3)
+    h = h ^ (h >> 11)
+    h = h +% (h << 15)
+    return h
+
+## Ported from AK/StringHash.h:19 AK::string_hash (char16_t).
+pub func string_hash_u16(characters: const u16*?, length: usize, seed: u32 = 0) -> u32:
+    var h = seed
+    if let chars = characters:
+        for i in 0..<length:
+            h = h +% (u32)chars[i]
+            h = h +% (h << 10)
+            h = h ^ (h >> 6)
+    h = h +% (h << 3)
+    h = h ^ (h >> 11)
+    h = h +% (h << 15)
+    return h
+
+# AK/CharacterTypes.h cannot be included from here.
+func string_hash_to_lowercase(ch: u8) -> u32:
+    if ch >= 'A' and ch <= 'Z':
+        return (u32)ch + 0x20
+    return (u32)ch
+
+## Ported from AK/StringHash.h:33 AK::case_insensitive_string_hash.
+pub func case_insensitive_string_hash(characters: const u8*?, length: usize, seed: u32 = 0) -> u32:
+    var h = seed
+    if let chars = characters:
+        for i in 0..<length:
+            h = h +% string_hash_to_lowercase(chars[i])
+            h = h +% (h << 10)
+            h = h ^ (h >> 6)
+    h = h +% (h << 3)
+    h = h ^ (h >> 11)
+    h = h +% (h << 15)
+    return h

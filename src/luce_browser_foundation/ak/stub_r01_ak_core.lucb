@@ -81,35 +81,6 @@ pub func empty_array_storage_at[T](this: const EmptyArrayStorage[T]*, arg0: usiz
 pub func empty_array_storage_to_t[T](this: const EmptyArrayStorage[T]*) -> T*?:
     return none
 
-## Ported from AK/Assertions.cpp:46 dump_backtrace.
-pub func dump_backtrace(frames_to_skip: u32 = 1, max_depth: u32 = 100):
-    trap("unported: dump_backtrace")
-
-## Ported from AK/Assertions.cpp:109 ak_colorize_output.
-pub func ak_colorize_output() -> bool:
-    trap("unported: ak_colorize_output")
-
-## Ported from AK/Assertions.cpp:130 ak_trap.
-pub func ak_trap():
-    trap("unported: ak_trap")
-
-## Ported from AK/Assertions.cpp:164 ak_verification_failed.
-pub func ak_verification_failed(message: const u8*?):
-    trap("unported: ak_verification_failed")
-
-## Ported from AK/Assertions.cpp:177 ak_assertion_failed.
-pub func ak_assertion_failed(message: const u8*?):
-    trap("unported: ak_assertion_failed")
-
-## Ported from AK/Assertions.cpp:140 ak_assertion_handler.
-pub func ak_assertion_handler(message: const u8*?):
-    trap("unported: ak_assertion_handler")
-
-## Ported from AK/Assertions.cpp:144 get_custom_assertion_handler.
-# internal linkage in C++: make it private when it is ported.
-pub func get_custom_assertion_handler() -> (func(const u8*?) -> unit)?:
-    trap("unported: get_custom_assertion_handler")
-
 ## Ported from AK/Atomic.h:15 AK::atomic_signal_fence.
 # internal linkage in C++: make it private when it is ported.
 pub func atomic_signal_fence(order: MemoryOrder):
@@ -349,10 +320,6 @@ pub func default_comparator_call[T, S](this: DefaultComparator*, lhs: T*, rhs: S
 # unmapped: decltype(&haystack[0])
 pub func binary_search[TContainer, TNeedle, TComparator](haystack: TContainer, needle: TNeedle, nearby_index: usize*? = none, comparator: TComparator) -> void*?:
     trap("unported: AK::binary_search")
-
-## Ported from AK/BitCast.h:14 AK::bit_cast.
-pub func bit_cast[T, U](a: U) -> T:
-    trap("unported: AK::bit_cast")
 
 ## Ported from AK/Bitmap.h:23 AK::Bitmap::create.
 pub func bitmap_create(size: usize, default_value: bool) -> Bitmap!:
@@ -815,208 +782,6 @@ pub func byte_buffer_shrink_into_inline_buffer(this: ByteBuffer*, size: usize, m
 pub func byte_buffer_try_ensure_capacity_slowpath(this: ByteBuffer*, new_capacity: usize) -> !:
     trap("unported: AK::Detail::ByteBuffer::try_ensure_capacity_slowpath")
 
-## Ported from AK/Checked.h:108 AK::is_within_range.
-pub func is_within_range[TDestination, TSource](value: TSource) -> bool:
-    trap("unported: AK::is_within_range")
-
-## Ported from AK/Checked.h:118 AK::Checked::Checked<T>.
-pub func checked_construct[T](this: Checked[T]*, value: T):
-    trap("unported: AK::Checked::Checked<T>")
-
-## Ported from AK/Checked.h:124 AK::Checked::Checked<T>.
-pub func checked_checked_t[T, U](this: Checked[T]*, value: U):
-    trap("unported: AK::Checked::Checked<T>")
-
-## Ported from AK/Checked.h:154 AK::Checked::has_overflow.
-pub func checked_has_overflow[T](this: const Checked[T]*) -> bool:
-    trap("unported: AK::Checked::has_overflow")
-
-## Ported from AK/Checked.h:159 AK::Checked::operator!.
-pub func checked_not[T](this: const Checked[T]*) -> bool:
-    trap("unported: AK::Checked::operator!")
-
-## Ported from AK/Checked.h:165 AK::Checked::value.
-pub func checked_value[T](this: const Checked[T]*) -> T:
-    trap("unported: AK::Checked::value")
-
-## Ported from AK/Checked.h:171 AK::Checked::value_unchecked.
-pub func checked_value_unchecked[T](this: const Checked[T]*) -> T:
-    trap("unported: AK::Checked::value_unchecked")
-
-## Ported from AK/Checked.h:176 AK::Checked::add.
-pub func checked_add[T](this: Checked[T]*, other: T):
-    trap("unported: AK::Checked::add")
-
-## Ported from AK/Checked.h:181 AK::Checked::sub.
-pub func checked_sub[T](this: Checked[T]*, other: T):
-    trap("unported: AK::Checked::sub")
-
-## Ported from AK/Checked.h:186 AK::Checked::mul.
-pub func checked_mul[T](this: Checked[T]*, other: T):
-    trap("unported: AK::Checked::mul")
-
-## Ported from AK/Checked.h:191 AK::Checked::div.
-pub func checked_div[T](this: Checked[T]*, other: T):
-    trap("unported: AK::Checked::div")
-
-## Ported from AK/Checked.h:207 AK::Checked::mod.
-pub func checked_mod[T](this: Checked[T]*, other: T):
-    trap("unported: AK::Checked::mod")
-
-## Ported from AK/Checked.h:215 AK::Checked::operator+=.
-# unmapped: AK::Checked arg 0; AK::Checked arg 0
-pub func checked_add_assign_checked[T](this: Checked[T]*, other: void*?) -> void*?:
-    trap("unported: AK::Checked::operator+=")
-
-## Ported from AK/Checked.h:222 AK::Checked::operator+=.
-# unmapped: AK::Checked arg 0
-pub func checked_add_assign_t[T](this: Checked[T]*, other: T) -> void*?:
-    trap("unported: AK::Checked::operator+=")
-
-## Ported from AK/Checked.h:228 AK::Checked::operator-=.
-# unmapped: AK::Checked arg 0; AK::Checked arg 0
-pub func checked_sub_assign_checked[T](this: Checked[T]*, other: void*?) -> void*?:
-    trap("unported: AK::Checked::operator-=")
-
-## Ported from AK/Checked.h:235 AK::Checked::operator-=.
-# unmapped: AK::Checked arg 0
-pub func checked_sub_assign_t[T](this: Checked[T]*, other: T) -> void*?:
-    trap("unported: AK::Checked::operator-=")
-
-## Ported from AK/Checked.h:241 AK::Checked::operator*=.
-# unmapped: AK::Checked arg 0; AK::Checked arg 0
-pub func checked_mul_assign_checked[T](this: Checked[T]*, other: void*?) -> void*?:
-    trap("unported: AK::Checked::operator*=")
-
-## Ported from AK/Checked.h:248 AK::Checked::operator*=.
-# unmapped: AK::Checked arg 0
-pub func checked_mul_assign_t[T](this: Checked[T]*, other: T) -> void*?:
-    trap("unported: AK::Checked::operator*=")
-
-## Ported from AK/Checked.h:254 AK::Checked::operator/=.
-# unmapped: AK::Checked arg 0; AK::Checked arg 0
-pub func checked_div_assign_checked[T](this: Checked[T]*, other: void*?) -> void*?:
-    trap("unported: AK::Checked::operator/=")
-
-## Ported from AK/Checked.h:261 AK::Checked::operator/=.
-# unmapped: AK::Checked arg 0
-pub func checked_div_assign_t[T](this: Checked[T]*, other: T) -> void*?:
-    trap("unported: AK::Checked::operator/=")
-
-## Ported from AK/Checked.h:267 AK::Checked::operator%=.
-# unmapped: AK::Checked arg 0; AK::Checked arg 0
-pub func checked_rem_assign_checked[T](this: Checked[T]*, other: void*?) -> void*?:
-    trap("unported: AK::Checked::operator%=")
-
-## Ported from AK/Checked.h:274 AK::Checked::operator%=.
-# unmapped: AK::Checked arg 0
-pub func checked_rem_assign_t[T](this: Checked[T]*, other: T) -> void*?:
-    trap("unported: AK::Checked::operator%=")
-
-## Ported from AK/Checked.h:280 AK::Checked::operator++.
-# unmapped: AK::Checked arg 0
-pub func checked_inc[T](this: Checked[T]*) -> void*?:
-    trap("unported: AK::Checked::operator++")
-
-## Ported from AK/Checked.h:286 AK::Checked::operator++.
-# unmapped: AK::Checked arg 0
-pub func checked_inc_i32[T](this: Checked[T]*, arg0: i32) -> void*?:
-    trap("unported: AK::Checked::operator++")
-
-## Ported from AK/Checked.h:293 AK::Checked::operator--.
-# unmapped: AK::Checked arg 0
-pub func checked_dec[T](this: Checked[T]*) -> void*?:
-    trap("unported: AK::Checked::operator--")
-
-## Ported from AK/Checked.h:299 AK::Checked::operator--.
-# unmapped: AK::Checked arg 0
-pub func checked_dec_i32[T](this: Checked[T]*, arg0: i32) -> void*?:
-    trap("unported: AK::Checked::operator--")
-
-## Ported from AK/Checked.h:307 AK::Checked::addition_would_overflow.
-pub func checked_addition_would_overflow[T, U, V](u: U, v: V) -> bool:
-    trap("unported: AK::Checked::addition_would_overflow")
-
-## Ported from AK/Checked.h:327 AK::Checked::subtraction_would_overflow.
-pub func checked_subtraction_would_overflow[T, U, V](u: U, v: V) -> bool:
-    trap("unported: AK::Checked::subtraction_would_overflow")
-
-## Ported from AK/Checked.h:338 AK::Checked::multiplication_would_overflow.
-pub func checked_multiplication_would_overflow[T, U, V](u: U, v: V) -> bool:
-    trap("unported: AK::Checked::multiplication_would_overflow")
-
-## Ported from AK/Checked.h:354 AK::operator+.
-pub func add[T](a: Checked[T], b: Checked[T]) -> Checked[T]:
-    trap("unported: AK::operator+")
-
-## Ported from AK/Checked.h:362 AK::operator-.
-pub func sub[T](a: Checked[T], b: Checked[T]) -> Checked[T]:
-    trap("unported: AK::operator-")
-
-## Ported from AK/Checked.h:370 AK::operator*.
-pub func mul[T](a: Checked[T], b: Checked[T]) -> Checked[T]:
-    trap("unported: AK::operator*")
-
-## Ported from AK/Checked.h:378 AK::operator/.
-pub func div[T](a: Checked[T], b: Checked[T]) -> Checked[T]:
-    trap("unported: AK::operator/")
-
-## Ported from AK/Checked.h:386 AK::operator%.
-pub func rem[T](a: Checked[T], b: Checked[T]) -> Checked[T]:
-    trap("unported: AK::operator%")
-
-## Ported from AK/Checked.h:394 AK::operator<.
-pub func lt_checked[T](a: Checked[T], b: T) -> bool:
-    trap("unported: AK::operator<")
-
-## Ported from AK/Checked.h:400 AK::operator>.
-pub func gt_checked[T](a: Checked[T], b: T) -> bool:
-    trap("unported: AK::operator>")
-
-## Ported from AK/Checked.h:406 AK::operator>=.
-pub func ge_checked[T](a: Checked[T], b: T) -> bool:
-    trap("unported: AK::operator>=")
-
-## Ported from AK/Checked.h:412 AK::operator<=.
-pub func le_checked[T](a: Checked[T], b: T) -> bool:
-    trap("unported: AK::operator<=")
-
-## Ported from AK/Checked.h:418 AK::operator==.
-pub func eq_checked[T](a: Checked[T], b: T) -> bool:
-    trap("unported: AK::operator==")
-
-## Ported from AK/Checked.h:424 AK::operator!=.
-pub func ne_checked[T](a: Checked[T], b: T) -> bool:
-    trap("unported: AK::operator!=")
-
-## Ported from AK/Checked.h:430 AK::operator<.
-pub func lt_t[T](a: T, b: Checked[T]) -> bool:
-    trap("unported: AK::operator<")
-
-## Ported from AK/Checked.h:436 AK::operator>.
-pub func gt_t[T](a: T, b: Checked[T]) -> bool:
-    trap("unported: AK::operator>")
-
-## Ported from AK/Checked.h:442 AK::operator>=.
-pub func ge_t[T](a: T, b: Checked[T]) -> bool:
-    trap("unported: AK::operator>=")
-
-## Ported from AK/Checked.h:448 AK::operator<=.
-pub func le_t[T](a: T, b: Checked[T]) -> bool:
-    trap("unported: AK::operator<=")
-
-## Ported from AK/Checked.h:454 AK::operator==.
-pub func eq_t[T](a: T, b: Checked[T]) -> bool:
-    trap("unported: AK::operator==")
-
-## Ported from AK/Checked.h:460 AK::operator!=.
-pub func ne_t[T](a: T, b: Checked[T]) -> bool:
-    trap("unported: AK::operator!=")
-
-## Ported from AK/Checked.h:466 AK::make_checked.
-pub func make_checked[T](value: T) -> Checked[T]:
-    trap("unported: AK::make_checked")
-
 ## Ported from AK/CircularBuffer.cpp:19 AK::CircularBuffer::create_empty.
 pub func circular_buffer_create_empty(size: usize) -> CircularBuffer!:
     trap("unported: AK::CircularBuffer::create_empty")
@@ -1388,38 +1153,6 @@ pub func doubly_linked_list_ensure_capacity[T, F](this: DoublyLinkedList[T]*, ne
 pub func doubly_linked_list_drop_node[T](this: DoublyLinkedList[T]*, node: DoublyLinkedListNode*?):
     trap("unported: AK::DoublyLinkedList::drop_node")
 
-## Ported from AK/Endian.h:28 AK::convert_between_host_and_little_endian.
-pub func convert_between_host_and_little_endian[T](value: T) -> T:
-    trap("unported: AK::convert_between_host_and_little_endian")
-
-## Ported from AK/Endian.h:43 AK::convert_between_host_and_big_endian.
-pub func convert_between_host_and_big_endian[T](value: T) -> T:
-    trap("unported: AK::convert_between_host_and_big_endian")
-
-## Ported from AK/Endian.h:58 AK::convert_between_host_and_network_endian.
-pub func convert_between_host_and_network_endian[T](value: T) -> T:
-    trap("unported: AK::convert_between_host_and_network_endian")
-
-## Ported from AK/Endian.h:68 AK::LittleEndian::LittleEndian<T>.
-pub func little_endian_construct[T](this: LittleEndian[T]*, value: T):
-    trap("unported: AK::LittleEndian::LittleEndian<T>")
-
-## Ported from AK/Endian.h:73 AK::LittleEndian::operator type-parameter-0-0.
-pub func little_endian_to_t[T](this: const LittleEndian[T]*) -> T:
-    trap("unported: AK::LittleEndian::operator type-parameter-0-0")
-
-## Ported from AK/Endian.h:84 AK::BigEndian::BigEndian<T>.
-pub func big_endian_construct[T](this: BigEndian[T]*, value: T):
-    trap("unported: AK::BigEndian::BigEndian<T>")
-
-## Ported from AK/Endian.h:89 AK::BigEndian::operator type-parameter-0-0.
-pub func big_endian_to_t[T](this: const BigEndian[T]*) -> T:
-    trap("unported: AK::BigEndian::operator type-parameter-0-0")
-
-## Ported from AK/Endian.h:116 AK::bitswap.
-pub func bitswap(v: u16) -> u16:
-    trap("unported: AK::bitswap")
-
 ## Ported from AK/Enumerate.h:41 AK::Detail::Enumerator::begin.
 pub func enumerator_begin[TIterable](this: Enumerator[TIterable]*) -> EnumeratorIterator:
     trap("unported: AK::Detail::Enumerator::begin")
@@ -1742,26 +1475,6 @@ pub func callable_wrapper_init_and_swap[TCallableType](this: CallableWrapper[TCa
 ## Ported from AK/Function.h:244 AK::Function::CallableWrapper::raw_callable.
 pub func callable_wrapper_raw_callable[TCallableType](this: const CallableWrapper[TCallableType]*) -> const void*?:
     trap("unported: AK::Function::CallableWrapper::raw_callable")
-
-## Ported from AK/HashFunctions.h:12 u32_hash.
-pub func u32_hash(key: u32) -> u32:
-    trap("unported: u32_hash")
-
-## Ported from AK/HashFunctions.h:23 u64_hash.
-pub func u64_hash(key: u64) -> u32:
-    trap("unported: u64_hash")
-
-## Ported from AK/HashFunctions.h:33 pair_int_hash.
-pub func pair_int_hash(key1: u32, key2: u32) -> u32:
-    trap("unported: pair_int_hash")
-
-## Ported from AK/HashFunctions.h:38 ptr_hash.
-pub func ptr_hash_usize(ptr: usize) -> u32:
-    trap("unported: ptr_hash")
-
-## Ported from AK/HashFunctions.h:46 ptr_hash.
-pub func ptr_hash_void(ptr: const void*?) -> u32:
-    trap("unported: ptr_hash")
 
 ## Ported from AK/HashMap.h:40 AK::HashMap::HashMap<K, V, KeyTraits, ValueTraits, IsOrdered>.
 # unmapped: initializer_list<Entry>
@@ -2319,30 +2032,6 @@ pub func insertion_sort_t_comparator[TCollection, TComparator, T](collection: TC
 pub func insertion_sort[TCollection, T](collection: TCollection*):
     trap("unported: AK::insertion_sort")
 
-## Ported from AK/IntegralMath.h:16 AK::exp2.
-pub func exp2[T](exponent: T) -> T:
-    trap("unported: AK::exp2")
-
-## Ported from AK/IntegralMath.h:22 AK::log2.
-pub func log2[T](x: T) -> T:
-    trap("unported: AK::log2")
-
-## Ported from AK/IntegralMath.h:28 AK::ceil_log2.
-pub func ceil_log2[T](x: T) -> T:
-    trap("unported: AK::ceil_log2")
-
-## Ported from AK/IntegralMath.h:77 AK::reinterpret_as_octal.
-pub func reinterpret_as_octal[T](decimal: T) -> T:
-    trap("unported: AK::reinterpret_as_octal")
-
-## Ported from AK/IntegralMath.h:89 AK::gcd.
-pub func gcd[T](x: T, y: T) -> T:
-    trap("unported: AK::gcd")
-
-## Ported from AK/IntegralMath.h:132 AK::lcm.
-pub func lcm[T](x: T, y: T) -> T:
-    trap("unported: AK::lcm")
-
 ## Ported from AK/IntrusiveList.h:191 AK::Detail::IntrusiveList::clear.
 pub func intrusive_list_clear[T, TContainer](this: IntrusiveList[T, TContainer]*):
     trap("unported: AK::Detail::IntrusiveList::clear")
@@ -2792,14 +2481,6 @@ pub func pow[T](x: T, y: T) -> T:
 ## Ported from AK/Math.h:1022 AK::clamp_to.
 pub func clamp_to[I, T](value: T) -> I:
     trap("unported: AK::clamp_to")
-
-## Ported from AK/Memory.h:15 AK::secure_zero.
-pub func secure_zero(ptr: void*?, size: usize):
-    trap("unported: AK::secure_zero")
-
-## Ported from AK/Memory.h:29 AK::timing_safe_compare.
-pub func timing_safe_compare(b1: const void*?, b2: const void*?, len: usize) -> bool:
-    trap("unported: AK::timing_safe_compare")
 
 ## Ported from AK/MemoryStream.cpp:14 AK::FixedMemoryStream::FixedMemoryStream.
 pub func fixed_memory_stream_construct_fixed_memory_stream_mode(this: FixedMemoryStream*, bytes: u8[], mode: FixedMemoryStreamMode = FixedMemoryStreamMode.read_write):
@@ -3516,18 +3197,6 @@ pub func reverse_wrapper_end[TContainer](wrapper: ReverseWrapper[TContainer]) ->
 pub func reverse_wrapper_in_reverse[TContainer](container: TContainer) -> ReverseWrapper[TContainer]:
     trap("unported: AK::ReverseWrapper::in_reverse")
 
-## Ported from AK/SaturatingMath.h:16 AK::saturating_add.
-pub func saturating_add[T](a: T, b: T) -> T:
-    trap("unported: AK::saturating_add")
-
-## Ported from AK/SaturatingMath.h:37 AK::saturating_sub.
-pub func saturating_sub[T](a: T, b: T) -> T:
-    trap("unported: AK::saturating_sub")
-
-## Ported from AK/SaturatingMath.h:58 AK::saturating_mul.
-pub func saturating_mul[T](a: T, b: T) -> T:
-    trap("unported: AK::saturating_mul")
-
 ## Ported from AK/ScopeGuard.h:16 AK::ScopeGuard::ScopeGuard<Callback>.
 pub func scope_guard_construct[TCallback](this: ScopeGuard[TCallback]*, callback: TCallback):
     trap("unported: AK::ScopeGuard::ScopeGuard<Callback>")
@@ -3795,79 +3464,6 @@ pub func stack_info_size(this: const StackInfo*) -> usize:
 pub func stack_info_size_free(this: const StackInfo*) -> usize:
     trap("unported: AK::StackInfo::size_free")
 
-## Ported from AK/StdLibExtras.h:19 AK::round_up_to_power_of_two.
-# unmapped: auto
-pub func round_up_to_power_of_two[T, U](value: T, power_of_two: U) -> void*?:
-    trap("unported: AK::round_up_to_power_of_two")
-
-## Ported from AK/StdLibExtras.h:26 AK::is_power_of_two.
-pub func is_power_of_two[T](value: T) -> bool:
-    trap("unported: AK::is_power_of_two")
-
-## Ported from AK/StdLibExtras.h:59 AK::min.
-# unmapped: IdentityType<T>
-pub func min[T](a: T, b: void*?) -> T:
-    trap("unported: AK::min")
-
-## Ported from AK/StdLibExtras.h:65 AK::max.
-# unmapped: IdentityType<T>
-pub func max[T](a: T, b: void*?) -> T:
-    trap("unported: AK::max")
-
-## Ported from AK/StdLibExtras.h:71 AK::clamp.
-# unmapped: IdentityType<T>; IdentityType<T>
-pub func clamp[T](value: T, min_: void*?, max_: void*?) -> T:
-    trap("unported: AK::clamp")
-
-## Ported from AK/StdLibExtras.h:82 AK::mix.
-pub func mix[T, U](v1: T, v2: T, interpolation: U) -> T:
-    trap("unported: AK::mix")
-
-## Ported from AK/StdLibExtras.h:88 AK::ceil_div.
-pub func ceil_div[T, U](a: T, b: U) -> T:
-    trap("unported: AK::ceil_div")
-
-## Ported from AK/StdLibExtras.h:98 AK::swap.
-pub func swap_5[T, U](a: T*, b: U*):
-    trap("unported: AK::swap")
-
-## Ported from AK/StdLibExtras.h:108 AK::exchange.
-pub func exchange[T, U](slot: T*, value: U) -> T:
-    trap("unported: AK::exchange")
-
-## Ported from AK/StdLibExtras.h:119 AK::to_underlying.
-# unmapped: decltype(auto)
-pub func to_underlying[V](value: V) -> void*?:
-    trap("unported: AK::to_underlying")
-
-## Ported from AK/StdLibExtras.h:126 AK::taint_for_optimizer.
-pub func taint_for_optimizer[T](value: T*):
-    trap("unported: AK::taint_for_optimizer")
-
-## Ported from AK/StdLibExtras.h:159 AK::abs.
-pub func abs_i32(num: i32) -> i32:
-    trap("unported: AK::abs")
-
-## Ported from AK/StdLibExtras.h:160 AK::abs.
-pub func abs_i64(num: i64) -> i64:
-    trap("unported: AK::abs")
-
-## Ported from AK/StdLibExtras.h:161 AK::abs.
-pub func abs_i64_2(num: i64) -> i64:
-    trap("unported: AK::abs")
-
-## Ported from AK/StdLibExtras.h:162 AK::abs.
-pub func abs_f32(num: f32) -> f32:
-    trap("unported: AK::abs")
-
-## Ported from AK/StdLibExtras.h:163 AK::abs.
-pub func abs_f64(num: f64) -> f64:
-    trap("unported: AK::abs")
-
-## Ported from AK/StdLibExtras.h:164 AK::abs.
-pub func abs_f64_2(num: f64) -> f64:
-    trap("unported: AK::abs")
-
 ## Ported from AK/Stream.h:29 AK::Stream::read_some (virtual).
 pub func stream_read_some_impl(this: Stream*, arg0: u8[]) -> u8[]!:
     trap("pure virtual: AK::Stream::read_some")
@@ -3943,14 +3539,6 @@ pub func seekable_stream_truncate_impl(this: SeekableStream*, length: usize) -> 
 ## Ported from AK/Stream.cpp:115 AK::SeekableStream::discard (override).
 pub func seekable_stream_discard_impl(base: Stream*, discarded_bytes: usize) -> !:
     trap("unported: AK::SeekableStream::discard")
-
-## Ported from AK/StringHash.h:19 AK::string_hash.
-pub func string_hash[T](characters: const T*?, length: usize, seed: u32 = 0) -> u32:
-    trap("unported: AK::string_hash")
-
-## Ported from AK/StringHash.h:33 AK::case_insensitive_string_hash.
-pub func case_insensitive_string_hash(characters: const u8*?, length: usize, seed: u32 = 0) -> u32:
-    trap("unported: AK::case_insensitive_string_hash")
 
 ## Ported from AK/TemporaryChange.h:17 AK::TemporaryChange::TemporaryChange<T>.
 pub func temporary_change_construct[T](this: TemporaryChange[T]*, variable: T*, value: T):
@@ -4534,19 +4122,6 @@ pub func as__2[TOutputType, TInputType](input: TInputType*?) -> void*?:
 # unmapped: CopyConst<InputType, OutputType>
 pub func bridge_cast[TOutputType, TInputType](input: TInputType) -> void*?:
     trap("unported: AK::bridge_cast")
-
-## Ported from AK/Types.h:163 AK::explode_byte.
-# internal linkage in C++: make it private when it is ported.
-pub func explode_byte(b: u8) -> usize:
-    trap("unported: AK::explode_byte")
-
-## Ported from AK/Types.h:177 AK::align_up_to.
-pub func align_up_to(value: usize, alignment: usize) -> usize:
-    trap("unported: AK::align_up_to")
-
-## Ported from AK/Types.h:182 AK::align_down_to.
-pub func align_down_to(value: usize, alignment: usize) -> usize:
-    trap("unported: AK::align_down_to")
 
 ## Ported from AK/UFixedBigInt.h:60 AK::Detail::mul_internal.
 pub func mul_internal[TOperand1, TOperand2, TResult](operand1: TOperand1, operand2: TOperand2, result: TResult*):
@@ -5439,72 +5014,3 @@ pub func weak_link_weak_link[T](this: WeakLink*, weakable: T*):
 ## Ported from AK/Weakable.h:76 AK::Weakable::revoke_weak_ptrs.
 pub func weakable_revoke_weak_ptrs[T](this: const Weakable[T]*):
     trap("unported: AK::Weakable::revoke_weak_ptrs")
-
-## Ported from AK/kmalloc.cpp:169 ak_kcalloc.
-pub func ak_kcalloc(count: usize, size: usize) -> void*?:
-    trap("unported: ak_kcalloc")
-
-## Ported from AK/kmalloc.cpp:189 ak_kfree.
-pub func ak_kfree(ptr: void*?):
-    trap("unported: ak_kfree")
-
-## Ported from AK/kmalloc.cpp:174 ak_kmalloc.
-pub func ak_kmalloc(size: usize) -> void*?:
-    trap("unported: ak_kmalloc")
-
-## Ported from AK/kmalloc.cpp:179 ak_krealloc.
-pub func ak_krealloc(ptr: void*?, size: usize) -> void*?:
-    trap("unported: ak_krealloc")
-
-## Ported from AK/kmalloc.cpp:184 ak_kmalloc_good_size.
-pub func ak_kmalloc_good_size(size: usize) -> usize:
-    trap("unported: ak_kmalloc_good_size")
-
-## Ported from AK/kmalloc.h:28 kcalloc.
-pub func kcalloc(count: usize, size: usize) -> void*?:
-    trap("unported: kcalloc")
-
-## Ported from AK/kmalloc.h:33 kfree.
-pub func kfree(ptr: void*?):
-    trap("unported: kfree")
-
-## Ported from AK/kmalloc.h:38 kmalloc.
-pub func kmalloc(size: usize) -> void*?:
-    trap("unported: kmalloc")
-
-## Ported from AK/kmalloc.h:43 krealloc.
-pub func krealloc(ptr: void*?, size: usize) -> void*?:
-    trap("unported: krealloc")
-
-## Ported from AK/kmalloc.h:48 kmalloc_good_size.
-pub func kmalloc_good_size(size: usize) -> usize:
-    trap("unported: kmalloc_good_size")
-
-## Ported from AK/kmalloc.h:56 kmalloc_array.
-pub func kmalloc_array(a: Checked[u64], b: Checked[u64]) -> void*?:
-    trap("unported: kmalloc_array")
-
-## Ported from AK/kmalloc.h:63 kmalloc_array.
-pub func kmalloc_array_checked(a: Checked[u64], b: Checked[u64], c_: Checked[u64]) -> void*?:
-    trap("unported: kmalloc_array")
-
-## Ported from AK/kmalloc.cpp:84 allocation_needs_explicit_alignment.
-# internal linkage in C++: make it private when it is ported.
-pub func allocation_needs_explicit_alignment(alignment: usize) -> bool:
-    trap("unported: allocation_needs_explicit_alignment")
-
-## Ported from AK/kmalloc.cpp:201 ladybird_rust_alloc.
-pub func ladybird_rust_alloc(size: usize, alignment: usize) -> void*?:
-    trap("unported: ladybird_rust_alloc")
-
-## Ported from AK/kmalloc.cpp:208 ladybird_rust_alloc_zeroed.
-pub func ladybird_rust_alloc_zeroed(size: usize, alignment: usize) -> void*?:
-    trap("unported: ladybird_rust_alloc_zeroed")
-
-## Ported from AK/kmalloc.cpp:215 ladybird_rust_dealloc.
-pub func ladybird_rust_dealloc(ptr: void*?, alignment: usize):
-    trap("unported: ladybird_rust_dealloc")
-
-## Ported from AK/kmalloc.cpp:220 ladybird_rust_realloc.
-pub func ladybird_rust_realloc(ptr: void*?, old_size: usize, new_size: usize, alignment: usize) -> void*?:
-    trap("unported: ladybird_rust_realloc")

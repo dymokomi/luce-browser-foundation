@@ -1,0 +1,199 @@
+#==============================================================================================
+#
+#   saturating_math - saturating add, sub and mul on integers
+#
+#   DESCRIPTION:
+#       Port of AK/SaturatingMath.h (lines 1-85), each template instantiated per integer
+#       type with the type as a suffix (`saturating_add_i32`). The branch-free formulas are
+#       kept; `__builtin_*_overflow` is the `+?` family.
+#
+#==============================================================================================
+
+# mark: Signed ==================================================================================
+
+## Ported from AK/SaturatingMath.h:16 AK::saturating_add (signed), for i8.
+pub func saturating_add_i8(a: i8, b: i8) -> i8:
+    let result = a +% b
+    let overflowed: u8 = 0 if (a +? b) != none else 1
+    let saturated = (i8)((u8)i8_max +% ((u8)a >> (8 - 1)))
+    let mask = -%overflowed
+    return (i8)(((u8)saturated & mask) | ((u8)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:16 AK::saturating_add (signed), for i16.
+pub func saturating_add_i16(a: i16, b: i16) -> i16:
+    let result = a +% b
+    let overflowed: u16 = 0 if (a +? b) != none else 1
+    let saturated = (i16)((u16)i16_max +% ((u16)a >> (16 - 1)))
+    let mask = -%overflowed
+    return (i16)(((u16)saturated & mask) | ((u16)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:16 AK::saturating_add (signed), for i32.
+pub func saturating_add_i32(a: i32, b: i32) -> i32:
+    let result = a +% b
+    let overflowed: u32 = 0 if (a +? b) != none else 1
+    let saturated = (i32)((u32)i32_max +% ((u32)a >> (32 - 1)))
+    let mask = -%overflowed
+    return (i32)(((u32)saturated & mask) | ((u32)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:16 AK::saturating_add (signed), for i64.
+pub func saturating_add_i64(a: i64, b: i64) -> i64:
+    let result = a +% b
+    let overflowed: u64 = 0 if (a +? b) != none else 1
+    let saturated = (i64)((u64)i64_max +% ((u64)a >> (64 - 1)))
+    let mask = -%overflowed
+    return (i64)(((u64)saturated & mask) | ((u64)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:37 AK::saturating_sub (signed), for i8.
+pub func saturating_sub_i8(a: i8, b: i8) -> i8:
+    let result = a -% b
+    let overflowed: u8 = 0 if (a -? b) != none else 1
+    let saturated = (i8)((u8)i8_max +% ((u8)a >> (8 - 1)))
+    let mask = -%overflowed
+    return (i8)(((u8)saturated & mask) | ((u8)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:37 AK::saturating_sub (signed), for i16.
+pub func saturating_sub_i16(a: i16, b: i16) -> i16:
+    let result = a -% b
+    let overflowed: u16 = 0 if (a -? b) != none else 1
+    let saturated = (i16)((u16)i16_max +% ((u16)a >> (16 - 1)))
+    let mask = -%overflowed
+    return (i16)(((u16)saturated & mask) | ((u16)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:37 AK::saturating_sub (signed), for i32.
+pub func saturating_sub_i32(a: i32, b: i32) -> i32:
+    let result = a -% b
+    let overflowed: u32 = 0 if (a -? b) != none else 1
+    let saturated = (i32)((u32)i32_max +% ((u32)a >> (32 - 1)))
+    let mask = -%overflowed
+    return (i32)(((u32)saturated & mask) | ((u32)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:37 AK::saturating_sub (signed), for i64.
+pub func saturating_sub_i64(a: i64, b: i64) -> i64:
+    let result = a -% b
+    let overflowed: u64 = 0 if (a -? b) != none else 1
+    let saturated = (i64)((u64)i64_max +% ((u64)a >> (64 - 1)))
+    let mask = -%overflowed
+    return (i64)(((u64)saturated & mask) | ((u64)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:58 AK::saturating_mul (signed), for i8.
+pub func saturating_mul_i8(a: i8, b: i8) -> i8:
+    let result = a *% b
+    let overflowed: u8 = 0 if (a *? b) != none else 1
+    # Same signs → positive overflow → max. Different signs → negative overflow → min.
+    let saturated = (i8)((u8)i8_max +% (((u8)a ^ (u8)b) >> (8 - 1)))
+    let mask = -%overflowed
+    return (i8)(((u8)saturated & mask) | ((u8)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:58 AK::saturating_mul (signed), for i16.
+pub func saturating_mul_i16(a: i16, b: i16) -> i16:
+    let result = a *% b
+    let overflowed: u16 = 0 if (a *? b) != none else 1
+    # Same signs → positive overflow → max. Different signs → negative overflow → min.
+    let saturated = (i16)((u16)i16_max +% (((u16)a ^ (u16)b) >> (16 - 1)))
+    let mask = -%overflowed
+    return (i16)(((u16)saturated & mask) | ((u16)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:58 AK::saturating_mul (signed), for i32.
+pub func saturating_mul_i32(a: i32, b: i32) -> i32:
+    let result = a *% b
+    let overflowed: u32 = 0 if (a *? b) != none else 1
+    # Same signs → positive overflow → max. Different signs → negative overflow → min.
+    let saturated = (i32)((u32)i32_max +% (((u32)a ^ (u32)b) >> (32 - 1)))
+    let mask = -%overflowed
+    return (i32)(((u32)saturated & mask) | ((u32)result & ~mask))
+
+## Ported from AK/SaturatingMath.h:58 AK::saturating_mul (signed), for i64.
+pub func saturating_mul_i64(a: i64, b: i64) -> i64:
+    let result = a *% b
+    let overflowed: u64 = 0 if (a *? b) != none else 1
+    # Same signs → positive overflow → max. Different signs → negative overflow → min.
+    let saturated = (i64)((u64)i64_max +% (((u64)a ^ (u64)b) >> (64 - 1)))
+    let mask = -%overflowed
+    return (i64)(((u64)saturated & mask) | ((u64)result & ~mask))
+
+# mark: Unsigned ================================================================================
+
+## Ported from AK/SaturatingMath.h:28 AK::saturating_add (unsigned), for u8.
+pub func saturating_add_u8(a: u8, b: u8) -> u8:
+    var result = a +% b
+    result = result | -%(u8)(result < a)
+    return result
+
+## Ported from AK/SaturatingMath.h:28 AK::saturating_add (unsigned), for u16.
+pub func saturating_add_u16(a: u16, b: u16) -> u16:
+    var result = a +% b
+    result = result | -%(u16)(result < a)
+    return result
+
+## Ported from AK/SaturatingMath.h:28 AK::saturating_add (unsigned), for u32.
+pub func saturating_add_u32(a: u32, b: u32) -> u32:
+    var result = a +% b
+    result = result | -%(u32)(result < a)
+    return result
+
+## Ported from AK/SaturatingMath.h:28 AK::saturating_add (unsigned), for u64.
+pub func saturating_add_u64(a: u64, b: u64) -> u64:
+    var result = a +% b
+    result = result | -%(u64)(result < a)
+    return result
+
+## Ported from AK/SaturatingMath.h:28 AK::saturating_add (unsigned), for usize.
+pub func saturating_add_usize(a: usize, b: usize) -> usize:
+    var result = a +% b
+    result = result | -%(usize)(result < a)
+    return result
+
+## Ported from AK/SaturatingMath.h:49 AK::saturating_sub (unsigned), for u8.
+pub func saturating_sub_u8(a: u8, b: u8) -> u8:
+    var result = a -% b
+    result = result & -%(u8)(result <= a)
+    return result
+
+## Ported from AK/SaturatingMath.h:49 AK::saturating_sub (unsigned), for u16.
+pub func saturating_sub_u16(a: u16, b: u16) -> u16:
+    var result = a -% b
+    result = result & -%(u16)(result <= a)
+    return result
+
+## Ported from AK/SaturatingMath.h:49 AK::saturating_sub (unsigned), for u32.
+pub func saturating_sub_u32(a: u32, b: u32) -> u32:
+    var result = a -% b
+    result = result & -%(u32)(result <= a)
+    return result
+
+## Ported from AK/SaturatingMath.h:49 AK::saturating_sub (unsigned), for u64.
+pub func saturating_sub_u64(a: u64, b: u64) -> u64:
+    var result = a -% b
+    result = result & -%(u64)(result <= a)
+    return result
+
+## Ported from AK/SaturatingMath.h:49 AK::saturating_sub (unsigned), for usize.
+pub func saturating_sub_usize(a: usize, b: usize) -> usize:
+    var result = a -% b
+    result = result & -%(usize)(result <= a)
+    return result
+
+## Ported from AK/SaturatingMath.h:72 AK::saturating_mul (unsigned), for u8.
+pub func saturating_mul_u8(a: u8, b: u8) -> u8:
+    let result = a *? b else return u8_max
+    return result
+
+## Ported from AK/SaturatingMath.h:72 AK::saturating_mul (unsigned), for u16.
+pub func saturating_mul_u16(a: u16, b: u16) -> u16:
+    let result = a *? b else return u16_max
+    return result
+
+## Ported from AK/SaturatingMath.h:72 AK::saturating_mul (unsigned), for u32.
+pub func saturating_mul_u32(a: u32, b: u32) -> u32:
+    let result = a *? b else return u32_max
+    return result
+
+## Ported from AK/SaturatingMath.h:72 AK::saturating_mul (unsigned), for u64.
+pub func saturating_mul_u64(a: u64, b: u64) -> u64:
+    let result = a *? b else return u64_max
+    return result
+
+## Ported from AK/SaturatingMath.h:72 AK::saturating_mul (unsigned), for usize.
+pub func saturating_mul_usize(a: usize, b: usize) -> usize:
+    let result = a *? b else return usize_max
+    return result

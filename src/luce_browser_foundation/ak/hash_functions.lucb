@@ -1,0 +1,44 @@
+#==============================================================================================
+#
+#   hash_functions - AK's integer, pair and pointer hashes
+#
+#   DESCRIPTION:
+#       Port of AK/HashFunctions.h (lines 1-49). These decide the iteration order of every
+#       HashTable and HashMap, so they are ported, never substituted (DESIGN.md §2.1).
+#
+#==============================================================================================
+
+## Ported from AK/HashFunctions.h:12 u32_hash.
+# MurmurHash3 32-bit finalizer (fmix32).
+pub func u32_hash(key: u32) -> u32:
+    var k = key
+    k = k ^ (k >> 16)
+    k = k *% 0x85ebca6b
+    k = k ^ (k >> 13)
+    k = k *% 0xc2b2ae35
+    k = k ^ (k >> 16)
+    return k
+
+## Ported from AK/HashFunctions.h:23 u64_hash.
+# MurmurHash3 64-bit finalizer (fmix64).
+pub func u64_hash(key: u64) -> u32:
+    var k = key
+    k = k ^ (k >> 33)
+    k = k *% 0xff51afd7ed558ccd
+    k = k ^ (k >> 33)
+    k = k *% 0xc4ceb9fe1a85ec53
+    k = k ^ (k >> 33)
+    return (u32)k
+
+## Ported from AK/HashFunctions.h:33 pair_int_hash.
+pub func pair_int_hash(key1: u32, key2: u32) -> u32:
+    return u64_hash(((u64)key1 << 32) | key2)
+
+## Ported from AK/HashFunctions.h:38 ptr_hash.
+pub func ptr_hash_usize(ptr: usize) -> u32:
+    return u64_hash((u64)ptr)
+
+## Ported from AK/HashFunctions.h:46 ptr_hash.
+pub func ptr_hash_void(ptr: const void*?) -> u32:
+    let address: usize = (usize)(ptr else return ptr_hash_usize(0))
+    return ptr_hash_usize(address)

@@ -1,0 +1,66 @@
+#==============================================================================================
+#
+#   endian - host/little/big-endian conversions and the LittleEndian/BigEndian wrappers
+#
+#   DESCRIPTION:
+#       Port of AK/Endian.h (lines 1-131). __builtin_bswap16/32/64 is a reversal of the
+#       value's bytes, which is written once for any type of 1, 2, 4 or 8 bytes.
+#
+#==============================================================================================
+
+# The value with its bytes in reverse order (__builtin_bswap16/32/64).
+func byte_swap[T](value: T) -> T:
+    assert(sizeof(T) == 1 or sizeof(T) == 2 or sizeof(T) == 4 or sizeof(T) == 8, "Cannot byte-swap values larger than 64-bits")
+    var copy = value
+    let bytes = u8[]((u8*)&copy, sizeof(T))
+    var low: usize = 0
+    var high = sizeof(T) - 1
+    while low < high:
+        let tmp = bytes[low]
+        bytes[low] = bytes[high]
+        bytes[high] = tmp
+        low += 1
+        high -= 1
+    return copy
+
+## Ported from AK/Endian.h:28 AK::convert_between_host_and_little_endian.
+pub func convert_between_host_and_little_endian[T](value: T) -> T:
+    if host_is_little_endian or sizeof(T) == 1:
+        return value
+    else:
+        return byte_swap(value)
+
+## Ported from AK/Endian.h:43 AK::convert_between_host_and_big_endian.
+pub func convert_between_host_and_big_endian[T](value: T) -> T:
+    if sizeof(T) == 1 or not host_is_little_endian:
+        return value
+    else:
+        return byte_swap(value)
+
+## Ported from AK/Endian.h:58 AK::convert_between_host_and_network_endian.
+pub func convert_between_host_and_network_endian[T](value: T) -> T:
+    return convert_between_host_and_big_endian(value)
+
+## Ported from AK/Endian.h:68 AK::LittleEndian::LittleEndian<T>.
+pub func little_endian_construct[T](this: LittleEndian[T]*, value: T):
+    this.m_value = convert_between_host_and_little_endian(value)
+
+## Ported from AK/Endian.h:73 AK::LittleEndian::operator T.
+pub func little_endian_to_t[T](this: const LittleEndian[T]*) -> T:
+    return convert_between_host_and_little_endian(this.m_value)
+
+## Ported from AK/Endian.h:84 AK::BigEndian::BigEndian<T>.
+pub func big_endian_construct[T](this: BigEndian[T]*, value: T):
+    this.m_value = convert_between_host_and_big_endian(value)
+
+## Ported from AK/Endian.h:89 AK::BigEndian::operator T.
+pub func big_endian_to_t[T](this: const BigEndian[T]*) -> T:
+    return convert_between_host_and_big_endian(this.m_value)
+
+## Ported from AK/Endian.h:116 AK::bitswap.
+pub func bitswap(v: u16) -> u16:
+    var x = v
+    x = ((x >> 1) & 0x5555) | ((x & 0x5555) << 1)  # even & odd bits
+    x = ((x >> 2) & 0x3333) | ((x & 0x3333) << 2)  # pairs
+    x = ((x >> 4) & 0x0F0F) | ((x & 0x0F0F) << 4)  # nibbles
+    return ((x >> 8) & 0x00FF) | ((x & 0x00FF) << 8)  # bytes

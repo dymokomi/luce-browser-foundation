@@ -1,0 +1,98 @@
+#==============================================================================================
+#
+#   numeric_limits - NumericLimits<T> as constants
+#
+#   DESCRIPTION:
+#       Port of AK/NumericLimits.h (lines 1-161). `NumericLimits<T>::max()` is `<t>_max`,
+#       `min()` is `<t>_min`; the float specializations give `<t>_lowest`, `<t>_min_normal`,
+#       `<t>_min_denormal`, `<t>_max` and `<t>_epsilon`; `digits()` is `<t>_digits`.
+#
+#==============================================================================================
+
+# mark: Integers ================================================================================
+
+## NumericLimits<i8>::min().
+pub let i8_min: i8 = -128
+## NumericLimits<i8>::max().
+pub let i8_max: i8 = 127
+## NumericLimits<i16>::min().
+pub let i16_min: i16 = -32768
+## NumericLimits<i16>::max().
+pub let i16_max: i16 = 32767
+## NumericLimits<i32>::min().
+pub let i32_min: i32 = -2147483648
+## NumericLimits<i32>::max().
+pub let i32_max: i32 = 2147483647
+## NumericLimits<i64>::min().
+pub let i64_min: i64 = -9223372036854775808
+## NumericLimits<i64>::max().
+pub let i64_max: i64 = 9223372036854775807
+## NumericLimits<isize>::min() (ssize_t on the 64-bit targets).
+pub let isize_min: isize = -9223372036854775808
+## NumericLimits<isize>::max().
+pub let isize_max: isize = 9223372036854775807
+## NumericLimits<u8>::min().
+pub let u8_min: u8 = 0
+## NumericLimits<u8>::max().
+pub let u8_max: u8 = 255
+## NumericLimits<u16>::min().
+pub let u16_min: u16 = 0
+## NumericLimits<u16>::max().
+pub let u16_max: u16 = 65535
+## NumericLimits<u32>::min().
+pub let u32_min: u32 = 0
+## NumericLimits<u32>::max().
+pub let u32_max: u32 = 4294967295
+## NumericLimits<u64>::min().
+pub let u64_min: u64 = 0
+## NumericLimits<u64>::max().
+pub let u64_max: u64 = 18446744073709551615
+## NumericLimits<usize>::min().
+pub let usize_min: usize = 0
+## NumericLimits<usize>::max() (size_t on the 64-bit targets).
+pub let usize_max: usize = 18446744073709551615
+
+## NumericLimits<i8>::digits().
+pub let i8_digits: usize = 7
+## NumericLimits<i16>::digits().
+pub let i16_digits: usize = 15
+## NumericLimits<i32>::digits().
+pub let i32_digits: usize = 31
+## NumericLimits<i64>::digits().
+pub let i64_digits: usize = 63
+## NumericLimits<u8>::digits().
+pub let u8_digits: usize = 8
+## NumericLimits<u16>::digits().
+pub let u16_digits: usize = 16
+## NumericLimits<u32>::digits().
+pub let u32_digits: usize = 32
+## NumericLimits<u64>::digits().
+pub let u64_digits: usize = 64
+
+# mark: Floats ==================================================================================
+
+## NumericLimits<float>::lowest().
+pub let f32_lowest: f32 = f32.bits(0xff7fffff)
+## NumericLimits<float>::min_normal().
+pub let f32_min_normal: f32 = f32.bits(0x00800000)
+## NumericLimits<float>::min_denormal().
+pub let f32_min_denormal: f32 = f32.bits(0x00000001)
+## NumericLimits<float>::max().
+pub let f32_max: f32 = f32.bits(0x7f7fffff)
+## NumericLimits<float>::epsilon().
+pub let f32_epsilon: f32 = f32.bits(0x34000000)
+## NumericLimits<float>::digits().
+pub let f32_digits: usize = 24
+
+## NumericLimits<double>::lowest().
+pub let f64_lowest: f64 = f64.bits(0xffefffffffffffff)
+## NumericLimits<double>::min_normal().
+pub let f64_min_normal: f64 = f64.bits(0x0010000000000000)
+## NumericLimits<double>::min_denormal().
+pub let f64_min_denormal: f64 = f64.bits(0x0000000000000001)
+## NumericLimits<double>::max().
+pub let f64_max: f64 = f64.bits(0x7fefffffffffffff)
+## NumericLimits<double>::epsilon().
+pub let f64_epsilon: f64 = f64.bits(0x3cb0000000000000)
+## NumericLimits<double>::digits().
+pub let f64_digits: usize = 53
