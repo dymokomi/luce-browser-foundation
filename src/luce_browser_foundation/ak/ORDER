@@ -186,3 +186,4 @@ tests_weak_ptr.lucb
 tests_misc.lucb
 tests_sort.lucb
 tests_optional.lucb
+tests_std_lib_extras.lucb
