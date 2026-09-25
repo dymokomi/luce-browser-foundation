@@ -12,116 +12,14 @@
 
 # mark: Gb18030RangeEntry =======================================================================
 
-## TextCodec::Gb18030RangeEntry (Build/Libraries/LibTextCodec/LookupTables.h:8).
+## TextCodec::Gb18030RangeEntry (Build/Libraries/LibTextCodec/LookupTables.h:8). The tables themselves are
+## in generated_lookup_tables (filled by region r06: the generator declared them as zeroed vars).
 pub struct Gb18030RangeEntry:
     pub var pointer: u32
     pub var code_point: u32
 
-## TextCodec::s_gb18030_ranges (Build/Libraries/LibTextCodec/LookupTables.h:13).
-pub var s_gb18030_ranges: Gb18030RangeEntry[207]
-
-## TextCodec::s_gb18030_index (Build/Libraries/LibTextCodec/LookupTables.h:223).
-pub var s_gb18030_index: u16[23940]
-
 ## TextCodec::s_big5_index_first_pointer (Build/Libraries/LibTextCodec/LookupTables.h:1725).
 pub let s_big5_index_first_pointer: u32 = 942
 
-## TextCodec::s_big5_index (Build/Libraries/LibTextCodec/LookupTables.h:1726).
-pub var s_big5_index: u32[18840]
-
-## TextCodec::s_jis0208_index (Build/Libraries/LibTextCodec/LookupTables.h:2909).
-pub var s_jis0208_index: u16[11104]
-
 ## TextCodec::s_jis0212_index_first_pointer (Build/Libraries/LibTextCodec/LookupTables.h:3608).
 pub let s_jis0212_index_first_pointer: u32 = 108
-
-## TextCodec::s_jis0212_index (Build/Libraries/LibTextCodec/LookupTables.h:3609).
-pub var s_jis0212_index: u16[7103]
-
-## TextCodec::s_euc_kr_index (Build/Libraries/LibTextCodec/LookupTables.h:4058).
-pub var s_euc_kr_index: u16[23750]
-
-## TextCodec::s_ibm866_index (Build/Libraries/LibTextCodec/LookupTables.h:5548).
-pub var s_ibm866_index: u16[128]
-
-## TextCodec::s_iso_2022_jp_katakana_index (Build/Libraries/LibTextCodec/LookupTables.h:5561).
-# C++ initializer: { 0x3002 , 0x300c , 0x300d , 0x3001 , 0x30fb , 0x30f2 , 0x30a1 , 0x30a3 , 0x30a5 , 0x30a7 , 0x30a9 ,
-pub var s_iso_2022_jp_katakana_index: u16[63]
-
-## TextCodec::s_iso_8859_2_index (Build/Libraries/LibTextCodec/LookupTables.h:5570).
-pub var s_iso_8859_2_index: u16[128]
-
-## TextCodec::s_iso_8859_3_index (Build/Libraries/LibTextCodec/LookupTables.h:5583).
-pub var s_iso_8859_3_index: u16[128]
-
-## TextCodec::s_iso_8859_4_index (Build/Libraries/LibTextCodec/LookupTables.h:5596).
-pub var s_iso_8859_4_index: u16[128]
-
-## TextCodec::s_iso_8859_5_index (Build/Libraries/LibTextCodec/LookupTables.h:5609).
-pub var s_iso_8859_5_index: u16[128]
-
-## TextCodec::s_iso_8859_6_index (Build/Libraries/LibTextCodec/LookupTables.h:5622).
-pub var s_iso_8859_6_index: u16[128]
-
-## TextCodec::s_iso_8859_7_index (Build/Libraries/LibTextCodec/LookupTables.h:5635).
-pub var s_iso_8859_7_index: u16[128]
-
-## TextCodec::s_iso_8859_8_index (Build/Libraries/LibTextCodec/LookupTables.h:5648).
-pub var s_iso_8859_8_index: u16[128]
-
-## TextCodec::s_iso_8859_10_index (Build/Libraries/LibTextCodec/LookupTables.h:5661).
-pub var s_iso_8859_10_index: u16[128]
-
-## TextCodec::s_iso_8859_13_index (Build/Libraries/LibTextCodec/LookupTables.h:5674).
-pub var s_iso_8859_13_index: u16[128]
-
-## TextCodec::s_iso_8859_14_index (Build/Libraries/LibTextCodec/LookupTables.h:5687).
-pub var s_iso_8859_14_index: u16[128]
-
-## TextCodec::s_iso_8859_15_index (Build/Libraries/LibTextCodec/LookupTables.h:5700).
-pub var s_iso_8859_15_index: u16[128]
-
-## TextCodec::s_iso_8859_16_index (Build/Libraries/LibTextCodec/LookupTables.h:5713).
-pub var s_iso_8859_16_index: u16[128]
-
-## TextCodec::s_koi8_r_index (Build/Libraries/LibTextCodec/LookupTables.h:5726).
-pub var s_koi8_r_index: u16[128]
-
-## TextCodec::s_koi8_u_index (Build/Libraries/LibTextCodec/LookupTables.h:5739).
-pub var s_koi8_u_index: u16[128]
-
-## TextCodec::s_macintosh_index (Build/Libraries/LibTextCodec/LookupTables.h:5752).
-pub var s_macintosh_index: u16[128]
-
-## TextCodec::s_windows_874_index (Build/Libraries/LibTextCodec/LookupTables.h:5765).
-pub var s_windows_874_index: u16[128]
-
-## TextCodec::s_windows_1250_index (Build/Libraries/LibTextCodec/LookupTables.h:5778).
-pub var s_windows_1250_index: u16[128]
-
-## TextCodec::s_windows_1251_index (Build/Libraries/LibTextCodec/LookupTables.h:5791).
-pub var s_windows_1251_index: u16[128]
-
-## TextCodec::s_windows_1252_index (Build/Libraries/LibTextCodec/LookupTables.h:5804).
-pub var s_windows_1252_index: u16[128]
-
-## TextCodec::s_windows_1253_index (Build/Libraries/LibTextCodec/LookupTables.h:5817).
-pub var s_windows_1253_index: u16[128]
-
-## TextCodec::s_windows_1254_index (Build/Libraries/LibTextCodec/LookupTables.h:5830).
-pub var s_windows_1254_index: u16[128]
-
-## TextCodec::s_windows_1255_index (Build/Libraries/LibTextCodec/LookupTables.h:5843).
-pub var s_windows_1255_index: u16[128]
-
-## TextCodec::s_windows_1256_index (Build/Libraries/LibTextCodec/LookupTables.h:5856).
-pub var s_windows_1256_index: u16[128]
-
-## TextCodec::s_windows_1257_index (Build/Libraries/LibTextCodec/LookupTables.h:5869).
-pub var s_windows_1257_index: u16[128]
-
-## TextCodec::s_windows_1258_index (Build/Libraries/LibTextCodec/LookupTables.h:5882).
-pub var s_windows_1258_index: u16[128]
-
-## TextCodec::s_x_mac_cyrillic_index (Build/Libraries/LibTextCodec/LookupTables.h:5895).
-pub var s_x_mac_cyrillic_index: u16[128]

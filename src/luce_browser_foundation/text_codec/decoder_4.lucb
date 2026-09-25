@@ -1,0 +1,355 @@
+#==============================================================================================
+#
+#   decoder_4 - the gb18030, Big5 and EUC-JP decoders
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibTextCodec/Decoder.cpp (lines 843-1222): the index gb18030 ranges
+#       code point, and the decoders of gb18030 (and GBK), Big5 and EUC-JP, each a loop over the
+#       input running the Encoding Standard's handler with its state in locals; "restore byte to
+#       ioQueue" steps the index back.
+#
+#==============================================================================================
+
+# mark: gb18030 ================================================================================
+
+# index_gb18030_ranges_code_point's binary_search comparator:
+# [](auto const pointer, auto const& entry) { return pointer - entry.pointer; } in u32, as int.
+func gb18030_ranges_compare_pointer(pointer: u32, entry: const Gb18030RangeEntry*) -> i32:
+    return (i32)(pointer -% entry.pointer)
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:843 TextCodec::index_gb18030_ranges_code_point.
+# https://encoding.spec.whatwg.org/#index-gb18030-ranges-code-point
+func index_gb18030_ranges_code_point(pointer: u32) -> u32?:
+    # 1. If pointer is greater than 39419 and less than 189000, or pointer is greater than 1237575, return null.
+    if (pointer > 39419 and pointer < 189000) or pointer > 1237575:
+        return none
+
+    # 2. If pointer is 7457, return code point U+E7C7.
+    if pointer == 7457:
+        return 0xE7C7
+
+    # FIXME: Encoding specification is not updated to GB-18030-2022 yet (https://github.com/whatwg/encoding/issues/312)
+    # NOTE: This matches https://commits.webkit.org/266173@main
+    let gb18030_2022_code_point: u32? = match pointer:
+        19057 => 0xE81E  # 82 35 90 37
+        19058 => 0xE826  # 82 35 90 38
+        19059 => 0xE82B  # 82 35 90 39
+        19060 => 0xE82C  # 82 35 91 30
+        19061 => 0xE832  # 82 35 91 31
+        19062 => 0xE843  # 82 35 91 32
+        19063 => 0xE854  # 82 35 91 33
+        19064 => 0xE864  # 82 35 91 34
+        39076 => 0xE78D  # 84 31 82 36
+        39077 => 0xE78F  # 84 31 82 37
+        39078 => 0xE78E  # 84 31 82 38
+        39079 => 0xE790  # 84 31 82 39
+        39080 => 0xE791  # 84 31 83 30
+        39081 => 0xE792  # 84 31 83 31
+        39082 => 0xE793  # 84 31 83 32
+        39083 => 0xE794  # 84 31 83 33
+        39084 => 0xE795  # 84 31 83 34
+        39085 => 0xE796  # 84 31 83 35
+        _ => none  # default: break;
+    if let code_point = gb18030_2022_code_point:
+        return code_point
+
+    # 3. Let offset be the last pointer in index gb18030 ranges that is less than or equal to pointer and let code point offset be its corresponding code point.
+    var last_index: usize = 0
+    discard(binary_search_gb18030_ranges(pointer, &last_index, gb18030_ranges_compare_pointer))
+    let offset = s_gb18030_ranges[last_index].pointer
+    let code_point_offset = s_gb18030_ranges[last_index].code_point
+
+    # 4. Return a code point whose value is code point offset + pointer − offset.
+    return code_point_offset + pointer - offset
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:909 TextCodec::GB18030Decoder::process (override).
+## https://encoding.spec.whatwg.org/#gb18030-decoder
+pub func gb18030_decoder_process_impl(base: Decoder*, input: ak.StringView, on_code_point: ak.Function1[u32, unit]) -> !:
+    # gb18030’s decoder has an associated gb18030 first, gb18030 second, and gb18030 third (all initially 0x00).
+    var first: u8 = 0x00
+    var second: u8 = 0x00
+    var third: u8 = 0x00
+
+    # gb18030’s decoder’s handler, given ioQueue and byte, runs these steps:
+    var index: usize = 0
+    while true:
+        # 1. If byte is end-of-queue and gb18030 first, gb18030 second, and gb18030 third are 0x00, return finished.
+        if index >= ak.string_view_length(&input) and first == 0x00 and second == 0x00 and third == 0x00:
+            return
+
+        # 2. If byte is end-of-queue, and gb18030 first, gb18030 second, or gb18030 third is not 0x00, set gb18030 first, gb18030 second, and gb18030 third to 0x00, and return error.
+        if index >= ak.string_view_length(&input) and (first != 0x00 or second != 0x00 or third != 0x00):
+            first = 0x00
+            second = 0x00
+            third = 0x00
+            call_function1(on_code_point, replacement_code_point)
+            continue
+
+        let byte = ak.string_view_at(&input, index)
+        index += 1
+        # 3. If gb18030 third is not 0x00, then:
+        if third != 0x00:
+            # 1. If byte is not in the range 0x30 to 0x39, inclusive, then:
+            if byte < 0x30 or byte > 0x39:
+                # 1. Restore « gb18030 second, gb18030 third, byte » to ioQueue.
+                index -= 3
+
+                # 2. Set gb18030 first, gb18030 second, and gb18030 third to 0x00.
+                first = 0x00
+                second = 0x00
+                third = 0x00
+
+                # 3. Return error.
+                call_function1(on_code_point, replacement_code_point)
+                continue
+
+            # 2. Let code point be the index gb18030 ranges code point for ((gb18030 first − 0x81) × (10 × 126 × 10)) + ((gb18030 second − 0x30) × (10 × 126)) + ((gb18030 third − 0x81) × 10) + byte − 0x30.
+            let code_point = index_gb18030_ranges_code_point((((u32)first - 0x81) * (10 * 126 * 10)) + (((u32)second - 0x30) * (10 * 126)) + (((u32)third - 0x81) * 10) + (u32)byte - 0x30)
+
+            # 3. Set gb18030 first, gb18030 second, and gb18030 third to 0x00.
+            first = 0x00
+            second = 0x00
+            third = 0x00
+
+            # 4. If code point is null, return error.
+            if code_point == none:
+                call_function1(on_code_point, replacement_code_point)
+                continue
+
+            # 5. Return a code point whose value is code point.
+            call_function1(on_code_point, code_point else trap("VERIFY: Optional::value() of an empty Optional"))
+            continue
+
+        # 4. If gb18030 second is not 0x00, then:
+        if second != 0x00:
+            # 1. If byte is in the range 0x81 to 0xFE, inclusive, set gb18030 third to byte and return continue.
+            if byte >= 0x81 and byte <= 0xFE:
+                third = byte
+                continue
+
+            # 2. Restore « gb18030 second, byte » to ioQueue, set gb18030 first and gb18030 second to 0x00, and return error.
+            index -= 2
+            first = 0x00
+            second = 0x00
+            call_function1(on_code_point, replacement_code_point)
+            continue
+
+        # 5. If gb18030 first is not 0x00, then:
+        if first != 0x00:
+            # 1. If byte is in the range 0x30 to 0x39, inclusive, set gb18030 second to byte and return continue.
+            if byte >= 0x30 and byte <= 0x39:
+                second = byte
+                continue
+
+            # 2. Let lead be gb18030 first, let pointer be null, and set gb18030 first to 0x00.
+            let lead = first
+            var pointer: u32? = none
+            first = 0x00
+
+            # 3. Let offset be 0x40 if byte is less than 0x7F, otherwise 0x41.
+            let offset: u8 = 0x40 if byte < 0x7F else 0x41
+
+            # 4. If byte is in the range 0x40 to 0x7E, inclusive, or 0x80 to 0xFE, inclusive, set pointer to (lead − 0x81) × 190 + (byte − offset).
+            if (byte >= 0x40 and byte <= 0x7E) or (byte >= 0x80 and byte <= 0xFE):
+                pointer = ((u32)lead - 0x81) * 190 + (u32)(byte - offset)
+
+            # 5. Let code point be null if pointer is null, otherwise the index code point for pointer in index gb18030.
+            var code_point: u32? = none
+            if let p = pointer:
+                code_point = index_gb18030_code_point(p)
+
+            # 6. If code point is non-null, return a code point whose value is code point.
+            if let value = code_point:
+                call_function1(on_code_point, value)
+                continue
+
+            # 7. If byte is an ASCII byte, restore byte to ioQueue.
+            if byte <= 0x7F:
+                index -= 1
+
+            # 8. Return error.
+            call_function1(on_code_point, replacement_code_point)
+            continue
+
+        # 6. If byte is an ASCII byte, return a code point whose value is byte.
+        if byte <= 0x7F:
+            call_function1(on_code_point, (u32)byte)
+            continue
+
+        # 7. If byte is 0x80, return code point U+20AC.
+        if byte == 0x80:
+            call_function1(on_code_point, 0x20AC)
+            continue
+
+        # 8. If byte is in the range 0x81 to 0xFE, inclusive, set gb18030 first to byte and return continue.
+        if byte >= 0x81 and byte <= 0xFE:
+            first = byte
+            continue
+
+        # 9. Return error.
+        call_function1(on_code_point, replacement_code_point)
+
+# mark: Big5 ===================================================================================
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:1047 TextCodec::Big5Decoder::process (override).
+## https://encoding.spec.whatwg.org/#big5-decoder
+pub func big5_decoder_process_impl(base: Decoder*, input: ak.StringView, on_code_point: ak.Function1[u32, unit]) -> !:
+    # Big5’s decoder has an associated Big5 lead (initially 0x00).
+    var big5_lead: u8 = 0x00
+
+    # Big5’s decoder’s handler, given ioQueue and byte, runs these steps:
+    var index: usize = 0
+    while true:
+        # 1. If byte is end-of-queue and Big5 lead is not 0x00, set Big5 lead to 0x00 and return error.
+        if index >= ak.string_view_length(&input) and big5_lead != 0x00:
+            big5_lead = 0x00
+            call_function1(on_code_point, replacement_code_point)
+            continue
+
+        # 2. If byte is end-of-queue and Big5 lead is 0x00, return finished.
+        if index >= ak.string_view_length(&input) and big5_lead == 0x00:
+            return
+
+        let byte = ak.string_view_at(&input, index)
+        index += 1
+
+        # 3. If Big5 lead is not 0x00, let lead be Big5 lead, let pointer be null, set Big5 lead to 0x00, and then:
+        if big5_lead != 0x00:
+            let lead = big5_lead
+            var pointer: u32? = none
+            big5_lead = 0x00
+
+            # 1. Let offset be 0x40 if byte is less than 0x7F, otherwise 0x62.
+            let offset: u8 = 0x40 if byte < 0x7F else 0x62
+
+            # 2. If byte is in the range 0x40 to 0x7E, inclusive, or 0xA1 to 0xFE, inclusive, set pointer to (lead − 0x81) × 157 + (byte − offset).
+            if (byte >= 0x40 and byte <= 0x7E) or (byte >= 0xA1 and byte <= 0xFE):
+                pointer = ((u32)lead - 0x81) * 157 + (u32)(byte - offset)
+
+            # 3. If there is a row in the table below whose first column is pointer, return the two code points listed in its second column (the third column is irrelevant):
+            if pointer == 1133:
+                call_function1(on_code_point, 0x00CA)
+                call_function1(on_code_point, 0x0304)
+                continue
+            if pointer == 1135:
+                call_function1(on_code_point, 0x00CA)
+                call_function1(on_code_point, 0x030C)
+                continue
+            if pointer == 1164:
+                call_function1(on_code_point, 0x00EA)
+                call_function1(on_code_point, 0x0304)
+                continue
+            if pointer == 1166:
+                call_function1(on_code_point, 0x00EA)
+                call_function1(on_code_point, 0x030C)
+                continue
+
+            # 4. Let code point be null if pointer is null, otherwise the index code point for pointer in index Big5.
+            var code_pointer: u32? = none
+            if let p = pointer:
+                code_pointer = index_big5_code_point(p)
+
+            # 5. If code point is non-null, return a code point whose value is code point.
+            if let value = code_pointer:
+                call_function1(on_code_point, value)
+                continue
+
+            # 6. If byte is an ASCII byte, restore byte to ioQueue.
+            if byte <= 0x7F:
+                index -= 1
+
+            # 7. Return error.
+            call_function1(on_code_point, replacement_code_point)
+            continue
+
+        # 4. If byte is an ASCII byte, return a code point whose value is byte.
+        if byte <= 0x7F:
+            call_function1(on_code_point, (u32)byte)
+            continue
+
+        # 5. If byte is in the range 0x81 to 0xFE, inclusive, set Big5 lead to byte and return continue.
+        if byte >= 0x81 and byte <= 0xFE:
+            big5_lead = byte
+            continue
+
+        # 6. Return error
+        call_function1(on_code_point, replacement_code_point)
+
+# mark: EUC-JP =================================================================================
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:1139 TextCodec::EUCJPDecoder::process (override).
+## https://encoding.spec.whatwg.org/#euc-jp-decoder
+pub func eucjp_decoder_process_impl(base: Decoder*, input: ak.StringView, on_code_point: ak.Function1[u32, unit]) -> !:
+    # EUC-JP’s decoder has an associated EUC-JP jis0212 (initially false) and EUC-JP lead (initially 0x00).
+    var jis0212 = false
+    var euc_jp_lead: u8 = 0x00
+
+    # EUC-JP’s decoder’s handler, given ioQueue and byte, runs these steps:
+    var index: usize = 0
+    while true:
+        # 1. If byte is end-of-queue and EUC-JP lead is not 0x00, set EUC-JP lead to 0x00, and return error.
+        if index >= ak.string_view_length(&input) and euc_jp_lead != 0x00:
+            euc_jp_lead = 0x00
+            call_function1(on_code_point, replacement_code_point)
+            continue
+
+        # 2. If byte is end-of-queue and EUC-JP lead is 0x00, return finished.
+        if index >= ak.string_view_length(&input) and euc_jp_lead == 0x00:
+            return
+
+        let byte = ak.string_view_at(&input, index)
+        index += 1
+
+        # 3. If EUC-JP lead is 0x8E and byte is in the range 0xA1 to 0xDF, inclusive, set EUC-JP lead to 0x00 and return a code point whose value is 0xFF61 − 0xA1 + byte.
+        if euc_jp_lead == 0x8E and byte >= 0xA1 and byte <= 0xDF:
+            euc_jp_lead = 0x00
+            call_function1(on_code_point, 0xFF61 - 0xA1 + (u32)byte)
+            continue
+
+        # 4. If EUC-JP lead is 0x8F and byte is in the range 0xA1 to 0xFE, inclusive, set EUC-JP jis0212 to true, set EUC-JP lead to byte, and return continue.
+        if euc_jp_lead == 0x8F and byte >= 0xA1 and byte <= 0xFE:
+            jis0212 = true
+            euc_jp_lead = byte
+            continue
+
+        # 5. If EUC-JP lead is not 0x00, let lead be EUC-JP lead, set EUC-JP lead to 0x00, and then:
+        if euc_jp_lead != 0x00:
+            let lead = euc_jp_lead
+            euc_jp_lead = 0x00
+
+            # 1. Let code point be null.
+            var code_point: u32? = none
+
+            # 2. If lead and byte are both in the range 0xA1 to 0xFE, inclusive, then set code point to the index code point for (lead − 0xA1) × 94 + byte − 0xA1 in index jis0208 if EUC-JP jis0212 is false and in index jis0212 otherwise.
+            if lead >= 0xA1 and lead <= 0xFE and byte >= 0xA1 and byte <= 0xFE:
+                let pointer = ((u32)lead - 0xA1) * 94 + (u32)byte - 0xA1
+                code_point = index_jis0212_code_point(pointer) if jis0212 else index_jis0208_code_point(pointer)
+
+            # 3. Set EUC-JP jis0212 to false.
+            jis0212 = false
+
+            # 4. If code point is non-null, return a code point whose value is code point.
+            if let value = code_point:
+                call_function1(on_code_point, value)
+                continue
+
+            # 5. If byte is an ASCII byte, restore byte to ioQueue.
+            if byte <= 0x7F:
+                index -= 1
+
+            # 6. Return error.
+            call_function1(on_code_point, replacement_code_point)
+            continue
+
+        # 6. If byte is an ASCII byte, return a code point whose value is byte.
+        if byte <= 0x7F:
+            call_function1(on_code_point, (u32)byte)
+            continue
+
+        # 7. If byte is 0x8E, 0x8F, or in the range 0xA1 to 0xFE, inclusive, set EUC-JP lead to byte and return continue.
+        if byte == 0x8E or byte == 0x8F or (byte >= 0xA1 and byte <= 0xFE):
+            euc_jp_lead = byte
+            continue
+
+        # 8. Return error.
+        call_function1(on_code_point, replacement_code_point)

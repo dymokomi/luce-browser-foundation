@@ -1,0 +1,343 @@
+#==============================================================================================
+#
+#   encoder_1 - the encoder instances, encoder lookup, and the UTF-8, EUC-JP and ISO-2022-JP
+#               encoders
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibTextCodec/Encoder.cpp (lines 1-336) with the pure virtual of
+#       Encoder.h: one encoder instance per encoding, encoder_for_exact_name and encoder_for,
+#       and the encoders of UTF-8, EUC-JP and ISO-2022-JP (whose state machine restores a code
+#       point to the queue by calling process_item again in the new state).
+#
+#==============================================================================================
+
+# mark: Encoder instances ======================================================================
+
+# The C++ globals of Encoder.cpp's anonymous namespace. Their constructors only set the vtable
+# pointer (and GBK's flag, or a single-byte encoder's table), so each is a constant-initialized
+# global here; the class id is the class's first id in types_encoder.
+
+var s_utf8_encoder: Utf8Encoder = Utf8Encoder(encoder_base = Encoder(vtable = &utf8_encoder_vtable.encoder_vtable, class_id = 7))
+var s_gb18030_encoder: Gb18030Encoder = Gb18030Encoder(encoder_base = Encoder(vtable = &gb18030_encoder_vtable.encoder_vtable, class_id = 4), m_is_gbk = Gb18030EncoderIsGbk.no)
+var s_gbk_encoder: Gb18030Encoder = Gb18030Encoder(encoder_base = Encoder(vtable = &gb18030_encoder_vtable.encoder_vtable, class_id = 4), m_is_gbk = Gb18030EncoderIsGbk.yes)
+var s_big5_encoder: Big5Encoder = Big5Encoder(encoder_base = Encoder(vtable = &big5_encoder_vtable.encoder_vtable, class_id = 1))
+var s_euc_jp_encoder: EucjpEncoder = EucjpEncoder(encoder_base = Encoder(vtable = &eucjp_encoder_vtable.encoder_vtable, class_id = 2))
+var s_iso_2022_jp_encoder: Iso2022JpEncoder = Iso2022JpEncoder(encoder_base = Encoder(vtable = &iso2022_jp_encoder_vtable.encoder_vtable, class_id = 5))
+var s_shift_jis_encoder: ShiftJisEncoder = ShiftJisEncoder(encoder_base = Encoder(vtable = &shift_jis_encoder_vtable.encoder_vtable, class_id = 6))
+var s_euc_kr_encoder: EuckrEncoder = EuckrEncoder(encoder_base = Encoder(vtable = &euckr_encoder_vtable.encoder_vtable, class_id = 3))
+
+# s_{encoding}_index is generated from https://encoding.spec.whatwg.org/indexes.json
+# Found separately in https://encoding.spec.whatwg.org/index-{encoding}.txt
+var s_ibm866_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_ibm866_index)
+var s_latin2_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_2_index)
+var s_latin3_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_3_index)
+var s_latin4_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_4_index)
+var s_latin_cyrillic_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_5_index)
+var s_latin_arabic_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_6_index)
+var s_latin_greek_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_7_index)
+var s_latin_hebrew_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_8_index)
+var s_latin6_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_10_index)
+var s_latin7_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_13_index)
+var s_latin8_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_14_index)
+var s_latin9_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_15_index)
+var s_latin10_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_iso_8859_16_index)
+var s_centraleurope_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_windows_1250_index)
+var s_cyrillic_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_windows_1251_index)
+var s_hebrew_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_windows_1255_index)
+var s_koi8r_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_koi8_r_index)
+var s_koi8u_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_koi8_u_index)
+var s_mac_roman_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_macintosh_index)
+var s_windows874_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_windows_874_index)
+var s_windows1252_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_windows_1252_index)
+var s_windows1253_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_windows_1253_index)
+var s_turkish_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_windows_1254_index)
+var s_windows1256_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_windows_1256_index)
+var s_windows1257_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_windows_1257_index)
+var s_windows1258_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_windows_1258_index)
+var s_mac_cyrillic_encoder: SingleByteEncoder[u16] = SingleByteEncoder[u16](encoder_base = Encoder(vtable = &single_byte_encoder_vtable.encoder_vtable, class_id = 8), m_translation_table = s_x_mac_cyrillic_index)
+
+# mark: Encoder lookup =========================================================================
+
+## Ported from Libraries/LibTextCodec/Encoder.cpp:59 TextCodec::encoder_for_exact_name: the encoder
+## for the exact encoding name given, or none.
+pub func encoder_for_exact_name(encoding: ak.StringView) -> Encoder*?:
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("utf-8")):
+        return s_utf8_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("big5")):
+        return s_big5_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("euc-jp")):
+        return s_euc_jp_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-2022-jp")):
+        return s_iso_2022_jp_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("shift_jis")):
+        return s_shift_jis_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("euc-kr")):
+        return s_euc_kr_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("gb18030")):
+        return s_gb18030_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("gbk")):
+        return s_gbk_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("ibm866")):
+        return s_ibm866_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-2")):
+        return s_latin2_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-3")):
+        return s_latin3_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-4")):
+        return s_latin4_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-5")):
+        return s_latin_cyrillic_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-6")):
+        return s_latin_arabic_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-7")):
+        return s_latin_greek_encoder.encoder()
+    if string_view_is_one_of_ignoring_ascii_case(&encoding, ["iso-8859-8", "iso-8859-8-i"]):
+        return s_latin_hebrew_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-10")):
+        return s_latin6_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-13")):
+        return s_latin7_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-14")):
+        return s_latin8_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-15")):
+        return s_latin9_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("iso-8859-16")):
+        return s_latin10_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("koi8-r")):
+        return s_koi8r_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("koi8-u")):
+        return s_koi8u_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("macintosh")):
+        return s_mac_roman_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("windows-874")):
+        return s_windows874_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("windows-1250")):
+        return s_centraleurope_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("windows-1251")):
+        return s_cyrillic_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("windows-1252")):
+        return s_windows1252_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("windows-1253")):
+        return s_windows1253_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("windows-1254")):
+        return s_turkish_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("windows-1255")):
+        return s_hebrew_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("windows-1256")):
+        return s_windows1256_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("windows-1257")):
+        return s_windows1257_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("windows-1258")):
+        return s_windows1258_encoder.encoder()
+    if ak.string_view_equals_ignoring_ascii_case(&encoding, sv("x-mac-cyrillic")):
+        return s_mac_cyrillic_encoder.encoder()
+    dbgln(f"TextCodec: No encoder implemented for encoding '{string_view_text(encoding)}'")
+    return none
+
+## Ported from Libraries/LibTextCodec/Encoder.cpp:135 TextCodec::encoder_for: the encoder of the
+## encoding a label names, or none.
+pub func encoder_for(label: ak.StringView) -> Encoder*?:
+    if let encoding = get_standardized_encoding(label):
+        return encoder_for_exact_name(encoding)
+    return none
+
+# mark: UTF-8 and EUC-JP =======================================================================
+
+## Ported from Libraries/LibTextCodec/Encoder.h:18 TextCodec::Encoder::process (pure virtual).
+pub func encoder_process_impl(this: Encoder*, arg0: ak.Utf8View, on_byte: ak.Function1[u8, unit], on_error: ak.Function1[u32, unit]) -> !:
+    trap("pure virtual: TextCodec::Encoder::process")
+
+## Ported from Libraries/LibTextCodec/Encoder.cpp:142 TextCodec::UTF8Encoder::process (override).
+## https://encoding.spec.whatwg.org/#utf-8-encoder
+pub func utf8_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byte: ak.Function1[u8, unit], on_error: ak.Function1[u32, unit]) -> !:
+    # ReadonlyBytes bytes { input.bytes(), input.byte_length() };
+    var bytes: const u8[]
+    if let data = ak.utf8_view_bytes(&input):
+        bytes = u8[]((u8*)data, ak.utf8_view_byte_length(&input))
+    for byte in bytes:
+        call_function1(on_byte, byte)
+
+## Ported from Libraries/LibTextCodec/Encoder.cpp:151 TextCodec::EUCJPEncoder::process (override).
+## https://encoding.spec.whatwg.org/#euc-jp-encoder
+pub func eucjp_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byte: ak.Function1[u8, unit], on_error: ak.Function1[u32, unit]) -> !:
+    # for (auto item : input)
+    let end = ak.utf8_view_end(&input)
+    var iterator = ak.utf8_view_begin(&input)
+    while iterator != end:
+        var item = ak.utf8_code_point_iterator_deref(&iterator)
+        discard(ak.utf8_code_point_iterator_inc(&iterator))
+
+        # 1. If code point is end-of-queue, return finished.
+
+        # 2. If code point is an ASCII code point, return a byte whose value is code point.
+        if ak.is_ascii(item):
+            call_function1(on_byte, (u8)item)
+            continue
+
+        # 3. If code point is U+00A5, return byte 0x5C.
+        if item == 0x00A5:
+            call_function1(on_byte, (u8)0x5C)
+            continue
+
+        # 4. If code point is U+203E, return byte 0x7E.
+        if item == 0x203E:
+            call_function1(on_byte, (u8)0x7E)
+            continue
+
+        # 5. If code point is in the range U+FF61 to U+FF9F, inclusive, return two bytes whose values are 0x8E and code point − 0xFF61 + 0xA1.
+        if item >= 0xFF61 and item <= 0xFF9F:
+            call_function1(on_byte, (u8)0x8E)
+            call_function1(on_byte, (u8)(item - 0xFF61 + 0xA1))
+            continue
+
+        # 6. If code point is U+2212, set it to U+FF0D.
+        if item == 0x2212:
+            item = 0xFF0D
+
+        # 7. Let pointer be the index pointer for code point in index jis0208.
+        let pointer = code_point_jis0208_index(item)
+
+        # 8. If pointer is null, return error with code point.
+        if pointer == none:
+            call_function1(on_error, item)
+            continue
+        let index_pointer = pointer else trap("VERIFY: Optional::operator* of an empty Optional")
+
+        # 9. Let lead be pointer / 94 + 0xA1.
+        let lead = index_pointer // 94 + 0xA1
+
+        # 10. Let trail be pointer % 94 + 0xA1.
+        let trail = index_pointer % 94 + 0xA1
+
+        # 11. Return two bytes whose values are lead and trail.
+        call_function1(on_byte, (u8)lead)
+        call_function1(on_byte, (u8)trail)
+
+# mark: ISO-2022-JP ============================================================================
+
+## Ported from Libraries/LibTextCodec/Encoder.cpp:209 TextCodec::ISO2022JPEncoder::process_item: runs
+## the encoder handler on one code point in `state` and answers the new state.
+## https://encoding.spec.whatwg.org/#iso-2022-jp-encoder
+pub func iso2022_jp_encoder_process_item(this: Iso2022JpEncoder*, item: u32, state: Iso2022JpEncoderState, on_byte: ak.Function1[u8, unit]*, on_error: ak.Function1[u32, unit]*) -> Iso2022JpEncoderState!:
+    var code_point = item  # C++ reassigns the `item` parameter
+
+    # 3. If ISO-2022-JP encoder state is ASCII or Roman, and code point is U+000E, U+000F, or U+001B, return error with U+FFFD.
+    if state == Iso2022JpEncoderState.ascii or state == Iso2022JpEncoderState.roman:
+        if code_point == 0x000E or code_point == 0x000F or code_point == 0x001B:
+            call_function1(*on_error, 0xFFFD)
+            return state
+
+    # 4. If ISO-2022-JP encoder state is ASCII and code point is an ASCII code point, return a byte whose value is code point.
+    if state == Iso2022JpEncoderState.ascii and ak.is_ascii(code_point):
+        call_function1(*on_byte, (u8)code_point)
+        return state
+
+    # 5. If ISO-2022-JP encoder state is Roman and code point is an ASCII code point, excluding U+005C and U+007E, or is U+00A5 or U+203E, then:
+    if state == Iso2022JpEncoderState.roman and ((ak.is_ascii(code_point) and code_point != 0x005C and code_point != 0x007E) or (code_point == 0x00A5 or code_point == 0x203E)):
+        # 1. If code point is an ASCII code point, return a byte whose value is code point.
+        if ak.is_ascii(code_point):
+            call_function1(*on_byte, (u8)code_point)
+            return state
+
+        # 2. If code point is U+00A5, return byte 0x5C.
+        if code_point == 0x00A5:
+            call_function1(*on_byte, (u8)0x5C)
+            return state
+
+        # 3. If code point is U+203E, return byte 0x7E.
+        if code_point == 0x203E:
+            call_function1(*on_byte, (u8)0x7E)
+            return state
+
+    # 6. If code point is an ASCII code point, and ISO-2022-JP encoder state is not ASCII, restore code point to ioQueue, set
+    #    ISO-2022-JP encoder state to ASCII, and return three bytes 0x1B 0x28 0x42.
+    if ak.is_ascii(code_point) and state != Iso2022JpEncoderState.ascii:
+        call_function1(*on_byte, (u8)0x1B)
+        call_function1(*on_byte, (u8)0x28)
+        call_function1(*on_byte, (u8)0x42)
+        return try iso2022_jp_encoder_process_item(this, code_point, Iso2022JpEncoderState.ascii, on_byte, on_error)
+
+    # 7. If code point is either U+00A5 or U+203E, and ISO-2022-JP encoder state is not Roman, restore code point to ioQueue,
+    #    set ISO-2022-JP encoder state to Roman, and return three bytes 0x1B 0x28 0x4A.
+    if (code_point == 0x00A5 or code_point == 0x203E) and state != Iso2022JpEncoderState.roman:
+        call_function1(*on_byte, (u8)0x1B)
+        call_function1(*on_byte, (u8)0x28)
+        call_function1(*on_byte, (u8)0x4A)
+        return try iso2022_jp_encoder_process_item(this, code_point, Iso2022JpEncoderState.roman, on_byte, on_error)
+
+    # 8. If code point is U+2212, set it to U+FF0D.
+    if code_point == 0x2212:
+        code_point = 0xFF0D
+
+    # 9. If code point is in the range U+FF61 to U+FF9F, inclusive, set it to the index code point for code point − 0xFF61
+    #    in index ISO-2022-JP katakana.
+    if code_point >= 0xFF61 and code_point <= 0xFF9F:
+        code_point = index_iso_2022_jp_katakana_code_point(code_point - 0xFF61) else trap("VERIFY: Optional::operator* of an empty Optional")
+
+    # 10. Let pointer be the index pointer for code point in index jis0208.
+    let pointer = code_point_jis0208_index(code_point)
+
+    # 11. If pointer is null, then:
+    if pointer == none:
+        # 1. If ISO-2022-JP encoder state is jis0208, then restore code point to ioQueue, set ISO-2022-JP encoder state to
+        #    ASCII, and return three bytes 0x1B 0x28 0x42.
+        if state == Iso2022JpEncoderState.jis0208:
+            # donor quirk: the bytes written are 0x1B 0x28 0x4A (the escape to Roman), not the 0x42 the step says.
+            call_function1(*on_byte, (u8)0x1B)
+            call_function1(*on_byte, (u8)0x28)
+            call_function1(*on_byte, (u8)0x4A)
+            return try iso2022_jp_encoder_process_item(this, code_point, Iso2022JpEncoderState.ascii, on_byte, on_error)
+
+        # 2. Return error with code point.
+        call_function1(*on_error, code_point)
+        return state
+    let index_pointer = pointer else trap("VERIFY: Optional::operator* of an empty Optional")
+
+    # 12. If ISO-2022-JP encoder state is not jis0208, restore code point to ioQueue, set ISO-2022-JP encoder state to
+    #     jis0208, and return three bytes 0x1B 0x24 0x42.
+    if state != Iso2022JpEncoderState.jis0208:
+        call_function1(*on_byte, (u8)0x1B)
+        call_function1(*on_byte, (u8)0x24)
+        call_function1(*on_byte, (u8)0x42)
+        return try iso2022_jp_encoder_process_item(this, code_point, Iso2022JpEncoderState.jis0208, on_byte, on_error)
+
+    # 13. Let lead be pointer / 94 + 0x21.
+    let lead = index_pointer // 94 + 0x21
+
+    # 14. Let trail be pointer % 94 + 0x21.
+    let trail = index_pointer % 94 + 0x21
+
+    # 15. Return two bytes whose values are lead and trail.
+    call_function1(*on_byte, (u8)lead)
+    call_function1(*on_byte, (u8)trail)
+    return state
+
+## Ported from Libraries/LibTextCodec/Encoder.cpp:315 TextCodec::ISO2022JPEncoder::process (override).
+## https://encoding.spec.whatwg.org/#iso-2022-jp-encoder
+pub func iso2022_jp_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byte: ak.Function1[u8, unit], on_error: ak.Function1[u32, unit]) -> !:
+    let this = (Iso2022JpEncoder*)base
+    var byte_callback = on_byte  # process_item takes the callbacks by reference
+    var error_callback = on_error
+
+    # ISO-2022-JP’s encoder has an associated ISO-2022-JP encoder state which is ASCII, Roman, or jis0208 (initially ASCII).
+    var state = Iso2022JpEncoderState.ascii
+
+    # for (u32 item : input)
+    let end = ak.utf8_view_end(&input)
+    var iterator = ak.utf8_view_begin(&input)
+    while iterator != end:
+        let item = ak.utf8_code_point_iterator_deref(&iterator)
+        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        state = try iso2022_jp_encoder_process_item(this, item, state, &byte_callback, &error_callback)
+
+    # 1. If code point is end-of-queue and ISO-2022-JP encoder state is not ASCII, set ISO-2022-JP
+    #    encoder state to ASCII, and return three bytes 0x1B 0x28 0x42.
+    if state != Iso2022JpEncoderState.ascii:
+        state = Iso2022JpEncoderState.ascii
+        call_function1(on_byte, (u8)0x1B)
+        call_function1(on_byte, (u8)0x28)
+        call_function1(on_byte, (u8)0x42)
+        return
+
+    # 2. If code point is end-of-queue and ISO-2022-JP encoder state is ASCII, return finished.
+    return

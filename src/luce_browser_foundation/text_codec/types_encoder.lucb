@@ -36,7 +36,7 @@ pub func encoder_process(this: Encoder*, arg0: ak.Utf8View, on_byte: ak.Function
 pub let encoder_vtable: EncoderVTable = EncoderVTable(class_info = &encoder_class)
 
 ## Class information of TextCodec::Encoder: name, class-id range (pre-order), size, vtable.
-pub let encoder_class: ak.ClassInfo = ak.ClassInfo(name = "Encoder", first_id = 0, last_id = 7, size = sizeof(Encoder), vtable = (const void*)&encoder_vtable)
+pub let encoder_class: ak.ClassInfo = ak.ClassInfo(name = "Encoder", first_id = 0, last_id = 8, size = sizeof(Encoder), vtable = (const void*)&encoder_vtable)
 
 ## is<TextCodec::Encoder>: the class-id range test.
 pub func is_encoder[P: IsEncoder](p: P*) -> bool:
@@ -51,27 +51,6 @@ pub func as_if_encoder[P: IsEncoder](p: P*) -> Encoder*?:
 ## as<TextCodec::Encoder> (verify_cast).
 pub func as_encoder[P: IsEncoder](p: P*) -> Encoder*:
     return as_if_encoder(p) else trap("as<TextCodec::Encoder> failed")
-
-## TextCodec::(anonymous)::s_utf8_encoder (Libraries/LibTextCodec/Encoder.cpp:18).
-pub var s_utf8_encoder: Utf8Encoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_gb18030_encoder (Libraries/LibTextCodec/Encoder.cpp:19).
-pub var s_gb18030_encoder: Gb18030Encoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_gbk_encoder (Libraries/LibTextCodec/Encoder.cpp:20).
-pub var s_gbk_encoder: Gb18030Encoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_big5_encoder (Libraries/LibTextCodec/Encoder.cpp:21).
-pub var s_big5_encoder: Big5Encoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_euc_jp_encoder (Libraries/LibTextCodec/Encoder.cpp:22).
-pub var s_euc_jp_encoder: EucjpEncoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_iso_2022_jp_encoder (Libraries/LibTextCodec/Encoder.cpp:23).
-pub var s_iso_2022_jp_encoder: Iso2022JpEncoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_shift_jis_encoder (Libraries/LibTextCodec/Encoder.cpp:24).
-pub var s_shift_jis_encoder: ShiftJisEncoder?  # not zeroable in Luce: optional until initialized
 
 # mark: Utf8Encoder =============================================================================
 
@@ -111,13 +90,6 @@ pub func as_if_utf8_encoder[P: IsEncoder](p: P*) -> Utf8Encoder*?:
 pub func as_utf8_encoder[P: IsEncoder](p: P*) -> Utf8Encoder*:
     return as_if_utf8_encoder(p) else trap("as<TextCodec::UTF8Encoder> failed")
 
-## TextCodec::(anonymous)::s_euc_kr_encoder (Libraries/LibTextCodec/Encoder.cpp:25).
-pub var s_euc_kr_encoder: EuckrEncoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_ibm866_encoder (Libraries/LibTextCodec/Encoder.cpp:29).
-# C++ initializer: { s_ibm866_index }
-pub var s_ibm866_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
 # mark: EucjpEncoder ============================================================================
 
 ## TextCodec::EUCJPEncoder (Libraries/LibTextCodec/Encoder.h:29).
@@ -155,26 +127,6 @@ pub func as_if_eucjp_encoder[P: IsEncoder](p: P*) -> EucjpEncoder*?:
 ## as<TextCodec::EUCJPEncoder> (verify_cast).
 pub func as_eucjp_encoder[P: IsEncoder](p: P*) -> EucjpEncoder*:
     return as_if_eucjp_encoder(p) else trap("as<TextCodec::EUCJPEncoder> failed")
-
-## TextCodec::(anonymous)::s_latin2_encoder (Libraries/LibTextCodec/Encoder.cpp:30).
-# C++ initializer: { s_iso_8859_2_index }
-pub var s_latin2_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin3_encoder (Libraries/LibTextCodec/Encoder.cpp:31).
-# C++ initializer: { s_iso_8859_3_index }
-pub var s_latin3_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin4_encoder (Libraries/LibTextCodec/Encoder.cpp:32).
-# C++ initializer: { s_iso_8859_4_index }
-pub var s_latin4_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin_cyrillic_encoder (Libraries/LibTextCodec/Encoder.cpp:33).
-# C++ initializer: { s_iso_8859_5_index }
-pub var s_latin_cyrillic_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin_arabic_encoder (Libraries/LibTextCodec/Encoder.cpp:34).
-# C++ initializer: { s_iso_8859_6_index }
-pub var s_latin_arabic_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
 
 # mark: Iso2022JpEncoder ========================================================================
 
@@ -214,67 +166,11 @@ pub func as_if_iso2022_jp_encoder[P: IsEncoder](p: P*) -> Iso2022JpEncoder*?:
 pub func as_iso2022_jp_encoder[P: IsEncoder](p: P*) -> Iso2022JpEncoder*:
     return as_if_iso2022_jp_encoder(p) else trap("as<TextCodec::ISO2022JPEncoder> failed")
 
-## TextCodec::(anonymous)::s_latin_greek_encoder (Libraries/LibTextCodec/Encoder.cpp:35).
-# C++ initializer: { s_iso_8859_7_index }
-pub var s_latin_greek_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin_hebrew_encoder (Libraries/LibTextCodec/Encoder.cpp:36).
-# C++ initializer: { s_iso_8859_8_index }
-pub var s_latin_hebrew_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin6_encoder (Libraries/LibTextCodec/Encoder.cpp:37).
-# C++ initializer: { s_iso_8859_10_index }
-pub var s_latin6_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin7_encoder (Libraries/LibTextCodec/Encoder.cpp:38).
-# C++ initializer: { s_iso_8859_13_index }
-pub var s_latin7_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin8_encoder (Libraries/LibTextCodec/Encoder.cpp:39).
-# C++ initializer: { s_iso_8859_14_index }
-pub var s_latin8_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
 ## TextCodec::ISO2022JPEncoder::State (Libraries/LibTextCodec/Encoder.h:39).
 pub enum Iso2022JpEncoderState as i32:
     ascii = 0
     roman = 1
     jis0208 = 2
-
-## TextCodec::(anonymous)::s_latin9_encoder (Libraries/LibTextCodec/Encoder.cpp:40).
-# C++ initializer: { s_iso_8859_15_index }
-pub var s_latin9_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin10_encoder (Libraries/LibTextCodec/Encoder.cpp:41).
-# C++ initializer: { s_iso_8859_16_index }
-pub var s_latin10_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_centraleurope_encoder (Libraries/LibTextCodec/Encoder.cpp:42).
-# C++ initializer: { s_windows_1250_index }
-pub var s_centraleurope_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_cyrillic_encoder (Libraries/LibTextCodec/Encoder.cpp:43).
-# C++ initializer: { s_windows_1251_index }
-pub var s_cyrillic_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_hebrew_encoder (Libraries/LibTextCodec/Encoder.cpp:44).
-# C++ initializer: { s_windows_1255_index }
-pub var s_hebrew_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_koi8r_encoder (Libraries/LibTextCodec/Encoder.cpp:45).
-# C++ initializer: { s_koi8_r_index }
-pub var s_koi8r_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_koi8u_encoder (Libraries/LibTextCodec/Encoder.cpp:46).
-# C++ initializer: { s_koi8_u_index }
-pub var s_koi8u_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_mac_roman_encoder (Libraries/LibTextCodec/Encoder.cpp:47).
-# C++ initializer: { s_macintosh_index }
-pub var s_mac_roman_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_windows874_encoder (Libraries/LibTextCodec/Encoder.cpp:48).
-# C++ initializer: { s_windows_874_index }
-pub var s_windows874_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
 
 # mark: ShiftJisEncoder =========================================================================
 
@@ -314,26 +210,6 @@ pub func as_if_shift_jis_encoder[P: IsEncoder](p: P*) -> ShiftJisEncoder*?:
 pub func as_shift_jis_encoder[P: IsEncoder](p: P*) -> ShiftJisEncoder*:
     return as_if_shift_jis_encoder(p) else trap("as<TextCodec::ShiftJISEncoder> failed")
 
-## TextCodec::(anonymous)::s_windows1252_encoder (Libraries/LibTextCodec/Encoder.cpp:49).
-# C++ initializer: { s_windows_1252_index }
-pub var s_windows1252_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_windows1253_encoder (Libraries/LibTextCodec/Encoder.cpp:50).
-# C++ initializer: { s_windows_1253_index }
-pub var s_windows1253_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_turkish_encoder (Libraries/LibTextCodec/Encoder.cpp:51).
-# C++ initializer: { s_windows_1254_index }
-pub var s_turkish_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_windows1256_encoder (Libraries/LibTextCodec/Encoder.cpp:52).
-# C++ initializer: { s_windows_1256_index }
-pub var s_windows1256_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_windows1257_encoder (Libraries/LibTextCodec/Encoder.cpp:53).
-# C++ initializer: { s_windows_1257_index }
-pub var s_windows1257_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
 # mark: EuckrEncoder ============================================================================
 
 ## TextCodec::EUCKREncoder (Libraries/LibTextCodec/Encoder.h:53).
@@ -371,14 +247,6 @@ pub func as_if_euckr_encoder[P: IsEncoder](p: P*) -> EuckrEncoder*?:
 ## as<TextCodec::EUCKREncoder> (verify_cast).
 pub func as_euckr_encoder[P: IsEncoder](p: P*) -> EuckrEncoder*:
     return as_if_euckr_encoder(p) else trap("as<TextCodec::EUCKREncoder> failed")
-
-## TextCodec::(anonymous)::s_windows1258_encoder (Libraries/LibTextCodec/Encoder.cpp:54).
-# C++ initializer: { s_windows_1258_index }
-pub var s_windows1258_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_mac_cyrillic_encoder (Libraries/LibTextCodec/Encoder.cpp:55).
-# C++ initializer: { s_x_mac_cyrillic_index }
-pub var s_mac_cyrillic_encoder: (SingleByteEncoder[u16])?  # not zeroable in Luce: optional until initialized
 
 # mark: Big5Encoder =============================================================================
 
@@ -469,6 +337,26 @@ pub enum Gb18030EncoderIsGbk as i32:
 # mark: SingleByteEncoder =======================================================================
 
 ## TextCodec::SingleByteEncoder (Libraries/LibTextCodec/Encoder.h:78): a generic struct.
-pub struct SingleByteEncoder[TArrayType]:
-    pub var encoder: Encoder
-    pub var m_translation_table: TArrayType[]
+# Filled by region r06: the base is `encoder_base` with the IsEncoder upcast, the table is held by
+# value as the C++ Array<ArrayType, 128> is, and the class gets a vtable and class id 8 (after the
+# generated pre-order). The donor instantiates only ArrayType = u16, so the vtable is that one's.
+pub struct SingleByteEncoder[TArrayType]: IsEncoder:
+    pub var encoder_base: Encoder  # primary base
+    pub var m_translation_table: TArrayType[128]
+
+    func encoder() -> Encoder*: return (Encoder*)&self
+
+## Virtual functions introduced by TextCodec::SingleByteEncoder.
+pub struct SingleByteEncoderVTable:
+    pub let encoder_vtable: EncoderVTable
+
+## The vtable of TextCodec::SingleByteEncoder<u16>.
+pub let single_byte_encoder_vtable: SingleByteEncoderVTable = SingleByteEncoderVTable(encoder_vtable = EncoderVTable(class_info = &single_byte_encoder_class, process = single_byte_encoder_process_impl))
+
+## Class information of TextCodec::SingleByteEncoder: name, class-id range (pre-order), size, vtable.
+pub let single_byte_encoder_class: ak.ClassInfo = ak.ClassInfo(name = "SingleByteEncoder", first_id = 8, last_id = 8, size = sizeof(SingleByteEncoder[u16]), vtable = (const void*)&single_byte_encoder_vtable)
+
+## is<TextCodec::SingleByteEncoder>: the class-id range test.
+pub func is_single_byte_encoder[P: IsEncoder](p: P*) -> bool:
+    let id = p.encoder().class_id
+    return id >= single_byte_encoder_class.first_id and id <= single_byte_encoder_class.last_id

@@ -1,0 +1,56 @@
+#==============================================================================================
+#
+#   tests_decoder_tails - the incomplete-tail lengths StreamingDecoder buffers
+#
+#   DESCRIPTION:
+#       Decoder::incomplete_tail_length through the vtable of each decoder whose tail scan needs
+#       nothing from ak (gb18030's and UTF-16's are in tests/text_codec.lucb). Each expectation was
+#       printed by the reference build's LibTextCodec (Ladybird 47c82b38d0) for the same bytes.
+#
+#==============================================================================================
+
+test "incomplete tail length: utf-8":
+    assert(decoder_incomplete_tail_length(s_utf8_decoder.decoder(), b"\x61\xc3") == 1)
+    assert(decoder_incomplete_tail_length(s_utf8_decoder.decoder(), b"\x61\xe2\x82") == 2)
+    assert(decoder_incomplete_tail_length(s_utf8_decoder.decoder(), b"\xf0\x9f\x98") == 3)
+    assert(decoder_incomplete_tail_length(s_utf8_decoder.decoder(), b"\xf0\x9f\x98\x80") == 0)
+    assert(decoder_incomplete_tail_length(s_utf8_decoder.decoder(), b"\x80\x80\x80\x80") == 0)
+    assert(decoder_incomplete_tail_length(s_utf8_decoder.decoder(), b"\xc0") == 0)
+    assert(decoder_incomplete_tail_length(s_utf8_decoder.decoder(), b"\xf5\x80") == 0)
+    assert(decoder_incomplete_tail_length(s_utf8_decoder.decoder(), b"\x61") == 0)
+
+test "incomplete tail length: big5":
+    assert(decoder_incomplete_tail_length(s_big5_decoder.decoder(), b"\xa4") == 1)
+    assert(decoder_incomplete_tail_length(s_big5_decoder.decoder(), b"\xa4\xa4") == 0)
+    assert(decoder_incomplete_tail_length(s_big5_decoder.decoder(), b"\xa4\x20\xa4") == 1)
+    assert(decoder_incomplete_tail_length(s_big5_decoder.decoder(), b"\xff\x41") == 0)
+
+test "incomplete tail length: euc-jp":
+    assert(decoder_incomplete_tail_length(s_euc_jp_decoder.decoder(), b"\x8f\xa2") == 2)
+    assert(decoder_incomplete_tail_length(s_euc_jp_decoder.decoder(), b"\x8f") == 1)
+    assert(decoder_incomplete_tail_length(s_euc_jp_decoder.decoder(), b"\x8f\x20\xa1") == 1)
+    assert(decoder_incomplete_tail_length(s_euc_jp_decoder.decoder(), b"\x8f\xa2\xaf") == 0)
+    assert(decoder_incomplete_tail_length(s_euc_jp_decoder.decoder(), b"\x8e") == 1)
+    assert(decoder_incomplete_tail_length(s_euc_jp_decoder.decoder(), b"\x8e\xe0") == 1)
+    assert(decoder_incomplete_tail_length(s_euc_jp_decoder.decoder(), b"\xa4\xe8\xa4") == 1)
+
+test "incomplete tail length: shift_jis":
+    assert(decoder_incomplete_tail_length(s_shift_jis_decoder.decoder(), b"\x82") == 1)
+    assert(decoder_incomplete_tail_length(s_shift_jis_decoder.decoder(), b"\x82\xa0") == 0)
+    assert(decoder_incomplete_tail_length(s_shift_jis_decoder.decoder(), b"\xa1\xe0") == 1)
+    assert(decoder_incomplete_tail_length(s_shift_jis_decoder.decoder(), b"\x80\xfd") == 0)
+
+test "incomplete tail length: euc-kr":
+    assert(decoder_incomplete_tail_length(s_euc_kr_decoder.decoder(), b"\x81") == 1)
+    assert(decoder_incomplete_tail_length(s_euc_kr_decoder.decoder(), b"\x81\x41\xfe") == 1)
+    assert(decoder_incomplete_tail_length(s_euc_kr_decoder.decoder(), b"\x81\x20") == 0)
+
+test "incomplete tail length: iso-2022-jp":
+    assert(decoder_incomplete_tail_length(s_iso_2022_jp_decoder.decoder(), b"\x61\x1b") == 1)
+    assert(decoder_incomplete_tail_length(s_iso_2022_jp_decoder.decoder(), b"\x1b\x24") == 2)
+    assert(decoder_incomplete_tail_length(s_iso_2022_jp_decoder.decoder(), b"\x1b\x28") == 2)
+    assert(decoder_incomplete_tail_length(s_iso_2022_jp_decoder.decoder(), b"\x1b\x78") == 0)
+    assert(decoder_incomplete_tail_length(s_iso_2022_jp_decoder.decoder(), b"\x61") == 0)
+
+test "incomplete tail length: windows-1252":
+    assert(decoder_incomplete_tail_length(s_windows1252_decoder.decoder(), b"\x81") == 0)

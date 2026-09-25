@@ -1,0 +1,126 @@
+#==============================================================================================
+#
+#   test_text_encoders - Tests/LibTextCodec/TestTextEncoders.cpp
+#
+#   DESCRIPTION:
+#       The donor's encoder tests, ported one TEST_CASE to one test.
+#
+#==============================================================================================
+
+# mark: TestTextEncoders.cpp ===================================================================
+
+# MUST(encoder.process(Utf8View(test_string), append byte, EXPECT(false))) into `bytes`.
+func encode_without_errors(encoder: tc.Encoder*, test_string: str, bytes: Bytes*):
+    tc.encoder_process(encoder, utf8_view_of(test_string.bytes), ak.Function1[u8, unit](call = append_byte, context = bytes), ak.Function1[u32, unit](call = expect_no_error, context = none)) else trap("MUST")
+
+test "test_utf8_encode":
+    var encoder = tc.Utf8Encoder(encoder_base = tc.Encoder(vtable = &tc.utf8_encoder_vtable.encoder_vtable, class_id = tc.utf8_encoder_class.first_id))
+    # Unicode character U+1F600 GRINNING FACE
+    var processed_bytes = Bytes()
+    encode_without_errors((tc.Encoder*)&encoder, "\u{1F600}", &processed_bytes)
+    assert(processed_bytes.count == 4)
+    assert(processed_bytes.items[0] == 0xF0)
+    assert(processed_bytes.items[1] == 0x9F)
+    assert(processed_bytes.items[2] == 0x98)
+    assert(processed_bytes.items[3] == 0x80)
+
+test "test_euc_jp_encoder":
+    var encoder = tc.EucjpEncoder(encoder_base = tc.Encoder(vtable = &tc.eucjp_encoder_vtable.encoder_vtable, class_id = tc.eucjp_encoder_class.first_id))
+    # U+A5 Yen Sign
+    # U+3088 Hiragana Letter Yo
+    # U+30C4 Katakana Letter Tu
+    var processed_bytes = Bytes()
+    encode_without_errors((tc.Encoder*)&encoder, "\u{A5}\u{3088}\u{30C4}", &processed_bytes)
+    assert(processed_bytes.count == 5)
+    assert(processed_bytes.items[0] == 0x5C)
+    assert(processed_bytes.items[1] == 0xA4)
+    assert(processed_bytes.items[2] == 0xE8)
+    assert(processed_bytes.items[3] == 0xA5)
+    assert(processed_bytes.items[4] == 0xC4)
+
+test "test_iso_2022_jp_encoder":
+    var encoder = tc.Iso2022JpEncoder(encoder_base = tc.Encoder(vtable = &tc.iso2022_jp_encoder_vtable.encoder_vtable, class_id = tc.iso2022_jp_encoder_class.first_id))
+    # U+A5 Yen Sign
+    # U+3088 Hiragana Letter Yo
+    # U+30C4 Katakana Letter Tu
+    var processed_bytes = Bytes()
+    encode_without_errors((tc.Encoder*)&encoder, "\u{A5}\u{3088}\u{30C4}", &processed_bytes)
+    assert(processed_bytes.count == 14)
+    assert(processed_bytes.items[0] == 0x1B)
+    assert(processed_bytes.items[1] == 0x28)
+    assert(processed_bytes.items[2] == 0x4A)
+    assert(processed_bytes.items[3] == 0x5C)
+    assert(processed_bytes.items[4] == 0x1B)
+    assert(processed_bytes.items[5] == 0x24)
+    assert(processed_bytes.items[6] == 0x42)
+    assert(processed_bytes.items[7] == 0x24)
+    assert(processed_bytes.items[8] == 0x68)
+    assert(processed_bytes.items[9] == 0x25)
+    assert(processed_bytes.items[10] == 0x44)
+    assert(processed_bytes.items[11] == 0x1B)
+    assert(processed_bytes.items[12] == 0x28)
+    assert(processed_bytes.items[13] == 0x42)
+
+test "test_shift_jis_encoder":
+    var encoder = tc.ShiftJisEncoder(encoder_base = tc.Encoder(vtable = &tc.shift_jis_encoder_vtable.encoder_vtable, class_id = tc.shift_jis_encoder_class.first_id))
+    # U+A5 Yen Sign
+    # U+3088 Hiragana Letter Yo
+    # U+30C4 Katakana Letter Tu
+    var processed_bytes = Bytes()
+    encode_without_errors((tc.Encoder*)&encoder, "\u{A5}\u{3088}\u{30C4}", &processed_bytes)
+    assert(processed_bytes.count == 5)
+    assert(processed_bytes.items[0] == 0x5C)
+    assert(processed_bytes.items[1] == 0x82)
+    assert(processed_bytes.items[2] == 0xE6)
+    assert(processed_bytes.items[3] == 0x83)
+    assert(processed_bytes.items[4] == 0x63)
+
+test "test_euc_kr_encoder":
+    var encoder = tc.EuckrEncoder(encoder_base = tc.Encoder(vtable = &tc.euckr_encoder_vtable.encoder_vtable, class_id = tc.euckr_encoder_class.first_id))
+    # U+B29F Hangul Syllable Neulh
+    # U+7C97 CJK Unified Ideograph-7C97
+    var processed_bytes = Bytes()
+    encode_without_errors((tc.Encoder*)&encoder, "\u{B29F}\u{7C97}", &processed_bytes)
+    assert(processed_bytes.count == 4)
+    assert(processed_bytes.items[0] == 0x88)
+    assert(processed_bytes.items[1] == 0x6B)
+    assert(processed_bytes.items[2] == 0xF0)
+    assert(processed_bytes.items[3] == 0xD8)
+
+test "test_big5_encoder":
+    var encoder = tc.Big5Encoder(encoder_base = tc.Encoder(vtable = &tc.big5_encoder_vtable.encoder_vtable, class_id = tc.big5_encoder_class.first_id))
+    # U+A7 Section Sign
+    # U+70D7 CJK Unified Ideograph-70D7
+    var processed_bytes = Bytes()
+    encode_without_errors((tc.Encoder*)&encoder, "\u{A7}\u{70D7}", &processed_bytes)
+    assert(processed_bytes.count == 4)
+    assert(processed_bytes.items[0] == 0xA1)
+    assert(processed_bytes.items[1] == 0xB1)
+    assert(processed_bytes.items[2] == 0xD2)
+    assert(processed_bytes.items[3] == 0x71)
+
+test "test_gb18030_encoder":
+    var encoder: tc.Gb18030Encoder = ---
+    tc.gb18030_encoder_construct(&encoder)
+    # U+20AC Euro Sign
+    # U+E4C5 Private Use Area
+    var processed_bytes = Bytes()
+    encode_without_errors((tc.Encoder*)&encoder, "\u{20AC}\u{E4C5}", &processed_bytes)
+    assert(processed_bytes.count == 4)
+    assert(processed_bytes.items[0] == 0xA2)
+    assert(processed_bytes.items[1] == 0xE3)
+    assert(processed_bytes.items[2] == 0xFE)
+    assert(processed_bytes.items[3] == 0xFE)
+
+test "test_windows1252_encoder":
+    let encoder = tc.encoder_for_exact_name(sv("windows-1252")) else trap("encoder.value()")
+    let test_string = "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏfoo€"
+    var processed_bytes = Bytes()
+    encode_without_errors(encoder, test_string, &processed_bytes)
+    assert(processed_bytes.count == 20)
+    for i: u8 in 0..<15:
+        assert(processed_bytes.items[i] == 0xC0 + i)
+    assert(processed_bytes.items[16] == 0x66)
+    assert(processed_bytes.items[17] == 0x6F)
+    assert(processed_bytes.items[18] == 0x6F)
+    assert(processed_bytes.items[19] == 0x80)

@@ -1,0 +1,75 @@
+#==============================================================================================
+#
+#   ak_support - the AK operations LibTextCodec uses that ak has no usable stub for yet
+#
+#   DESCRIPTION:
+#       LibTextCodec leans on a few AK templates the skeleton could not give a callable
+#       signature: the parameter pack of StringView::is_one_of_ignoring_ascii_case, calling an
+#       AK::Function, AK::binary_search with a comparator, dbgln with a message, and the ""sv
+#       literal. Each helper here does what the AK template does, spelled over ak's stubs, and
+#       says which ak function should replace it once regions r01-r03 settle those signatures.
+#
+#==============================================================================================
+
+## "text"sv: a StringView of a string literal (AK/StringView.h operator""sv).
+func sv(text: str) -> ak.StringView:
+    return ak.literalsv_u8(text.bytes.data, text.length)
+
+## AK::StringView::is_one_of_ignoring_ascii_case(strings...) (AK/StringView.h:336): true when
+## the view is an ASCII case-insensitive match for any of `strings`. C++ folds a parameter pack of
+## equals_ignoring_ascii_case calls with ||; the pack is a span here.
+func string_view_is_one_of_ignoring_ascii_case(this: const ak.StringView*, strings: const str[]) -> bool:
+    for string in strings:
+        if ak.string_view_equals_ignoring_ascii_case(this, sv(string)):
+            return true
+    return false
+
+## AK::Function<ErrorOr<void>(A)>::operator() (AK/Function.h): calls the function with its capture
+## context. LibTextCodec's callbacks cannot fail in the port (the donor's only return {} or fail
+## on allocation, which traps here), so the call returns nothing.
+func call_function1[A](function: ak.Function1[A, unit], argument: A):
+    let call = function.call else trap("VERIFY: calling an empty AK::Function")
+    call(function.context, argument)
+
+## AK::dbgln(fmt, ...) (AK/Format.h:743): writes one line of debug output to standard error.
+## ak.dbgln's generated stub takes no message yet; switch to it once region r03 ports it.
+func dbgln(message: fmt):
+    discard(io.stderr().write(f"{message}\n") else 0)
+
+## AK::binary_search(s_gb18030_ranges, needle, &nearby_index, comparator) (AK/BinarySearch.h:29)
+## over the gb18030 ranges, the one table LibTextCodec searches: the same halving, the same
+## comparator contract (needle minus entry, negative, zero or positive) and the same nearby index,
+## min(low, high), when the needle is absent. ak.binary_search's generated signature takes a
+## generic comparator value, which Base cannot call; switch to it once region r01 settles it.
+func binary_search_gb18030_ranges(needle: u32, nearby_index: usize*, comparator: func(u32, const Gb18030RangeEntry*) -> i32) -> const Gb18030RangeEntry*?:
+    let haystack: const Gb18030RangeEntry[] = s_gb18030_ranges
+    if haystack.length == 0:
+        *nearby_index = 0
+        return none
+
+    var low: usize = 0
+    var high: usize = haystack.length - 1
+    while low <= high:
+        let middle = low + (high - low) // 2
+
+        let comparison = comparator(needle, &haystack[middle])
+
+        if comparison < 0:
+            if middle != 0:
+                high = middle - 1
+            else:
+                break
+        elif comparison > 0:
+            low = middle + 1
+        else:
+            *nearby_index = middle
+            return &haystack[middle]
+
+    *nearby_index = low if low < high else high  # min(low, high)
+
+    return none
+
+## A StringView's bytes as text for debug output: AK's formatter writes the bytes as they are;
+## bytes that are not UTF-8 print as a marker here.
+func string_view_text(view: ak.StringView) -> str:
+    return str(ak.string_view_bytes(&view)) else "<not UTF-8>"

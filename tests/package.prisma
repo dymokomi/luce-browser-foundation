@@ -1,0 +1,10 @@
+#prisma 4.0
+def package "luce_browser_foundation_tests" {
+    str source = "."
+    def dependency "luce-browser-foundation" {
+        str path = ".."
+    }
+    def dependency "luce-std" {
+        str path = "../../luce-std"
+    }
+}

@@ -1,0 +1,141 @@
+#==============================================================================================
+#
+#   codec_api - labels, lookup, BOM sniffing, decode, isomorphic coding, tails
+#
+#   DESCRIPTION:
+#       The rest of LibTextCodec's interface: the label table, decoder_for and encoder_for,
+#       BOM sniffing and decode, get_output_encoding, isomorphic decode and encode, constructed
+#       codecs, and the incomplete-tail scans that use ak.
+#
+#==============================================================================================
+
+# mark: Labels, BOM sniffing, streaming tails =================================================
+
+test "labels resolve to encodings as the Encoding Standard's table says":
+    expect_label("utf8", "UTF-8")
+    expect_label(" UTF-8 ", "UTF-8")
+    expect_label("\t\n\u{c}\r unicode-1-1-utf-8\r", "UTF-8")
+    expect_label("latin1", "windows-1252")
+    expect_label("ASCII", "windows-1252")
+    expect_label("us-ascii", "windows-1252")
+    expect_label("iso-8859-1", "windows-1252")
+    expect_label("iso-8859-8", "ISO-8859-8")
+    expect_label("logical", "ISO-8859-8-I")
+    expect_label("visual", "ISO-8859-8")
+    expect_label("koi8-r", "KOI8-R")
+    expect_label("koi8r", "koi8-r")
+    expect_label("koi", "KOI8-R")
+    expect_label("gb2312", "GBK")
+    expect_label("GBK", "GBK")
+    expect_label("gb18030", "gb18030")
+    expect_label("big5-hkscs", "Big5")
+    expect_label("x-euc-jp", "EUC-JP")
+    expect_label("csiso2022jp", "ISO-2022-JP")
+    expect_label("sjis", "Shift_JIS")
+    expect_label("windows-949", "EUC-KR")
+    expect_label("iso-2022-kr", "replacement")
+    expect_label("hz-gb-2312", "replacement")
+    expect_label("utf-16", "UTF-16LE")
+    expect_label("UTF-16BE", "UTF-16BE")
+    expect_label("unicodefffe", "UTF-16BE")
+    expect_label("x-user-defined", "x-user-defined")
+    expect_label("pdfdocencoding", "PDFDocEncoding")
+    expect_label("tis-620", "windows-874")
+    expect_label("iso-8859-11", "windows-874")
+    expect_label("iso-8859-9", "windows-1254")
+    expect_label("x-mac-ukrainian", "x-mac-cyrillic")
+    expect_label("mac", "macintosh")
+    expect_label("", none)
+    expect_label("utf-32", none)
+    expect_label("latin 1", none)
+    expect_label("iso-8859-12", none)
+
+test "decoder_for goes through the label table; decoder_for_exact_name does not":
+    let windows_1252 = tc.decoder_for(sv("iso-8859-1")) else trap("no decoder")
+    let latin1 = tc.decoder_for_exact_name(sv("ISO-8859-1")) else trap("no decoder")
+    assert(windows_1252 != latin1)
+    assert(windows_1252 == tc.decoder_for_exact_name(sv("windows-1252")))
+    assert(tc.decoder_for(sv(" utf8 ")) == tc.decoder_for_exact_name(sv("utf-8")))
+    assert(tc.decoder_for(sv("gbk")) == tc.decoder_for(sv("gb18030")))
+    assert(tc.decoder_for(sv("utf-32")) == none)
+    assert(tc.decoder_for_exact_name(sv("utf-32")) == none)
+    assert(tc.decoder_for_exact_name(sv("GBK")) != none)
+
+test "encoder_for goes through the label table":
+    assert(tc.encoder_for(sv("latin1")) == tc.encoder_for_exact_name(sv("windows-1252")))
+    assert(tc.encoder_for(sv("gbk")) != tc.encoder_for(sv("gb18030")))
+    assert(tc.encoder_for(sv("utf-16le")) == none)
+    assert(tc.encoder_for(sv("replacement")) == none)
+    assert(tc.encoder_for(sv("x-user-defined")) == none)
+
+test "get_output_encoding":
+    let a = tc.get_output_encoding(sv("UTF-16LE"))
+    assert(bytes_equal(ak.string_view_bytes(&a), "UTF-8".bytes))
+    let b = tc.get_output_encoding(sv("replacement"))
+    assert(bytes_equal(ak.string_view_bytes(&b), "UTF-8".bytes))
+    let c = tc.get_output_encoding(sv("Shift_JIS"))
+    assert(bytes_equal(ak.string_view_bytes(&c), "Shift_JIS".bytes))
+
+test "BOM sniffing":
+    assert(tc.bom_sniff_to_decoder(view_of(b"\xef\xbb\xbfa")) == tc.decoder_for_exact_name(sv("utf-8")))
+    assert(tc.bom_sniff_to_decoder(view_of(b"\xef\xbb")) == none)
+    assert(tc.bom_sniff_to_decoder(view_of(b"\xfe\xff")) == tc.decoder_for_exact_name(sv("utf-16be")))
+    assert(tc.bom_sniff_to_decoder(view_of(b"\xff\xfe\x00")) == tc.decoder_for_exact_name(sv("utf-16le")))
+    assert(tc.bom_sniff_to_decoder(view_of(b"\xff")) == none)
+    assert(tc.bom_sniff_to_decoder(view_of(b"\xfe\xfe")) == none)
+    assert(tc.bom_sniff_to_decoder(view_of(b"ab")) == none)
+
+test "decode with a fallback decoder unless there is a byte order mark":
+    let fallback = tc.decoder_for(sv("windows-1252")) else trap("no decoder")
+    let plain = tc.convert_input_to_utf8_using_given_decoder_unless_there_is_a_byte_order_mark(fallback, view_of(b"\xe9")) else trap("MUST")
+    assert(bytes_equal(string_bytes(&plain), "é".bytes))
+    let utf8 = tc.convert_input_to_utf8_using_given_decoder_unless_there_is_a_byte_order_mark(fallback, view_of(b"\xef\xbb\xbf\xc3\xa9")) else trap("MUST")
+    assert(bytes_equal(string_bytes(&utf8), "é".bytes))
+    let utf16 = tc.convert_input_to_utf8_using_given_decoder_unless_there_is_a_byte_order_mark(fallback, view_of(b"\xff\xfe\xe9\x00")) else trap("MUST")
+    assert(bytes_equal(string_bytes(&utf16), "é".bytes))
+
+test "isomorphic decode and encode":
+    let isomorphic = tc.isomorphic_decode(view_of(b"a\x80\xe9\xff"))
+    assert(bytes_equal(string_bytes(&isomorphic), "a\u{80}é\u{ff}".bytes))
+    let encoded = tc.isomorphic_encode(sv("a\u{80}é\u{ff}"))
+    assert(bytes_equal(ak.byte_string_bytes(&encoded), b"a\x80\xe9\xff"))
+    let truncated = tc.isomorphic_encode(sv("\u{3042}"))
+    assert(bytes_equal(ak.byte_string_bytes(&truncated), b"\x42"))
+
+test "constructed single-byte codecs work like the registered ones":
+    var decoder: tc.SingleByteDecoder[u16] = ---
+    tc.single_byte_decoder_construct(&decoder, tc.s_koi8_r_index)
+    var code_points = CodePoints()
+    tc.decoder_process((tc.Decoder*)&decoder, view_of(b"a\xc1\xff"), code_point_collector(&code_points)) else trap("MUST")
+    assert(code_points_equal(code_points.items[0..<code_points.count], [0x61, 0x430, 0x42a]))
+
+    var encoder: tc.SingleByteEncoder[u16] = ---
+    tc.single_byte_encoder_construct(&encoder, tc.s_koi8_r_index)
+    var bytes = Bytes()
+    var errors = CodePoints()
+    encode((tc.Encoder*)&encoder, [0x61, 0x430, 0x42a, 0xe9], &bytes, &errors)
+    assert(bytes_equal(bytes.items[0..<bytes.count], b"a\xc1\xff"))
+    assert(code_points_equal(errors.items[0..<errors.count], [0xe9]))
+
+test "GBK's encoder is gb18030's with is_gbk":
+    var gbk: tc.Gb18030Encoder = ---
+    tc.gb18030_encoder_construct(&gbk, tc.Gb18030EncoderIsGbk.yes)
+    var bytes = Bytes()
+    var errors = CodePoints()
+    encode((tc.Encoder*)&gbk, [0x20ac, 0x80], &bytes, &errors)
+    assert(bytes_equal(bytes.items[0..<bytes.count], b"\x80"))
+    assert(code_points_equal(errors.items[0..<errors.count], [0x80]))
+
+test "incomplete tail lengths of the decoders that scan with ak":
+    expect_tail("utf-16be", b"\x00\x41\xd8\x3d", 2)
+    expect_tail("utf-16be", b"\x00\x41\x00", 1)
+    expect_tail("utf-16be", b"\xdc\x00", 0)
+    expect_tail("utf-16le", b"\x41\x00\x3d\xd8", 2)
+    expect_tail("utf-16le", b"\x41", 1)
+    expect_tail("gb18030", b"\x61\x81\x30\x81", 3)
+    expect_tail("gb18030", b"\x81", 1)
+    expect_tail("gb18030", b"\x81\x30", 2)
+    expect_tail("gb18030", b"\x81\x30\x81\x30", 0)
+    expect_tail("gb18030", b"\x81\x30\x20", 0)
+    expect_tail("gb18030", b"\x81\x40\x81", 1)
+    expect_tail("gb18030", b"\x80\xff", 0)

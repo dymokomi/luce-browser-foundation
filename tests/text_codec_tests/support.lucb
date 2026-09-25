@@ -1,0 +1,193 @@
+#==============================================================================================
+#
+#   support - helpers of the text_codec tests that go through ak
+#
+#   DESCRIPTION:
+#       The tests of this program need ak's strings, views and builders, so test.sh checks it
+#       always and runs it once ak's regions (r01-r03) are ported; until then the ak functions
+#       they reach are stubs that trap. The text_codec module's own tests_* fragments hold the
+#       tests that need nothing from ak. Expectations not taken from the donor's tests were
+#       printed by the reference build's LibTextCodec (Ladybird 47c82b38d0) for the same input.
+#
+#==============================================================================================
+
+import ak
+import text_codec as tc
+
+# mark: Helpers ================================================================================
+
+# The empty list of code points.
+var no_code_points: const u32[]
+
+# "text"sv.
+func sv(text: str) -> ak.StringView:
+    return ak.literalsv_u8(text.bytes.data, text.length)
+
+# StringView(ReadonlyBytes).
+func view_of(bytes: const u8[]) -> ak.StringView:
+    var view: ak.StringView
+    ak.string_view_construct_span_u8(&view, bytes)
+    return view
+
+# The bytes of a String (bytes_as_string_view().bytes()).
+func string_bytes(string: const ak.String*) -> const u8[]:
+    let view = ak.string_bytes_as_string_view(string)
+    return ak.string_view_bytes(&view)
+
+func bytes_equal(a: const u8[], b: const u8[]) -> bool:
+    if a.length != b.length:
+        return false
+    for i in 0..<a.length:
+        if a[i] != b[i]:
+            return false
+    return true
+
+func code_points_equal(a: const u32[], b: const u32[]) -> bool:
+    if a.length != b.length:
+        return false
+    for i in 0..<a.length:
+        if a[i] != b[i]:
+            return false
+    return true
+
+# Writes code points as UTF-8 into `buffer` and answers the bytes written.
+func utf8_of(code_points: const u32[], buffer: u8[]) -> const u8[]:
+    var length: usize = 0
+    for code_point in code_points:
+        if code_point < 0x80:
+            buffer[length] = (u8)code_point
+            length += 1
+        elif code_point < 0x800:
+            buffer[length] = (u8)(0xc0 | (code_point >> 6))
+            buffer[length + 1] = (u8)(0x80 | (code_point & 0x3f))
+            length += 2
+        elif code_point < 0x10000:
+            buffer[length] = (u8)(0xe0 | (code_point >> 12))
+            buffer[length + 1] = (u8)(0x80 | ((code_point >> 6) & 0x3f))
+            buffer[length + 2] = (u8)(0x80 | (code_point & 0x3f))
+            length += 3
+        else:
+            buffer[length] = (u8)(0xf0 | (code_point >> 18))
+            buffer[length + 1] = (u8)(0x80 | ((code_point >> 12) & 0x3f))
+            buffer[length + 2] = (u8)(0x80 | ((code_point >> 6) & 0x3f))
+            buffer[length + 3] = (u8)(0x80 | (code_point & 0x3f))
+            length += 4
+    return buffer[0..<length]
+
+# A Utf8View of UTF-8 bytes.
+func utf8_view_of(bytes: const u8[]) -> ak.Utf8View:
+    var view: ak.Utf8View
+    ak.utf8_view_construct_string_view(&view, view_of(bytes))
+    return view
+
+# The code points a callback receives (the tests' Vector<u32>).
+struct CodePoints:
+    var items: u32[64]
+    var count: usize
+
+    mutating func append(code_point: u32):
+        self.items[self.count] = code_point
+        self.count += 1
+
+func append_code_point(context: void*?, code_point: u32):
+    let code_points = (CodePoints*)(context else trap("no capture"))
+    code_points.append(code_point)
+
+func code_point_collector(code_points: CodePoints*) -> ak.Function1[u32, unit]:
+    return ak.Function1[u32, unit](call = append_code_point, context = code_points)
+
+# The bytes a callback receives (the tests' Vector<u8>).
+struct Bytes:
+    var items: u8[64]
+    var count: usize
+
+func append_byte(context: void*?, byte: u8):
+    let bytes = (Bytes*)(context else trap("no capture"))
+    bytes.items[bytes.count] = byte
+    bytes.count += 1
+
+# The tests' [&](u32) -> ErrorOr<void> { EXPECT(false); return {}; }.
+func expect_no_error(context: void*?, code_point: u32):
+    trap("encoder error")
+
+func encode(encoder: tc.Encoder*, code_points: const u32[], bytes: Bytes*, errors: CodePoints*):
+    var buffer: u8[256]
+    let text = utf8_of(code_points, buffer)
+    tc.encoder_process(encoder, utf8_view_of(text), ak.Function1[u8, unit](call = append_byte, context = bytes), code_point_collector(errors)) else trap("MUST")
+
+func is_utf16(name: str) -> bool:
+    return name == "utf-16be" or name == "utf-16le"
+
+# Decodes with the decoder of the exact encoding name through process() (not UTF-16's, whose
+# process() is unreachable), to_utf8() and validate().
+func expect_decode(name: str, input: const u8[], expected: const u32[], valid: bool):
+    let decoder = tc.decoder_for_exact_name(sv(name)) else trap("no decoder")
+    if not is_utf16(name):
+        var code_points = CodePoints()
+        tc.decoder_process(decoder, view_of(input), code_point_collector(&code_points)) else trap("MUST")
+        assert(code_points_equal(code_points.items[0..<code_points.count], expected))
+    let output = tc.decoder_to_utf8(decoder, view_of(input)) else trap("MUST")
+    var buffer: u8[256]
+    assert(bytes_equal(string_bytes(&output), utf8_of(expected, buffer)))
+    assert(tc.decoder_validate(decoder, view_of(input)) == valid)
+
+# expect_decode where process() and to_utf8() differ: UTF-8's process() passes a lonely surrogate
+# through, to_utf8() (String::from_utf8_with_replacement_character) replaces it.
+func expect_decode_processed(name: str, input: const u8[], processed: const u32[], expected: const u32[], valid: bool):
+    let decoder = tc.decoder_for_exact_name(sv(name)) else trap("no decoder")
+    var code_points = CodePoints()
+    tc.decoder_process(decoder, view_of(input), code_point_collector(&code_points)) else trap("MUST")
+    assert(code_points_equal(code_points.items[0..<code_points.count], processed))
+    let output = tc.decoder_to_utf8(decoder, view_of(input)) else trap("MUST")
+    var buffer: u8[256]
+    assert(bytes_equal(string_bytes(&output), utf8_of(expected, buffer)))
+    assert(tc.decoder_validate(decoder, view_of(input)) == valid)
+
+# Encodes with the encoder of the exact encoding name.
+func expect_encode(name: str, code_points: const u32[], expected: const u8[], expected_errors: const u32[]):
+    let encoder = tc.encoder_for_exact_name(sv(name)) else trap("no encoder")
+    var bytes = Bytes()
+    var errors = CodePoints()
+    encode(encoder, code_points, &bytes, &errors)
+    assert(bytes_equal(bytes.items[0..<bytes.count], expected))
+    assert(code_points_equal(errors.items[0..<errors.count], expected_errors))
+
+# get_standardized_encoding(label).
+func expect_label(label: str, expected: str?):
+    let encoding = tc.get_standardized_encoding(sv(label))
+    if let name = expected:
+        let actual = encoding else trap("no encoding")
+        assert(bytes_equal(ak.string_view_bytes(&actual), name.bytes))
+    else:
+        assert(encoding == none)
+
+func expect_tail(name: str, bytes: const u8[], expected: usize):
+    let decoder = tc.decoder_for_exact_name(sv(name)) else trap("no decoder")
+    assert(tc.decoder_incomplete_tail_length(decoder, bytes) == expected)
+
+# TestTextDecoders.cpp's decoder_for: VERIFY(decoder.has_value()).
+func decoder_for(encoding: str) -> tc.Decoder*:
+    return tc.decoder_for(sv(encoding)) else trap("VERIFY(decoder.has_value())")
+
+# EXPECT_EQ(MUST(streaming_decoder.to_utf8(bytes)), expected).
+func expect_streaming(streaming_decoder: tc.StreamingDecoder*, bytes: const u8[], expected: const u8[]):
+    let output = tc.streaming_decoder_to_utf8(streaming_decoder, bytes) else trap("MUST")
+    assert(bytes_equal(string_bytes(&output), expected))
+
+# EXPECT_EQ(MUST(streaming_decoder.finish()), expected).
+func expect_finish(streaming_decoder: tc.StreamingDecoder*, expected: const u8[]):
+    let output = tc.streaming_decoder_finish(streaming_decoder) else trap("MUST")
+    assert(bytes_equal(string_bytes(&output), expected))
+
+# MUST(decoder.to_utf8(StringView(bytes))), as bytes into `buffer`.
+func decoded(decoder: tc.Decoder*, bytes: const u8[], buffer: u8[]) -> const u8[]:
+    let output = tc.decoder_to_utf8(decoder, view_of(bytes)) else trap("MUST")
+    let result = string_bytes(&output)
+    for i in 0..<result.length:
+        buffer[i] = result[i]
+    return buffer[0..<result.length]
+
+func streaming_decoder_for(decoder: tc.Decoder*) -> tc.StreamingDecoder:
+    var streaming_decoder: tc.StreamingDecoder = ---
+    tc.streaming_decoder_construct(&streaming_decoder, decoder)
+    return streaming_decoder

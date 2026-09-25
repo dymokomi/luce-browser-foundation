@@ -1,0 +1,605 @@
+#==============================================================================================
+#
+#   lookup_tables - index code point and index pointer lookups over the Encoding indexes
+#
+#   DESCRIPTION:
+#       Port of Build/Libraries/LibTextCodec/LookupTables.cpp (lines 1-666), which Ladybird
+#       generates with Meta/Generators/generate_encoding_indexes.py: for each index, the index
+#       code point for a pointer and the index pointer for a code point
+#       (https://encoding.spec.whatwg.org/#index-code-point). 0xfffd marks a null entry.
+#
+#==============================================================================================
+
+# mark: gb18030 ===============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:6 TextCodec::index_gb18030_code_point.
+pub func index_gb18030_code_point(pointer: u32) -> u32?:
+    if pointer >= s_gb18030_index.length:
+        return none
+    let value = s_gb18030_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:16 TextCodec::code_point_gb18030_index.
+pub func code_point_gb18030_index(code_point: u32) -> u32?:
+    for i in 0..<s_gb18030_index.length:
+        if s_gb18030_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: big5 ==================================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:26 TextCodec::index_big5_code_point.
+pub func index_big5_code_point(pointer: u32) -> u32?:
+    if pointer < s_big5_index_first_pointer or pointer - s_big5_index_first_pointer >= s_big5_index.length:
+        return none
+    let value = s_big5_index[pointer - s_big5_index_first_pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:36 TextCodec::code_point_big5_index.
+pub func code_point_big5_index(code_point: u32) -> u32?:
+    for i in 0..<s_big5_index.length:
+        if s_big5_index[i] == code_point:
+            return s_big5_index_first_pointer + (u32)i
+    return none
+
+# mark: jis0208 ===============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:46 TextCodec::index_jis0208_code_point.
+pub func index_jis0208_code_point(pointer: u32) -> u32?:
+    if pointer >= s_jis0208_index.length:
+        return none
+    let value = s_jis0208_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:56 TextCodec::code_point_jis0208_index.
+pub func code_point_jis0208_index(code_point: u32) -> u32?:
+    for i in 0..<s_jis0208_index.length:
+        if s_jis0208_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: jis0212 ===============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:66 TextCodec::index_jis0212_code_point.
+pub func index_jis0212_code_point(pointer: u32) -> u32?:
+    if pointer < s_jis0212_index_first_pointer or pointer - s_jis0212_index_first_pointer >= s_jis0212_index.length:
+        return none
+    let value = s_jis0212_index[pointer - s_jis0212_index_first_pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:76 TextCodec::code_point_jis0212_index.
+pub func code_point_jis0212_index(code_point: u32) -> u32?:
+    for i in 0..<s_jis0212_index.length:
+        if s_jis0212_index[i] == code_point:
+            return s_jis0212_index_first_pointer + (u32)i
+    return none
+
+# mark: euc_kr ================================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:86 TextCodec::index_euc_kr_code_point.
+pub func index_euc_kr_code_point(pointer: u32) -> u32?:
+    if pointer >= s_euc_kr_index.length:
+        return none
+    let value = s_euc_kr_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:96 TextCodec::code_point_euc_kr_index.
+pub func code_point_euc_kr_index(code_point: u32) -> u32?:
+    for i in 0..<s_euc_kr_index.length:
+        if s_euc_kr_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: ibm866 ================================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:106 TextCodec::index_ibm866_code_point.
+pub func index_ibm866_code_point(pointer: u32) -> u32?:
+    if pointer >= s_ibm866_index.length:
+        return none
+    let value = s_ibm866_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:116 TextCodec::code_point_ibm866_index.
+pub func code_point_ibm866_index(code_point: u32) -> u32?:
+    for i in 0..<s_ibm866_index.length:
+        if s_ibm866_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_2022_jp_katakana ==================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:126 TextCodec::index_iso_2022_jp_katakana_code_point.
+pub func index_iso_2022_jp_katakana_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_2022_jp_katakana_index.length:
+        return none
+    let value = s_iso_2022_jp_katakana_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:136 TextCodec::code_point_iso_2022_jp_katakana_index.
+pub func code_point_iso_2022_jp_katakana_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_2022_jp_katakana_index.length:
+        if s_iso_2022_jp_katakana_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_2 ============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:146 TextCodec::index_iso_8859_2_code_point.
+pub func index_iso_8859_2_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_2_index.length:
+        return none
+    let value = s_iso_8859_2_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:156 TextCodec::code_point_iso_8859_2_index.
+pub func code_point_iso_8859_2_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_2_index.length:
+        if s_iso_8859_2_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_3 ============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:166 TextCodec::index_iso_8859_3_code_point.
+pub func index_iso_8859_3_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_3_index.length:
+        return none
+    let value = s_iso_8859_3_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:176 TextCodec::code_point_iso_8859_3_index.
+pub func code_point_iso_8859_3_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_3_index.length:
+        if s_iso_8859_3_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_4 ============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:186 TextCodec::index_iso_8859_4_code_point.
+pub func index_iso_8859_4_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_4_index.length:
+        return none
+    let value = s_iso_8859_4_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:196 TextCodec::code_point_iso_8859_4_index.
+pub func code_point_iso_8859_4_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_4_index.length:
+        if s_iso_8859_4_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_5 ============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:206 TextCodec::index_iso_8859_5_code_point.
+pub func index_iso_8859_5_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_5_index.length:
+        return none
+    let value = s_iso_8859_5_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:216 TextCodec::code_point_iso_8859_5_index.
+pub func code_point_iso_8859_5_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_5_index.length:
+        if s_iso_8859_5_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_6 ============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:226 TextCodec::index_iso_8859_6_code_point.
+pub func index_iso_8859_6_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_6_index.length:
+        return none
+    let value = s_iso_8859_6_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:236 TextCodec::code_point_iso_8859_6_index.
+pub func code_point_iso_8859_6_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_6_index.length:
+        if s_iso_8859_6_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_7 ============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:246 TextCodec::index_iso_8859_7_code_point.
+pub func index_iso_8859_7_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_7_index.length:
+        return none
+    let value = s_iso_8859_7_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:256 TextCodec::code_point_iso_8859_7_index.
+pub func code_point_iso_8859_7_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_7_index.length:
+        if s_iso_8859_7_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_8 ============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:266 TextCodec::index_iso_8859_8_code_point.
+pub func index_iso_8859_8_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_8_index.length:
+        return none
+    let value = s_iso_8859_8_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:276 TextCodec::code_point_iso_8859_8_index.
+pub func code_point_iso_8859_8_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_8_index.length:
+        if s_iso_8859_8_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_10 ===========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:286 TextCodec::index_iso_8859_10_code_point.
+pub func index_iso_8859_10_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_10_index.length:
+        return none
+    let value = s_iso_8859_10_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:296 TextCodec::code_point_iso_8859_10_index.
+pub func code_point_iso_8859_10_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_10_index.length:
+        if s_iso_8859_10_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_13 ===========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:306 TextCodec::index_iso_8859_13_code_point.
+pub func index_iso_8859_13_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_13_index.length:
+        return none
+    let value = s_iso_8859_13_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:316 TextCodec::code_point_iso_8859_13_index.
+pub func code_point_iso_8859_13_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_13_index.length:
+        if s_iso_8859_13_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_14 ===========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:326 TextCodec::index_iso_8859_14_code_point.
+pub func index_iso_8859_14_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_14_index.length:
+        return none
+    let value = s_iso_8859_14_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:336 TextCodec::code_point_iso_8859_14_index.
+pub func code_point_iso_8859_14_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_14_index.length:
+        if s_iso_8859_14_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_15 ===========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:346 TextCodec::index_iso_8859_15_code_point.
+pub func index_iso_8859_15_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_15_index.length:
+        return none
+    let value = s_iso_8859_15_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:356 TextCodec::code_point_iso_8859_15_index.
+pub func code_point_iso_8859_15_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_15_index.length:
+        if s_iso_8859_15_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: iso_8859_16 ===========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:366 TextCodec::index_iso_8859_16_code_point.
+pub func index_iso_8859_16_code_point(pointer: u32) -> u32?:
+    if pointer >= s_iso_8859_16_index.length:
+        return none
+    let value = s_iso_8859_16_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:376 TextCodec::code_point_iso_8859_16_index.
+pub func code_point_iso_8859_16_index(code_point: u32) -> u32?:
+    for i in 0..<s_iso_8859_16_index.length:
+        if s_iso_8859_16_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: koi8_r ================================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:386 TextCodec::index_koi8_r_code_point.
+pub func index_koi8_r_code_point(pointer: u32) -> u32?:
+    if pointer >= s_koi8_r_index.length:
+        return none
+    let value = s_koi8_r_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:396 TextCodec::code_point_koi8_r_index.
+pub func code_point_koi8_r_index(code_point: u32) -> u32?:
+    for i in 0..<s_koi8_r_index.length:
+        if s_koi8_r_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: koi8_u ================================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:406 TextCodec::index_koi8_u_code_point.
+pub func index_koi8_u_code_point(pointer: u32) -> u32?:
+    if pointer >= s_koi8_u_index.length:
+        return none
+    let value = s_koi8_u_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:416 TextCodec::code_point_koi8_u_index.
+pub func code_point_koi8_u_index(code_point: u32) -> u32?:
+    for i in 0..<s_koi8_u_index.length:
+        if s_koi8_u_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: macintosh =============================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:426 TextCodec::index_macintosh_code_point.
+pub func index_macintosh_code_point(pointer: u32) -> u32?:
+    if pointer >= s_macintosh_index.length:
+        return none
+    let value = s_macintosh_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:436 TextCodec::code_point_macintosh_index.
+pub func code_point_macintosh_index(code_point: u32) -> u32?:
+    for i in 0..<s_macintosh_index.length:
+        if s_macintosh_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: windows_874 ===========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:446 TextCodec::index_windows_874_code_point.
+pub func index_windows_874_code_point(pointer: u32) -> u32?:
+    if pointer >= s_windows_874_index.length:
+        return none
+    let value = s_windows_874_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:456 TextCodec::code_point_windows_874_index.
+pub func code_point_windows_874_index(code_point: u32) -> u32?:
+    for i in 0..<s_windows_874_index.length:
+        if s_windows_874_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: windows_1250 ==========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:466 TextCodec::index_windows_1250_code_point.
+pub func index_windows_1250_code_point(pointer: u32) -> u32?:
+    if pointer >= s_windows_1250_index.length:
+        return none
+    let value = s_windows_1250_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:476 TextCodec::code_point_windows_1250_index.
+pub func code_point_windows_1250_index(code_point: u32) -> u32?:
+    for i in 0..<s_windows_1250_index.length:
+        if s_windows_1250_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: windows_1251 ==========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:486 TextCodec::index_windows_1251_code_point.
+pub func index_windows_1251_code_point(pointer: u32) -> u32?:
+    if pointer >= s_windows_1251_index.length:
+        return none
+    let value = s_windows_1251_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:496 TextCodec::code_point_windows_1251_index.
+pub func code_point_windows_1251_index(code_point: u32) -> u32?:
+    for i in 0..<s_windows_1251_index.length:
+        if s_windows_1251_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: windows_1252 ==========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:506 TextCodec::index_windows_1252_code_point.
+pub func index_windows_1252_code_point(pointer: u32) -> u32?:
+    if pointer >= s_windows_1252_index.length:
+        return none
+    let value = s_windows_1252_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:516 TextCodec::code_point_windows_1252_index.
+pub func code_point_windows_1252_index(code_point: u32) -> u32?:
+    for i in 0..<s_windows_1252_index.length:
+        if s_windows_1252_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: windows_1253 ==========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:526 TextCodec::index_windows_1253_code_point.
+pub func index_windows_1253_code_point(pointer: u32) -> u32?:
+    if pointer >= s_windows_1253_index.length:
+        return none
+    let value = s_windows_1253_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:536 TextCodec::code_point_windows_1253_index.
+pub func code_point_windows_1253_index(code_point: u32) -> u32?:
+    for i in 0..<s_windows_1253_index.length:
+        if s_windows_1253_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: windows_1254 ==========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:546 TextCodec::index_windows_1254_code_point.
+pub func index_windows_1254_code_point(pointer: u32) -> u32?:
+    if pointer >= s_windows_1254_index.length:
+        return none
+    let value = s_windows_1254_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:556 TextCodec::code_point_windows_1254_index.
+pub func code_point_windows_1254_index(code_point: u32) -> u32?:
+    for i in 0..<s_windows_1254_index.length:
+        if s_windows_1254_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: windows_1255 ==========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:566 TextCodec::index_windows_1255_code_point.
+pub func index_windows_1255_code_point(pointer: u32) -> u32?:
+    if pointer >= s_windows_1255_index.length:
+        return none
+    let value = s_windows_1255_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:576 TextCodec::code_point_windows_1255_index.
+pub func code_point_windows_1255_index(code_point: u32) -> u32?:
+    for i in 0..<s_windows_1255_index.length:
+        if s_windows_1255_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: windows_1256 ==========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:586 TextCodec::index_windows_1256_code_point.
+pub func index_windows_1256_code_point(pointer: u32) -> u32?:
+    if pointer >= s_windows_1256_index.length:
+        return none
+    let value = s_windows_1256_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:596 TextCodec::code_point_windows_1256_index.
+pub func code_point_windows_1256_index(code_point: u32) -> u32?:
+    for i in 0..<s_windows_1256_index.length:
+        if s_windows_1256_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: windows_1257 ==========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:606 TextCodec::index_windows_1257_code_point.
+pub func index_windows_1257_code_point(pointer: u32) -> u32?:
+    if pointer >= s_windows_1257_index.length:
+        return none
+    let value = s_windows_1257_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:616 TextCodec::code_point_windows_1257_index.
+pub func code_point_windows_1257_index(code_point: u32) -> u32?:
+    for i in 0..<s_windows_1257_index.length:
+        if s_windows_1257_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: windows_1258 ==========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:626 TextCodec::index_windows_1258_code_point.
+pub func index_windows_1258_code_point(pointer: u32) -> u32?:
+    if pointer >= s_windows_1258_index.length:
+        return none
+    let value = s_windows_1258_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:636 TextCodec::code_point_windows_1258_index.
+pub func code_point_windows_1258_index(code_point: u32) -> u32?:
+    for i in 0..<s_windows_1258_index.length:
+        if s_windows_1258_index[i] == code_point:
+            return (u32)i
+    return none
+
+# mark: x_mac_cyrillic ========================================================================
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:646 TextCodec::index_x_mac_cyrillic_code_point.
+pub func index_x_mac_cyrillic_code_point(pointer: u32) -> u32?:
+    if pointer >= s_x_mac_cyrillic_index.length:
+        return none
+    let value = s_x_mac_cyrillic_index[pointer]
+    if value == 0xfffd:
+        return none
+    return value
+
+## Ported from Build/Libraries/LibTextCodec/LookupTables.cpp:656 TextCodec::code_point_x_mac_cyrillic_index.
+pub func code_point_x_mac_cyrillic_index(code_point: u32) -> u32?:
+    for i in 0..<s_x_mac_cyrillic_index.length:
+        if s_x_mac_cyrillic_index[i] == code_point:
+            return (u32)i
+    return none

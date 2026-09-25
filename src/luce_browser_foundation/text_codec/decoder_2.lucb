@@ -1,0 +1,372 @@
+#==============================================================================================
+#
+#   decoder_2 - Decoder's default validate and to_utf8, incomplete tails, StreamingDecoder
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibTextCodec/Decoder.cpp (lines 339-690) with the inline functions of
+#       Decoder.h: the Decoder base class's validate and to_utf8, the tail-length helpers that
+#       say how many trailing bytes of a chunk form an incomplete sequence, and StreamingDecoder,
+#       which buffers such a tail until the next chunk.
+#
+#==============================================================================================
+
+# mark: Decoder ================================================================================
+
+# The capture of Decoder::validate's lambda: whether a replacement code point was seen.
+struct DecoderValidateResult:
+    var saw_error: bool
+
+# Decoder::validate's lambda. In C++ it fails with EINVAL on U+FFFD, which ends process() with an
+# error; the port's callbacks cannot fail, so it records the error and process() runs on. validate
+# answers the same, and process() has no other effect.
+func decoder_validate_on_code_point(context: void*?, code_point: u32):
+    let result = (DecoderValidateResult*)(context else trap("Decoder::validate: no capture"))
+    if code_point == replacement_code_point:
+        result.saw_error = true  # return Error::from_errno(EINVAL);
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:339 TextCodec::Decoder::validate (virtual): true
+## when decoding the input produces no error (no U+FFFD).
+pub func decoder_validate_impl(this: Decoder*, input: ak.StringView) -> bool:
+    var result = DecoderValidateResult(saw_error = false)
+    let on_code_point = ak.Function1[u32, unit](call = decoder_validate_on_code_point, context = &result)
+    decoder_process(this, input, on_code_point) catch:
+        return false
+
+    return not result.saw_error
+
+# The capture of Decoder::to_utf8's lambda: the builder the code points go to.
+struct DecoderToUtf8Builder:
+    var builder: ak.StringBuilder*
+
+# Decoder::to_utf8's lambda: [&builder](u32 c) { return builder.try_append_code_point(c); }.
+func decoder_to_utf8_on_code_point(context: void*?, code_point: u32):
+    let captures = (DecoderToUtf8Builder*)(context else trap("Decoder::to_utf8: no capture"))
+    ak.string_builder_try_append_code_point(captures.builder, code_point) else trap("FIXME: should propagate errors")
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:350 TextCodec::Decoder::to_utf8 (virtual): the
+## input decoded to UTF-8, errors as U+FFFD.
+pub func decoder_to_utf8_impl(this: Decoder*, input: ak.StringView) -> ak.String!:
+    var builder: ak.StringBuilder
+    ak.string_builder_construct_usize(&builder, ak.string_view_length(&input))
+    var captures = DecoderToUtf8Builder(builder = &builder)
+    try decoder_process(this, input, ak.Function1[u32, unit](call = decoder_to_utf8_on_code_point, context = &captures))
+    return ak.string_builder_to_string_without_validation(&builder)
+
+## Ported from Libraries/LibTextCodec/Decoder.h:28 TextCodec::Decoder::incomplete_tail_length
+## (virtual): the number of trailing bytes that form an incomplete sequence and must be buffered
+## until more input arrives. Used by StreamingDecoder for chunked decoding.
+pub func decoder_incomplete_tail_length_impl(this: Decoder*, arg0: const u8[]) -> usize:
+    return 0
+
+## Ported from Libraries/LibTextCodec/Decoder.h:32 TextCodec::Decoder::process (pure virtual).
+pub func decoder_process_impl(this: Decoder*, arg0: ak.StringView, on_code_point: ak.Function1[u32, unit]) -> !:
+    trap("pure virtual: TextCodec::Decoder::process")
+
+# mark: Incomplete tails ========================================================================
+
+# Tail-length helpers for chunked decoding. Each returns the number of trailing bytes that must
+# be buffered until more input arrives, because they form an incomplete trailing sequence per the
+# Encoding Standard's decoder handler byte ranges.
+# https://encoding.spec.whatwg.org/#interface-textdecoder
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:362 TextCodec::is_utf8_continuation_byte.
+func is_utf8_continuation_byte(byte: u8) -> bool:
+    return (byte & 0xc0) == 0x80
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:367 TextCodec::utf8_sequence_length.
+func utf8_sequence_length(lead: u8) -> usize?:
+    if lead <= 0x7f:
+        return 1
+    if lead >= 0xc2 and lead <= 0xdf:
+        return 2
+    if lead >= 0xe0 and lead <= 0xef:
+        return 3
+    if lead >= 0xf0 and lead <= 0xf4:
+        return 4
+    return none
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:380 TextCodec::UTF8Decoder::incomplete_tail_length (override).
+pub func utf8_decoder_incomplete_tail_length_impl(base: Decoder*, bytes: const u8[]) -> usize:
+    # The longest UTF-8 sequence is 4 bytes, so the lead of any incomplete trailing sequence is
+    # at most 3 positions before the end. Scan backward to find the lead and decide.
+    let max_back = bytes.length if bytes.length < 4 else 4  # min(bytes.size(), 4uz)
+    for back in 0..<max_back:
+        let byte = bytes[bytes.length - 1 - back]
+        if is_utf8_continuation_byte(byte):
+            continue
+
+        let seq_len = utf8_sequence_length(byte)
+        let seen = back + 1
+        let length = seq_len else return 0  # !seq_len.has_value()
+        if length <= seen:
+            return 0
+        return seen
+    return 0
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:399 TextCodec::incomplete_utf16_tail_length.
+func incomplete_utf16_tail_length(bytes: const u8[], big_endian: bool) -> usize:
+    if bytes.length % 2 != 0:
+        return 1
+    if bytes.length < 2:
+        return 0
+
+    let high = bytes[bytes.length - 2]
+    let low = bytes[bytes.length - 1]
+    let code_unit: u16 = ((u16)high << 8) | (u16)low if big_endian else ((u16)low << 8) | (u16)high
+    if ak.unicode_utils_is_utf16_high_surrogate(code_unit):
+        return 2
+    return 0
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:416 TextCodec::UTF16BEDecoder::incomplete_tail_length (override).
+pub func utf16_be_decoder_incomplete_tail_length_impl(base: Decoder*, bytes: const u8[]) -> usize:
+    return incomplete_utf16_tail_length(bytes, true)
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:421 TextCodec::UTF16LEDecoder::incomplete_tail_length (override).
+pub func utf16_le_decoder_incomplete_tail_length_impl(base: Decoder*, bytes: const u8[]) -> usize:
+    return incomplete_utf16_tail_length(bytes, false)
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:426 TextCodec::is_gb18030_lead_byte.
+func is_gb18030_lead_byte(byte: u8) -> bool:
+    return byte >= 0x81 and byte <= 0xfe
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:431 TextCodec::is_gb18030_two_byte_trail.
+func is_gb18030_two_byte_trail(byte: u8) -> bool:
+    return (byte >= 0x40 and byte <= 0x7e) or (byte >= 0x80 and byte <= 0xfe)
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:436 TextCodec::GB18030Decoder::incomplete_tail_length (override).
+pub func gb18030_decoder_incomplete_tail_length_impl(base: Decoder*, bytes: const u8[]) -> usize:
+    var i: usize = 0
+    while i < bytes.length:
+        let byte = bytes[i]
+        if byte <= 0x80:
+            i += 1
+            continue
+
+        if not is_gb18030_lead_byte(byte):
+            i += 1
+            continue
+
+        if i + 1 >= bytes.length:
+            return bytes.length - i
+
+        let second = bytes[i + 1]
+        if ak.is_ascii_digit(second):
+            if i + 2 >= bytes.length:
+                return bytes.length - i
+
+            let third = bytes[i + 2]
+            if is_gb18030_lead_byte(third):
+                if i + 3 >= bytes.length:
+                    return bytes.length - i
+
+                let fourth = bytes[i + 3]
+                if ak.is_ascii_digit(fourth):
+                    i += 4
+                    continue
+
+            i += 1
+            continue
+
+        if is_gb18030_two_byte_trail(second):
+            i += 2
+            continue
+
+        i += 1
+
+    return 0
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:485 TextCodec::is_big5_lead_byte.
+func is_big5_lead_byte(byte: u8) -> bool:
+    return byte >= 0x81 and byte <= 0xfe
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:490 TextCodec::is_big5_trail_byte.
+func is_big5_trail_byte(byte: u8) -> bool:
+    return (byte >= 0x40 and byte <= 0x7e) or (byte >= 0xa1 and byte <= 0xfe)
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:495 TextCodec::Big5Decoder::incomplete_tail_length (override).
+pub func big5_decoder_incomplete_tail_length_impl(base: Decoder*, bytes: const u8[]) -> usize:
+    var i: usize = 0
+    while i < bytes.length:
+        let byte = bytes[i]
+        if byte <= 0x7f:
+            i += 1
+            continue
+
+        if not is_big5_lead_byte(byte):
+            i += 1
+            continue
+
+        if i + 1 >= bytes.length:
+            return bytes.length - i
+
+        if is_big5_trail_byte(bytes[i + 1]):
+            i += 2
+        else:
+            i += 1
+
+    return 0
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:521 TextCodec::is_euc_jp_lead_byte.
+func is_euc_jp_lead_byte(byte: u8) -> bool:
+    return byte == 0x8e or byte == 0x8f or (byte >= 0xa1 and byte <= 0xfe)
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:526 TextCodec::is_euc_jp_trail_byte.
+func is_euc_jp_trail_byte(byte: u8) -> bool:
+    return byte >= 0xa1 and byte <= 0xfe
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:531 TextCodec::EUCJPDecoder::incomplete_tail_length (override).
+pub func eucjp_decoder_incomplete_tail_length_impl(base: Decoder*, bytes: const u8[]) -> usize:
+    var i: usize = 0
+    while i < bytes.length:
+        let byte = bytes[i]
+        if byte <= 0x7f:
+            i += 1
+            continue
+
+        if not is_euc_jp_lead_byte(byte):
+            i += 1
+            continue
+
+        if byte == 0x8f:
+            if i + 1 >= bytes.length:
+                return bytes.length - i
+            if not is_euc_jp_trail_byte(bytes[i + 1]):
+                i += 1
+                continue
+            if i + 2 >= bytes.length:
+                return bytes.length - i
+            if is_euc_jp_trail_byte(bytes[i + 2]):
+                i += 3
+            else:
+                i += 2
+            continue
+
+        if i + 1 >= bytes.length:
+            return bytes.length - i
+
+        if byte == 0x8e:
+            if bytes[i + 1] >= 0xa1 and bytes[i + 1] <= 0xdf:
+                i += 2
+            else:
+                i += 1
+            continue
+
+        if is_euc_jp_trail_byte(bytes[i + 1]):
+            i += 2
+        else:
+            i += 1
+
+    return 0
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:581 TextCodec::is_shift_jis_lead_byte.
+func is_shift_jis_lead_byte(byte: u8) -> bool:
+    return (byte >= 0x81 and byte <= 0x9f) or (byte >= 0xe0 and byte <= 0xfc)
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:586 TextCodec::is_shift_jis_trail_byte.
+func is_shift_jis_trail_byte(byte: u8) -> bool:
+    return (byte >= 0x40 and byte <= 0x7e) or (byte >= 0x80 and byte <= 0xfc)
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:591 TextCodec::ShiftJISDecoder::incomplete_tail_length (override).
+pub func shift_jis_decoder_incomplete_tail_length_impl(base: Decoder*, bytes: const u8[]) -> usize:
+    var i: usize = 0
+    while i < bytes.length:
+        let byte = bytes[i]
+        if byte <= 0x80 or (byte >= 0xa1 and byte <= 0xdf):
+            i += 1
+            continue
+
+        if not is_shift_jis_lead_byte(byte):
+            i += 1
+            continue
+
+        if i + 1 >= bytes.length:
+            return bytes.length - i
+
+        if is_shift_jis_trail_byte(bytes[i + 1]):
+            i += 2
+        else:
+            i += 1
+
+    return 0
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:617 TextCodec::is_euc_kr_lead_byte.
+func is_euc_kr_lead_byte(byte: u8) -> bool:
+    return byte >= 0x81 and byte <= 0xfe
+
+# Ported from Libraries/LibTextCodec/Decoder.cpp:622 TextCodec::is_euc_kr_trail_byte.
+func is_euc_kr_trail_byte(byte: u8) -> bool:
+    return byte >= 0x41 and byte <= 0xfe
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:627 TextCodec::EUCKRDecoder::incomplete_tail_length (override).
+pub func euckr_decoder_incomplete_tail_length_impl(base: Decoder*, bytes: const u8[]) -> usize:
+    var i: usize = 0
+    while i < bytes.length:
+        let byte = bytes[i]
+        if byte <= 0x7f:
+            i += 1
+            continue
+
+        if not is_euc_kr_lead_byte(byte):
+            i += 1
+            continue
+
+        if i + 1 >= bytes.length:
+            return bytes.length - i
+
+        if is_euc_kr_trail_byte(bytes[i + 1]):
+            i += 2
+        else:
+            i += 1
+
+    return 0
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:653 TextCodec::ISO2022JPDecoder::incomplete_tail_length (override).
+pub func iso2022_jp_decoder_incomplete_tail_length_impl(base: Decoder*, bytes: const u8[]) -> usize:
+    if bytes.length == 0:  # bytes.is_empty()
+        return 0
+
+    if bytes[bytes.length - 1] == 0x1b:
+        return 1
+    if bytes.length >= 2 and bytes[bytes.length - 2] == 0x1b and (bytes[bytes.length - 1] == 0x24 or bytes[bytes.length - 1] == 0x28):
+        return 2
+    return 0
+
+# mark: StreamingDecoder =======================================================================
+
+## Ported from Libraries/LibTextCodec/Decoder.h:140 TextCodec::StreamingDecoder::StreamingDecoder:
+## a streaming decoder over `decoder` that preserves incomplete trailing decoder tokens when callers
+## provide input in chunks.
+pub func streaming_decoder_construct(this: StreamingDecoder*, decoder: Decoder*):
+    this.m_decoder = decoder
+
+# A StringView of a byte span (StringView(ReadonlyBytes)).
+func string_view_of_bytes(bytes: const u8[]) -> ak.StringView:
+    var view: ak.StringView
+    ak.string_view_construct_span_u8(&view, bytes)
+    return view
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:665 TextCodec::StreamingDecoder::to_utf8: decodes
+## a chunk, keeping an incomplete trailing sequence for the next chunk.
+pub func streaming_decoder_to_utf8(this: StreamingDecoder*, input: const u8[]) -> ak.String!:
+    var bytes: const u8[]
+    if ak.byte_buffer_is_empty(&this.m_pending_input):
+        bytes = input
+    else:
+        try ak.byte_buffer_try_append_span_u8(&this.m_pending_input, input)
+        bytes = ak.byte_buffer_bytes(&this.m_pending_input)
+
+    let tail_length = decoder_incomplete_tail_length(this.m_decoder, bytes)
+    let decoded = try decoder_to_utf8(this.m_decoder, string_view_of_bytes(bytes[0..<bytes.length - tail_length]))
+
+    if tail_length == 0:
+        ak.byte_buffer_clear(&this.m_pending_input)
+    else:
+        this.m_pending_input = try ak.byte_buffer_copy_span_u8(bytes[bytes.length - tail_length..])
+    return decoded
+
+## Ported from Libraries/LibTextCodec/Decoder.cpp:685 TextCodec::StreamingDecoder::finish: decodes
+## what is still pending, errors for an incomplete sequence included.
+pub func streaming_decoder_finish(this: StreamingDecoder*) -> ak.String!:
+    let decoded = try decoder_to_utf8(this.m_decoder, string_view_of_bytes(ak.byte_buffer_bytes(&this.m_pending_input)))
+    ak.byte_buffer_clear(&this.m_pending_input)
+    return decoded

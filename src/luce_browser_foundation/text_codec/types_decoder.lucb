@@ -51,7 +51,7 @@ pub func decoder_process(this: Decoder*, arg0: ak.StringView, on_code_point: ak.
 pub let decoder_vtable: DecoderVTable = DecoderVTable(class_info = &decoder_class)
 
 ## Class information of TextCodec::Decoder: name, class-id range (pre-order), size, vtable.
-pub let decoder_class: ak.ClassInfo = ak.ClassInfo(name = "Decoder", first_id = 0, last_id = 13, size = sizeof(Decoder), vtable = (const void*)&decoder_vtable)
+pub let decoder_class: ak.ClassInfo = ak.ClassInfo(name = "Decoder", first_id = 0, last_id = 14, size = sizeof(Decoder), vtable = (const void*)&decoder_vtable)
 
 ## is<TextCodec::Decoder>: the class-id range test.
 pub func is_decoder[P: IsDecoder](p: P*) -> bool:
@@ -69,39 +69,6 @@ pub func as_decoder[P: IsDecoder](p: P*) -> Decoder*:
 
 ## TextCodec::replacement_code_point (Libraries/LibTextCodec/Decoder.cpp:21).
 pub let replacement_code_point: u32 = 0xfffd
-
-## TextCodec::(anonymous)::s_latin1_decoder (Libraries/LibTextCodec/Decoder.cpp:25).
-pub var s_latin1_decoder: Latin1Decoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_utf8_decoder (Libraries/LibTextCodec/Decoder.cpp:26).
-pub var s_utf8_decoder: Utf8Decoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_utf16be_decoder (Libraries/LibTextCodec/Decoder.cpp:27).
-pub var s_utf16be_decoder: Utf16BeDecoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_utf16le_decoder (Libraries/LibTextCodec/Decoder.cpp:28).
-pub var s_utf16le_decoder: Utf16LeDecoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_pdf_doc_encoding_decoder (Libraries/LibTextCodec/Decoder.cpp:29).
-pub var s_pdf_doc_encoding_decoder: PdfDocEncodingDecoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_x_user_defined_decoder (Libraries/LibTextCodec/Decoder.cpp:30).
-pub var s_x_user_defined_decoder: XUserDefinedDecoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_gb18030_decoder (Libraries/LibTextCodec/Decoder.cpp:31).
-pub var s_gb18030_decoder: Gb18030Decoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_big5_decoder (Libraries/LibTextCodec/Decoder.cpp:32).
-pub var s_big5_decoder: Big5Decoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_euc_jp_decoder (Libraries/LibTextCodec/Decoder.cpp:33).
-pub var s_euc_jp_decoder: EucjpDecoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_iso_2022_jp_decoder (Libraries/LibTextCodec/Decoder.cpp:34).
-pub var s_iso_2022_jp_decoder: Iso2022JpDecoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_shift_jis_decoder (Libraries/LibTextCodec/Decoder.cpp:35).
-pub var s_shift_jis_decoder: ShiftJisDecoder?  # not zeroable in Luce: optional until initialized
 
 # mark: Utf8Decoder =============================================================================
 
@@ -141,24 +108,6 @@ pub func as_if_utf8_decoder[P: IsDecoder](p: P*) -> Utf8Decoder*?:
 pub func as_utf8_decoder[P: IsDecoder](p: P*) -> Utf8Decoder*:
     return as_if_utf8_decoder(p) else trap("as<TextCodec::UTF8Decoder> failed")
 
-## TextCodec::(anonymous)::s_euc_kr_decoder (Libraries/LibTextCodec/Decoder.cpp:36).
-pub var s_euc_kr_decoder: EuckrDecoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_replacement_decoder (Libraries/LibTextCodec/Decoder.cpp:37).
-pub var s_replacement_decoder: ReplacementDecoder?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_ibm866_decoder (Libraries/LibTextCodec/Decoder.cpp:41).
-# C++ initializer: { s_ibm866_index }
-pub var s_ibm866_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin2_decoder (Libraries/LibTextCodec/Decoder.cpp:42).
-# C++ initializer: { s_iso_8859_2_index }
-pub var s_latin2_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin3_decoder (Libraries/LibTextCodec/Decoder.cpp:43).
-# C++ initializer: { s_iso_8859_3_index }
-pub var s_latin3_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
 # mark: Utf16BeDecoder ==========================================================================
 
 ## TextCodec::UTF16BEDecoder (Libraries/LibTextCodec/Decoder.h:43).
@@ -196,46 +145,6 @@ pub func as_if_utf16_be_decoder[P: IsDecoder](p: P*) -> Utf16BeDecoder*?:
 ## as<TextCodec::UTF16BEDecoder> (verify_cast).
 pub func as_utf16_be_decoder[P: IsDecoder](p: P*) -> Utf16BeDecoder*:
     return as_if_utf16_be_decoder(p) else trap("as<TextCodec::UTF16BEDecoder> failed")
-
-## TextCodec::(anonymous)::s_latin4_decoder (Libraries/LibTextCodec/Decoder.cpp:44).
-# C++ initializer: { s_iso_8859_4_index }
-pub var s_latin4_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin_cyrillic_decoder (Libraries/LibTextCodec/Decoder.cpp:45).
-# C++ initializer: { s_iso_8859_5_index }
-pub var s_latin_cyrillic_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin_arabic_decoder (Libraries/LibTextCodec/Decoder.cpp:46).
-# C++ initializer: { s_iso_8859_6_index }
-pub var s_latin_arabic_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin_greek_decoder (Libraries/LibTextCodec/Decoder.cpp:47).
-# C++ initializer: { s_iso_8859_7_index }
-pub var s_latin_greek_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin_hebrew_decoder (Libraries/LibTextCodec/Decoder.cpp:48).
-# C++ initializer: { s_iso_8859_8_index }
-pub var s_latin_hebrew_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin6_decoder (Libraries/LibTextCodec/Decoder.cpp:49).
-# C++ initializer: { s_iso_8859_10_index }
-pub var s_latin6_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin7_decoder (Libraries/LibTextCodec/Decoder.cpp:50).
-# C++ initializer: { s_iso_8859_13_index }
-pub var s_latin7_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin8_decoder (Libraries/LibTextCodec/Decoder.cpp:51).
-# C++ initializer: { s_iso_8859_14_index }
-pub var s_latin8_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin9_decoder (Libraries/LibTextCodec/Decoder.cpp:52).
-# C++ initializer: { s_iso_8859_15_index }
-pub var s_latin9_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_latin10_decoder (Libraries/LibTextCodec/Decoder.cpp:53).
-# C++ initializer: { s_iso_8859_16_index }
-pub var s_latin10_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
 
 # mark: Utf16LeDecoder ==========================================================================
 
@@ -275,68 +184,32 @@ pub func as_if_utf16_le_decoder[P: IsDecoder](p: P*) -> Utf16LeDecoder*?:
 pub func as_utf16_le_decoder[P: IsDecoder](p: P*) -> Utf16LeDecoder*:
     return as_if_utf16_le_decoder(p) else trap("as<TextCodec::UTF16LEDecoder> failed")
 
-## TextCodec::(anonymous)::s_centraleurope_decoder (Libraries/LibTextCodec/Decoder.cpp:54).
-# C++ initializer: { s_windows_1250_index }
-pub var s_centraleurope_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_cyrillic_decoder (Libraries/LibTextCodec/Decoder.cpp:55).
-# C++ initializer: { s_windows_1251_index }
-pub var s_cyrillic_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_hebrew_decoder (Libraries/LibTextCodec/Decoder.cpp:56).
-# C++ initializer: { s_windows_1255_index }
-pub var s_hebrew_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_koi8r_decoder (Libraries/LibTextCodec/Decoder.cpp:57).
-# C++ initializer: { s_koi8_r_index }
-pub var s_koi8r_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_koi8u_decoder (Libraries/LibTextCodec/Decoder.cpp:58).
-# C++ initializer: { s_koi8_u_index }
-pub var s_koi8u_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_mac_roman_decoder (Libraries/LibTextCodec/Decoder.cpp:59).
-# C++ initializer: { s_macintosh_index }
-pub var s_mac_roman_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_windows874_decoder (Libraries/LibTextCodec/Decoder.cpp:60).
-# C++ initializer: { s_windows_874_index }
-pub var s_windows874_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_windows1252_decoder (Libraries/LibTextCodec/Decoder.cpp:61).
-# C++ initializer: { s_windows_1252_index }
-pub var s_windows1252_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_windows1253_decoder (Libraries/LibTextCodec/Decoder.cpp:62).
-# C++ initializer: { s_windows_1253_index }
-pub var s_windows1253_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_turkish_decoder (Libraries/LibTextCodec/Decoder.cpp:63).
-# C++ initializer: { s_windows_1254_index }
-pub var s_turkish_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
-## TextCodec::(anonymous)::s_windows1256_decoder (Libraries/LibTextCodec/Decoder.cpp:64).
-# C++ initializer: { s_windows_1256_index }
-pub var s_windows1256_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
-
 # mark: SingleByteDecoder =======================================================================
 
 ## TextCodec::SingleByteDecoder (Libraries/LibTextCodec/Decoder.h:64): a generic struct.
-pub struct SingleByteDecoder[TArrayType]:
-    pub var decoder: Decoder
-    pub var m_translation_table: TArrayType[]
+# Filled by region r06: the base is `decoder_base` with the IsDecoder upcast, the table is held by
+# value as the C++ Array<ArrayType, 128> is, and the class gets a vtable and class id 14 (after the
+# generated pre-order). The donor instantiates only ArrayType = u16, so the vtable is that one's.
+pub struct SingleByteDecoder[TArrayType]: IsDecoder:
+    pub var decoder_base: Decoder  # primary base
+    pub var m_translation_table: TArrayType[128]
 
-## TextCodec::(anonymous)::s_windows1257_decoder (Libraries/LibTextCodec/Decoder.cpp:65).
-# C++ initializer: { s_windows_1257_index }
-pub var s_windows1257_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
+    func decoder() -> Decoder*: return (Decoder*)&self
 
-## TextCodec::(anonymous)::s_windows1258_decoder (Libraries/LibTextCodec/Decoder.cpp:66).
-# C++ initializer: { s_windows_1258_index }
-pub var s_windows1258_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
+## Virtual functions introduced by TextCodec::SingleByteDecoder.
+pub struct SingleByteDecoderVTable:
+    pub let decoder_vtable: DecoderVTable
 
-## TextCodec::(anonymous)::s_mac_cyrillic_decoder (Libraries/LibTextCodec/Decoder.cpp:67).
-# C++ initializer: { s_x_mac_cyrillic_index }
-pub var s_mac_cyrillic_decoder: (SingleByteDecoder[u16])?  # not zeroable in Luce: optional until initialized
+## The vtable of TextCodec::SingleByteDecoder<u16>.
+pub let single_byte_decoder_vtable: SingleByteDecoderVTable = SingleByteDecoderVTable(decoder_vtable = DecoderVTable(class_info = &single_byte_decoder_class, process = single_byte_decoder_process_impl))
+
+## Class information of TextCodec::SingleByteDecoder: name, class-id range (pre-order), size, vtable.
+pub let single_byte_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "SingleByteDecoder", first_id = 14, last_id = 14, size = sizeof(SingleByteDecoder[u16]), vtable = (const void*)&single_byte_decoder_vtable)
+
+## is<TextCodec::SingleByteDecoder>: the class-id range test.
+pub func is_single_byte_decoder[P: IsDecoder](p: P*) -> bool:
+    let id = p.decoder().class_id
+    return id >= single_byte_decoder_class.first_id and id <= single_byte_decoder_class.last_id
 
 # mark: Latin1Decoder ===========================================================================
 

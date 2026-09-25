@@ -1,0 +1,192 @@
+#==============================================================================================
+#
+#   codec_vectors - decoder and encoder vectors of every encoding
+#
+#   DESCRIPTION:
+#       Byte and code point vectors of each decoder (errors, restored bytes, state changes) and
+#       each encoder (errors, escapes), printed by the reference build for the same input.
+#
+#==============================================================================================
+
+# mark: Decoder vectors ======================================================================
+
+test "decode utf-8":
+    expect_decode("utf-8", b"\xf0\x9f\x98\x80", [0x1f600], true)
+    expect_decode("utf-8", b"\x61\xc3", [0x61, 0xfffd], false)
+    expect_decode("utf-8", b"\xff\x62", [0xfffd, 0x62], false)
+    expect_decode_processed("utf-8", b"\xed\xa0\x80", [0xd800], [0xfffd], true)
+    expect_decode("utf-8", b"\xe2\x82\x78", [0xfffd, 0xfffd, 0x78], false)
+    expect_decode("utf-8", b"\x68\x69", [0x68, 0x69], true)
+
+test "decode iso-8859-1":
+    expect_decode("iso-8859-1", b"\x00\x41\x80\x9f\xa0\xff", [0x0, 0x41, 0x80, 0x9f, 0xa0, 0xff], true)
+
+test "decode windows-1252":
+    expect_decode("windows-1252", b"\x41\x80\x81\x8d\x9f\xff", [0x41, 0x20ac, 0x81, 0x8d, 0x178, 0xff], true)
+
+test "decode ibm866":
+    expect_decode("ibm866", b"\x41\x80\xb0\xff", [0x41, 0x410, 0x2591, 0xa0], true)
+
+test "decode iso-8859-3":
+    expect_decode("iso-8859-3", b"\xa1\xa5\xae\xff", [0x126, 0xfffd, 0xfffd, 0x2d9], false)
+
+test "decode iso-8859-8-i":
+    expect_decode("iso-8859-8-i", b"\xe0\xa1\xfa", [0x5d0, 0xfffd, 0x5ea], false)
+
+test "decode koi8-u":
+    expect_decode("koi8-u", b"\xa4\xad\xbf", [0x454, 0x491, 0xa9], true)
+
+test "decode x-mac-cyrillic":
+    expect_decode("x-mac-cyrillic", b"\x80\xa2\xff", [0x410, 0x490, 0x20ac], true)
+
+test "decode windows-874":
+    expect_decode("windows-874", b"\x80\x81\xdb\xfc", [0x20ac, 0x81, 0xfffd, 0xfffd], false)
+
+test "decode PDFDocEncoding":
+    expect_decode("PDFDocEncoding", b"\x18\x41\x7f\x80\x9f\xad\xff", [0x2d8, 0x41, 0xfffc, 0x2022, 0xfffc, 0xfffc, 0xff], true)
+
+test "decode x-user-defined":
+    expect_decode("x-user-defined", b"\x00\x41\x7f\x80\xff", [0x0, 0x41, 0x7f, 0xf780, 0xf7ff], true)
+
+test "decode gb18030":
+    expect_decode("gb18030", b"\x81\x30\x81\x30", [0x80], true)
+    expect_decode("gb18030", b"\x84\x31\xa4\x39", [0xffff], true)
+    expect_decode("gb18030", b"\x90\x30\x81\x30", [0x10000], true)
+    expect_decode("gb18030", b"\xe3\x32\x9a\x35", [0x10ffff], true)
+    expect_decode("gb18030", b"\xe3\x32\x9a\x36", [0xfffd], false)
+    expect_decode("gb18030", b"\x84\x31\xa5\x30", [0xfffd], false)
+    expect_decode("gb18030", b"\x82\x35\x90\x37", [0xe81e], true)
+    expect_decode("gb18030", b"\x84\x31\x83\x35", [0xe796], true)
+    expect_decode("gb18030", b"\x81\x35\xf4\x37", [0xe7c7], true)
+    expect_decode("gb18030", b"\x81\x40\xa2\xe3\xfe\xfe", [0x4e02, 0x20ac, 0xe4c5], true)
+    expect_decode("gb18030", b"\x80\x41\xff", [0x20ac, 0x41, 0xfffd], false)
+    expect_decode("gb18030", b"\x81", [0xfffd], false)
+    expect_decode("gb18030", b"\x81\x30", [0xfffd], false)
+    expect_decode("gb18030", b"\x81\x30\x81", [0xfffd], false)
+    expect_decode("gb18030", b"\x81\x30\x81\x41", [0xfffd, 0x30, 0x4e04], false)
+    expect_decode("gb18030", b"\x81\x30\x41", [0xfffd, 0x30, 0x41], false)
+    expect_decode("gb18030", b"\x81\x7f\x42", [0xfffd, 0x7f, 0x42], false)
+    expect_decode("gb18030", b"\x81\x20", [0xfffd, 0x20], false)
+
+test "decode gbk":
+    expect_decode("gbk", b"\xa2\xe3\x80", [0x20ac, 0x20ac], true)
+
+test "decode big5":
+    expect_decode("big5", b"\xa4\xa4\xa1\xb1", [0x4e2d, 0xa7], true)
+    expect_decode("big5", b"\x88\x62\x88\x64\x88\xa3\x88\xa5", [0xca, 0x304, 0xca, 0x30c, 0xea, 0x304, 0xea, 0x30c], true)
+    expect_decode("big5", b"\x81\x40", [0xfffd, 0x40], false)
+    expect_decode("big5", b"\x87\x40", [0x43f0], true)
+    expect_decode("big5", b"\xa4", [0xfffd], false)
+    expect_decode("big5", b"\xa4\x20", [0xfffd, 0x20], false)
+    expect_decode("big5", b"\xa4\x80", [0xfffd], false)
+    expect_decode("big5", b"\x80\xff\x41", [0xfffd, 0xfffd, 0x41], false)
+
+test "decode euc-jp":
+    expect_decode("euc-jp", b"\x8e\xa1\x8e\xdf", [0xff61, 0xff9f], true)
+    expect_decode("euc-jp", b"\x8e\xe0", [0xfffd], false)
+    expect_decode("euc-jp", b"\x8f\xa2\xaf", [0x2d8], true)
+    expect_decode("euc-jp", b"\x8f\xa1\xa1", [0xfffd], false)
+    expect_decode("euc-jp", b"\xa4\xe8\xa5\xc4", [0x3088, 0x30c4], true)
+    expect_decode("euc-jp", b"\xa1", [0xfffd], false)
+    expect_decode("euc-jp", b"\x8f", [0xfffd], false)
+    expect_decode("euc-jp", b"\x8f\xa2", [0xfffd], false)
+    expect_decode("euc-jp", b"\xa4\x41", [0xfffd, 0x41], false)
+    expect_decode("euc-jp", b"\x80\xff\x5c", [0xfffd, 0xfffd, 0x5c], false)
+
+test "decode iso-2022-jp":
+    expect_decode("iso-2022-jp", b"\x1b\x24\x42\x24\x68\x25\x44\x1b\x28\x42", [0x3088, 0x30c4], true)
+    expect_decode("iso-2022-jp", b"\x1b\x28\x4a\x5c\x7e\x61\x1b\x28\x42\x5c", [0xa5, 0x203e, 0x61, 0x5c], true)
+    expect_decode("iso-2022-jp", b"\x1b\x28\x49\x21\x5f\x60", [0xff61, 0xff9f, 0xfffd], false)
+    expect_decode("iso-2022-jp", b"\x61\x62\x0e\x0f\x80", [0x61, 0x62, 0xfffd, 0xfffd, 0xfffd], false)
+    expect_decode("iso-2022-jp", b"\x1b", [0xfffd], false)
+    expect_decode("iso-2022-jp", b"\x1b\x24", [0xfffd, 0x24], false)
+    expect_decode("iso-2022-jp", b"\x1b\x24\x42\x24", [0xfffd], false)
+    expect_decode("iso-2022-jp", b"\x1b\x24\x42\x1b\x28\x42", [0xfffd], false)
+    expect_decode("iso-2022-jp", b"\x1b\x24\x42\x24\x0a", [0xfffd], false)
+    expect_decode("iso-2022-jp", b"\x1b\x24\x42\x24\x1b\x28\x42\x61", [0xfffd, 0x61], false)
+    expect_decode("iso-2022-jp", b"\x1b\x28\x4a\x0e\x1b\x78\x79", [0xfffd, 0xfffd, 0x78, 0x79], false)
+    expect_decode("iso-2022-jp", b"\x1b\x24\x40\x21\x21\x7f", [0x3000, 0xfffd], false)
+    expect_decode("iso-2022-jp", b"\x1b\x28\x49\x1b\x28\x42", [0xfffd], false)
+    expect_decode("iso-2022-jp", b"\x1b\x28", [0xfffd, 0x28], false)
+
+test "decode shift_jis":
+    expect_decode("shift_jis", b"\x82\xa0\x5c\x7e\x80", [0x3042, 0x5c, 0x7e, 0x80], true)
+    expect_decode("shift_jis", b"\xa1\xdf", [0xff61, 0xff9f], true)
+    expect_decode("shift_jis", b"\xf0\x40\xf9\xfc", [0xe000, 0xe757], true)
+    expect_decode("shift_jis", b"\x82", [0xfffd], false)
+    expect_decode("shift_jis", b"\x82\x20", [0xfffd, 0x20], false)
+    expect_decode("shift_jis", b"\xa0\xfd\xff", [0xfffd, 0xfffd, 0xfffd], false)
+    expect_decode("shift_jis", b"\x81\x7f", [0xfffd, 0x7f], false)
+    expect_decode("shift_jis", b"\xea\xa5", [0xfffd], false)
+
+test "decode euc-kr":
+    expect_decode("euc-kr", b"\x88\x6b\xf0\xd8", [0xb29f, 0x7c97], true)
+    expect_decode("euc-kr", b"\x81\x41", [0xac02], true)
+    expect_decode("euc-kr", b"\x81", [0xfffd], false)
+    expect_decode("euc-kr", b"\x81\x20", [0xfffd, 0x20], false)
+    expect_decode("euc-kr", b"\xa1\x40", [0xfffd, 0x40], false)
+    expect_decode("euc-kr", b"\x80\xff", [0xfffd, 0xfffd], false)
+
+test "decode replacement":
+    expect_decode("replacement", b"\x61\x62\x63", [0xfffd], false)
+
+test "decode utf-16be":
+    expect_decode("utf-16be", b"\x00\x73\x00\xe4\xd8\x3d\xde\x00", [0x73, 0xe4, 0x1f600], true)
+    expect_decode("utf-16be", b"\xfe\xff\x00\x61", [0x61], true)
+    expect_decode("utf-16be", b"\xd8\x3d\x00\x61", [0xfffd, 0x61], false)
+    expect_decode("utf-16be", b"\x00\x61\x00", [0x61], true)
+
+test "decode utf-16le":
+    expect_decode("utf-16le", b"\x73\x00\xe4\x00\x3d\xd8\x00\xde", [0x73, 0xe4, 0x1f600], true)
+    expect_decode("utf-16le", b"\xff\xfe\x61\x00", [0x61], true)
+    expect_decode("utf-16le", b"\x00\xdc\x61\x00", [0xfffd, 0x61], false)
+
+# mark: Encoder vectors ======================================================================
+
+test "encode utf-8":
+    expect_encode("utf-8", [0x1f600, 0x41], b"\xf0\x9f\x98\x80\x41", no_code_points)
+
+test "encode euc-jp":
+    expect_encode("euc-jp", [0xa5, 0x3088, 0x30c4], b"\x5c\xa4\xe8\xa5\xc4", no_code_points)
+    expect_encode("euc-jp", [0x41, 0x203e, 0xff61, 0xff9f, 0x2212, 0x1f600, 0x80], b"\x41\x7e\x8e\xa1\x8e\xdf\xa1\xdd", [0x1f600, 0x80])
+
+test "encode iso-2022-jp":
+    expect_encode("iso-2022-jp", [0xa5, 0x3088, 0x30c4], b"\x1b\x28\x4a\x5c\x1b\x24\x42\x24\x68\x25\x44\x1b\x28\x42", no_code_points)
+    expect_encode("iso-2022-jp", [0x41, 0xe, 0xa5, 0x5c, 0x7e, 0x203e, 0x1b], b"\x41\x1b\x28\x4a\x5c\x1b\x28\x42\x5c\x7e\x1b\x28\x4a\x7e\x1b\x28\x42", [0xfffd, 0xfffd])
+    expect_encode("iso-2022-jp", [0xff61, 0xff9f, 0x2212], b"\x1b\x24\x42\x21\x23\x21\x2c\x21\x5d\x1b\x28\x42", no_code_points)
+    expect_encode("iso-2022-jp", [0x3088, 0x1f600, 0x41], b"\x1b\x24\x42\x24\x68\x1b\x28\x4a\x41", [0x1f600])
+    expect_encode("iso-2022-jp", [0x1f600, 0xe9], b"", [0x1f600, 0xe9])
+    expect_encode("iso-2022-jp", [0xa5, 0x1f600], b"\x1b\x28\x4a\x5c\x1b\x28\x42", [0x1f600])
+
+test "encode shift_jis":
+    expect_encode("shift_jis", [0xa5, 0x3088, 0x30c4], b"\x5c\x82\xe6\x83\x63", no_code_points)
+    expect_encode("shift_jis", [0x80, 0x203e, 0xff61, 0xff9f, 0x2212, 0x2170, 0xe9], b"\x80\x7e\xa1\xdf\x81\x7c\xfa\x40", [0xe9])
+
+test "encode euc-kr":
+    expect_encode("euc-kr", [0xb29f, 0x7c97, 0x41, 0x1f600], b"\x88\x6b\xf0\xd8\x41", [0x1f600])
+
+test "encode big5":
+    expect_encode("big5", [0xa7, 0x70d7, 0x41], b"\xa1\xb1\xd2\x71\x41", no_code_points)
+    expect_encode("big5", [0x2550, 0x255e, 0x2561, 0x256a, 0x5341, 0x5345, 0x43f0, 0x1f600], b"\xf9\xf9\xf9\xe9\xf9\xeb\xf9\xea\xa4\x51\xa4\xca", [0x43f0, 0x1f600])
+
+test "encode gb18030":
+    expect_encode("gb18030", [0x20ac, 0xe4c5], b"\xa2\xe3\xfe\xfe", no_code_points)
+    expect_encode("gb18030", [0x80, 0xa5, 0xe7c7, 0xe5e5, 0xffff, 0x10000, 0x10ffff, 0x41], b"\x81\x30\x81\x30\x81\x30\x84\x36\x81\x35\xf4\x37\x84\x31\xa4\x39\x90\x30\x81\x30\xe3\x32\x9a\x35\x41", [0xe5e5])
+
+test "encode gbk":
+    expect_encode("gbk", [0x20ac, 0x80, 0xa2e3, 0x4e02], b"\x80\x81\x40", [0x80, 0xa2e3])
+
+test "encode windows-1252":
+    expect_encode("windows-1252", [0xc0, 0xcf, 0x66, 0x20ac, 0x81, 0x3042], b"\xc0\xcf\x66\x80\x81", [0x3042])
+
+test "encode ibm866":
+    expect_encode("ibm866", [0x410, 0xa0, 0x41, 0xe9], b"\x80\xff\x41", [0xe9])
+
+test "encode iso-8859-8-i":
+    expect_encode("iso-8859-8-i", [0x5d0, 0xd7], b"\xe0\xaa", no_code_points)
+
+test "encode x-mac-cyrillic":
+    expect_encode("x-mac-cyrillic", [0x20ac, 0x410], b"\xff\x80", no_code_points)
+
+test "encode windows-874":
+    expect_encode("windows-874", [0x20ac, 0xfffd], b"\x80\xdb", no_code_points)
