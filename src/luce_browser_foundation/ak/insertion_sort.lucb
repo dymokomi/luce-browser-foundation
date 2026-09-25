@@ -1,0 +1,32 @@
+#==============================================================================================
+#
+#   insertion_sort - AK's insertion sort (end inclusive)
+#
+#   DESCRIPTION:
+#       Port of AK/InsertionSort.h (lines 1-45). A collection is a span; the comparator is a
+#       Function2[const T*, const T*, bool]; the form without one uses `a < b`.
+#
+#==============================================================================================
+
+## Ported from AK/InsertionSort.h:17 AK::insertion_sort.
+# Standard Insertion Sort, with `end` inclusive!
+pub func insertion_sort_isize[T](col: T[], start: isize, end: isize, comparator: Function2[const T*, const T*, bool]):
+    var i = start + 1
+    while i <= end:
+        var j = i
+        while j > start and function2_call(&comparator, &col[(usize)j], &col[(usize)(j - 1)]):
+            swap_5(&col[(usize)j], &col[(usize)(j - 1)])
+            j -= 1
+        i += 1
+
+## Ported from AK/InsertionSort.h:27 AK::insertion_sort(Collection&, Comparator).
+pub func insertion_sort_t_comparator[T](collection: T[], comparator: Function2[const T*, const T*, bool]):
+    if collection.length == 0:
+        return
+    insertion_sort_isize(collection, 0, (isize)collection.length - 1, comparator)
+
+## Ported from AK/InsertionSort.h:36 AK::insertion_sort(Collection&): `a < b`.
+pub func insertion_sort[T: luce.Comparable](collection: T[]):
+    if collection.length == 0:
+        return
+    insertion_sort_isize(collection, 0, (isize)collection.length - 1, default_less_than[T]())

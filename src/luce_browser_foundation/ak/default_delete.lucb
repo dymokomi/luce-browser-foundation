@@ -1,0 +1,16 @@
+#==============================================================================================
+#
+#   default_delete - DefaultDelete<T>
+#
+#   DESCRIPTION:
+#       Port of AK/DefaultDelete.h (lines 1-35). `delete t` returns the object to the
+#       current allocator (the gc heap, DESIGN.md §3.3, where freeing is allowed as an
+#       optimization).
+#
+#==============================================================================================
+
+## Ported from AK/DefaultDelete.h:15 AK::DefaultDelete::operator().
+pub func default_delete_call[T](this: DefaultDelete[T]*, t: T*?):
+    discard(this)
+    if let object = t:
+        free(object)

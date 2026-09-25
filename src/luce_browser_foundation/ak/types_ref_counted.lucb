@@ -23,4 +23,4 @@ pub func ref_counted_base_init_fields(this: RefCountedBase*):
 
 ## AK::RefCounted (AK/RefCounted.h:56): a generic struct.
 pub struct RefCounted[T]:
-    pub var empty_: u8
+    pub var ref_counted_base: RefCountedBase  # primary base

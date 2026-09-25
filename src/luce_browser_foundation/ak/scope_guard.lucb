@@ -1,0 +1,34 @@
+#==============================================================================================
+#
+#   scope_guard - ScopeGuard and ArmedScopeGuard
+#
+#   DESCRIPTION:
+#       Port of AK/ScopeGuard.h (lines 1-56). DESIGN.md §2.6: the destructor is what a scope
+#       exit runs, so a port writes `defer scope_guard_run(&guard)` (or `defer f()` directly).
+#       The callback is an ak.Function0 (the lambda, DESIGN.md §2.7).
+#
+#==============================================================================================
+
+## Ported from AK/ScopeGuard.h:16 AK::ScopeGuard::ScopeGuard<Callback>.
+pub func scope_guard_construct[TCallback](this: ScopeGuard[TCallback]*, callback: Function0[unit]):
+    this.m_callback = callback
+
+## AK/ScopeGuard.h:21 AK::ScopeGuard::~ScopeGuard: runs the callback.
+pub func scope_guard_run[TCallback](this: ScopeGuard[TCallback]*):
+    let call = this.m_callback.call else trap("VERIFY: empty Function")
+    call(this.m_callback.context)
+
+## Ported from AK/ScopeGuard.h:33 AK::ArmedScopeGuard::ArmedScopeGuard<Callback>.
+pub func armed_scope_guard_construct[TCallback](this: ArmedScopeGuard[TCallback]*, callback: Function0[unit]):
+    this.m_callback = callback
+    this.m_armed = true
+
+## AK/ScopeGuard.h:38 AK::ArmedScopeGuard::~ArmedScopeGuard: runs the callback unless disarmed.
+pub func armed_scope_guard_run[TCallback](this: ArmedScopeGuard[TCallback]*):
+    if this.m_armed:
+        let call = this.m_callback.call else trap("VERIFY: empty Function")
+        call(this.m_callback.context)
+
+## Ported from AK/ScopeGuard.h:44 AK::ArmedScopeGuard::disarm.
+pub func armed_scope_guard_disarm[TCallback](this: ArmedScopeGuard[TCallback]*):
+    this.m_armed = false

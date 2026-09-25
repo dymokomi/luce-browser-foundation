@@ -1,0 +1,21 @@
+#==============================================================================================
+#
+#   own_ptr - the free functions of OwnPtr<T>
+#
+#   DESCRIPTION:
+#       Port of the free functions of AK/OwnPtr.h (lines 175-217). DESIGN.md §2.6: OwnPtr<T>
+#       is `T*?` in managed memory; `move()` is a plain copy.
+#
+#==============================================================================================
+
+## Ported from AK/OwnPtr.h:182 AK::swap.
+pub func swap_3[T](a: (T*?)*, b: (T*?)*):
+    let tmp = *a
+    *a = *b
+    *b = tmp
+
+## Ported from AK/OwnPtr.h:188 AK::adopt_own_if_nonnull.
+pub func adopt_own_if_nonnull[T](object: T*?) -> T*?:
+    if let adopted = object:
+        return adopted
+    return none

@@ -1,0 +1,222 @@
+#==============================================================================================
+#
+#   tests_bitmap - Bitmap and BitmapView
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestBitmap.cpp. The randomized cases run over a fixed set of
+#       seeds from testing.random().
+#
+#==============================================================================================
+
+# MUST(Bitmap::create(size, value)).
+func test_bitmap(size: usize, value: bool) -> Bitmap:
+    return bitmap_create(size, value) else trap("MUST: Bitmap::create")
+
+# Releases a test bitmap's storage (the donor's ~Bitmap).
+func test_bitmap_free(bitmap: Bitmap*):
+    kfree(bitmap.bitmap_view.m_data)
+
+test "bitmap: construct_empty":
+    var bitmap: Bitmap
+    bitmap_init_fields(&bitmap)
+    assert(bitmap_view_size(&bitmap.bitmap_view) == 0)
+
+test "bitmap: find_first_set and find_first_unset":
+    var bitmap = test_bitmap(128, false)
+    bitmap_set(&bitmap, 69, true)
+    assert((bitmap_view_find_first_set(&bitmap.bitmap_view) else trap("none")) == 69)
+    var other = test_bitmap(128, true)
+    bitmap_set(&other, 51, false)
+    assert((bitmap_view_find_first_unset(&other.bitmap_view) else trap("none")) == 51)
+
+# find_one_anywhere(hint).value() for one value of the bit.
+func test_find_anywhere(bitmap: const Bitmap*, set: bool, hint: usize) -> usize:
+    if set:
+        return bitmap_view_find_one_anywhere_set(&bitmap.bitmap_view, hint) else trap("none")
+    return bitmap_view_find_one_anywhere_unset(&bitmap.bitmap_view, hint) else trap("none")
+
+test "bitmap: find_one_anywhere_set and find_one_anywhere_unset":
+    for set in [true, false]:
+        var bitmap = test_bitmap(168, not set)
+        bitmap_set(&bitmap, 34, set)
+        bitmap_set(&bitmap, 97, set)
+        assert(test_find_anywhere(&bitmap, set, 0) == 34)
+        assert(test_find_anywhere(&bitmap, set, 31) == 34)
+        assert(test_find_anywhere(&bitmap, set, 32) == 34)
+        assert(test_find_anywhere(&bitmap, set, 34) == 34)
+        assert(test_find_anywhere(&bitmap, set, 36) == 34)
+        assert(test_find_anywhere(&bitmap, set, 63) == 34)
+        assert(test_find_anywhere(&bitmap, set, 64) == 97)
+        assert(test_find_anywhere(&bitmap, set, 96) == 97)
+        assert(test_find_anywhere(&bitmap, set, 97) == 97)
+        assert(test_find_anywhere(&bitmap, set, 127) == 97)
+        assert(test_find_anywhere(&bitmap, set, 128) == 34)
+
+        var second = test_bitmap(128 + 24, not set)
+        bitmap_set(&second, 34, set)
+        bitmap_set(&second, 126, set)
+        assert(test_find_anywhere(&second, set, 0) == 34)
+        assert(test_find_anywhere(&second, set, 63) == 34)
+        assert(test_find_anywhere(&second, set, 64) == 126)
+
+        var third = test_bitmap(32, not set)
+        bitmap_set(&third, 12, set)
+        bitmap_set(&third, 24, set)
+        let got = test_find_anywhere(&third, set, 0)
+        assert(got == 12 or got == 24)
+
+test "bitmap: find_first_range":
+    var bitmap = test_bitmap(128, true)
+    for i in 47..<52usize:
+        bitmap_set(&bitmap, i, false)
+    var found_range_size: usize = 0
+    let result = bitmap_view_find_longest_range_of_unset_bits(&bitmap.bitmap_view, 5, &found_range_size)
+    assert(result != none)
+    assert(found_range_size == 5)
+    assert((result else 0) == 47)
+
+test "bitmap: set_range":
+    var bitmap = test_bitmap(128, false)
+    bitmap_set_range(&bitmap, 41, 10, true)
+    assert(not bitmap_view_get(&bitmap.bitmap_view, 40))
+    for i in 41..<51usize:
+        assert(bitmap_view_get(&bitmap.bitmap_view, i))
+    assert(not bitmap_view_get(&bitmap.bitmap_view, 51))
+
+    var big = test_bitmap(288, false)
+    bitmap_set_range(&big, 48, 32, true)
+    bitmap_set_range(&big, 94, 39, true)
+    bitmap_set_range(&big, 190, 71, true)
+    bitmap_set_range(&big, 190 + 71 - 7, 21, false)  # slightly overlapping clear
+    for i in 0..<bitmap_view_size(&big.bitmap_view):
+        let should_be_set = (i >= 48 and i < 48 + 32) or (i >= 94 and i < 94 + 39) or ((i >= 190 and i < 190 + 71) and not (i >= 190 + 71 - 7 and i < 190 + 71 - 7 + 21))
+        assert(bitmap_view_get(&big.bitmap_view, i) == should_be_set)
+    assert(bitmap_view_count_slow(&big.bitmap_view, true) == 32 + 39 + 71 - 7)
+
+test "bitmap: find_first_fit":
+    var full = test_bitmap(32, true)
+    assert(bitmap_view_find_first_fit(&full.bitmap_view, 1) == none)
+    bitmap_set(&full, 31, false)
+    assert((bitmap_view_find_first_fit(&full.bitmap_view, 1) else trap("none")) == 31)
+
+    for i in 0..<128usize:
+        var bitmap = test_bitmap(128, true)
+        bitmap_set(&bitmap, i, false)
+        assert((bitmap_view_find_first_fit(&bitmap.bitmap_view, 1) else trap("none")) == i)
+        test_bitmap_free(&bitmap)
+
+    for i in 0..<127usize:
+        var bitmap = test_bitmap(128, true)
+        bitmap_set(&bitmap, i, false)
+        bitmap_set(&bitmap, i + 1, false)
+        assert((bitmap_view_find_first_fit(&bitmap.bitmap_view, 2) else trap("none")) == i)
+        test_bitmap_free(&bitmap)
+
+    let bitmap_size: usize = 1024
+    for chunk_size in 1..<64usize:
+        for i in 0..<bitmap_size - chunk_size:
+            var bitmap = test_bitmap(bitmap_size, true)
+            for c in 0..<chunk_size:
+                bitmap_set(&bitmap, i + c, false)
+            assert((bitmap_view_find_first_fit(&bitmap.bitmap_view, chunk_size) else trap("none")) == i)
+            test_bitmap_free(&bitmap)
+
+test "bitmap: find_longest_range_of_unset_bits_edge":
+    var bitmap = test_bitmap(36, true)
+    bitmap_set_range(&bitmap, 32, 4, false)
+    var found_range_size: usize = 0
+    let result = bitmap_view_find_longest_range_of_unset_bits(&bitmap.bitmap_view, 1, &found_range_size)
+    assert((result else trap("none")) == 32)
+
+# count_bits_slow of TestBitmap.cpp.
+func test_count_bits_slow(b: const Bitmap*, start: usize, len: usize, value: bool) -> usize:
+    var count: usize = 0
+    for i in start..<start + len:
+        if bitmap_view_get(&b.bitmap_view, i) == value:
+            count += 1
+    return count
+
+test "bitmap: count_in_range":
+    var bitmap = test_bitmap(256, false)
+    bitmap_set(&bitmap, 14, true)
+    bitmap_set(&bitmap, 17, true)
+    bitmap_set(&bitmap, 19, true)
+    bitmap_set(&bitmap, 20, true)
+    for i in 34..<250usize:
+        if i < 130 or i > 183:
+            bitmap_set(&bitmap, i, true)
+    for value in [true, false]:
+        for (start, len) in [(16usize, 2usize), (16, 3), (16, 4)]:
+            assert(bitmap_view_count_in_range(&bitmap.bitmap_view, start, len, value) == test_count_bits_slow(&bitmap, start, len, value))
+        for start in 8..<24usize:
+            for end in 9..<25usize:
+                if start >= end:
+                    continue
+                assert(bitmap_view_count_in_range(&bitmap.bitmap_view, start, end - start, value) == test_count_bits_slow(&bitmap, start, end - start, value))
+        for start in 1..=9usize:
+            for i in start + 1..<bitmap_view_size(&bitmap.bitmap_view) - start + 1:
+                assert(bitmap_view_count_in_range(&bitmap.bitmap_view, start, i - start, value) == test_count_bits_slow(&bitmap, start, i - start, value))
+
+test "bitmap: byte_aligned_access":
+    var a = test_bitmap(16, true)
+    assert(bitmap_view_count_in_range(&a.bitmap_view, 0, 16, true) == 16)
+    assert(bitmap_view_count_in_range(&a.bitmap_view, 8, 8, true) == 8)
+    assert(bitmap_view_count_in_range(&a.bitmap_view, 0, 8, true) == 8)
+    assert(bitmap_view_count_in_range(&a.bitmap_view, 4, 8, true) == 8)
+    var b = test_bitmap(16, false)
+    bitmap_set_range(&b, 4, 8, true)
+    assert(bitmap_view_count_in_range(&b.bitmap_view, 0, 16, true) == 8)
+    assert(bitmap_view_count_in_range(&b.bitmap_view, 8, 8, true) == 4)
+    assert(bitmap_view_count_in_range(&b.bitmap_view, 0, 8, true) == 4)
+    assert(bitmap_view_count_in_range(&b.bitmap_view, 4, 8, true) == 8)
+    var c = test_bitmap(8, false)
+    bitmap_set(&c, 2, true)
+    bitmap_set(&c, 4, true)
+    assert(bitmap_view_count_in_range(&c.bitmap_view, 0, 2, true) == 0)
+    assert(bitmap_view_count_in_range(&c.bitmap_view, 0, 4, true) == 1)
+    assert(bitmap_view_count_in_range(&c.bitmap_view, 0, 8, true) == 2)
+    assert(bitmap_view_count_in_range(&c.bitmap_view, 4, 4, true) == 1)
+
+test "bitmap: randomized set_get and set_range":
+    for round in 0..<200:
+        discard(round)
+        let init = (testing.random() & 1) == 1
+        let new_value = (testing.random() & 1) == 1
+        let size = (usize)(testing.random() % 64) + 1
+        let i = (usize)(testing.random() % (u64)size)
+        var bitmap = test_bitmap(size, init)
+        bitmap_set(&bitmap, i, new_value)
+        assert(bitmap_view_get(&bitmap.bitmap_view, i) == new_value)
+        let start = (usize)(testing.random() % (u64)size)
+        let len = (usize)(testing.random() % (u64)(size - start))
+        bitmap_fill(&bitmap, init)
+        bitmap_set_range(&bitmap, start, len, new_value)
+        for j in 0..<size:
+            let expected = new_value if (j >= start and j < start + len) else init
+            assert(bitmap_view_get(&bitmap.bitmap_view, j) == expected)
+        test_bitmap_free(&bitmap)
+
+test "bitmap: grow, eq and verify-all-bits-flip":
+    var bitmap = test_bitmap(10, true)
+    bitmap_grow(&bitmap, 30, false)
+    assert(bitmap_view_size(&bitmap.bitmap_view) == 30)
+    assert(bitmap_view_count_slow(&bitmap.bitmap_view, true) == 10)
+    assert(not bitmap_view_get(&bitmap.bitmap_view, 10))
+    var other = test_bitmap(30, false)
+    bitmap_set_range_and_verify_that_all_bits_flip(&other, 0, 10, true)
+    assert(bitmap_view_eq(&bitmap.bitmap_view, other.bitmap_view))
+    bitmap_set(&other, 29, true)
+    assert(not bitmap_view_eq(&bitmap.bitmap_view, other.bitmap_view))
+    var from_: usize = 0
+    assert((bitmap_view_find_next_range_of_unset_bits(&bitmap.bitmap_view, &from_, 3) else trap("none")) == 3)
+    assert(from_ == 10)
+    # find_best_fit on a bitmap of whole words: the trailing-bits pass of
+    # find_next_range_of_unset_bits restarts at the first trailing bit whatever `from` is,
+    # so on a bitmap shorter than a word the donor's find_best_fit never terminates.
+    var words = test_bitmap(128, true)
+    bitmap_set_range(&words, 5, 4, false)
+    bitmap_set_range(&words, 70, 2, false)
+    bitmap_set_range(&words, 100, 3, false)
+    assert((bitmap_view_find_best_fit(&words.bitmap_view, 2) else trap("none")) == 70)
+    assert((bitmap_view_find_best_fit(&words.bitmap_view, 3) else trap("none")) == 100)
+    assert(bitmap_view_find_best_fit(&words.bitmap_view, 5) == none)

@@ -13,6 +13,7 @@
 
 ## AK::WeakLink (AK/Weakable.h:19).
 pub struct WeakLink:
+    pub var ref_counted: RefCounted[WeakLink]  # primary base (RefCounted<WeakLink>)
     pub var m_ptr: void*?  # C++ default: { nullptr }
 
 # mark: Weakable ================================================================================

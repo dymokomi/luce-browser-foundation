@@ -1,0 +1,157 @@
+#==============================================================================================
+#
+#   quick_sort - AK's dual-pivot and single-pivot quick sorts
+#
+#   DESCRIPTION:
+#       Port of AK/QuickSort.h (lines 1-170). AK::quick_sort is ported, never substituted
+#       (DESIGN.md §2.1): it is not stable, and LibWeb's output depends on the order it
+#       leaves equal elements in. A collection is a span (`vector_span(&v)` for a Vector);
+#       an iterator pair is the span between them. `less_than` is a
+#       Function2[const T*, const T*, bool]; the forms without one use `a < b` (Comparable).
+#
+#==============================================================================================
+
+# The default comparison `[](auto& a, auto& b) { return a < b; }`.
+# workaround: compiler-issues/generic_function_value (the callback is a static method)
+struct QuickSortLessThan[T: luce.Comparable]:
+    var unused: u8
+
+    static func call(context: void*?, a: const T*, b: const T*) -> bool:
+        discard(context)
+        # workaround: compiler-issues/float_bits_through_pointer
+        let left = *a
+        return left.compare(*b) < 0
+
+## The Function2 comparing with `a < b`, the default comparator of quick_sort and
+## insertion_sort.
+pub func default_less_than[T: luce.Comparable]() -> Function2[const T*, const T*, bool]:
+    let call: func(void*?, const T*, const T*) -> bool = QuickSortLessThan[T].call
+    return Function2[const T*, const T*, bool](call = call, context = none)
+
+# `less_than(col[a], col[b])` for the i32 indices the donor's quick sort uses.
+func quick_sort_less[T](col: T[], a: i32, b: i32, less_than: const Function2[const T*, const T*, bool]*) -> bool:
+    return function2_call(less_than, &col[(usize)a], &col[(usize)b])
+
+func quick_sort_swap[T](col: T[], a: i32, b: i32):
+    swap_5(&col[(usize)a], &col[(usize)b])
+
+## Ported from AK/QuickSort.h:26 AK::dual_pivot_quick_sort.
+# This is a dual pivot quick sort. It is quite a bit faster than the single
+# pivot quick_sort below. The other quick_sort below should only be used when
+# you are stuck with simple iterators to a container and you don't have access
+# to the container itself.
+#
+# We use a cutoff to insertion sort for partitions of size 7 or smaller.
+# The idea is to avoid recursion for small partitions.
+# The value 7 here is a magic number. According to princeton's CS algorithm class
+# a value between 5 and 15 should work well in most situations:
+# https://algs4.cs.princeton.edu/23quicksort/
+pub func dual_pivot_quick_sort[T](col: T[], start_: i32, end_: i32, less_than: Function2[const T*, const T*, bool]):
+    var start = start_
+    var end = end_
+    if (end + 1) - start <= insertion_sort_cutoff:
+        insertion_sort_isize(col, (isize)start, (isize)end, less_than)
+        return
+
+    while start < end:
+        let size = end - start + 1
+        if size > 3:
+            let third = size // 3
+            if quick_sort_less(col, start + third, end - third, &less_than):
+                quick_sort_swap(col, start + third, start)
+                quick_sort_swap(col, end - third, end)
+            else:
+                quick_sort_swap(col, start + third, end)
+                quick_sort_swap(col, end - third, start)
+        else:
+            if not quick_sort_less(col, start, end, &less_than):
+                quick_sort_swap(col, start, end)
+
+        var j = start + 1
+        var k = start + 1
+        var g = end - 1
+
+        # left_pivot and right_pivot are references to col[start] and col[end].
+        while k <= g:
+            if quick_sort_less(col, k, start, &less_than):
+                quick_sort_swap(col, k, j)
+                j += 1
+            elif not quick_sort_less(col, k, end, &less_than):
+                while not quick_sort_less(col, g, end, &less_than) and k < g:
+                    g -= 1
+                quick_sort_swap(col, k, g)
+                g -= 1
+                if quick_sort_less(col, k, start, &less_than):
+                    quick_sort_swap(col, k, j)
+                    j += 1
+            k += 1
+        j -= 1
+        g += 1
+
+        quick_sort_swap(col, start, j)
+        quick_sort_swap(col, end, g)
+
+        let left_pointer = j
+        let right_pointer = g
+
+        let left_size = left_pointer - start
+        let middle_size = right_pointer - (left_pointer + 1)
+        let right_size = (end + 1) - (right_pointer + 1)
+
+        if left_size >= middle_size and left_size >= right_size:
+            dual_pivot_quick_sort(col, left_pointer + 1, right_pointer - 1, less_than)
+            dual_pivot_quick_sort(col, right_pointer + 1, end, less_than)
+            end = left_pointer - 1
+        elif middle_size >= right_size:
+            dual_pivot_quick_sort(col, start, left_pointer - 1, less_than)
+            dual_pivot_quick_sort(col, right_pointer + 1, end, less_than)
+            start = left_pointer + 1
+            end = right_pointer - 1
+        else:
+            dual_pivot_quick_sort(col, start, left_pointer - 1, less_than)
+            dual_pivot_quick_sort(col, left_pointer + 1, right_pointer - 1, less_than)
+            start = right_pointer + 1
+
+## Ported from AK/QuickSort.h:108 AK::single_pivot_quick_sort, over the span between the two
+## iterators.
+pub func single_pivot_quick_sort[T](range: T[], less_than: Function2[const T*, const T*, bool]):
+    var items = range
+    while true:
+        let size = (i32)items.length
+        if size <= 1:
+            return
+        let pivot_point = size // 2
+        quick_sort_swap(items, pivot_point, 0)
+
+        # pivot is a reference to *start.
+        var i: i32 = 1
+        for j in 1..<size:
+            if quick_sort_less(items, j, 0, &less_than):
+                quick_sort_swap(items, j, i)
+                i += 1
+
+        quick_sort_swap(items, 0, i - 1)
+        # Recur into the shorter part of the remaining data
+        # to ensure a stack depth of at most log(n).
+        if i > size // 2:
+            single_pivot_quick_sort(items[(usize)i..], less_than)
+            items = items[..<(usize)(i - 1)]
+        else:
+            single_pivot_quick_sort(items[..<(usize)(i - 1)], less_than)
+            items = items[(usize)i..]
+
+## Ported from AK/QuickSort.h:140 AK::quick_sort(Iterator, Iterator): `a < b`.
+pub func quick_sort_t_iterator_t_iterator[T: luce.Comparable](range: T[]):
+    single_pivot_quick_sort(range, default_less_than[T]())
+
+## Ported from AK/QuickSort.h:146 AK::quick_sort(Iterator, Iterator, LessThan).
+pub func quick_sort_t_iterator_t_iterator_t_less_than[T](range: T[], less_than: Function2[const T*, const T*, bool]):
+    single_pivot_quick_sort(range, less_than)
+
+## Ported from AK/QuickSort.h:152 AK::quick_sort(Collection&, LessThan).
+pub func quick_sort_t_collection_t_less_than[T](collection: T[], less_than: Function2[const T*, const T*, bool]):
+    dual_pivot_quick_sort(collection, 0, (i32)collection.length - 1, less_than)
+
+## Ported from AK/QuickSort.h:158 AK::quick_sort(Collection&): `a < b`.
+pub func quick_sort_t_collection[T: luce.Comparable](collection: T[]):
+    dual_pivot_quick_sort(collection, 0, (i32)collection.length - 1, default_less_than[T]())

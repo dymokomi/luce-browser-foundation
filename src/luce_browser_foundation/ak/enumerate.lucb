@@ -1,0 +1,47 @@
+#==============================================================================================
+#
+#   enumerate - enumerate(range): (index, value) pairs
+#
+#   DESCRIPTION:
+#       Port of AK/Enumerate.h (lines 1-59). luce-base spans enumerate themselves
+#       (`for (index, value) in items.indexed()`); enumerate() over a Vector or any
+#       IndexedContainer is an Enumerator whose iterator yields EnumeratorItem pairs of an
+#       index and a pointer to the element, so `for item in enumerate(&v):` walks it.
+#
+#==============================================================================================
+
+## Enumerator::Enumeration: the index of an element and the element.
+pub struct EnumeratorItem[T]:
+    pub var index: usize
+    pub var value: T*
+
+## Enumerator::Iterator: the index and the container being walked; also a luce-base iterator.
+pub struct EnumeratorCursor[T, TContainer: IndexedContainer[T]]: luce.Iterable[EnumeratorItem[T], EnumeratorCursor[T, TContainer]], luce.Iterator[EnumeratorItem[T]]:
+    pub var index: usize
+    pub var container: TContainer*
+
+    func iterator() -> EnumeratorCursor[T, TContainer]: return self
+
+    mutating func next() -> EnumeratorItem[T]?: return enumerator_cursor_next(&self)
+
+## Enumerator::Iterator::operator* and operator++: the current pair, and the cursor advanced;
+## none past the end.
+pub func enumerator_cursor_next[T, TContainer: IndexedContainer[T]](this: EnumeratorCursor[T, TContainer]*) -> EnumeratorItem[T]?:
+    if this.index >= this.container.size():
+        return none
+    let item = EnumeratorItem[T](index = this.index, value = this.container.at(this.index))
+    this.index += 1
+    return item
+
+## Ported from AK/Enumerate.h:41 AK::Detail::Enumerator::begin.
+pub func enumerator_begin[T, TContainer: IndexedContainer[T]](this: Enumerator[TContainer*]*) -> EnumeratorCursor[T, TContainer]:
+    return EnumeratorCursor[T, TContainer](index = 0, container = this.iterable)
+
+## Ported from AK/Enumerate.h:42 AK::Detail::Enumerator::end.
+pub func enumerator_end[T, TContainer: IndexedContainer[T]](this: Enumerator[TContainer*]*) -> EnumeratorCursor[T, TContainer]:
+    return EnumeratorCursor[T, TContainer](index = this.iterable.size(), container = this.iterable)
+
+## Ported from AK/Enumerate.h:48 AK::enumerate: the (index, element) pairs of a container.
+pub func enumerate[T, TContainer: IndexedContainer[T]](range: TContainer*) -> EnumeratorCursor[T, TContainer]:
+    var enumerator = Enumerator[TContainer*](iterable = range)
+    return enumerator_begin[T, TContainer](&enumerator)

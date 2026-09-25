@@ -13,4 +13,5 @@
 
 ## AK::Singleton (AK/Singleton.h:34): a generic struct.
 pub struct Singleton[T]:
-    pub var m_obj: T*?  # C++ default: { nullptr }
+    pub var m_obj: @T*?  # C++ default: { nullptr } (Atomic<T*>)
+    pub var m_init: (func() -> T*)?  # the InitFunction template argument

@@ -1,0 +1,15 @@
+#==============================================================================================
+#
+#   weakable - AK::Weakable::make_weak_ptr, which answers a GC weak pointer
+#
+#   DESCRIPTION:
+#       Port of AK/Weakable.h:60 (region r01). DESIGN.md §2.6 maps AK::WeakPtr<U> to
+#       gc.Weak[U]; its m_impl here holds the object's ak.WeakLink (the WeakImpl of LibGC
+#       is for cells). The AK half is ak.weakable_ensure_link.
+#
+#==============================================================================================
+
+## Ported from AK/Weakable.h:60 AK::Weakable::make_weak_ptr.
+pub func weakable_make_weak_ptr[T, U](this: const ak.Weakable[T]*) -> Weak[U]:
+    let link = ak.weakable_ensure_link(this)
+    return Weak[U](m_impl = link)

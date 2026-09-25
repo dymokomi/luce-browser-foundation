@@ -1,0 +1,51 @@
+#==============================================================================================
+#
+#   atomic_ref_counted - AtomicRefCountedBase and AtomicRefCounted<T>
+#
+#   DESCRIPTION:
+#       Port of AK/AtomicRefCounted.h (lines 1-88). As ref_counted: the counter (an `@u32`)
+#       is kept faithfully, nothing is deleted (DESIGN.md §3.3).
+#
+#==============================================================================================
+
+# The counter of a const base, as the donor's `mutable Atomic<RefCountType>`.
+func atomic_ref_counted_base_counter(this: const AtomicRefCountedBase*) -> AtomicRefCountedBase*:
+    return (AtomicRefCountedBase*)this
+
+## Ported from AK/AtomicRefCounted.h:25 AK::AtomicRefCountedBase::ref.
+pub func atomic_ref_counted_base_ref(this: const AtomicRefCountedBase*):
+    let old_ref_count = atomic_ref_counted_base_counter(this).m_ref_count.add(1, .relaxed)
+    assert(old_ref_count > 0)
+    assert(not checked_addition_would_overflow_u32(old_ref_count, 1))
+
+## Ported from AK/AtomicRefCounted.h:32 AK::AtomicRefCountedBase::try_ref.
+pub func atomic_ref_counted_base_try_ref(this: const AtomicRefCountedBase*) -> bool:
+    let that = atomic_ref_counted_base_counter(this)
+    var expected = that.m_ref_count.load(.relaxed)
+    while true:
+        if expected == 0:
+            return false
+        assert(not checked_addition_would_overflow_u32(expected, 1))
+        # compare_exchange_strong(expected, expected + 1, memory_order_acquire)
+        let (exchanged, observed) = that.m_ref_count.cas(expected, expected + 1, .acquire, .acquire)
+        if exchanged:
+            return true
+        expected = observed
+
+## Ported from AK/AtomicRefCounted.h:44 AK::AtomicRefCountedBase::ref_count.
+pub func atomic_ref_counted_base_ref_count(this: const AtomicRefCountedBase*) -> u32:
+    return atomic_ref_counted_base_counter(this).m_ref_count.load(.relaxed)
+
+## Ported from AK/AtomicRefCounted.h:56 AK::AtomicRefCountedBase::deref_base.
+pub func atomic_ref_counted_base_deref_base(this: const AtomicRefCountedBase*) -> u32:
+    let old_ref_count = atomic_ref_counted_base_counter(this).m_ref_count.sub(1, .acq_rel)
+    assert(old_ref_count > 0)
+    return old_ref_count - 1
+
+## Ported from AK/AtomicRefCounted.h:69 AK::AtomicRefCounted::unref.
+# The donor calls will_be_destroyed() and deletes the object at zero; managed memory keeps it.
+pub func atomic_ref_counted_unref[T](this: const AtomicRefCounted[T]*) -> bool:
+    let new_ref_count = atomic_ref_counted_base_deref_base(&this.atomic_ref_counted_base)
+    if new_ref_count == 0:
+        return true
+    return false

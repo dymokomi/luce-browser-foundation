@@ -1,0 +1,114 @@
+#==============================================================================================
+#
+#   tests_atomic - the atomic free functions and AtomicRefCounted
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestAtomic.cpp (the operations on plain locations; the Atomic<T>
+#       class is `@T`) and focused cases pinned to AtomicRefCounted.h.
+#
+#==============================================================================================
+
+test "atomic: do_exchange":
+    var a_bool = false
+    assert(atomic_exchange_bool(&a_bool, true) == false)
+    assert(atomic_load_bool(&a_bool) == true)
+    var a_u32: u32 = 2
+    assert(atomic_exchange_u32(&a_u32, 22) == 2)
+    assert(atomic_load_u32(&a_u32) == 22)
+    var a_u16: u16 = 3
+    assert(atomic_exchange_u16(&a_u16, 33) == 3)
+    assert(atomic_load_u16(&a_u16) == 33)
+    var a_u8: u8 = 4
+    assert(atomic_exchange_u8(&a_u8, 44) == 4)
+    assert(atomic_load_u8(&a_u8) == 44)
+    var v_u16: u16[6]
+    var a_pu16: u16*? = &v_u16[2]
+    assert(atomic_load_2(&a_pu16) == (u16*?)&v_u16[2])
+    assert(atomic_exchange_v(&a_pu16, &v_u16[4]) == (u16*?)&v_u16[2])
+    assert(atomic_exchange_void(&a_pu16) == (u16*?)&v_u16[4])
+    assert(a_pu16 == none)
+
+test "atomic: do_compare_exchange":
+    var a_bool = false
+    var e_bool = true
+    assert(not atomic_compare_exchange_strong_bool(&a_bool, &e_bool, true))
+    assert(e_bool == false)
+    assert(atomic_load_bool(&a_bool) == false)
+    e_bool = false
+    assert(atomic_compare_exchange_strong_bool(&a_bool, &e_bool, true))
+    assert(atomic_load_bool(&a_bool) == true)
+    var a_u32: u32 = 2
+    var e_u32: u32 = 99
+    assert(not atomic_compare_exchange_strong_u32(&a_u32, &e_u32, 22))
+    assert(e_u32 == 2)
+    e_u32 = 2
+    assert(atomic_compare_exchange_strong_u32(&a_u32, &e_u32, 22, MemoryOrder.memory_order_acq_rel))
+    assert(a_u32 == 22)
+    var a_u8: u8 = 4
+    var e_u8: u8 = 99
+    assert(not atomic_compare_exchange_strong_u8(&a_u8, &e_u8, 44, MemoryOrder.memory_order_release))
+    assert(e_u8 == 4)
+    var v: i64[2]
+    var p: i64*? = none
+    var expected: i64*? = &v[0]
+    assert(not atomic_compare_exchange_strong_v_v(&p, &expected, &v[1]))
+    assert(expected == none)
+    assert(atomic_compare_exchange_strong_v_v(&p, &expected, &v[1]))
+    assert(p == (i64*?)&v[1])
+    expected = &v[1]
+    assert(atomic_compare_exchange_strong_v_void(&p, &expected))
+    assert(p == none)
+
+test "atomic: fetch_add, fetch_sub, fetch_and, fetch_or, fetch_xor":
+    var a_u32: u32 = 5
+    assert(atomic_fetch_add_u32(&a_u32, 2) == 5)
+    assert(atomic_load_u32(&a_u32) == 7)
+    var a_u16: u16 = 5
+    assert(atomic_fetch_add_u16(&a_u16, 2) == 5)
+    assert(a_u16 == 7)
+    var a_u8: u8 = 5
+    assert(atomic_fetch_sub_u8(&a_u8, 2) == 5)
+    assert(a_u8 == 3)
+    var a_i64: i64 = -1
+    assert(atomic_fetch_add_i64(&a_i64, 3, MemoryOrder.memory_order_relaxed) == -1)
+    assert(a_i64 == 2)
+    var bits: u32 = 0b1100
+    assert(atomic_fetch_and_u32(&bits, 0b0110) == 0b1100)
+    assert(bits == 0b0100)
+    assert(atomic_fetch_or_u32(&bits, 0b0001) == 0b0100)
+    assert(bits == 0b0101)
+    assert(atomic_fetch_xor_u32(&bits, 0b0111) == 0b0101)
+    assert(bits == 0b0010)
+
+test "atomic: load, store, fences":
+    var value: usize = 1
+    atomic_store_usize(&value, 9, MemoryOrder.memory_order_release)
+    assert(atomic_load_usize(&value, MemoryOrder.memory_order_acquire) == 9)
+    var p: u8*? = none
+    var byte: u8 = 1
+    atomic_store_v(&p, &byte)
+    assert(atomic_load_2(&p, MemoryOrder.memory_order_consume) == (u8*?)&byte)
+    atomic_store_void(&p)
+    assert(p == none)
+    atomic_thread_fence(MemoryOrder.memory_order_seq_cst)
+    atomic_signal_fence(MemoryOrder.memory_order_acq_rel)
+    full_memory_barrier()
+    atomic_pause()
+    assert(atomic_is_lock_free_u64())
+
+struct TestAtomicObject:
+    var base: AtomicRefCounted[TestAtomicObject]
+
+test "atomic_ref_counted: ref, try_ref, unref":
+    var object: TestAtomicObject
+    atomic_ref_counted_base_init_fields(&object.base.atomic_ref_counted_base)
+    let base = &object.base.atomic_ref_counted_base
+    assert(atomic_ref_counted_base_ref_count(base) == 1)
+    atomic_ref_counted_base_ref(base)
+    assert(atomic_ref_counted_base_ref_count(base) == 2)
+    assert(atomic_ref_counted_base_try_ref(base))
+    assert(atomic_ref_counted_base_ref_count(base) == 3)
+    assert(not atomic_ref_counted_unref(&object.base))
+    assert(not atomic_ref_counted_unref(&object.base))
+    assert(atomic_ref_counted_unref(&object.base))
+    assert(not atomic_ref_counted_base_try_ref(base))

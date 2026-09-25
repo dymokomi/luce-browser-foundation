@@ -1,0 +1,158 @@
+#==============================================================================================
+#
+#   tests_sort - quick_sort, insertion_sort and binary_search
+#
+#   DESCRIPTION:
+#       Ports of Tests/AK/TestQuickSort.cpp, TestInsertionSort.cpp and TestBinarySearch.cpp
+#       (the randomized cases run over the test's deterministic seed), and the order
+#       quick_sort leaves equal keys in, pinned against the donor's AK (it is not stable).
+#
+#==============================================================================================
+
+struct TestSortPair:
+    var key: i32
+    var id: i32
+
+func test_sort_pair_less(context: void*?, a: const TestSortPair*, b: const TestSortPair*) -> bool:
+    discard(context)
+    return a.key < b.key
+
+func test_sort_int_greater(context: void*?, a: const i32*, b: const i32*) -> bool:
+    discard(context)
+    return *a > *b
+
+func test_sort_int_less(context: void*?, a: const i32*, b: const i32*) -> bool:
+    discard(context)
+    return *a < *b
+
+test "quick_sort: sorts_without_copy":
+    var array: TestSortPair[64]
+    for i in 0..<64usize:
+        array[i].key = (i32)((64 - i) % 32 + 32)
+    let less = Function2[const TestSortPair*, const TestSortPair*, bool](call = test_sort_pair_less, context = none)
+    dual_pivot_quick_sort(array, 0, 63, less)
+    for i in 0..<63usize:
+        assert(array[i].key <= array[i + 1].key)
+    for i in 0..<64usize:
+        array[i].key = (i32)((64 - i) % 32 + 32)
+    single_pivot_quick_sort(array, less)
+    for i in 0..<63usize:
+        assert(array[i].key <= array[i + 1].key)
+
+test "quick_sort: maximum_stack_depth":
+    var data: i32[256]
+    for i in 0..<256usize:
+        data[i] = (i32)i
+    # Construct the data in such a way that the assumed pivot choice
+    # of (size / 2) causes the partitions to be of worst case size.
+    for i in 0..<128usize:
+        swap_5(&data[i], &data[i + (256 - i) // 2])
+    quick_sort_t_iterator_t_iterator(data)
+    for i in 0..<256usize:
+        assert(data[i] == (i32)i)
+
+test "quick_sort: the order of equal keys matches the donor":
+    var v: Vector[TestSortPair]
+    var w: Vector[TestSortPair]
+    for i: i32 in 0..<40:
+        vector_append_t(&v, TestSortPair(key = (i * 7) % 5, id = i))
+        vector_append_t(&w, TestSortPair(key = (i * 7) % 5, id = i))
+    let less = Function2[const TestSortPair*, const TestSortPair*, bool](call = test_sort_pair_less, context = none)
+    quick_sort_t_collection_t_less_than(vector_span(&v), less)
+    let dual: i32[40] = [10, 5, 15, 25, 20, 0, 30, 35, 13, 33, 38, 23, 3, 28, 18, 8, 26, 11, 21, 16, 36, 1, 31, 6, 24, 9, 39, 4, 14, 29, 19, 34, 32, 27, 17, 2, 22, 37, 12, 7]
+    for i in 0..<40usize:
+        assert(vector_at(&v, i).id == dual[i])
+    quick_sort_t_iterator_t_iterator_t_less_than(vector_span(&w), less)
+    let single: i32[40] = [20, 0, 15, 35, 25, 10, 30, 5, 18, 28, 13, 23, 33, 38, 8, 3, 21, 26, 11, 16, 31, 6, 36, 1, 29, 34, 4, 24, 19, 9, 39, 14, 12, 7, 37, 17, 22, 27, 32, 2]
+    for i in 0..<40usize:
+        assert(vector_at(&w, i).id == single[i])
+
+test "quick_sort: default comparison":
+    var values: i64[7] = [5, -3, 9, 0, 9, 2, -8]
+    quick_sort_t_collection(values)
+    for i in 0..<6usize:
+        assert(values[i] <= values[i + 1])
+
+test "insertion_sort: sorts_ascending and sorts_descending":
+    for iteration in 0..<10:
+        discard(iteration)
+        var ints: i32[10]
+        for j in 0..<10usize:
+            ints[j] = (i32)(testing.random() % 2000) - 1000
+        var ints_copy = ints
+        insertion_sort(ints)
+        insertion_sort(ints_copy)
+        for j in 0..<9usize:
+            assert(ints[j] <= ints[j + 1])
+            assert(ints[j] == ints_copy[j])
+        let greater = Function2[const i32*, const i32*, bool](call = test_sort_int_greater, context = none)
+        insertion_sort_t_comparator(ints, greater)
+        for j in 0..<9usize:
+            assert(ints[j] >= ints[j + 1])
+
+test "insertion_sort: sorts_subrange_without_affecting_outside_elements":
+    var ints: i32[10] = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+    let original_ints = ints
+    let start: isize = 3
+    let end: isize = 6
+    insertion_sort_isize(ints, start, end, Function2[const i32*, const i32*, bool](call = test_sort_int_less, context = none))
+    for i in 3..<6usize:
+        assert(ints[i] <= ints[i + 1])
+    for i in 0..<3usize:
+        assert(ints[i] == original_ints[i])
+    for i in 7..<10usize:
+        assert(ints[i] == original_ints[i])
+
+test "binary_search: vector_ints, single_element, not_found, no_elements":
+    var ints: Vector[i32]
+    vector_append_t(&ints, 1)
+    vector_append_t(&ints, 2)
+    vector_append_t(&ints, 3)
+    let compare = default_comparator[i32]()
+    assert(*(binary_search(vector_span_const(&ints), 1i32, none, compare) else trap("missing")) == 1)
+    assert(*(binary_search(vector_span_const(&ints), 2i32, none, compare) else trap("missing")) == 2)
+    assert(*(binary_search(vector_span_const(&ints), 3i32, none, compare) else trap("missing")) == 3)
+    assert(binary_search(vector_span_const(&ints), -1i32, none, compare) == none)
+    assert(binary_search(vector_span_const(&ints), 0i32, none, compare) == none)
+    assert(binary_search(vector_span_const(&ints), 4i32, none, compare) == none)
+    var empty: Vector[i32]
+    assert(binary_search(vector_span_const(&empty), 1i32, none, compare) == none)
+
+test "binary_search: span_rvalue_reference, array_doubles and unsigned_to_signed_regression":
+    let array: i64[3] = [1, 2, 3]
+    var nearby_index: usize = 0
+    let pointer = binary_search(array, 2i64, &nearby_index, default_comparator[i64]()) else trap("missing")
+    assert(nearby_index == 1)
+    assert(*pointer == 2)
+    let doubles: f64[3] = [1.1, 9.9, 33.33]
+    let compare = default_comparator[f64]()
+    assert(*(binary_search(doubles, 1.1, none, compare) else trap("missing")) == 1.1)
+    assert(*(binary_search(doubles, 33.33, none, compare) else trap("missing")) == 33.33)
+    assert(*(binary_search(doubles, 9.9, none, compare) else trap("missing")) == 9.9)
+    let input: u32[5] = [0, 1, 2, 3, 4]
+    # The algorithm computes 1 - input[2] = -1, and if this is (incorrectly) cast
+    # to an unsigned then it will look in the wrong direction and miss the 1.
+    nearby_index = 1
+    assert(*(binary_search(input, 1u32, &nearby_index, default_comparator[u32]()) else trap("missing")) == 1)
+    assert(nearby_index == 1)
+
+test "binary_search: finds present numbers and not absent ones":
+    for round in 0..<20:
+        discard(round)
+        var values: u64[16]
+        for i in 0..<16usize:
+            values[i] = testing.random() % 1000
+        quick_sort_t_collection(values)
+        let compare = default_comparator[u64]()
+        let n = values[(usize)(testing.random() % 16)]
+        assert(*(binary_search(values, n, none, compare) else trap("missing")) == n)
+        var not_present: u64 = 0
+        var found = true
+        while found:
+            found = false
+            for value in values:
+                if value == not_present:
+                    found = true
+            if found:
+                not_present += 1
+        assert(binary_search(values, not_present, none, compare) == none)

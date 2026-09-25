@@ -1,0 +1,51 @@
+#==============================================================================================
+#
+#   result - Result<ValueT, ErrorT>
+#
+#   DESCRIPTION:
+#       Port of AK/Result.h (lines 1-123): a value or an error, held as two optionals as in
+#       the donor. The const and rvalue constructor overloads are one function each.
+#
+#==============================================================================================
+
+## Ported from AK/Result.h:20 AK::Result::Result<ValueT, ErrorT> (ValueType const&).
+pub func result_construct_t_value_t[TValueT, TErrorT](this: Result[TValueT, TErrorT]*, res: TValueT):
+    this.m_result = res
+    this.m_error = none
+
+## Ported from AK/Result.h:25 AK::Result::Result<ValueT, ErrorT> (ValueType&&).
+pub func result_construct_opaque[TValueT, TErrorT](this: Result[TValueT, TErrorT]*, res: TValueT):
+    result_construct_t_value_t(this, res)
+
+## Ported from AK/Result.h:30 AK::Result::Result<ValueT, ErrorT> (ErrorType const&).
+pub func result_construct_opaque_2[TValueT, TErrorT](this: Result[TValueT, TErrorT]*, error_: TErrorT):
+    this.m_result = none
+    this.m_error = error_
+
+## Ported from AK/Result.h:35 AK::Result::Result<ValueT, ErrorT> (ErrorType&&).
+pub func result_construct_opaque_3[TValueT, TErrorT](this: Result[TValueT, TErrorT]*, error_: TErrorT):
+    result_construct_opaque_2(this, error_)
+
+## Ported from AK/Result.h:44 AK::Result::value.
+pub func result_value[TValueT, TErrorT](this: Result[TValueT, TErrorT]*) -> TValueT:
+    return this.m_result else trap("VERIFY: Optional::value on an empty Optional")
+
+## Ported from AK/Result.h:49 AK::Result::error.
+pub func result_error[TValueT, TErrorT](this: Result[TValueT, TErrorT]*) -> TErrorT:
+    return this.m_error else trap("VERIFY: Optional::value on an empty Optional")
+
+## Ported from AK/Result.h:54 AK::Result::is_error.
+pub func result_is_error[TValueT, TErrorT](this: const Result[TValueT, TErrorT]*) -> bool:
+    return this.m_error != none
+
+## Ported from AK/Result.h:59 AK::Result::release_value.
+pub func result_release_value[TValueT, TErrorT](this: Result[TValueT, TErrorT]*) -> TValueT:
+    let value = this.m_result else trap("VERIFY: Optional::release_value on an empty Optional")
+    this.m_result = none
+    return value
+
+## Ported from AK/Result.h:64 AK::Result::release_error.
+pub func result_release_error[TValueT, TErrorT](this: Result[TValueT, TErrorT]*) -> TErrorT:
+    let value = this.m_error else trap("VERIFY: Optional::release_value on an empty Optional")
+    this.m_error = none
+    return value

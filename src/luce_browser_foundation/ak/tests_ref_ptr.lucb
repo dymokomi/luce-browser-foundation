@@ -1,0 +1,99 @@
+#==============================================================================================
+#
+#   tests_ref_ptr - RefCounted, RefPtr, NonnullRefPtr, OwnPtr and NonnullOwnPtr
+#
+#   DESCRIPTION:
+#       Ports of the cases of Tests/AK/TestRefPtr.cpp, TestNonnullRefPtr.cpp, TestOwnPtr.cpp
+#       and TestNonnullOwnPtr.cpp that do not depend on C++ destructors: the reference
+#       counts a smart-pointer copy takes are written out (DESIGN.md §2.6, §3.3).
+#
+#==============================================================================================
+
+struct TestRefObject:
+    var ref_counted: RefCounted[TestRefObject]
+    var x: i32
+
+func test_new_ref_object() -> TestRefObject*:
+    let object = new TestRefObject(ref_counted = RefCounted[TestRefObject](ref_counted_base = RefCountedBase(m_ref_count = 0)), x = 0) else trap("out of memory")
+    ref_counted_base_init_fields(&object.ref_counted.ref_counted_base)
+    return object
+
+test "ref_ptr: basics":
+    let object = adopt_ref(test_new_ref_object())
+    let base = &object.ref_counted.ref_counted_base
+    assert(ref_counted_base_ref_count(base) == 1)
+    ref_counted_base_ref(base)
+    assert(ref_counted_base_ref_count(base) == 2)
+    discard(ref_counted_unref(&object.ref_counted))
+    assert(ref_counted_base_ref_count(base) == 1)
+    # NonnullRefPtr another = *object;
+    ref_if_not_null(base)
+    assert(ref_counted_base_ref_count(base) == 2)
+    unref_if_not_null(base)
+    assert(ref_counted_base_ref_count(base) == 1)
+    ref_if_not_null(none)
+    unref_if_not_null(none)
+
+test "ref_ptr: swap":
+    var object_a: TestRefObject*? = adopt_ref(test_new_ref_object())
+    var object_b: TestRefObject*? = adopt_ref(test_new_ref_object())
+    let ptr_a = object_a
+    let ptr_b = object_b
+    swap_4(&object_a, &object_b)
+    assert(object_a == ptr_b)
+    assert(object_b == ptr_a)
+    var nonnull_a = adopt_ref(test_new_ref_object())
+    var nonnull_b = adopt_ref(test_new_ref_object())
+    let first = nonnull_a
+    swap_2(&nonnull_a, &nonnull_b)
+    assert(nonnull_b == first)
+    swap(&nonnull_a, &nonnull_b)
+    assert(nonnull_a == first)
+    swap_3(&object_a, &object_b)
+    assert(object_a == ptr_a)
+
+test "ref_ptr: self_observers and try_ref":
+    let object = test_new_ref_object()
+    let base = &object.ref_counted.ref_counted_base
+    ref_counted_base_ref(base)
+    assert(not ref_counted_unref(&object.ref_counted))
+    assert(ref_counted_unref(&object.ref_counted))
+    assert(ref_counted_base_ref_count(base) == 0)
+    assert(not ref_counted_base_try_ref(base))
+
+test "ref_ptr: adopt_ref_if_nonnull and adopt_own_if_nonnull":
+    let object = adopt_ref_if_nonnull[TestRefObject](test_new_ref_object())
+    assert(object != none)
+    let failed_allocation = adopt_ref_if_nonnull[TestRefObject](none)
+    assert(failed_allocation == none)
+    assert(adopt_own_if_nonnull[TestRefObject](none) == none)
+    assert(adopt_own_if_nonnull[TestRefObject](object) == object)
+
+test "ref_ptr: adopt_nonnull_*_or_enomem":
+    let object = adopt_nonnull_ref_or_enomem[TestRefObject](test_new_ref_object()) else trap("failed")
+    assert(object.x == 0)
+    assert(adopt_own(object) == object)
+    let owned = adopt_nonnull_own_or_enomem[TestRefObject](object) else trap("failed")
+    assert(owned == object)
+    let recovered = adopt_nonnull_ref_or_enomem[TestRefObject](none) catch failure:
+        assert(failure.code == ak_errno_error)
+        assert(ak_error_code(&ak_pending_error) == enomem)
+        recover object
+    assert(recovered == object)
+    let own_failure = adopt_nonnull_own_or_enomem[TestRefObject](none) catch failure:
+        let e = ak_error_from_failure(failure)
+        assert(ak_error_is_errno(&e))
+        recover object
+    assert(own_failure == object)
+
+test "ref_ptr: static_ptr_cast and fixme_launder_const_through_pointer_cast":
+    let object = test_new_ref_object()
+    let as_base = static_ptr_cast[RefCountedBase, TestRefObject](object)
+    assert((void*)as_base == (void*)object)
+    assert(static_ptr_cast_2[RefCountedBase, TestRefObject](none) == none)
+    let read_only: const TestRefObject* = object
+    let laundered = fixme_launder_const_through_pointer_cast(read_only)
+    laundered.x = 5
+    assert(object.x == 5)
+    assert(fixme_launder_const_through_pointer_cast_2[TestRefObject](none) == none)
+    assert(fixme_launder_const_through_pointer_cast_3(read_only) == object)

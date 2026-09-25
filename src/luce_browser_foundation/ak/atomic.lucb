@@ -1,0 +1,466 @@
+#==============================================================================================
+#
+#   atomic - the AK atomic free functions over luce-base `@T` atomics
+#
+#   DESCRIPTION:
+#       Port of the free functions of AK/Atomic.h (lines 1-150). The donor's `T volatile*`
+#       templates wrap the __atomic builtins; here a plain `T*` location is viewed as `(@T)*`
+#       (language §5.9, §15.1) and the operation is the atomic's method. The templates are
+#       instantiated per type with the type as a suffix (`atomic_fetch_add_u32`); the pointer
+#       overloads (`T volatile**`) are generic over the pointee. AK::MemoryOrder maps onto
+#       atomics.Ordering (memory_order_consume is acquire, as compilers implement it).
+#       The Atomic<T> class template is not in the phase-1 closure: `@T` fields replace it.
+#
+#==============================================================================================
+
+# mark: Memory orders ===========================================================================
+
+# AK::MemoryOrder as luce-base's atomics.Ordering.
+func atomic_ordering(order: MemoryOrder) -> atomics.Ordering:
+    return match order:
+        .memory_order_relaxed => atomics.Ordering.relaxed
+        .memory_order_consume => atomics.Ordering.acquire
+        .memory_order_acquire => atomics.Ordering.acquire
+        .memory_order_release => atomics.Ordering.release
+        .memory_order_acq_rel => atomics.Ordering.acq_rel
+        _ => atomics.Ordering.seq_cst
+
+# atomic_compare_exchange_strong's success order: release for acq_rel and release.
+func atomic_cas_success_order(order: MemoryOrder) -> atomics.Ordering:
+    if order == MemoryOrder.memory_order_acq_rel or order == MemoryOrder.memory_order_release:
+        return atomics.Ordering.release
+    return atomic_ordering(order)
+
+# atomic_compare_exchange_strong's failure order: acquire for acq_rel and release.
+func atomic_cas_failure_order(order: MemoryOrder) -> atomics.Ordering:
+    if order == MemoryOrder.memory_order_acq_rel or order == MemoryOrder.memory_order_release:
+        return atomics.Ordering.acquire
+    return atomic_ordering(order)
+
+# mark: Fences ==================================================================================
+
+## Ported from AK/Atomic.h:15 AK::atomic_signal_fence.
+# luce-base has no signal-only fence in this revision; a thread fence is at least as strong.
+pub func atomic_signal_fence(order: MemoryOrder):
+    atomics.fence(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:20 AK::atomic_thread_fence.
+pub func atomic_thread_fence(order: MemoryOrder):
+    atomics.fence(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:25 AK::full_memory_barrier.
+pub func full_memory_barrier():
+    atomic_signal_fence(MemoryOrder.memory_order_acq_rel)
+    atomic_thread_fence(MemoryOrder.memory_order_acq_rel)
+
+# mark: Scalar locations ========================================================================
+
+# The atomic view of a plain `u8` location.
+type AtomicU8Ptr = (@u8)*
+
+# The atomic view of a plain `u16` location.
+type AtomicU16Ptr = (@u16)*
+
+# The atomic view of a plain `u32` location.
+type AtomicU32Ptr = (@u32)*
+
+# The atomic view of a plain `u64` location.
+type AtomicU64Ptr = (@u64)*
+
+# The atomic view of a plain `usize` location.
+type AtomicUsizePtr = (@usize)*
+
+# The atomic view of a plain `i32` location.
+type AtomicI32Ptr = (@i32)*
+
+# The atomic view of a plain `i64` location.
+type AtomicI64Ptr = (@i64)*
+
+# The atomic view of a plain `bool` location.
+type AtomicBoolPtr = (@bool)*
+
+## Ported from AK/Atomic.h:32 AK::atomic_exchange, for u8.
+pub func atomic_exchange_u8(var_: u8*, desired: u8, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u8:
+    return ((AtomicU8Ptr)(void*)var_).swap(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:32 AK::atomic_exchange, for u16.
+pub func atomic_exchange_u16(var_: u16*, desired: u16, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u16:
+    return ((AtomicU16Ptr)(void*)var_).swap(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:32 AK::atomic_exchange, for u32.
+pub func atomic_exchange_u32(var_: u32*, desired: u32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u32:
+    return ((AtomicU32Ptr)(void*)var_).swap(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:32 AK::atomic_exchange, for u64.
+pub func atomic_exchange_u64(var_: u64*, desired: u64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u64:
+    return ((AtomicU64Ptr)(void*)var_).swap(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:32 AK::atomic_exchange, for usize.
+pub func atomic_exchange_usize(var_: usize*, desired: usize, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> usize:
+    return ((AtomicUsizePtr)(void*)var_).swap(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:32 AK::atomic_exchange, for i32.
+pub func atomic_exchange_i32(var_: i32*, desired: i32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i32:
+    return ((AtomicI32Ptr)(void*)var_).swap(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:32 AK::atomic_exchange, for i64.
+pub func atomic_exchange_i64(var_: i64*, desired: i64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i64:
+    return ((AtomicI64Ptr)(void*)var_).swap(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:32 AK::atomic_exchange, for bool.
+pub func atomic_exchange_bool(var_: bool*, desired: bool, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    return ((AtomicBoolPtr)(void*)var_).swap(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:50 AK::atomic_compare_exchange_strong, for u8.
+pub func atomic_compare_exchange_strong_u8(var_: u8*, expected: u8*, desired: u8, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    let a = (AtomicU8Ptr)(void*)var_
+    let (exchanged, observed) = a.cas(*expected, desired, atomic_cas_success_order(order), atomic_cas_failure_order(order))
+    # __atomic_compare_exchange_n writes the observed value back into `expected` on failure.
+    if not exchanged:
+        *expected = observed
+    return exchanged
+
+## Ported from AK/Atomic.h:50 AK::atomic_compare_exchange_strong, for u16.
+pub func atomic_compare_exchange_strong_u16(var_: u16*, expected: u16*, desired: u16, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    let a = (AtomicU16Ptr)(void*)var_
+    let (exchanged, observed) = a.cas(*expected, desired, atomic_cas_success_order(order), atomic_cas_failure_order(order))
+    # __atomic_compare_exchange_n writes the observed value back into `expected` on failure.
+    if not exchanged:
+        *expected = observed
+    return exchanged
+
+## Ported from AK/Atomic.h:50 AK::atomic_compare_exchange_strong, for u32.
+pub func atomic_compare_exchange_strong_u32(var_: u32*, expected: u32*, desired: u32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    let a = (AtomicU32Ptr)(void*)var_
+    let (exchanged, observed) = a.cas(*expected, desired, atomic_cas_success_order(order), atomic_cas_failure_order(order))
+    # __atomic_compare_exchange_n writes the observed value back into `expected` on failure.
+    if not exchanged:
+        *expected = observed
+    return exchanged
+
+## Ported from AK/Atomic.h:50 AK::atomic_compare_exchange_strong, for u64.
+pub func atomic_compare_exchange_strong_u64(var_: u64*, expected: u64*, desired: u64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    let a = (AtomicU64Ptr)(void*)var_
+    let (exchanged, observed) = a.cas(*expected, desired, atomic_cas_success_order(order), atomic_cas_failure_order(order))
+    # __atomic_compare_exchange_n writes the observed value back into `expected` on failure.
+    if not exchanged:
+        *expected = observed
+    return exchanged
+
+## Ported from AK/Atomic.h:50 AK::atomic_compare_exchange_strong, for usize.
+pub func atomic_compare_exchange_strong_usize(var_: usize*, expected: usize*, desired: usize, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    let a = (AtomicUsizePtr)(void*)var_
+    let (exchanged, observed) = a.cas(*expected, desired, atomic_cas_success_order(order), atomic_cas_failure_order(order))
+    # __atomic_compare_exchange_n writes the observed value back into `expected` on failure.
+    if not exchanged:
+        *expected = observed
+    return exchanged
+
+## Ported from AK/Atomic.h:50 AK::atomic_compare_exchange_strong, for i32.
+pub func atomic_compare_exchange_strong_i32(var_: i32*, expected: i32*, desired: i32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    let a = (AtomicI32Ptr)(void*)var_
+    let (exchanged, observed) = a.cas(*expected, desired, atomic_cas_success_order(order), atomic_cas_failure_order(order))
+    # __atomic_compare_exchange_n writes the observed value back into `expected` on failure.
+    if not exchanged:
+        *expected = observed
+    return exchanged
+
+## Ported from AK/Atomic.h:50 AK::atomic_compare_exchange_strong, for i64.
+pub func atomic_compare_exchange_strong_i64(var_: i64*, expected: i64*, desired: i64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    let a = (AtomicI64Ptr)(void*)var_
+    let (exchanged, observed) = a.cas(*expected, desired, atomic_cas_success_order(order), atomic_cas_failure_order(order))
+    # __atomic_compare_exchange_n writes the observed value back into `expected` on failure.
+    if not exchanged:
+        *expected = observed
+    return exchanged
+
+## Ported from AK/Atomic.h:50 AK::atomic_compare_exchange_strong, for bool.
+pub func atomic_compare_exchange_strong_bool(var_: bool*, expected: bool*, desired: bool, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    let a = (AtomicBoolPtr)(void*)var_
+    let (exchanged, observed) = a.cas(*expected, desired, atomic_cas_success_order(order), atomic_cas_failure_order(order))
+    # __atomic_compare_exchange_n writes the observed value back into `expected` on failure.
+    if not exchanged:
+        *expected = observed
+    return exchanged
+
+## Ported from AK/Atomic.h:104 AK::atomic_load, for u8.
+pub func atomic_load_u8(var_: u8*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u8:
+    return ((AtomicU8Ptr)(void*)var_).load(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:104 AK::atomic_load, for u16.
+pub func atomic_load_u16(var_: u16*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u16:
+    return ((AtomicU16Ptr)(void*)var_).load(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:104 AK::atomic_load, for u32.
+pub func atomic_load_u32(var_: u32*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u32:
+    return ((AtomicU32Ptr)(void*)var_).load(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:104 AK::atomic_load, for u64.
+pub func atomic_load_u64(var_: u64*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u64:
+    return ((AtomicU64Ptr)(void*)var_).load(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:104 AK::atomic_load, for usize.
+pub func atomic_load_usize(var_: usize*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> usize:
+    return ((AtomicUsizePtr)(void*)var_).load(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:104 AK::atomic_load, for i32.
+pub func atomic_load_i32(var_: i32*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i32:
+    return ((AtomicI32Ptr)(void*)var_).load(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:104 AK::atomic_load, for i64.
+pub func atomic_load_i64(var_: i64*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i64:
+    return ((AtomicI64Ptr)(void*)var_).load(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:104 AK::atomic_load, for bool.
+pub func atomic_load_bool(var_: bool*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    return ((AtomicBoolPtr)(void*)var_).load(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:125 AK::atomic_store, for u8.
+pub func atomic_store_u8(var_: u8*, desired: u8, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
+    ((AtomicU8Ptr)(void*)var_).store(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:125 AK::atomic_store, for u16.
+pub func atomic_store_u16(var_: u16*, desired: u16, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
+    ((AtomicU16Ptr)(void*)var_).store(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:125 AK::atomic_store, for u32.
+pub func atomic_store_u32(var_: u32*, desired: u32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
+    ((AtomicU32Ptr)(void*)var_).store(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:125 AK::atomic_store, for u64.
+pub func atomic_store_u64(var_: u64*, desired: u64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
+    ((AtomicU64Ptr)(void*)var_).store(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:125 AK::atomic_store, for usize.
+pub func atomic_store_usize(var_: usize*, desired: usize, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
+    ((AtomicUsizePtr)(void*)var_).store(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:125 AK::atomic_store, for i32.
+pub func atomic_store_i32(var_: i32*, desired: i32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
+    ((AtomicI32Ptr)(void*)var_).store(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:125 AK::atomic_store, for i64.
+pub func atomic_store_i64(var_: i64*, desired: i64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
+    ((AtomicI64Ptr)(void*)var_).store(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:125 AK::atomic_store, for bool.
+pub func atomic_store_bool(var_: bool*, desired: bool, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
+    ((AtomicBoolPtr)(void*)var_).store(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:74 AK::atomic_fetch_add, for u8.
+pub func atomic_fetch_add_u8(var_: u8*, val: u8, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u8:
+    return ((AtomicU8Ptr)(void*)var_).add(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:74 AK::atomic_fetch_add, for u16.
+pub func atomic_fetch_add_u16(var_: u16*, val: u16, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u16:
+    return ((AtomicU16Ptr)(void*)var_).add(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:74 AK::atomic_fetch_add, for u32.
+pub func atomic_fetch_add_u32(var_: u32*, val: u32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u32:
+    return ((AtomicU32Ptr)(void*)var_).add(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:74 AK::atomic_fetch_add, for u64.
+pub func atomic_fetch_add_u64(var_: u64*, val: u64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u64:
+    return ((AtomicU64Ptr)(void*)var_).add(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:74 AK::atomic_fetch_add, for usize.
+pub func atomic_fetch_add_usize(var_: usize*, val: usize, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> usize:
+    return ((AtomicUsizePtr)(void*)var_).add(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:74 AK::atomic_fetch_add, for i32.
+pub func atomic_fetch_add_i32(var_: i32*, val: i32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i32:
+    return ((AtomicI32Ptr)(void*)var_).add(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:74 AK::atomic_fetch_add, for i64.
+pub func atomic_fetch_add_i64(var_: i64*, val: i64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i64:
+    return ((AtomicI64Ptr)(void*)var_).add(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:80 AK::atomic_fetch_sub, for u8.
+pub func atomic_fetch_sub_u8(var_: u8*, val: u8, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u8:
+    return ((AtomicU8Ptr)(void*)var_).sub(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:80 AK::atomic_fetch_sub, for u16.
+pub func atomic_fetch_sub_u16(var_: u16*, val: u16, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u16:
+    return ((AtomicU16Ptr)(void*)var_).sub(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:80 AK::atomic_fetch_sub, for u32.
+pub func atomic_fetch_sub_u32(var_: u32*, val: u32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u32:
+    return ((AtomicU32Ptr)(void*)var_).sub(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:80 AK::atomic_fetch_sub, for u64.
+pub func atomic_fetch_sub_u64(var_: u64*, val: u64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u64:
+    return ((AtomicU64Ptr)(void*)var_).sub(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:80 AK::atomic_fetch_sub, for usize.
+pub func atomic_fetch_sub_usize(var_: usize*, val: usize, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> usize:
+    return ((AtomicUsizePtr)(void*)var_).sub(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:80 AK::atomic_fetch_sub, for i32.
+pub func atomic_fetch_sub_i32(var_: i32*, val: i32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i32:
+    return ((AtomicI32Ptr)(void*)var_).sub(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:80 AK::atomic_fetch_sub, for i64.
+pub func atomic_fetch_sub_i64(var_: i64*, val: i64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i64:
+    return ((AtomicI64Ptr)(void*)var_).sub(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:86 AK::atomic_fetch_and, for u8.
+pub func atomic_fetch_and_u8(var_: u8*, val: u8, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u8:
+    return ((AtomicU8Ptr)(void*)var_).clear(~val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:86 AK::atomic_fetch_and, for u16.
+pub func atomic_fetch_and_u16(var_: u16*, val: u16, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u16:
+    return ((AtomicU16Ptr)(void*)var_).clear(~val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:86 AK::atomic_fetch_and, for u32.
+pub func atomic_fetch_and_u32(var_: u32*, val: u32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u32:
+    return ((AtomicU32Ptr)(void*)var_).clear(~val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:86 AK::atomic_fetch_and, for u64.
+pub func atomic_fetch_and_u64(var_: u64*, val: u64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u64:
+    return ((AtomicU64Ptr)(void*)var_).clear(~val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:86 AK::atomic_fetch_and, for usize.
+pub func atomic_fetch_and_usize(var_: usize*, val: usize, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> usize:
+    return ((AtomicUsizePtr)(void*)var_).clear(~val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:86 AK::atomic_fetch_and, for i32.
+pub func atomic_fetch_and_i32(var_: i32*, val: i32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i32:
+    return ((AtomicI32Ptr)(void*)var_).clear(~val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:86 AK::atomic_fetch_and, for i64.
+pub func atomic_fetch_and_i64(var_: i64*, val: i64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i64:
+    return ((AtomicI64Ptr)(void*)var_).clear(~val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:92 AK::atomic_fetch_or, for u8.
+pub func atomic_fetch_or_u8(var_: u8*, val: u8, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u8:
+    return ((AtomicU8Ptr)(void*)var_).set(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:92 AK::atomic_fetch_or, for u16.
+pub func atomic_fetch_or_u16(var_: u16*, val: u16, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u16:
+    return ((AtomicU16Ptr)(void*)var_).set(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:92 AK::atomic_fetch_or, for u32.
+pub func atomic_fetch_or_u32(var_: u32*, val: u32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u32:
+    return ((AtomicU32Ptr)(void*)var_).set(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:92 AK::atomic_fetch_or, for u64.
+pub func atomic_fetch_or_u64(var_: u64*, val: u64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u64:
+    return ((AtomicU64Ptr)(void*)var_).set(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:92 AK::atomic_fetch_or, for usize.
+pub func atomic_fetch_or_usize(var_: usize*, val: usize, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> usize:
+    return ((AtomicUsizePtr)(void*)var_).set(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:92 AK::atomic_fetch_or, for i32.
+pub func atomic_fetch_or_i32(var_: i32*, val: i32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i32:
+    return ((AtomicI32Ptr)(void*)var_).set(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:92 AK::atomic_fetch_or, for i64.
+pub func atomic_fetch_or_i64(var_: i64*, val: i64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i64:
+    return ((AtomicI64Ptr)(void*)var_).set(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:98 AK::atomic_fetch_xor, for u8.
+pub func atomic_fetch_xor_u8(var_: u8*, val: u8, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u8:
+    return ((AtomicU8Ptr)(void*)var_).flip(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:98 AK::atomic_fetch_xor, for u16.
+pub func atomic_fetch_xor_u16(var_: u16*, val: u16, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u16:
+    return ((AtomicU16Ptr)(void*)var_).flip(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:98 AK::atomic_fetch_xor, for u32.
+pub func atomic_fetch_xor_u32(var_: u32*, val: u32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u32:
+    return ((AtomicU32Ptr)(void*)var_).flip(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:98 AK::atomic_fetch_xor, for u64.
+pub func atomic_fetch_xor_u64(var_: u64*, val: u64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> u64:
+    return ((AtomicU64Ptr)(void*)var_).flip(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:98 AK::atomic_fetch_xor, for usize.
+pub func atomic_fetch_xor_usize(var_: usize*, val: usize, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> usize:
+    return ((AtomicUsizePtr)(void*)var_).flip(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:98 AK::atomic_fetch_xor, for i32.
+pub func atomic_fetch_xor_i32(var_: i32*, val: i32, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i32:
+    return ((AtomicI32Ptr)(void*)var_).flip(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:98 AK::atomic_fetch_xor, for i64.
+pub func atomic_fetch_xor_i64(var_: i64*, val: i64, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> i64:
+    return ((AtomicI64Ptr)(void*)var_).flip(val, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for u8: every luce-base `@T` is lock-free.
+pub func atomic_is_lock_free_u8(ptr: u8*? = none) -> bool:
+    discard(ptr)
+    return true
+
+## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for u16: every luce-base `@T` is lock-free.
+pub func atomic_is_lock_free_u16(ptr: u16*? = none) -> bool:
+    discard(ptr)
+    return true
+
+## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for u32: every luce-base `@T` is lock-free.
+pub func atomic_is_lock_free_u32(ptr: u32*? = none) -> bool:
+    discard(ptr)
+    return true
+
+## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for u64: every luce-base `@T` is lock-free.
+pub func atomic_is_lock_free_u64(ptr: u64*? = none) -> bool:
+    discard(ptr)
+    return true
+
+## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for usize: every luce-base `@T` is lock-free.
+pub func atomic_is_lock_free_usize(ptr: usize*? = none) -> bool:
+    discard(ptr)
+    return true
+
+## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for i32: every luce-base `@T` is lock-free.
+pub func atomic_is_lock_free_i32(ptr: i32*? = none) -> bool:
+    discard(ptr)
+    return true
+
+## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for i64: every luce-base `@T` is lock-free.
+pub func atomic_is_lock_free_i64(ptr: i64*? = none) -> bool:
+    discard(ptr)
+    return true
+
+# mark: Pointer locations =======================================================================
+
+# The atomic view of a plain pointer location.
+type AtomicPointerPtr = (@void*?)*
+
+## Ported from AK/Atomic.h:38 AK::atomic_exchange (T volatile**, V*).
+pub func atomic_exchange_v[V](var_: (V*?)*, desired: V*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> V*?:
+    return (V*?)((AtomicPointerPtr)(void*)var_).swap(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:44 AK::atomic_exchange (T volatile**, nullptr_t).
+pub func atomic_exchange_void[V](var_: (V*?)*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> V*?:
+    return (V*?)((AtomicPointerPtr)(void*)var_).swap(none, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:58 AK::atomic_compare_exchange_strong (T volatile**, V*&, V*).
+pub func atomic_compare_exchange_strong_v_v[V](var_: (V*?)*, expected: (V*?)*, desired: V*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    let a = (AtomicPointerPtr)(void*)var_
+    let (exchanged, observed) = a.cas(*expected, desired, atomic_cas_success_order(order), atomic_cas_failure_order(order))
+    if not exchanged:
+        *expected = (V*?)observed
+    return exchanged
+
+## Ported from AK/Atomic.h:66 AK::atomic_compare_exchange_strong (T volatile**, V*&, nullptr_t).
+pub func atomic_compare_exchange_strong_v_void[V](var_: (V*?)*, expected: (V*?)*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> bool:
+    return atomic_compare_exchange_strong_v_v(var_, expected, none, order)
+
+## Ported from AK/Atomic.h:110 AK::atomic_load (T volatile**).
+pub func atomic_load_2[V](var_: (V*?)*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst) -> V*?:
+    return (V*?)((AtomicPointerPtr)(void*)var_).load(atomic_ordering(order))
+
+## Ported from AK/Atomic.h:131 AK::atomic_store (T volatile**, V*).
+pub func atomic_store_v[V](var_: (V*?)*, desired: V*?, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
+    ((AtomicPointerPtr)(void*)var_).store(desired, atomic_ordering(order))
+
+## Ported from AK/Atomic.h:137 AK::atomic_store (T volatile**, nullptr_t).
+pub func atomic_store_void[V](var_: (V*?)*, order: MemoryOrder = MemoryOrder.memory_order_seq_cst):
+    ((AtomicPointerPtr)(void*)var_).store(none, atomic_ordering(order))
+
+# mark: atomic_pause ============================================================================
+
+## Ported from AK/Atomic.h:115 AK::atomic_pause.
+pub func atomic_pause():
+    thread.pause()

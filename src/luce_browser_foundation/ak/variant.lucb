@@ -1,0 +1,33 @@
+#==============================================================================================
+#
+#   variant - the Variant<Ts...> helpers
+#
+#   DESCRIPTION:
+#       Port of the functions of AK/Variant.h (lines 39-155). DESIGN.md §2.6: every
+#       Variant<A, B, ...> is a generated payload enum, whose cases are the alternatives;
+#       constructing one is naming its case and `visit`/`has`/`get` are `match`. The
+#       compile-time helpers below work on parameter packs, which luce-base generics do not
+#       have (language §13.1), so reaching them is a porting error and traps.
+#
+#==============================================================================================
+
+## Ported from AK/Variant.h:39 AK::Detail::index_of: the position of T in Ts... is the enum
+## case's position, known where the enum is generated.
+pub func index_of[T, TIndexType, TTs]() -> TIndexType:
+    trap("VERIFY_NOT_REACHED: Variant index_of<T, Ts...> needs a parameter pack; use the generated enum case")
+
+## Ported from AK/Variant.h:135 AK::Detail::VariantConstructors::VariantConstructors<T, Base> (T&&).
+pub func variant_constructors_construct[T, TBase](this: VariantConstructors[T, TBase]*, t: T):
+    discard(this)
+    discard(t)
+    trap("VERIFY_NOT_REACHED: a Variant is constructed by naming its generated enum case")
+
+## Ported from AK/Variant.h:142 AK::Detail::VariantConstructors::VariantConstructors<T, Base> (T const&).
+pub func variant_constructors_construct_2[T, TBase](this: VariantConstructors[T, TBase]*, t: T):
+    variant_constructors_construct(this, t)
+
+## Ported from AK/Variant.h:152 AK::Detail::VariantConstructors::internal_cast.
+# Warning: Internal type shenanigans - VariantsConstrutors<T, Base> <- Base
+#          Not the other way around, so be _really_ careful not to cause issues.
+pub func variant_constructors_internal_cast[T, TBase](this: VariantConstructors[T, TBase]*) -> TBase*:
+    return (TBase*)(void*)this

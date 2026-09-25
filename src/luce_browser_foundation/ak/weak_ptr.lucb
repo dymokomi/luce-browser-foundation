@@ -1,0 +1,26 @@
+#==============================================================================================
+#
+#   weak_ptr - weak_callback
+#
+#   DESCRIPTION:
+#       Port of AK/WeakPtr.h's weak_callback (lines 178-186). WeakPtr<T> itself is gc.Weak
+#       (DESIGN.md §2.6). The donor returns a lambda capturing the weak pointer and the
+#       callback; here that capture is a WeakCallback, called with weak_callback_call.
+#
+#==============================================================================================
+
+## The lambda weak_callback returns: the object's WeakLink and the callback to run on the
+## object while it is still alive.
+pub struct WeakCallback[T]:
+    pub var weak: WeakLink*
+    pub var cb: Function1[T*, unit]
+
+## Ported from AK/WeakPtr.h:178 AK::weak_callback.
+pub func weak_callback[T](obj: Weakable[T]*, callback: Function1[T*, unit]) -> WeakCallback[T]:
+    return WeakCallback[T](weak = weakable_ensure_link(obj), cb = callback)
+
+## Calls the lambda of weak_callback: `if (weak) cb(*weak, args...)`.
+pub func weak_callback_call[T](this: const WeakCallback[T]*):
+    let object = weak_link_unsafe_ptr[T](this.weak) else return
+    let call = this.cb.call else trap("VERIFY: empty Function")
+    call(this.cb.context, object)

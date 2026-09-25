@@ -1,0 +1,38 @@
+#==============================================================================================
+#
+#   nonnull_ref_ptr - the free functions of NonnullRefPtr<T>
+#
+#   DESCRIPTION:
+#       Port of the free functions of AK/NonnullRefPtr.h (lines 1-290). DESIGN.md §2.6:
+#       NonnullRefPtr<T> is `T*` in managed memory, so adopting is the pointer itself and
+#       no count changes hands. ref_if_not_null and unref_if_not_null take the object's
+#       RefCountedBase (the first field of every RefCounted<T>).
+#
+#==============================================================================================
+
+## Ported from AK/NonnullRefPtr.h:22 AK::ref_if_not_null.
+pub func ref_if_not_null(ptr: RefCountedBase*?):
+    if let object = ptr:
+        ref_counted_base_ref(object)
+
+## Ported from AK/NonnullRefPtr.h:29 AK::unref_if_not_null.
+# RefCounted<T>::unref: the object is not deleted at zero (managed memory).
+pub func unref_if_not_null(ptr: RefCountedBase*?):
+    if let object = ptr:
+        discard(ref_counted_base_deref_base(object))
+
+## Ported from AK/NonnullRefPtr.h:223 AK::adopt_ref.
+pub func adopt_ref[T](object: T*) -> T*:
+    return object
+
+## Ported from AK/NonnullRefPtr.h:230 AK::adopt_nonnull_ref_or_enomem.
+# Use like `adopt_nonnull_ref_or_enomem(new (nothrow) T(args...))`.
+pub func adopt_nonnull_ref_or_enomem[T](object: T*?) -> T*!:
+    let adopted = object else try ak_error_throw(ak_error_from_errno(enomem))
+    return adopted
+
+## Ported from AK/NonnullRefPtr.h:262 AK::swap.
+pub func swap_2[T](a: T**, b: T**):
+    let tmp = *a
+    *a = *b
+    *b = tmp

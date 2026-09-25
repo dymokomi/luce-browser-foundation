@@ -1,0 +1,56 @@
+#==============================================================================================
+#
+#   type_casts - is<T>, as_if<T>, as<T> and bridge_cast<T>
+#
+#   DESCRIPTION:
+#       Port of AK/TypeCasts.h (lines 1-92). DESIGN.md §2.4: every class gets generated
+#       `is_<class>`/`as_if_<class>`/`as_<class>` helpers from its class-id range; these
+#       generic forms do the same check given the target class's ClassInfo (a generic body
+#       cannot ask a type parameter for its class id), where the donor uses fast_is<T>() or
+#       dynamic_cast. The input exposes its class id through HasClassId.
+#
+#==============================================================================================
+
+## A polymorphic object whose class id can be read (the cell header's class_id, DESIGN.md §2.3).
+pub interface HasClassId:
+    func class_id_of() -> u16
+
+## Ported from AK/TypeCasts.h:17 AK::is (InputType&): whether `input` is an `output` or one
+## of its subclasses.
+pub func is[TInputType: HasClassId](input: TInputType*, output: const ClassInfo*) -> bool:
+    let id = input.class_id_of()
+    return id >= output.first_id and id <= output.last_id
+
+## Ported from AK/TypeCasts.h:27 AK::is (InputType*).
+pub func is_2[TInputType: HasClassId](input: TInputType*?, output: const ClassInfo*) -> bool:
+    let object = input else return false
+    return is(object, output)
+
+## Ported from AK/TypeCasts.h:33 AK::is (NonnullRefPtr<InputType>, which is `T*`).
+pub func is_3[TInputType: HasClassId](input: TInputType*, output: const ClassInfo*) -> bool:
+    return is(input, output)
+
+## Ported from AK/TypeCasts.h:39 AK::as_if (InputType&).
+pub func as_if[TOutputType, TInputType: HasClassId](input: TInputType*, output: const ClassInfo*) -> TOutputType*?:
+    if not is(input, output):
+        return none
+    return (TOutputType*)(void*)input
+
+## Ported from AK/TypeCasts.h:50 AK::as_if (InputType*).
+pub func as_if_2[TOutputType, TInputType: HasClassId](input: TInputType*?, output: const ClassInfo*) -> TOutputType*?:
+    let object = input else return none
+    return as_if[TOutputType, TInputType](object, output)
+
+## Ported from AK/TypeCasts.h:58 AK::as (InputType&).
+pub func as_[TOutputType, TInputType: HasClassId](input: TInputType*, output: const ClassInfo*) -> TOutputType*:
+    let result = as_if[TOutputType, TInputType](input, output)
+    return result else trap("VERIFY: as<T> failed")
+
+## Ported from AK/TypeCasts.h:66 AK::as (InputType*).
+pub func as__2[TOutputType, TInputType: HasClassId](input: TInputType*?, output: const ClassInfo*) -> TOutputType*?:
+    let object = input else return none
+    return as_[TOutputType, TInputType](object, output)
+
+## Ported from AK/TypeCasts.h:76 AK::bridge_cast: the static_cast branch (no Objective-C ARC).
+pub func bridge_cast[TOutputType, TInputType](input: TInputType*) -> TOutputType*:
+    return (TOutputType*)(void*)input
