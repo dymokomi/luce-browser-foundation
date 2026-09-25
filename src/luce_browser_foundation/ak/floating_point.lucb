@@ -1,0 +1,139 @@
+#==============================================================================================
+#
+#   floating_point - FloatExtractor: the sign, exponent and mantissa fields of a float
+#
+#   DESCRIPTION:
+#       Port of AK/FloatingPoint.h (lines 1-131). C++ reads the fields through a packed
+#       bit-field struct in a union with the float; luce-base has no bit-fields, so the union
+#       holds the float beside its bit pattern and the fields are read and written with
+#       accessor functions over that pattern (the little-endian layout of the C++ struct:
+#       mantissa in the low bits, then the exponent, then the sign). The f80 and f128
+#       extractors are not ported: luce-base has neither type.
+#
+#==============================================================================================
+
+# mark: FloatExtractor<f64> =====================================================================
+
+## AK::FloatExtractor<f64> (AK/FloatingPoint.h:78): an f64 and its bit pattern.
+pub union FloatExtractorF64:
+    pub d: f64
+    pub bits: u64
+
+## AK::FloatExtractor<f64>::mantissa_bits.
+pub let float_extractor_f64_mantissa_bits: i32 = 52
+
+## AK::FloatExtractor<f64>::mantissa_max.
+pub let float_extractor_f64_mantissa_max: u64 = (1 << 52) - 1
+
+## AK::FloatExtractor<f64>::exponent_bias.
+pub let float_extractor_f64_exponent_bias: i32 = 1023
+
+## AK::FloatExtractor<f64>::exponent_bits.
+pub let float_extractor_f64_exponent_bits: i32 = 11
+
+## AK::FloatExtractor<f64>::exponent_max.
+pub let float_extractor_f64_exponent_max: u32 = 2047
+
+## FloatExtractor<f64> { .d = value }.
+pub func float_extractor_f64_from_value(value: f64) -> FloatExtractorF64:
+    var extractor: FloatExtractorF64
+    extractor.d = value
+    return extractor
+
+## FloatExtractor<f64> { .mantissa = mantissa, .exponent = exponent, .sign = sign }.
+pub func float_extractor_f64_from_parts(mantissa: u64, exponent: u64, sign: u64) -> FloatExtractorF64:
+    var extractor: FloatExtractorF64
+    extractor.bits = 0
+    float_extractor_f64_set_mantissa(&extractor, mantissa)
+    float_extractor_f64_set_exponent(&extractor, exponent)
+    float_extractor_f64_set_sign(&extractor, sign)
+    return extractor
+
+## The `mantissa : 52` bit-field of AK::FloatExtractor<f64>.
+pub func float_extractor_f64_mantissa(this: const FloatExtractorF64*) -> u64:
+    return this.bits & float_extractor_f64_mantissa_max
+
+## The `exponent : 11` bit-field of AK::FloatExtractor<f64>.
+pub func float_extractor_f64_exponent(this: const FloatExtractorF64*) -> u64:
+    return (this.bits >> 52) & (u64)float_extractor_f64_exponent_max
+
+## The `sign : 1` bit-field of AK::FloatExtractor<f64>.
+pub func float_extractor_f64_sign(this: const FloatExtractorF64*) -> u64:
+    return this.bits >> 63
+
+## Assigns the `mantissa : 52` bit-field (the value is truncated to 52 bits, as C++ does).
+pub func float_extractor_f64_set_mantissa(this: FloatExtractorF64*, value: u64):
+    this.bits = (this.bits & ~float_extractor_f64_mantissa_max) | (value & float_extractor_f64_mantissa_max)
+
+## Assigns the `exponent : 11` bit-field (the value is truncated to 11 bits, as C++ does).
+pub func float_extractor_f64_set_exponent(this: FloatExtractorF64*, value: u64):
+    let mask = (u64)float_extractor_f64_exponent_max << 52
+    this.bits = (this.bits & ~mask) | ((value << 52) & mask)
+
+## Assigns the `sign : 1` bit-field (the value is truncated to 1 bit, as C++ does).
+pub func float_extractor_f64_set_sign(this: FloatExtractorF64*, value: u64):
+    let mask: u64 = 1 << 63
+    this.bits = (this.bits & ~mask) | ((value << 63) & mask)
+
+# mark: FloatExtractor<f32> =====================================================================
+
+## AK::FloatExtractor<f32> (AK/FloatingPoint.h:109): an f32 and its bit pattern.
+pub union FloatExtractorF32:
+    pub d: f32
+    pub bits: u32
+
+## AK::FloatExtractor<f32>::mantissa_bits.
+pub let float_extractor_f32_mantissa_bits: i32 = 23
+
+## AK::FloatExtractor<f32>::mantissa_max.
+pub let float_extractor_f32_mantissa_max: u32 = (1 << 23) - 1
+
+## AK::FloatExtractor<f32>::exponent_bias.
+pub let float_extractor_f32_exponent_bias: i32 = 127
+
+## AK::FloatExtractor<f32>::exponent_bits.
+pub let float_extractor_f32_exponent_bits: i32 = 8
+
+## AK::FloatExtractor<f32>::exponent_max.
+pub let float_extractor_f32_exponent_max: u32 = 255
+
+## FloatExtractor<f32> { .d = value }.
+pub func float_extractor_f32_from_value(value: f32) -> FloatExtractorF32:
+    var extractor: FloatExtractorF32
+    extractor.d = value
+    return extractor
+
+## FloatExtractor<f32> { .mantissa = mantissa, .exponent = exponent, .sign = sign }.
+pub func float_extractor_f32_from_parts(mantissa: u32, exponent: u32, sign: u32) -> FloatExtractorF32:
+    var extractor: FloatExtractorF32
+    extractor.bits = 0
+    float_extractor_f32_set_mantissa(&extractor, mantissa)
+    float_extractor_f32_set_exponent(&extractor, exponent)
+    float_extractor_f32_set_sign(&extractor, sign)
+    return extractor
+
+## The `mantissa : 23` bit-field of AK::FloatExtractor<f32>.
+pub func float_extractor_f32_mantissa(this: const FloatExtractorF32*) -> u32:
+    return this.bits & float_extractor_f32_mantissa_max
+
+## The `exponent : 8` bit-field of AK::FloatExtractor<f32>.
+pub func float_extractor_f32_exponent(this: const FloatExtractorF32*) -> u32:
+    return (this.bits >> 23) & float_extractor_f32_exponent_max
+
+## The `sign : 1` bit-field of AK::FloatExtractor<f32>.
+pub func float_extractor_f32_sign(this: const FloatExtractorF32*) -> u32:
+    return this.bits >> 31
+
+## Assigns the `mantissa : 23` bit-field (the value is truncated to 23 bits, as C++ does).
+pub func float_extractor_f32_set_mantissa(this: FloatExtractorF32*, value: u32):
+    this.bits = (this.bits & ~float_extractor_f32_mantissa_max) | (value & float_extractor_f32_mantissa_max)
+
+## Assigns the `exponent : 8` bit-field (the value is truncated to 8 bits, as C++ does).
+pub func float_extractor_f32_set_exponent(this: FloatExtractorF32*, value: u32):
+    let mask = float_extractor_f32_exponent_max << 23
+    this.bits = (this.bits & ~mask) | ((value << 23) & mask)
+
+## Assigns the `sign : 1` bit-field (the value is truncated to 1 bit, as C++ does).
+pub func float_extractor_f32_set_sign(this: FloatExtractorF32*, value: u32):
+    let mask: u32 = 1 << 31
+    this.bits = (this.bits & ~mask) | ((value << 31) & mask)

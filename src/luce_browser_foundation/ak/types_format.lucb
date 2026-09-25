@@ -21,16 +21,16 @@ pub enum AllowDebugOnlyFormatters as u32:
 pub struct FormatParser:
     pub var generic_lexer: GenericLexer[u8]  # base AK::Detail::GenericLexer<char>
 
-## AK::FormatParser::FormatSpecifier (AK/Format.cpp:46): opaque in this phase (not in the phase-1 closure).
+## AK::FormatParser::FormatSpecifier (AK/Format.cpp:46).
 pub struct FormatParserFormatSpecifier:
-    pub var opaque_: u8
+    pub var flags: StringView
+    pub var index: usize
 
 ## AK::max_format_arguments (AK/Format.h:52).
 pub let max_format_arguments: usize = 256
 
 ## AK::(anonymous)::use_next_index (AK/Format.cpp:61).
-# C++ initializer: NumericLimits < size_t > :: max ( )
-pub var use_next_index: usize
+let use_next_index: usize = ~(usize)0
 
 # mark: TypeErasedParameter =====================================================================
 
@@ -133,8 +133,7 @@ pub struct StandardFormatter:
 
 ## The non-zero default member initializers of AK::StandardFormatter; the constructor runs them first.
 pub func standard_formatter_init_fields(this: StandardFormatter*):
-    # m_fill: C++ default ' ' (not translated by the generator)
-    return
+    this.m_fill = ' '
 
 ## AK::StandardFormatter::Mode (AK/Format.h:370).
 pub enum StandardFormatterMode as i32:
@@ -163,7 +162,7 @@ pub struct FormatIfSupported[T]:
 
 ## AK::__FormatIfSupported (AK/Format.h:762): a generic struct.
 pub struct FormatIfSupported2[T]:
-    pub var empty_: u8
+    pub var formatter: StandardFormatter  # base Formatter<StringView> (r03)
 
 # mark: FormatString ============================================================================
 
@@ -179,5 +178,9 @@ pub var is_debug_enabled: bool = true
 pub var is_rich_debug_enabled: bool
 
 ## AK::s_main_thread_id (AK/Format.cpp:1334).
-# C++ initializer: current_thread_id ( )
+# C++ initializer: current_thread_id ( ), run at static initialisation; luce-base globals are
+# constants, so it is read on the first rich debug log instead (s_main_thread_id_initialized).
 pub var s_main_thread_id: u64
+
+## Whether s_main_thread_id holds current_thread_id() yet (the C++ static initialiser, run lazily).
+pub var s_main_thread_id_initialized: bool

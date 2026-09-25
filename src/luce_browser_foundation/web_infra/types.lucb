@@ -1,0 +1,46 @@
+#==============================================================================================
+#
+#   types - the Infra standard's primitive types
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibWeb/Infra/Types.h (lines 1-54): aliases of the scalar types.
+#       Unsigned128BitInteger (AK's u128, a UFixedBigInt) has no luce-base type yet and is
+#       left out; LibWeb names none of it.
+#
+#==============================================================================================
+
+## Web::Infra::Boolean: https://infra.spec.whatwg.org/#booleans
+# A boolean is either true or false.
+pub type Boolean = bool
+
+## Web::Infra::Unsigned8BitInteger: https://infra.spec.whatwg.org/#8-bit-unsigned-integer
+# An 8-bit unsigned integer is an integer in the range 0 to 255 (0 to 2^8 − 1), inclusive.
+pub type Unsigned8BitInteger = u8
+
+## Web::Infra::Unsigned16BitInteger: https://infra.spec.whatwg.org/#16-bit-unsigned-integer
+# A 16-bit unsigned integer is an integer in the range 0 to 65535 (0 to 2^16 − 1), inclusive.
+pub type Unsigned16BitInteger = u16
+
+## Web::Infra::Unsigned32BitInteger: https://infra.spec.whatwg.org/#32-bit-unsigned-integer
+# A 32-bit unsigned integer is an integer in the range 0 to 4294967295 (0 to 2^32 − 1), inclusive.
+pub type Unsigned32BitInteger = u32
+
+## Web::Infra::Unsigned64BitInteger: https://infra.spec.whatwg.org/#64-bit-unsigned-integer
+# A 64-bit unsigned integer is an integer in the range 0 to 18446744073709551615 (0 to 2^64 − 1), inclusive.
+pub type Unsigned64BitInteger = u64
+
+## Web::Infra::Signed8BitInteger: https://infra.spec.whatwg.org/#8-bit-signed-integer
+# An 8-bit signed integer is an integer in the range −128 to 127 (−2^7 to 2^7 − 1), inclusive.
+pub type Signed8BitInteger = i8
+
+## Web::Infra::Signed16BitInteger: https://infra.spec.whatwg.org/#16-bit-signed-integer
+# A 16-bit signed integer is an integer in the range −32768 to 32767 (−2^15 to 2^15 − 1), inclusive.
+pub type Signed16BitInteger = i16
+
+## Web::Infra::Signed32BitInteger: https://infra.spec.whatwg.org/#32-bit-signed-integer
+# A 32-bit signed integer is an integer in the range −2147483648 to 2147483647 (−2^31 to 2^31 − 1), inclusive.
+pub type Signed32BitInteger = i32
+
+## Web::Infra::Signed64BitInteger: https://infra.spec.whatwg.org/#64-bit-signed-integer
+# A 64-bit signed integer is an integer in the range −9223372036854775808 to 9223372036854775807 (−2^63 to 2^63 − 1), inclusive.
+pub type Signed64BitInteger = i64

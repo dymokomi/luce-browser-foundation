@@ -1,0 +1,302 @@
+#==============================================================================================
+#
+#   json_object - JsonObject: an insertion-ordered map from strings to JSON values
+#
+#   DESCRIPTION:
+#       Port of AK/JsonObject.cpp (lines 1-297) with the inline members of AK/JsonObject.h
+#       (lines 1-119).
+#
+#       The members are an OrderedHashMap<String, JsonValue>. C++ looks a StringView key up
+#       directly (a HashCompatible lookup); here the key is made a String first, which finds
+#       the same member. Iteration in insertion order goes over keys(). The copy constructor
+#       copies each value deeply (json_object_clone), and for_each_member takes a function with
+#       a context pointer (DESIGN.md §2.7).
+#
+#==============================================================================================
+
+# mark: Construction and copies =================================================================
+
+## Ported from AK/JsonObject.cpp:15 AK::JsonObject::JsonObject: no members.
+pub func json_object_construct(this: JsonObject*):
+    var members: OrderedHashMap[String, JsonValue2, StringTraits]
+    this.m_members = members
+
+## AK::JsonObject::JsonObject(JsonObject const&) (AK/JsonObject.cpp:18): a copy whose values are
+## copies, in the same order.
+pub func json_object_clone(this: const JsonObject*) -> JsonObject:
+    var copy: JsonObject
+    json_object_construct(&copy)
+    let keys = ordered_hash_map_keys(&this.m_members)
+    for i in 0..<vector_size(&keys):
+        let key = *vector_at_const(&keys, i)
+        let value = ordered_hash_map_get_k_const(&this.m_members, key) else trap("VERIFY_NOT_REACHED")
+        discard(ordered_hash_map_set(&copy.m_members, key, json_value2_clone(value)))
+    return copy
+
+## The String for a StringView key (the C++ lookups take the StringView itself).
+func json_object_key(key: StringView) -> String:
+    return string_from_utf8(key) else trap("MUST: String::from_utf8")
+
+## Ported from AK/JsonObject.cpp:42 AK::JsonObject::size.
+pub func json_object_size(this: const JsonObject*) -> usize:
+    return ordered_hash_map_size(&this.m_members)
+
+## Ported from AK/JsonObject.cpp:47 AK::JsonObject::is_empty.
+pub func json_object_is_empty(this: const JsonObject*) -> bool:
+    return ordered_hash_map_is_empty(&this.m_members)
+
+# mark: Lookups =================================================================================
+
+## Ported from AK/JsonObject.cpp:52 AK::JsonObject::get.
+pub func json_object_get(this: JsonObject*, key: StringView) -> JsonValue2*?:
+    return ordered_hash_map_get_k(&this.m_members, json_object_key(key))
+
+## Ported from AK/JsonObject.cpp:60 AK::JsonObject::get.
+pub func json_object_get_const(this: const JsonObject*, key: StringView) -> const JsonValue2*?:
+    return ordered_hash_map_get_k_const(&this.m_members, json_object_key(key))
+
+## Ported from AK/JsonObject.cpp:68 AK::JsonObject::get_i8.
+pub func json_object_get_i8(this: const JsonObject*, key: StringView) -> i8?:
+    if let value = json_object_get_const(this, key):
+        return json_value2_get_integer_i8(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:73 AK::JsonObject::get_u8.
+pub func json_object_get_u8(this: const JsonObject*, key: StringView) -> u8?:
+    if let value = json_object_get_const(this, key):
+        return json_value2_get_integer_u8(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:78 AK::JsonObject::get_i16.
+pub func json_object_get_i16(this: const JsonObject*, key: StringView) -> i16?:
+    if let value = json_object_get_const(this, key):
+        return json_value2_get_integer_i16(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:83 AK::JsonObject::get_u16.
+pub func json_object_get_u16(this: const JsonObject*, key: StringView) -> u16?:
+    if let value = json_object_get_const(this, key):
+        return json_value2_get_integer_u16(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:88 AK::JsonObject::get_i32.
+pub func json_object_get_i32(this: const JsonObject*, key: StringView) -> i32?:
+    if let value = json_object_get_const(this, key):
+        return json_value2_get_integer_i32(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:93 AK::JsonObject::get_u32.
+pub func json_object_get_u32(this: const JsonObject*, key: StringView) -> u32?:
+    if let value = json_object_get_const(this, key):
+        return json_value2_get_integer_u32(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:98 AK::JsonObject::get_i64.
+pub func json_object_get_i64(this: const JsonObject*, key: StringView) -> i64?:
+    if let value = json_object_get_const(this, key):
+        return json_value2_get_integer_i64(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:103 AK::JsonObject::get_u64.
+pub func json_object_get_u64(this: const JsonObject*, key: StringView) -> u64?:
+    if let value = json_object_get_const(this, key):
+        return json_value2_get_integer_u64(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:108 AK::JsonObject::get_addr (FlatPtr is u64 on the 64-bit targets).
+pub func json_object_get_addr(this: const JsonObject*, key: StringView) -> u64?:
+    return json_object_get_u64(this, key)
+
+## Ported from AK/JsonObject.cpp:113 AK::JsonObject::get_bool.
+pub func json_object_get_bool(this: const JsonObject*, key: StringView) -> bool?:
+    if let value = json_object_get_const(this, key):
+        if json_value2_is_bool(value):
+            return json_value2_as_bool(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:121 AK::JsonObject::get_string (C++ answers `String const&`; a
+## String is an immutable value, so a copy reads the same).
+pub func json_object_get_string(this: const JsonObject*, key: StringView) -> String?:
+    if let value = json_object_get_const(this, key):
+        if json_value2_is_string(value):
+            return json_value2_as_string(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:128 AK::JsonObject::get_object.
+pub func json_object_get_object(this: JsonObject*, key: StringView) -> JsonObject*?:
+    if let value = json_object_get(this, key):
+        if json_value2_is_object(value):
+            return json_value2_as_object(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:136 AK::JsonObject::get_object.
+pub func json_object_get_object_const(this: const JsonObject*, key: StringView) -> const JsonObject*?:
+    if let value = json_object_get_const(this, key):
+        if json_value2_is_object(value):
+            return json_value2_as_object_const(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:144 AK::JsonObject::get_array.
+pub func json_object_get_array(this: JsonObject*, key: StringView) -> JsonArray*?:
+    if let value = json_object_get(this, key):
+        if json_value2_is_array(value):
+            return json_value2_as_array(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:152 AK::JsonObject::get_array.
+pub func json_object_get_array_const(this: const JsonObject*, key: StringView) -> const JsonArray*?:
+    if let value = json_object_get_const(this, key):
+        if json_value2_is_array(value):
+            return json_value2_as_array_const(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:160 AK::JsonObject::get_double_with_precision_loss.
+pub func json_object_get_double_with_precision_loss(this: const JsonObject*, key: StringView) -> f64?:
+    if let value = json_object_get_const(this, key):
+        return json_value2_get_double_with_precision_loss(value)
+    return none
+
+## Ported from AK/JsonObject.cpp:168 AK::JsonObject::get_float_with_precision_loss.
+pub func json_object_get_float_with_precision_loss(this: const JsonObject*, key: StringView) -> f32?:
+    if let value = json_object_get_const(this, key):
+        return json_value2_get_float_with_precision_loss(value)
+    return none
+
+# mark: has ======================================================================================
+
+## Ported from AK/JsonObject.cpp:176 AK::JsonObject::has.
+pub func json_object_has(this: const JsonObject*, key: StringView) -> bool:
+    return ordered_hash_map_contains_k(&this.m_members, json_object_key(key))
+
+## Ported from AK/JsonObject.cpp:181 AK::JsonObject::has_null.
+pub func json_object_has_null(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_null(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:187 AK::JsonObject::has_bool.
+pub func json_object_has_bool(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_bool(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:193 AK::JsonObject::has_string.
+pub func json_object_has_string(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_string(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:199 AK::JsonObject::has_i8.
+pub func json_object_has_i8(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_integer_i8(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:205 AK::JsonObject::has_u8.
+pub func json_object_has_u8(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_integer_u8(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:211 AK::JsonObject::has_i16.
+pub func json_object_has_i16(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_integer_i16(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:217 AK::JsonObject::has_u16.
+pub func json_object_has_u16(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_integer_u16(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:223 AK::JsonObject::has_i32.
+pub func json_object_has_i32(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_integer_i32(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:229 AK::JsonObject::has_u32.
+pub func json_object_has_u32(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_integer_u32(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:235 AK::JsonObject::has_i64.
+pub func json_object_has_i64(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_integer_i64(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:241 AK::JsonObject::has_u64.
+pub func json_object_has_u64(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_integer_u64(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:247 AK::JsonObject::has_number.
+pub func json_object_has_number(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_number(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:253 AK::JsonObject::has_array.
+pub func json_object_has_array(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_array(value)
+    return false
+
+## Ported from AK/JsonObject.cpp:259 AK::JsonObject::has_object.
+pub func json_object_has_object(this: const JsonObject*, key: StringView) -> bool:
+    if let value = json_object_get_const(this, key):
+        return json_value2_is_object(value)
+    return false
+
+# mark: Changes, iteration and serialization ====================================================
+
+## Ported from AK/JsonObject.cpp:265 AK::JsonObject::set(String, JsonValue).
+pub func json_object_set_string(this: JsonObject*, key: String, value: JsonValue2):
+    discard(ordered_hash_map_set(&this.m_members, key, value))
+
+## Ported from AK/JsonObject.cpp:270 AK::JsonObject::set(StringView, JsonValue).
+pub func json_object_set_string_view(this: JsonObject*, key: StringView, value: JsonValue2):
+    json_object_set_string(this, string_from_utf8(key) else trap("MUST: String::from_utf8"), value)
+
+## Ported from AK/JsonObject.h:92 AK::JsonObject::for_each_member: calls
+## `callback(context, key, value)` for each member, in insertion order.
+pub func json_object_for_each_member(this: const JsonObject*, callback: func(void*?, const String*, const JsonValue2*) -> unit, context: void*?):
+    let keys = ordered_hash_map_keys(&this.m_members)
+    for i in 0..<vector_size(&keys):
+        let key = vector_at_const(&keys, i)
+        let value = ordered_hash_map_get_k_const(&this.m_members, *key) else trap("VERIFY_NOT_REACHED")
+        callback(context, key, value)
+
+## Ported from AK/JsonObject.h:99 AK::JsonObject::try_for_each_member: stops at the first failure.
+pub func json_object_try_for_each_member(this: const JsonObject*, callback: func(void*?, const String*, const JsonValue2*) -> unit!, context: void*?) -> !:
+    let keys = ordered_hash_map_keys(&this.m_members)
+    for i in 0..<vector_size(&keys):
+        let key = vector_at_const(&keys, i)
+        let value = ordered_hash_map_get_k_const(&this.m_members, *key) else trap("VERIFY_NOT_REACHED")
+        try callback(context, key, value)
+
+## Ported from AK/JsonObject.cpp:275 AK::JsonObject::remove.
+pub func json_object_remove(this: JsonObject*, key: StringView) -> bool:
+    return ordered_hash_map_remove_k(&this.m_members, json_object_key(key))
+
+## Ported from AK/JsonObject.cpp:280 AK::JsonObject::serialized.
+pub func json_object_serialized(this: const JsonObject*) -> String:
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    json_object_serialize(this, &builder)
+
+    return string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")
+
+## Ported from AK/JsonObject.cpp:288 AK::JsonObject::serialize.
+pub func json_object_serialize(this: const JsonObject*, builder: StringBuilder*):
+    var serializer = json_object_serializer_try_create(builder) else trap("MUST: JsonObjectSerializer::try_create")
+    let keys = ordered_hash_map_keys(&this.m_members)
+    for i in 0..<vector_size(&keys):
+        let key = vector_at_const(&keys, i)
+        let value = ordered_hash_map_get_k_const(&this.m_members, *key) else trap("VERIFY_NOT_REACHED")
+        json_object_serializer_add_json_value2(&serializer, string_bytes_as_string_view(key), value) else trap("MUST: JsonObjectSerializer::add")
+    json_object_serializer_finish(&serializer) else trap("MUST: JsonObjectSerializer::finish")

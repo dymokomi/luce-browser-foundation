@@ -1,0 +1,19 @@
+#==============================================================================================
+#
+#   character_types - ASCII whitespace as the Infra standard defines it
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibWeb/Infra/CharacterTypes.h (lines 1-24). The constants are in
+#       types_character_types.
+#
+#==============================================================================================
+
+## Web::Infra::ASCII_WHITESPACE as a StringView.
+pub func ascii_whitespace_view() -> ak.StringView:
+    return ak.literalsv_u8(ascii_whitespace.bytes.data, ascii_whitespace.length)
+
+## Ported from Libraries/LibWeb/Infra/CharacterTypes.h:18 Web::Infra::is_ascii_whitespace.
+# https://infra.spec.whatwg.org/#ascii-whitespace
+pub func is_ascii_whitespace(code_point: u32) -> bool:
+    # ASCII whitespace is U+0009 TAB, U+000A LF, U+000C FF, U+000D CR, or U+0020 SPACE.
+    return code_point == 0x09 or code_point == 0x0a or code_point == 0x0c or code_point == 0x0d or code_point == 0x20

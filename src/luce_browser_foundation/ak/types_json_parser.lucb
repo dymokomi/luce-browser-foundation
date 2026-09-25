@@ -17,9 +17,9 @@ pub struct JsonParser:
     pub var generic_lexer: GenericLexer[u8]  # base AK::Detail::GenericLexer<char>
     pub var m_current_nesting_depth: usize  # C++ default: { 0 }
 
-## AK::exceeded_max_nesting_depth_error (AK/JsonParser.cpp:22).
-# C++ initializer: "JsonParser: Exceeded maximum nesting depth"sv
-pub var exceeded_max_nesting_depth_error: StringView
+## AK::exceeded_max_nesting_depth_error (AK/JsonParser.cpp:22), the message of the error (r03: a
+## str, the type of a luce-base error message).
+pub let exceeded_max_nesting_depth_error: str = "JsonParser: Exceeded maximum nesting depth"
 
 ## AK::JsonParser::max_nesting_depth (AK/JsonParser.h:37).
 pub let json_parser_max_nesting_depth: usize = 512

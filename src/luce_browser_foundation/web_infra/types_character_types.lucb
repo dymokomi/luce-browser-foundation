@@ -10,10 +10,9 @@
 #
 #==============================================================================================
 
-## Web::Infra::ASCII_WHITESPACE (Libraries/LibWeb/Infra/CharacterTypes.h:14).
-# C++ initializer: "\t\n\f\r "sv
-pub var ascii_whitespace: ak.StringView
+## Web::Infra::ASCII_WHITESPACE (Libraries/LibWeb/Infra/CharacterTypes.h:14): "\t\n\f\r " (r03: a str
+## constant; ascii_whitespace_view() is the C++ StringView).
+pub let ascii_whitespace: str = "\t\n\u{C}\r "
 
 ## Web::Infra::ASCII_WHITESPACE_CODE_POINTS (Libraries/LibWeb/Infra/CharacterTypes.h:15).
-# C++ initializer: to_array < u32 > ( { '\t' , '\n' , '\f' , '\r' , ' ' } )
-pub var ascii_whitespace_code_points: u32[5]
+pub let ascii_whitespace_code_points: u32[5] = [0x09, 0x0a, 0x0c, 0x0d, 0x20]

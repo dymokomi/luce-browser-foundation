@@ -1,0 +1,326 @@
+#==============================================================================================
+#
+#   format_float - FormatBuilder: floating-point numbers, hex dumps, and vformat
+#
+#   DESCRIPTION:
+#       Port of AK/Format.cpp lines 487-824: put_f64_with_precision, put_f32_or_f64, put_f80,
+#       put_hexdump and vformat. This is the float format of the layout dumps (DESIGN.md
+#       §2.11): the shortest round-trip digits when no precision is given, AK's own
+#       digit-by-digit approximation when one is.
+#
+#       put_f32_or_f64 is a template over f32 and f64 in C++; here it is one body over f64
+#       that asks StringConversions for the digits of the original width, with an entry per
+#       width. `long double` is f64 in luce-base (no wider float type exists), so put_f80
+#       computes in f64.
+#
+#==============================================================================================
+
+# mark: put_f64_with_precision ==================================================================
+
+## Ported from AK/Format.cpp:487 AK::FormatBuilder::put_f64_with_precision.
+pub func format_builder_put_f64_with_precision(this: FormatBuilder*, value: f64, base_: u8, upper_case: bool, zero_pad: bool, use_separator: bool, align: FormatBuilderAlign, min_width: usize, precision: usize, fill: u8, sign_mode: FormatBuilderSignMode, display_mode: FormatBuilderRealNumberDisplayMode) -> !:
+    var string_builder: StringBuilder
+    string_builder_construct(&string_builder)
+    var format_builder = FormatBuilder(m_builder = &string_builder)
+
+    var number = value
+    let is_negative = number < 0.0
+    if is_negative:
+        number = -number
+
+    try format_builder_put_u64(&format_builder, (u64)number, base_, false, upper_case, false, use_separator, FormatBuilderAlign.right, 0, ' ', sign_mode, is_negative)
+    number -= f64((i64)number)
+
+    var did_emit_decimals = false
+
+    if precision > 0:
+        # FIXME: This is a terrible approximation but doing it properly would be a lot of work. If someone is up for that, a good
+        # place to start would be the following video from CppCon 2019:
+        # https://youtu.be/4P_kbF0EbZM (Stephan T. Lavavej “Floating-Point <charconv>: Making Your Code 10x Faster With C++17's Final Boss”)
+        var epsilon = 0.5
+        if not zero_pad and display_mode != FormatBuilderRealNumberDisplayMode.fixed_point:
+            for _ in 0..<precision:
+                epsilon /= 10.0
+
+        for digit in 0..<precision:
+            if not zero_pad and display_mode != FormatBuilderRealNumberDisplayMode.fixed_point and number - f64((i64)number) < epsilon:
+                break
+
+            number *= 10.0
+            epsilon *= 10.0
+
+            if number > 4294967295.0:
+                number -= f64((u64)number - ((u64)number % 10))
+
+            if digit == 0:
+                try string_builder_try_append_u8(&string_builder, '.')
+
+            try string_builder_try_append_u8(&string_builder, (u8)((u32)'0' + ((u32)number % 10)))
+            did_emit_decimals = true
+
+    # Round up if the following decimal is 5 or higher
+    if (u64)(number * 10.0) % 10 >= 5:
+        try round_up_digits(&string_builder)
+
+    if did_emit_decimals and display_mode == format_builder_real_number_display_mode_default:
+        while not string_builder_is_empty(&string_builder):
+            # Strip trailing zero decimals.
+            var digits = string_builder_string_view(&string_builder)
+            if string_view_ends_with_u8(&digits, '0'):
+                string_builder_trim(&string_builder, 1)
+                continue
+            # Strip trailing decimal point.
+            digits = string_builder_string_view(&string_builder)
+            if string_view_ends_with_u8(&digits, '.'):
+                string_builder_trim(&string_builder, 1)
+                break
+            break
+
+    try format_builder_put_string(this, string_builder_string_view(&string_builder), align, min_width, size_max, fill)
+
+# mark: put_f32_or_f64 ==========================================================================
+
+## put_f32_or_f64's `convert_to_decimal_digits_array` lambda (AK/Format.cpp:600): writes the
+## decimal digits of `x` into `digits` and answers how many there are (none for zero).
+func convert_to_decimal_digits_array(x: u64, digits: u8[]) -> usize:
+    var length: usize = 0
+    var remaining = x
+    while remaining != 0:
+        digits[length] = (u8)(remaining % 10) | '0'
+        length += 1
+        remaining = remaining // 10
+    var i: usize = 0
+    while 2 * i + 1 < length:
+        let swapped = digits[i]
+        digits[i] = digits[length - i - 1]
+        digits[length - i - 1] = swapped
+        i += 1
+    return length
+
+## The sign put before a special value, zero or a number (the `if (value < 0) ... else if
+## (sign_mode == ...)` blocks of put_f32_or_f64).
+func put_float_sign(builder: StringBuilder*, is_negative: bool, sign_mode: FormatBuilderSignMode) -> !:
+    if is_negative:
+        try string_builder_try_append_u8(builder, '-')
+    elif sign_mode == FormatBuilderSignMode.always:
+        try string_builder_try_append_u8(builder, '+')
+    elif sign_mode == FormatBuilderSignMode.reserved:
+        try string_builder_try_append_u8(builder, ' ')
+
+## Ported from AK/Format.cpp:564 AK::FormatBuilder::put_f32_or_f64<float>.
+pub func format_builder_put_f32_or_f64_f32(this: FormatBuilder*, value: f32, base_: u8 = 10, upper_case: bool = false, zero_pad: bool = false, use_separator: bool = false, align: FormatBuilderAlign = FormatBuilderAlign.right, min_width: usize = 0, precision: usize? = none, fill: u8 = ' ', sign_mode: FormatBuilderSignMode = FormatBuilderSignMode.only_if_needed, display_mode: FormatBuilderRealNumberDisplayMode = FormatBuilderRealNumberDisplayMode.general) -> !:
+    try format_builder_put_f32_or_f64(this, f64(value), true, base_, upper_case, zero_pad, use_separator, align, min_width, precision, fill, sign_mode, display_mode)
+
+## Ported from AK/Format.cpp:564 AK::FormatBuilder::put_f32_or_f64<double>.
+pub func format_builder_put_f32_or_f64_f64(this: FormatBuilder*, value: f64, base_: u8 = 10, upper_case: bool = false, zero_pad: bool = false, use_separator: bool = false, align: FormatBuilderAlign = FormatBuilderAlign.right, min_width: usize = 0, precision: usize? = none, fill: u8 = ' ', sign_mode: FormatBuilderSignMode = FormatBuilderSignMode.only_if_needed, display_mode: FormatBuilderRealNumberDisplayMode = FormatBuilderRealNumberDisplayMode.general) -> !:
+    try format_builder_put_f32_or_f64(this, value, false, base_, upper_case, zero_pad, use_separator, align, min_width, precision, fill, sign_mode, display_mode)
+
+## Ported from AK/Format.cpp:564 AK::FormatBuilder::put_f32_or_f64: the body both widths share.
+## `value` is the number widened to f64 (exact for an f32); `is_f32` picks the width whose
+## shortest round-trip digits are printed.
+func format_builder_put_f32_or_f64(this: FormatBuilder*, value: f64, is_f32: bool, base_: u8, upper_case: bool, zero_pad: bool, use_separator: bool, align: FormatBuilderAlign, min_width: usize, precision: usize?, fill: u8, sign_mode: FormatBuilderSignMode, display_mode: FormatBuilderRealNumberDisplayMode) -> !:
+    # Special cases: NaN, inf, -inf, 0 and -0.
+    let is_nan = math.is_nan(value)
+    let is_inf = math.is_infinite(value)
+
+    if is_nan or is_inf:
+        var special_case_builder: StringBuilder
+        string_builder_construct(&special_case_builder)
+
+        try put_float_sign(&special_case_builder, value < 0.0, sign_mode)
+
+        if is_nan:
+            try string_builder_try_append_string_view(&special_case_builder, sv_of("NAN") if upper_case else sv_of("nan"))
+        elif is_inf:
+            try string_builder_try_append_string_view(&special_case_builder, sv_of("INF") if upper_case else sv_of("inf"))
+
+        return try format_builder_put_string(this, string_builder_string_view(&special_case_builder), align, min_width, size_max, fill)
+
+    let form = convert_to_decimal_exponential_form((f32)value) if is_f32 else convert_to_decimal_exponential_form(value)
+    let sign = form.sign
+    let mantissa = form.fraction
+    let exponent = form.exponent
+
+    var mantissa_digits: u8[20]
+    let mantissa_length = convert_to_decimal_digits_array(mantissa, mantissa_digits)
+
+    let n = exponent + (i32)mantissa_length
+    var mantissa_text: StringView
+    string_view_construct_span_u8(&mantissa_text, mantissa_digits[0..<mantissa_length])
+
+    # NOTE: Range from ECMA262, seems like an okay default.
+    if n < -5 or n > 21:
+        var scientific_notation_builder: StringBuilder
+        string_builder_construct(&scientific_notation_builder)
+
+        try put_float_sign(&scientific_notation_builder, sign, sign_mode)
+
+        let exponent_sign: u8 = '-' if n < 0 else '+'
+        var exponent_digits: u8[5]
+        let exponent_length = convert_to_decimal_digits_array((u64)(-(n - 1) if n - 1 < 0 else n - 1), exponent_digits)
+        var exponent_text: StringView
+        string_view_construct_span_u8(&exponent_text, exponent_digits[0..<exponent_length])
+
+        if let digits_wanted = precision:
+            let mantissa_used = digits_wanted + 1 if digits_wanted + 1 < string_view_length(&mantissa_text) else string_view_length(&mantissa_text)
+            let shortened = string_view_substring_view_usize(&mantissa_text, 0, mantissa_used)
+            mantissa_text = string_view_trim(&shortened, sv_of("0"), TrimMode.right)
+
+        if string_view_length(&mantissa_text) == 1:
+            # <mantissa>e<exponent>
+            try string_builder_try_append_string_view(&scientific_notation_builder, mantissa_text)
+            try string_builder_try_append_u8(&scientific_notation_builder, 'e')
+            try string_builder_try_append_u8(&scientific_notation_builder, exponent_sign)
+            try string_builder_try_append_string_view(&scientific_notation_builder, exponent_text)
+        else:
+            # <mantissa>.<mantissa[1..]>e<exponent>
+            try string_builder_try_append_string_view(&scientific_notation_builder, string_view_substring_view_usize(&mantissa_text, 0, 1))
+            try string_builder_try_append_u8(&scientific_notation_builder, '.')
+            try string_builder_try_append_string_view(&scientific_notation_builder, string_view_substring_view(&mantissa_text, 1))
+            try string_builder_try_append_u8(&scientific_notation_builder, 'e')
+            try string_builder_try_append_u8(&scientific_notation_builder, exponent_sign)
+            try string_builder_try_append_string_view(&scientific_notation_builder, exponent_text)
+
+        return try format_builder_put_string(this, string_builder_string_view(&scientific_notation_builder), align, min_width, size_max, fill)
+
+    if precision != none or base_ != 10:
+        return try format_builder_put_f64_with_precision(this, value, base_, upper_case, zero_pad, use_separator, align, min_width, precision else 6, fill, sign_mode, display_mode)
+
+    if value == 0.0:
+        var zero_builder: StringBuilder
+        string_builder_construct(&zero_builder)
+
+        try put_float_sign(&zero_builder, value < 0.0, sign_mode)
+
+        try string_builder_try_append_u8(&zero_builder, '0')
+
+        return try format_builder_put_string(this, string_builder_string_view(&zero_builder), align, min_width, size_max, fill)
+
+    # No precision specified, so pick the best precision with roundtrip guarantees.
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+
+    try put_float_sign(&builder, sign, sign_mode)
+
+    var integral_part_end: usize = 0
+
+    if exponent >= 0:
+        try string_builder_try_append_string_view(&builder, mantissa_text)
+        try string_builder_try_append_repeated_u8(&builder, '0', (usize)exponent)
+        integral_part_end = string_builder_length(&builder)
+    elif n > 0:
+        try string_builder_try_append_string_view(&builder, string_view_substring_view_usize(&mantissa_text, 0, (usize)n))
+        integral_part_end = string_builder_length(&builder)
+        try string_builder_try_append_u8(&builder, '.')
+        try string_builder_try_append_string_view(&builder, string_view_substring_view(&mantissa_text, (usize)n))
+    else:
+        try string_builder_try_append_string_view(&builder, sv_of("0."))
+        try string_builder_try_append_repeated_u8(&builder, '0', (usize)(-n))
+        try string_builder_try_append_string_view(&builder, mantissa_text)
+        integral_part_end = 1
+
+    var separated_builder: StringBuilder
+    string_builder_construct(&separated_builder)
+    var result_builder = &builder
+    if use_separator and integral_part_end > 3:
+        # Go backwards from the end of the integral part, inserting commas every 3 consecutive digits.
+        let string_view = string_builder_string_view(&builder)
+        for i in 0..<integral_part_end:
+            let index_from_end = integral_part_end - i - 1
+            if index_from_end > 0 and index_from_end != integral_part_end - 1 and index_from_end % 3 == 2:
+                try string_builder_try_append_u8(&separated_builder, ',')
+            try string_builder_try_append_u8(&separated_builder, string_view_at(&string_view, i))
+        try string_builder_try_append_string_view(&separated_builder, string_view_substring_view(&string_view, integral_part_end))
+        # builder = move(separated_builder);
+        result_builder = &separated_builder
+
+    try format_builder_put_string(this, string_builder_string_view(result_builder), align, min_width, size_max, fill)
+
+# mark: put_f80 =================================================================================
+
+## Ported from AK/Format.cpp:717 AK::FormatBuilder::put_f80 (`long double`, computed in f64).
+pub func format_builder_put_f80(this: FormatBuilder*, value: f64, base_: u8 = 10, upper_case: bool = false, use_separator: bool = false, align: FormatBuilderAlign = FormatBuilderAlign.right, min_width: usize = 0, precision: usize = 6, fill: u8 = ' ', sign_mode: FormatBuilderSignMode = FormatBuilderSignMode.only_if_needed, display_mode: FormatBuilderRealNumberDisplayMode = FormatBuilderRealNumberDisplayMode.general) -> !:
+    var string_builder: StringBuilder
+    string_builder_construct(&string_builder)
+    var format_builder = FormatBuilder(m_builder = &string_builder)
+
+    if math.is_nan(value) or math.is_infinite(value):
+        try put_float_sign(&string_builder, value < 0.0, sign_mode)
+
+        if math.is_nan(value):
+            try string_builder_try_append_string_view(&string_builder, sv_of("NAN") if upper_case else sv_of("nan"))
+        else:
+            try string_builder_try_append_string_view(&string_builder, sv_of("INF") if upper_case else sv_of("inf"))
+        try format_builder_put_string(this, string_builder_string_view(&string_builder), align, min_width, size_max, fill)
+        return
+
+    var number = value
+    let is_negative = number < 0.0
+    if is_negative:
+        number = -number
+
+    try format_builder_put_u64(&format_builder, (u64)number, base_, false, upper_case, false, use_separator, FormatBuilderAlign.right, 0, ' ', sign_mode, is_negative)
+    number -= f64((i64)number)
+
+    if precision > 0:
+        # FIXME: This is a terrible approximation but doing it properly would be a lot of work. If someone is up for that, a good
+        # place to start would be the following video from CppCon 2019:
+        # https://youtu.be/4P_kbF0EbZM (Stephan T. Lavavej “Floating-Point <charconv>: Making Your Code 10x Faster With C++17's Final Boss”)
+        var epsilon = 0.5
+        if display_mode != FormatBuilderRealNumberDisplayMode.fixed_point:
+            for _ in 0..<precision:
+                epsilon /= 10.0
+
+        for digit in 0..<precision:
+            if display_mode != FormatBuilderRealNumberDisplayMode.fixed_point and number - f64((i64)number) < epsilon:
+                break
+
+            number *= 10.0
+            epsilon *= 10.0
+
+            if number > 4294967295.0:
+                number -= f64((u64)number - ((u64)number % 10))
+
+            if digit == 0:
+                try string_builder_try_append_u8(&string_builder, '.')
+
+            try string_builder_try_append_u8(&string_builder, (u8)((u32)'0' + ((u32)number % 10)))
+
+    # Round up if the following decimal is 5 or higher
+    if (u64)(number * 10.0) % 10 >= 5:
+        try round_up_digits(&string_builder)
+
+    try format_builder_put_string(this, string_builder_string_view(&string_builder), align, min_width, size_max, fill)
+
+# mark: put_hexdump =============================================================================
+
+## put_hexdump's `put_char_view` lambda (AK/Format.cpp:792): the printable bytes of the row
+## that ends before `i`, after four fill characters.
+func format_builder_put_hexdump_char_view(this: FormatBuilder*, bytes: const u8[], width: usize, fill: u8, i: usize) -> !:
+    try format_builder_put_padding(this, fill, 4)
+    let row_length = i if i < width else width
+    for j in i - row_length..<i:
+        let ch = bytes[j]
+        try string_builder_try_append_u8(this.m_builder, ch if ch >= 32 and ch <= 127 else '.')  # silly hack
+
+## Ported from AK/Format.cpp:790 AK::FormatBuilder::put_hexdump.
+pub func format_builder_put_hexdump(this: FormatBuilder*, bytes: const u8[], width: usize, fill: u8 = ' ') -> !:
+    for i in 0..<bytes.length:
+        if width > 0:
+            if i % width == 0 and i != 0:
+                try format_builder_put_hexdump_char_view(this, bytes, width, fill, i)
+                try format_builder_put_literal(this, sv_of("\n"))
+        try format_builder_put_u64(this, (u64)bytes[i], 16, false, false, true, false, FormatBuilderAlign.right, 2)
+
+    if width > 0:
+        try format_builder_put_hexdump_char_view(this, bytes, width, fill, bytes.length)
+
+# mark: vformat =================================================================================
+
+## Ported from AK/Format.cpp:817 AK::vformat: formats `fmtstr` with `params` onto `builder`.
+pub func vformat(builder: StringBuilder*, fmtstr: StringView, params: TypeErasedFormatParams*) -> !:
+    var fmtbuilder = FormatBuilder(m_builder = builder)
+    var parser: FormatParser
+    format_parser_construct(&parser, fmtstr)
+
+    try vformat_impl(params, &fmtbuilder, &parser)

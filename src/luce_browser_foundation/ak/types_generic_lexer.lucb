@@ -26,7 +26,8 @@ pub enum UnicodeEscapeError as i32:
 
 ## AK::Detail::GenericLexer (AK/GenericLexer.h:41): a generic struct.
 pub struct GenericLexer[TCharType]:
-    pub var m_input: void*?  # unmapped: Conditional<IsSame<CharType, char>, StringView, Utf16View>
+    # r03: the `char` instantiation's StringView (C++: Conditional<IsSame<CharType, char>, StringView, Utf16View>).
+    pub var m_input: StringView
     pub var m_index: usize  # C++ default: { 0 }
 
 # mark: LineTrackingLexer =======================================================================

@@ -1,0 +1,265 @@
+#==============================================================================================
+#
+#   format_builder - FormatBuilder: padding, literals, strings, integers and fixed point
+#
+#   DESCRIPTION:
+#       Port of AK/Format.cpp lines 218-485: FormatBuilder::put_padding, put_literal,
+#       put_string, put_u64 (with its put_prefix and put_digits lambdas as helpers), put_i64,
+#       put_fixed_point and round_up_digits. Every function writes through the StringBuilder the
+#       FormatBuilder wraps; the arithmetic keeps C++'s unsigned wrapping where it can wrap.
+#
+#==============================================================================================
+
+# mark: Integral helpers ========================================================================
+
+## AK::pow<u64> (AK/IntegralMath.h:37, exponentiation by squaring with unsigned wrapping), as
+## put_fixed_point instantiates it.
+func pow_u64(base_: u64, exponent: u64) -> u64:
+    # https://en.wikipedia.org/wiki/Exponentiation_by_squaring
+    if exponent == 0:
+        return 1
+
+    var result: u64 = 1
+    var power = base_
+    var remaining = exponent
+    while remaining > 0:
+        if (remaining & 1) != 0:
+            result = result *% power
+        power = power *% power
+        remaining = remaining // 2
+    return result
+
+## AK::log2<u8> (AK/IntegralMath.h:22), as put_fixed_point instantiates it.
+func log2_u8(x: u8) -> u8:
+    if x == 0:
+        return 0
+    var result: u8 = 0
+    var remaining = x
+    while remaining > 1:
+        remaining = remaining >> 1
+        result += 1
+    return result
+
+# mark: Padding, literals and strings ===========================================================
+
+## Ported from AK/Format.cpp:218 AK::FormatBuilder::put_padding.
+pub func format_builder_put_padding(this: FormatBuilder*, fill: u8, amount: usize) -> !:
+    for _ in 0..<amount:
+        try string_builder_try_append_u8(this.m_builder, fill)
+
+## Ported from AK/Format.cpp:224 AK::FormatBuilder::put_literal: appends `value`, collapsing
+## each escaped `{{` and `}}` to one brace.
+pub func format_builder_put_literal(this: FormatBuilder*, value: StringView) -> !:
+    var i: usize = 0
+    while i < string_view_length(&value):
+        let ch = string_view_at(&value, i)
+        try string_builder_try_append_u8(this.m_builder, ch)
+        if ch == '{' or ch == '}':
+            i += 1
+        i += 1
+
+## Ported from AK/Format.cpp:234 AK::FormatBuilder::put_string.
+pub func format_builder_put_string(this: FormatBuilder*, value: StringView, align: FormatBuilderAlign = FormatBuilderAlign.left, min_width: usize = 0, max_width: usize = size_max, fill: u8 = ' ') -> !:
+    let used_by_string = max_width if max_width < string_view_length(&value) else string_view_length(&value)
+    let used_by_padding = (min_width if min_width > used_by_string else used_by_string) - used_by_string
+
+    var string = value
+    if used_by_string < string_view_length(&value):
+        string = string_view_substring_view_usize(&value, 0, used_by_string)
+
+    if align == FormatBuilderAlign.left or align == FormatBuilderAlign.default:
+        try string_builder_try_append_string_view(this.m_builder, string)
+        try format_builder_put_padding(this, fill, used_by_padding)
+    elif align == FormatBuilderAlign.center:
+        let used_by_left_padding = used_by_padding // 2
+        # ceil_div<size_t, size_t>(used_by_padding, 2)
+        let used_by_right_padding = used_by_padding // 2 + (1 if used_by_padding % 2 != 0 else 0)
+
+        try format_builder_put_padding(this, fill, used_by_left_padding)
+        try string_builder_try_append_string_view(this.m_builder, string)
+        try format_builder_put_padding(this, fill, used_by_right_padding)
+    elif align == FormatBuilderAlign.right:
+        try format_builder_put_padding(this, fill, used_by_padding)
+        try string_builder_try_append_string_view(this.m_builder, string)
+
+# mark: Integers ================================================================================
+
+## put_u64's `put_prefix` lambda (AK/Format.cpp:307).
+func format_builder_put_u64_prefix(this: FormatBuilder*, base_: u8, prefix: bool, upper_case: bool, sign_mode: FormatBuilderSignMode, is_negative: bool) -> !:
+    if is_negative:
+        try string_builder_try_append_u8(this.m_builder, '-')
+    elif sign_mode == FormatBuilderSignMode.always:
+        try string_builder_try_append_u8(this.m_builder, '+')
+    elif sign_mode == FormatBuilderSignMode.reserved:
+        try string_builder_try_append_u8(this.m_builder, ' ')
+
+    if prefix:
+        if base_ == 2:
+            if upper_case:
+                try string_builder_try_append_string_view(this.m_builder, sv_of("0B"))
+            else:
+                try string_builder_try_append_string_view(this.m_builder, sv_of("0b"))
+        elif base_ == 8:
+            try string_builder_try_append_string_view(this.m_builder, sv_of("0"))
+        elif base_ == 16:
+            if upper_case:
+                try string_builder_try_append_string_view(this.m_builder, sv_of("0X"))
+            else:
+                try string_builder_try_append_string_view(this.m_builder, sv_of("0x"))
+
+## put_u64's `put_digits` lambda (AK/Format.cpp:332).
+func format_builder_put_u64_digits(this: FormatBuilder*, buffer: const (u8[128])*, used_by_digits: usize) -> !:
+    for i in 0..<used_by_digits:
+        try string_builder_try_append_u8(this.m_builder, (*buffer)[i])
+
+## Ported from AK/Format.cpp:264 AK::FormatBuilder::put_u64.
+pub func format_builder_put_u64(this: FormatBuilder*, value: u64, base_: u8 = 10, prefix: bool = false, upper_case: bool = false, zero_pad: bool = false, use_separator: bool = false, align: FormatBuilderAlign = FormatBuilderAlign.right, min_width: usize = 0, fill: u8 = ' ', sign_mode: FormatBuilderSignMode = FormatBuilderSignMode.only_if_needed, is_negative: bool = false) -> !:
+    var alignment = align
+    if alignment == FormatBuilderAlign.default:
+        alignment = FormatBuilderAlign.right
+
+    var buffer: u8[128]
+
+    let used_by_digits = convert_unsigned_to_string(value, &buffer, base_, upper_case, use_separator)
+
+    var used_by_prefix: usize = 0
+    if alignment == FormatBuilderAlign.right and zero_pad:
+        # We want ByteString::formatted("{:#08x}", 32) to produce '0x00000020' instead of '0x000020'. This
+        # behavior differs from both fmtlib and printf, but is more intuitive.
+        used_by_prefix = 0
+    else:
+        if is_negative or sign_mode != FormatBuilderSignMode.only_if_needed:
+            used_by_prefix += 1
+
+        if prefix:
+            if base_ == 8:
+                used_by_prefix += 1
+            elif base_ == 16:
+                used_by_prefix += 2
+            elif base_ == 2:
+                used_by_prefix += 2
+
+    let used_by_field = used_by_prefix + used_by_digits
+    let used_by_padding = (used_by_field if used_by_field > min_width else min_width) - used_by_field
+
+    if alignment == FormatBuilderAlign.left:
+        let used_by_right_padding = used_by_padding
+
+        try format_builder_put_u64_prefix(this, base_, prefix, upper_case, sign_mode, is_negative)
+        try format_builder_put_u64_digits(this, &buffer, used_by_digits)
+        try format_builder_put_padding(this, fill, used_by_right_padding)
+    elif alignment == FormatBuilderAlign.center:
+        let used_by_left_padding = used_by_padding // 2
+        let used_by_right_padding = used_by_padding - used_by_left_padding
+
+        try format_builder_put_padding(this, fill, used_by_left_padding)
+        try format_builder_put_u64_prefix(this, base_, prefix, upper_case, sign_mode, is_negative)
+        try format_builder_put_u64_digits(this, &buffer, used_by_digits)
+        try format_builder_put_padding(this, fill, used_by_right_padding)
+    elif alignment == FormatBuilderAlign.right:
+        let used_by_left_padding = used_by_padding
+
+        if zero_pad:
+            try format_builder_put_u64_prefix(this, base_, prefix, upper_case, sign_mode, is_negative)
+            try format_builder_put_padding(this, '0', used_by_left_padding)
+            try format_builder_put_u64_digits(this, &buffer, used_by_digits)
+        else:
+            try format_builder_put_padding(this, fill, used_by_left_padding)
+            try format_builder_put_u64_prefix(this, base_, prefix, upper_case, sign_mode, is_negative)
+            try format_builder_put_u64_digits(this, &buffer, used_by_digits)
+
+## Ported from AK/Format.cpp:368 AK::FormatBuilder::put_i64.
+pub func format_builder_put_i64(this: FormatBuilder*, value: i64, base_: u8 = 10, prefix: bool = false, upper_case: bool = false, zero_pad: bool = false, use_separator: bool = false, align: FormatBuilderAlign = FormatBuilderAlign.right, min_width: usize = 0, fill: u8 = ' ', sign_mode: FormatBuilderSignMode = FormatBuilderSignMode.only_if_needed) -> !:
+    let is_negative = value < 0
+    var positive_value: u64
+    if value == -9223372036854775808:
+        positive_value = (u64)9223372036854775807 + 1
+    else:
+        positive_value = (u64)(-value if is_negative else value)
+
+    try format_builder_put_u64(this, positive_value, base_, prefix, upper_case, zero_pad, use_separator, align, min_width, fill, sign_mode, is_negative)
+
+# mark: Fixed point =============================================================================
+
+## Ported from AK/Format.cpp:392 AK::FormatBuilder::put_fixed_point.
+pub func format_builder_put_fixed_point(this: FormatBuilder*, is_negative: bool, integer_value: i64, fraction_value: u64, fraction_one: u64, precision: usize, base_: u8 = 10, upper_case: bool = false, zero_pad: bool = false, use_separator: bool = false, align: FormatBuilderAlign = FormatBuilderAlign.right, min_width: usize = 0, fraction_max_width: usize = 6, fill: u8 = ' ', sign_mode: FormatBuilderSignMode = FormatBuilderSignMode.only_if_needed) -> !:
+    var string_builder: StringBuilder
+    string_builder_construct(&string_builder)
+    var format_builder = FormatBuilder(m_builder = &string_builder)
+
+    var integer = integer_value
+    if is_negative:
+        integer = -integer
+
+    try format_builder_put_u64(&format_builder, (u64)integer, base_, false, upper_case, false, use_separator, FormatBuilderAlign.right, 0, ' ', sign_mode, is_negative)
+
+    var fraction_value_left = fraction_value
+    if fraction_max_width != 0 and (zero_pad or fraction_value_left != 0):
+        # FIXME: This is a terrible approximation but doing it properly would be a lot of work. If someone is up for that, a good
+        # place to start would be the following video from CppCon 2019:
+        # https://youtu.be/4P_kbF0EbZM (Stephan T. Lavavej “Floating-Point <charconv>: Making Your Code 10x Faster With C++17's Final Boss”)
+
+        if is_negative and fraction_value_left != 0:
+            fraction_value_left = fraction_one - fraction_value_left
+
+        try string_builder_try_append_u8(&string_builder, '.')
+
+        if base_ == 10:
+            let scale = pow_u64(5, (u64)precision)
+            # FIXME: overflows (not before: fraction_value = (2^precision - 1) and precision >= 20) (use wider integer type)
+            let fraction = scale *% fraction_value_left
+            try format_builder_put_u64(&format_builder, fraction, base_, false, upper_case, true, use_separator, FormatBuilderAlign.right, precision)
+        elif base_ == 16 or base_ == 8 or base_ == 2:
+            let bits_per_character = (usize)log2_u8(base_)
+            let fraction = fraction_value_left << (u64)((bits_per_character - (precision % bits_per_character)) % bits_per_character)
+            let width = precision // bits_per_character + (1 if precision % bits_per_character != 0 else 0)
+            try format_builder_put_u64(&format_builder, fraction, base_, false, upper_case, false, use_separator, FormatBuilderAlign.right, width, '0')
+        else:
+            trap("VERIFY_NOT_REACHED")
+
+    var formatted_string = string_builder_string_view(&string_builder)
+    if fraction_max_width != 0 and (zero_pad or fraction_value_left != 0):
+        let point_index = (usize)(string_view_find_u8(&formatted_string, '.') else 0)
+        if point_index == 0:
+            trap("VERIFY_NOT_REACHED")
+
+        let formatted_length = string_view_length(&formatted_string) - point_index - 1
+        if formatted_length > fraction_max_width:
+            formatted_string = string_view_substring_view_usize(&formatted_string, 0, 1 + point_index + fraction_max_width)
+        else:
+            string_builder_append_repeated_u8(&string_builder, '0', fraction_max_width - formatted_length)
+            formatted_string = string_builder_string_view(&string_builder)
+
+        if not zero_pad:
+            formatted_string = string_view_trim(&formatted_string, sv_of("0"), TrimMode.right)
+
+        if string_view_ends_with_u8(&formatted_string, '.'):
+            formatted_string = string_view_trim(&formatted_string, sv_of("."), TrimMode.right)
+
+    try format_builder_put_string(this, formatted_string, align, min_width, size_max, fill)
+
+# mark: round_up_digits =========================================================================
+
+## Ported from AK/Format.cpp:464 AK::round_up_digits: adds one in the last place of the decimal
+## digits in `digits_builder`, carrying through the digits and over the point.
+func round_up_digits(digits_builder: StringBuilder*) -> !:
+    var digits_buffer = try string_builder_to_byte_buffer(digits_builder)
+    var current_position = (i32)byte_buffer_size(&digits_buffer) - 1
+
+    while current_position >= 0:
+        let digit = byte_buffer_at(&digits_buffer, (usize)current_position)
+        if *digit == '.':
+            current_position -= 1
+            continue
+        *digit += 1
+        if *digit <= '9':
+            break
+        *digit = '0'
+        current_position -= 1
+
+    string_builder_clear(digits_builder)
+    if current_position < 0:
+        try string_builder_try_append_u8(digits_builder, '1')
+    var digits: StringView
+    string_view_construct_byte_buffer(&digits, digits_buffer)
+    try string_builder_try_append_string_view(digits_builder, digits)

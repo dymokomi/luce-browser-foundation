@@ -12,3 +12,11 @@
 #       SPDX-License-Identifier: BSD-2-Clause (see LICENSE)
 #
 #==============================================================================================
+
+# Imports of region r03 (ak_format): C types and the standard streams for the format output,
+# math for the float formats, the comparison protocols for the generic shorthands.
+import c
+import io
+import math
+import os
+from luce import Comparable, Equatable

@@ -1,0 +1,178 @@
+#==============================================================================================
+#
+#   tests_number_format - tests of number_format
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestNumberFormat.cpp (Ladybird 47c82b38d0), with the sizes written
+#       out (KiB, MiB, GiB of AK/Types.h) and the 8-byte size_t branch always taken. They go
+#       through other regions' String and Duration, so they run only when
+#       ak_format_tests_use_other_regions is set (see tests_format).
+#
+#==============================================================================================
+
+# mark: TestNumberFormat.cpp ====================================================================
+
+test "golden_path":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size(0)) == "0 B")
+    assert(text_of_string(human_readable_size(123)) == "123 B")
+    assert(text_of_string(human_readable_size(125952)) == "123.0 KiB")  # 123 * KiB
+    assert(text_of_string(human_readable_size(128974848)) == "123.0 MiB")  # 123 * MiB
+    assert(text_of_string(human_readable_size(2147483648)) == "2.0 GiB")  # 2 * GiB
+
+test "border_B_KiB":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size(1000)) == "1000 B")
+    assert(text_of_string(human_readable_size(1023)) == "1023 B")
+    # KiB = 1024
+    assert(text_of_string(human_readable_size(1024)) == "1.0 KiB")
+    assert(text_of_string(human_readable_size(1025)) == "1.0 KiB")
+
+test "fraction_KiB":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size(1050)) == "1.0 KiB")
+    assert(text_of_string(human_readable_size(1075)) == "1.0 KiB")
+    # 1024 * 1.05 = 1075.2
+    assert(text_of_string(human_readable_size(1076)) == "1.0 KiB")
+    assert(text_of_string(human_readable_size(1100)) == "1.0 KiB")
+    assert(text_of_string(human_readable_size(1126)) == "1.0 KiB")
+    # 1024 * 1.1 = 1126.4
+    assert(text_of_string(human_readable_size(1127)) == "1.1 KiB")
+    assert(text_of_string(human_readable_size(1146)) == "1.1 KiB")
+
+test "border_KiB_MiB":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size(1024000)) == "1000.0 KiB")  # 1000 * KiB
+    assert(text_of_string(human_readable_size(1048575)) == "1023.9 KiB")  # 1024 * KiB - 1
+    # MiB
+    assert(text_of_string(human_readable_size(1048576)) == "1.0 MiB")  # 1024 * KiB
+    assert(text_of_string(human_readable_size(1048577)) == "1.0 MiB")  # 1024 * KiB + 1
+
+test "fraction_MiB":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size(1069547)) == "1.0 MiB")
+    assert(text_of_string(human_readable_size(1101004)) == "1.0 MiB")
+    # 1024 * 1024 * 1.05 = 1101004.8
+    assert(text_of_string(human_readable_size(1101005)) == "1.0 MiB")
+    assert(text_of_string(human_readable_size(1101006)) == "1.0 MiB")
+    assert(text_of_string(human_readable_size(1120000)) == "1.0 MiB")
+    assert(text_of_string(human_readable_size(1153433)) == "1.0 MiB")
+    # 1024 * 1024 * 1.1 = 1153433.6
+    assert(text_of_string(human_readable_size(1153434)) == "1.1 MiB")
+
+test "border_MiB_GiB":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size(1048576000)) == "1000.0 MiB")  # 1000 * MiB
+    assert(text_of_string(human_readable_size(1073741823)) == "1023.9 MiB")  # 1024 * MiB - 1
+    assert(text_of_string(human_readable_size(1073741824)) == "1.0 GiB")  # 1024 * MiB
+    assert(text_of_string(human_readable_size(1073741825)) == "1.0 GiB")  # 1024 * MiB + 1
+
+test "fraction_GiB":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size(1095216660)) == "1.0 GiB")
+    assert(text_of_string(human_readable_size(1127428915)) == "1.0 GiB")
+    # 1024 * 1024 * 1024 * 1.05 = 1127428915.2
+    assert(text_of_string(human_readable_size(1127428916)) == "1.0 GiB")
+    assert(text_of_string(human_readable_size(1127536289)) == "1.0 GiB")
+    assert(text_of_string(human_readable_size(1154272461)) == "1.0 GiB")
+    assert(text_of_string(human_readable_size(1181115968)) == "1.0 GiB")
+    assert(text_of_string(human_readable_size(1181115969)) == "1.0 GiB")
+    assert(text_of_string(human_readable_size(1181116000)) == "1.0 GiB")
+    assert(text_of_string(human_readable_size(1181116006)) == "1.0 GiB")
+    # 1024 * 1024 * 1024 * 1.1 = 1181116006.4
+    assert(text_of_string(human_readable_size(1181116007)) == "1.1 GiB")
+    assert(text_of_string(human_readable_size(1202590842)) == "1.1 GiB")
+
+test "extremes_4byte":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size(2147483647)) == "1.9 GiB")  # 0x7fffffff
+    assert(text_of_string(human_readable_size(2147483648)) == "2.0 GiB")  # 0x80000000
+    assert(text_of_string(human_readable_size(4294967295)) == "3.9 GiB")  # 0xffffffff
+
+test "extremes_8byte":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size(4294967296)) == "4.0 GiB")  # 0x100000000ULL
+    assert(text_of_string(human_readable_size(4294967297)) == "4.0 GiB")  # 0x100000001ULL
+    assert(text_of_string(human_readable_size(34359738368)) == "32.0 GiB")  # 0x800000000ULL
+    assert(text_of_string(human_readable_size(1099511627776)) == "1.0 TiB")  # 0x10000000000ULL
+    assert(text_of_string(human_readable_size(1125899906842624)) == "1.0 PiB")  # 0x4000000000000ULL
+    assert(text_of_string(human_readable_size(9223372036854775807)) == "7.9 EiB")  # 0x7fffffffffffffffULL
+    assert(text_of_string(human_readable_size(9223372036854775808)) == "8.0 EiB")  # 0x8000000000000000ULL
+    assert(text_of_string(human_readable_size(18446744073709551615)) == "15.9 EiB")  # 0xffffffffffffffffULL
+
+test "base10_units":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size(999, HumanReadableBasedOn.base10)) == "999 B")
+    assert(text_of_string(human_readable_size(1024, HumanReadableBasedOn.base10)) == "1.0 KB")
+    assert(text_of_string(human_readable_size(1100, HumanReadableBasedOn.base10)) == "1.1 KB")
+    assert(text_of_string(human_readable_size(1000000, HumanReadableBasedOn.base10)) == "1.0 MB")
+
+test "human_readable_short_time":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_short_time(duration_from_nanoseconds(0))) == "0ns")
+    assert(text_of_string(human_readable_short_time(duration_from_nanoseconds(1))) == "1ns")
+    assert(text_of_string(human_readable_short_time(duration_from_nanoseconds(99))) == "99ns")
+    assert(text_of_string(human_readable_short_time(duration_from_nanoseconds(999))) == "999ns")
+    assert(text_of_string(human_readable_short_time(duration_from_nanoseconds(1009))) == "1.009µs")
+    assert(text_of_string(human_readable_short_time(duration_from_nanoseconds(1099))) == "1.099µs")
+    assert(text_of_string(human_readable_short_time(duration_from_nanoseconds(1999))) == "1.999µs")
+    assert(text_of_string(human_readable_short_time(duration_from_microseconds(1))) == "1µs")
+    assert(text_of_string(human_readable_short_time(duration_from_microseconds(999))) == "999µs")
+    assert(text_of_string(human_readable_short_time(duration_from_microseconds(1009))) == "1.009ms")
+    assert(text_of_string(human_readable_short_time(duration_from_microseconds(1099))) == "1.099ms")
+    assert(text_of_string(human_readable_short_time(duration_from_microseconds(1999))) == "1.999ms")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(1))) == "1ms")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(99))) == "99ms")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(999))) == "999ms")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(1009))) == "1.009s")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(1099))) == "1.099s")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(1999))) == "1.999s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(1))) == "1s")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(1001))) == "1.001s")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(1999))) == "1.999s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(59))) == "59s")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(59999))) == "59.999s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(60))) == "1m")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(60001))) == "1m 0.001s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(61))) == "1m 1s")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(61001))) == "1m 1.001s")
+    assert(text_of_string(human_readable_short_time(duration_from_microseconds(61001001))) == "1m 1.001s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(3599))) == "59m 59s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(3600))) == "1h")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(3601))) == "1h 1s")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(3600001))) == "1h 0.001s")
+    assert(text_of_string(human_readable_short_time(duration_from_microseconds(3601001001))) == "1h 1.001s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(3661))) == "1h 1m 1s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(3661))) == "1h 1m 1s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(86399))) == "23h 59m 59s")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(86399001))) == "23h 59m 59.001s")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(86399999))) == "23h 59m 59.999s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(86400))) == "1d")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(86401))) == "1d 1s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(86461))) == "1d 1m 1s")
+    assert(text_of_string(human_readable_short_time(duration_from_seconds(90061))) == "1d 1h 1m 1s")
+    assert(text_of_string(human_readable_short_time(duration_from_milliseconds(90061001))) == "1d 1h 1m 1.001s")
+
+# mark: Reference-build cases ===================================================================
+
+# The donor tests nothing below; these values are the reference build's (Ladybird 47c82b38d0).
+test "human_readable_size_long_and_quantity":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_size_long(1000)) == "1000 bytes")
+    assert(text_of_string(human_readable_size_long(1000, UseThousandsSeparator.yes)) == "1,000 bytes")
+    assert(text_of_string(human_readable_size_long(123456789)) == "117.7 MiB (123456789 bytes)")
+    assert(text_of_string(human_readable_size_long(123456789, UseThousandsSeparator.yes)) == "117.7 MiB (123,456,789 bytes)")
+    assert(text_of_string(human_readable_quantity(1500000, HumanReadableBasedOn.base10, sv_of("Hz"))) == "1.5 MHz")
+    assert(text_of_string(human_readable_quantity(123456789012, HumanReadableBasedOn.base2, sv_of("B"), UseThousandsSeparator.yes)) == "114.9 GiB")
+    assert(text_of_string(human_readable_size(1234567, HumanReadableBasedOn.base2, UseThousandsSeparator.yes)) == "1.1 MiB")
+
+test "human_readable_time_and_digital_time":
+    if not ak_format_tests_use_other_regions: return
+    assert(text_of_string(human_readable_time(duration_from_milliseconds(1000))) == "1 second")
+    assert(text_of_string(human_readable_time(duration_from_milliseconds(90061001))) == "1 day 1 hour 1 minute 1.001 seconds")
+    assert(text_of_string(human_readable_time(duration_from_milliseconds(172800000 + 7200000 + 120000 + 2500))) == "2 days 2 hours 2 minutes 2.5 seconds")
+    # to_milliseconds() rounds a partial millisecond up.
+    assert(text_of_string(human_readable_time(duration_from_nanoseconds(1))) == "0.001 seconds")
+    assert(text_of_string(human_readable_digital_time(3725)) == "01:02:05")
+    assert(text_of_string(human_readable_digital_time(59)) == "00:59")
+    assert(text_of_string(human_readable_digital_time(360000)) == "100:00:00")

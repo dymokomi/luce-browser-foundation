@@ -750,8 +750,8 @@ pub func is_not_any_of(values: StringView) -> void*?:
     trap("unported: AK::is_not_any_of")
 
 ## Ported from AK/GenericLexer.h:47 AK::Detail::GenericLexer::GenericLexer<CharType>.
-# unmapped: Conditional<IsSame<CharType, char>, StringView, Utf16View>
-pub func generic_lexer_construct[TCharType](this: GenericLexer[TCharType]*, input: void*?):
+# r03: signature fixed to the `char` instantiation's StringView.
+pub func generic_lexer_construct[TCharType](this: GenericLexer[TCharType]*, input: StringView):
     trap("unported: AK::Detail::GenericLexer::GenericLexer<CharType>")
 
 ## Ported from AK/GenericLexer.h:52 AK::Detail::GenericLexer::tell.
@@ -763,13 +763,13 @@ pub func generic_lexer_tell_remaining[TCharType](this: const GenericLexer[TCharT
     trap("unported: AK::Detail::GenericLexer::tell_remaining")
 
 ## Ported from AK/GenericLexer.h:55 AK::Detail::GenericLexer::remaining.
-# unmapped: Conditional<IsSame<CharType, char>, StringView, Utf16View>
-pub func generic_lexer_remaining[TCharType](this: const GenericLexer[TCharType]*) -> void*?:
+# r03: signature fixed to the `char` instantiation's StringView.
+pub func generic_lexer_remaining[TCharType](this: const GenericLexer[TCharType]*) -> StringView:
     trap("unported: AK::Detail::GenericLexer::remaining")
 
 ## Ported from AK/GenericLexer.h:56 AK::Detail::GenericLexer::input.
-# unmapped: Conditional<IsSame<CharType, char>, StringView, Utf16View>
-pub func generic_lexer_input[TCharType](this: const GenericLexer[TCharType]*) -> void*?:
+# r03: signature fixed to the `char` instantiation's StringView.
+pub func generic_lexer_input[TCharType](this: const GenericLexer[TCharType]*) -> StringView:
     trap("unported: AK::Detail::GenericLexer::input")
 
 ## Ported from AK/GenericLexer.h:58 AK::Detail::GenericLexer::is_eof.
@@ -836,8 +836,8 @@ pub func generic_lexer_consume_escaped_character[TCharType](this: GenericLexer[T
     trap("unported: AK::Detail::GenericLexer::consume_escaped_character")
 
 ## Ported from AK/GenericLexer.h:173 AK::Detail::GenericLexer::consume.
-# unmapped: Conditional<IsSame<CharType, char>, StringView, Utf16View>
-pub func generic_lexer_consume_usize[TCharType](this: GenericLexer[TCharType]*, count: usize) -> void*?:
+# r03: signature fixed to the `char` instantiation's StringView.
+pub func generic_lexer_consume_usize[TCharType](this: GenericLexer[TCharType]*, count: usize) -> StringView:
     trap("unported: AK::Detail::GenericLexer::consume")
 
 ## Ported from AK/GenericLexer.h:183 AK::Detail::GenericLexer::consume_all.
@@ -851,8 +851,8 @@ pub func generic_lexer_consume_line[TCharType](this: GenericLexer[TCharType]*) -
     trap("unported: AK::Detail::GenericLexer::consume_line")
 
 ## Ported from AK/GenericLexer.h:205 AK::Detail::GenericLexer::consume_until.
-# unmapped: Conditional<IsSame<CharType, char>, StringView, Utf16View>
-pub func generic_lexer_consume_until_t_char_type[TCharType](this: GenericLexer[TCharType]*, stop: TCharType) -> void*?:
+# r03: signature fixed to the `char` instantiation's StringView.
+pub func generic_lexer_consume_until_t_char_type[TCharType](this: GenericLexer[TCharType]*, stop: TCharType) -> StringView:
     trap("unported: AK::Detail::GenericLexer::consume_until")
 
 ## Ported from AK/GenericLexer.h:215 AK::Detail::GenericLexer::consume_until.
@@ -1750,8 +1750,8 @@ pub func string_builder_data_const(this: const StringBuilder*) -> const u8*?:
     trap("unported: AK::StringBuilder::data")
 
 ## Ported from AK/StringConversions.cpp:63 AK::parse_first_number.
-# unmapped: Optional<ParseFirstNumberResult<T>>
-pub func parse_first_number_string_view[T](string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
+# r03: signature fixed (C++ returns Optional<ParseFirstNumberResult<T>>).
+pub func parse_first_number_string_view[T](string: StringView, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> ParseFirstNumberResult[T]?:
     trap("unported: AK::parse_first_number")
 
 ## Ported from AK/StringConversions.cpp:72 AK::parse_first_number.
@@ -2258,8 +2258,8 @@ pub func string_view_count_u8(this: const StringView*, needle: u8) -> usize:
     trap("unported: AK::StringView::count")
 
 ## Ported from AK/StringView.h:348 AK::StringView::to_number.
-# unmapped: Optional<T>
-pub func string_view_to_number[T](this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> void*?:
+# r03: signature fixed (C++ returns Optional<T>).
+pub func string_view_to_number[T](this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> T?:
     trap("unported: AK::StringView::to_number")
 
 ## Ported from AK/StringView.h:357 AK::StringView::StringView.

@@ -1,0 +1,190 @@
+#==============================================================================================
+#
+#   format_parser - FormatParser and the replacement-field loop of vformat
+#
+#   DESCRIPTION:
+#       Port of AK/Format.cpp lines 44-216: FormatParser (a GenericLexer over the format
+#       string), convert_unsigned_to_string and vformat_impl, which alternates literal text
+#       with replacement fields and hands each argument to the Formatter of its kind.
+#
+#       GenericLexer predicates (`next_is(is_any_of("{}"sv))`, `next_is(is_ascii_digit)`)
+#       are written out as the tests they make: not at the end, and the next character
+#       matches.
+#
+#==============================================================================================
+
+# mark: convert_unsigned_to_string ==============================================================
+
+let lowercase_lookup = "0123456789abcdef"
+let uppercase_lookup = "0123456789ABCDEF"
+
+## Ported from AK/Format.cpp:65 AK::(anonymous)::convert_unsigned_to_string.
+# The worst case is that we have the largest 64-bit value formatted as binary number, this would take
+# 65 bytes (85 bytes with separators). Choosing a larger power of two won't hurt and is a bit of mitigation against out-of-bounds accesses.
+func convert_unsigned_to_string(value: u64, buffer: (u8[128])*, base_: u8, upper_case: bool, use_separator: bool) -> usize:
+    assert(base_ >= 2 and base_ <= 16)
+
+    if value == 0:
+        (*buffer)[0] = '0'
+        return 1
+
+    var remaining = value
+    var used: usize = 0
+    var digit_count: usize = 0
+    while remaining > 0:
+        if upper_case:
+            (*buffer)[used] = uppercase_lookup.bytes[(usize)(remaining % base_)]
+        else:
+            (*buffer)[used] = lowercase_lookup.bytes[(usize)(remaining % base_)]
+        used += 1
+
+        digit_count += 1
+        remaining = remaining // base_
+
+        if use_separator and remaining > 0 and digit_count % 3 == 0:
+            (*buffer)[used] = ','
+            used += 1
+
+    for i in 0..<used // 2:
+        let swapped = (*buffer)[i]
+        (*buffer)[i] = (*buffer)[used - i - 1]
+        (*buffer)[used - i - 1] = swapped
+
+    return used
+
+# mark: vformat_impl ============================================================================
+
+## Ported from AK/Format.cpp:98 AK::(anonymous)::vformat_impl.
+func vformat_impl(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*) -> !:
+    let literal = format_parser_consume_literal(parser)
+    try format_builder_put_literal(builder, literal)
+
+    var specifier = FormatParserFormatSpecifier(flags = sv_of(""), index = 0)
+    if not format_parser_consume_specifier(parser, &specifier):
+        assert(generic_lexer_is_eof(&parser.generic_lexer))
+        return
+
+    if specifier.index == use_next_index:
+        specifier.index = type_erased_format_params_take_next_index(params)
+
+    let parameter = &type_erased_format_params_parameters(params)[specifier.index]
+
+    var argparser: FormatParser
+    format_parser_construct(&argparser, specifier.flags)
+    # parameter.visit(...): a custom type calls its own formatter, every other kind the
+    # __format_value<T> of its union member's type.
+    match parameter.type_:
+        .unsigned_integer:
+            try format_value_u64(params, builder, &argparser, &parameter.value.as_unsigned)
+        .signed_integer:
+            try format_value_i64(params, builder, &argparser, &parameter.value.as_signed)
+        .boolean:
+            try format_value_bool(params, builder, &argparser, &parameter.value.as_bool)
+        .character:
+            try format_value_char(params, builder, &argparser, &parameter.value.as_char)
+        .float:
+            try format_value_f32(params, builder, &argparser, &parameter.value.as_float)
+        .double:
+            try format_value_f64(params, builder, &argparser, &parameter.value.as_double)
+        .string_view:
+            try format_value_string_view(params, builder, &argparser, &parameter.value.as_string_view)
+        .c_string:
+            try format_value_c_string(params, builder, &argparser, &parameter.value.as_c_string)
+        .custom_type:
+            let custom = parameter.value.as_custom_type
+            let formatter = custom.formatter else trap("VERIFY_NOT_REACHED: custom format parameter without formatter")
+            try formatter(params, builder, &argparser, custom.value)
+        _:
+            trap("VERIFY_NOT_REACHED")
+    try vformat_impl(params, builder, parser)
+
+# mark: FormatParser ============================================================================
+
+## Ported from AK/Format.cpp:128 AK::FormatParser::FormatParser.
+pub func format_parser_construct(this: FormatParser*, input: StringView):
+    generic_lexer_construct(&this.generic_lexer, input)
+
+## Ported from AK/Format.cpp:132 AK::FormatParser::consume_literal.
+pub func format_parser_consume_literal(this: FormatParser*) -> StringView:
+    let lexer = &this.generic_lexer
+    let begin = generic_lexer_tell(lexer)
+
+    while not generic_lexer_is_eof(lexer):
+        if generic_lexer_consume_specific_string_view(lexer, sv_of("{{")):
+            continue
+
+        if generic_lexer_consume_specific_string_view(lexer, sv_of("}}")):
+            continue
+
+        # next_is(is_any_of("{}"sv))
+        if generic_lexer_next_is_u8(lexer, '{') or generic_lexer_next_is_u8(lexer, '}'):
+            return string_view_substring_view_usize(&lexer.m_input, begin, generic_lexer_tell(lexer) - begin)
+
+        discard(generic_lexer_consume(lexer))
+
+    return string_view_substring_view(&lexer.m_input, begin)
+
+## Ported from AK/Format.cpp:151 AK::FormatParser::consume_number.
+pub func format_parser_consume_number(this: FormatParser*, value: usize*) -> bool:
+    let lexer = &this.generic_lexer
+    *value = 0
+
+    var consumed_at_least_one = false
+    # next_is(is_ascii_digit)
+    while not generic_lexer_is_eof(lexer) and is_ascii_digit((u32)generic_lexer_peek(lexer)):
+        *value = *value * 10
+        *value = *value + (usize)parse_ascii_digit((u32)generic_lexer_consume(lexer))
+        consumed_at_least_one = true
+
+    return consumed_at_least_one
+
+## Ported from AK/Format.cpp:164 AK::FormatParser::consume_specifier.
+pub func format_parser_consume_specifier(this: FormatParser*, specifier: FormatParserFormatSpecifier*) -> bool:
+    let lexer = &this.generic_lexer
+    assert(not generic_lexer_next_is_u8(lexer, '}'))
+
+    if not generic_lexer_consume_specific_u8(lexer, '{'):
+        return false
+
+    if not format_parser_consume_number(this, &specifier.index):
+        specifier.index = use_next_index
+
+    if generic_lexer_consume_specific_u8(lexer, ':'):
+        let begin = generic_lexer_tell(lexer)
+
+        var level: usize = 1
+        while level > 0:
+            assert(not generic_lexer_is_eof(lexer))
+
+            if generic_lexer_consume_specific_u8(lexer, '{'):
+                level += 1
+                continue
+
+            if generic_lexer_consume_specific_u8(lexer, '}'):
+                level -= 1
+                continue
+
+            discard(generic_lexer_consume(lexer))
+
+        specifier.flags = string_view_substring_view_usize(&lexer.m_input, begin, generic_lexer_tell(lexer) - begin - 1)
+    else:
+        if not generic_lexer_consume_specific_u8(lexer, '}'):
+            trap("VERIFY_NOT_REACHED")
+
+        specifier.flags = sv_of("")
+
+    return true
+
+## Ported from AK/Format.cpp:204 AK::FormatParser::consume_replacement_field.
+pub func format_parser_consume_replacement_field(this: FormatParser*, index: usize*) -> bool:
+    let lexer = &this.generic_lexer
+    if not generic_lexer_consume_specific_u8(lexer, '{'):
+        return false
+
+    if not format_parser_consume_number(this, index):
+        *index = use_next_index
+
+    if not generic_lexer_consume_specific_u8(lexer, '}'):
+        trap("VERIFY_NOT_REACHED")
+
+    return true

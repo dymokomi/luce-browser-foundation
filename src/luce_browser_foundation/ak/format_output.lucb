@@ -1,0 +1,294 @@
+#==============================================================================================
+#
+#   format_output - out, warn and dbg: formatted text to files, stdout and stderr
+#
+#   DESCRIPTION:
+#       Port of AK/Format.cpp lines 1139-1431 (vout, Formatter<Error>, the process and thread
+#       names of rich debug logs, vdbg) and of the out/outln/warn/warnln/dbg/dbgln templates
+#       of AK/Format.h (lines 640-760).
+#
+#       The C++ templates take an AK format string and its arguments. The luce-base entry
+#       points take a formatted string (`ak.dbgln(f"...")`, DESIGN.md §2.10), which is written
+#       as it is; code that needs AK's format specifications formats first (`vformat`,
+#       String::vformatted) or calls vout/vdbg with type-erased arguments. Android's log
+#       sink is not ported.
+#
+#==============================================================================================
+
+extern func fwrite(ptr: const void*?, size: usize, count: usize, stream: SFile*?) -> usize
+extern func ferror(stream: SFile*?) -> i32
+extern func strerror(errnum: i32) -> c.str
+extern func getpid() -> i32
+extern func pthread_self() -> void*?
+extern func pthread_threadid_np(thread: void*?, thread_id: u64*) -> i32
+extern func pthread_getname_np(thread: void*?, name: u8*, length: usize) -> i32
+extern func gettid() -> i32
+extern func getprogname() -> c.str?
+extern var program_invocation_name: c.str?
+extern func GetCurrentProcessId() -> u32
+extern func GetCurrentThreadId() -> u32
+extern func GetLastError() -> u32
+extern func GetModuleFileNameA(module: void*?, filename: u8*, size: u32) -> u32
+extern func FormatMessageA(flags: u32, source: const void*?, message_id: u32, language_id: u32, buffer: u8*, size: u32, arguments: void*?) -> u32
+
+# mark: Output sinks ============================================================================
+
+## A C `FILE*` as a Writer, so a formatted string can be written to it.
+pub struct SFileWriter: io.Writer:
+    pub var file: SFile*?
+
+    pub mutating func write(bytes: const u8[]) -> usize!:
+        return fwrite((const void*?)bytes.data, 1, bytes.length, self.file)
+
+## Writes `text` to standard error, ignoring a failed write (`write(STDERR_FILENO, ...)`).
+func write_to_stderr(text: StringView):
+    discard(io.stderr().write(string_view_bytes(&text)) else 0)
+
+## The length of the NUL-terminated text at `text` (strlen).
+func c_string_length(text: const u8*) -> usize:
+    var length: usize = 0
+    while text[length] != 0:
+        length += 1
+    return length
+
+# mark: vout ====================================================================================
+
+## Ported from AK/Format.cpp:1141 AK::vout: formats `fmtstr` with `params` and writes it (and a
+## newline when `newline`) to `file`.
+pub func vout(file: SFile*?, fmtstr: StringView, params: TypeErasedFormatParams*, newline: bool = false):
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    vformat(&builder, fmtstr, params) else trap("MUST: vformat")
+
+    if newline:
+        string_builder_append_u8(&builder, '\n')
+
+    let string = string_builder_string_view(&builder)
+    let retval = fwrite((const void*?)string_view_characters_without_null_termination(&string), 1, string_view_length(&string), file)
+    if retval != string_view_length(&string):
+        let error_ = ferror(file)
+        let message = str((c.str)strerror(error_)) else "?"
+        dbgln(f"vout() failed ({retval} written out of {string_view_length(&string)}), error was {error_} ({message})")
+
+# mark: Formatter<Error> ========================================================================
+
+## Ported from AK/Format.cpp:1159 AK::Formatter<Error>::format_windows_error (the per-thread
+## cache of messages is not kept: FormatMessage is asked each time).
+func formatter_error_format_windows_error(this: StandardFormatter*, builder: FormatBuilder*, error_: const AkError*) -> !:
+    if os.windows:
+        let code = (u32)ak_error_code(error_)
+
+        var message: u8[256]
+        # FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT)
+        let size = FormatMessageA(0x1000 | 0x200, none, code, 0x400, &message[0], 256, none)
+        if size == 0:
+            let format_error = GetLastError()
+            return try formatter_format_string_format(this, builder, sv_of("Error {:08x} when formatting code {:08x}"), [arg_u64((u64)format_error), arg_u64((u64)code)])
+
+        var text: StringView
+        string_view_construct_span_u8(&text, message[0..<(usize)size])
+        return try formatter_format_string_format(this, builder, sv_of("Error {:x}: {}"), [arg_u64((u64)code), arg_string_view(text)])
+    else:
+        trap("VERIFY_NOT_REACHED")
+
+## Ported from AK/Format.cpp:1195 AK::Formatter<Error>::format.
+pub func formatter_error_format(this: StandardFormatter*, builder: FormatBuilder*, error_: const AkError*) -> !:
+    match ak_error_kind(error_):
+        .syscall:
+            return try formatter_format_string_format(this, builder, sv_of("{}: {} (errno={})"), [arg_string_view(ak_error_string_literal(error_)), arg_c_string((const u8*)strerror(ak_error_code(error_))), arg_i64((i64)ak_error_code(error_))])
+        .errno:
+            return try formatter_format_string_format(this, builder, sv_of("{} (errno={})"), [arg_c_string((const u8*)strerror(ak_error_code(error_))), arg_i64((i64)ak_error_code(error_))])
+        .windows:
+            return try formatter_error_format_windows_error(this, builder, error_)
+        .string_literal:
+            return try formatter_format_string_format(this, builder, sv_of("{}"), [arg_string_view(ak_error_string_literal(error_))])
+        _:
+            trap("VERIFY_NOT_REACHED")
+
+## __format_value<Error>: `value` points at an AkError.
+pub func format_value_error(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_error_format(&formatter, builder, (const AkError*)format_value_target(value))
+
+# mark: Process and thread names ================================================================
+
+## Ported from AK/Format.cpp:1246 AK::process_name_helper.
+# FIXME: Deduplicate with Core::Process:get_name()
+func process_name_helper() -> ByteString:
+    var name: ByteString = ---
+    if os.macos:
+        byte_string_construct_string_view(&name, c_string_view(getprogname()))
+    elif os.linux:
+        byte_string_construct_string_view(&name, c_string_view(program_invocation_name))
+    elif os.windows:
+        var path: u8[260]
+        let length = GetModuleFileNameA(none, &path[0], 260)
+        var view: StringView
+        string_view_construct_span_u8(&view, path[0..<(usize)length])
+        byte_string_construct_string_view(&name, view)
+    else:
+        # FIXME: Implement process_name_helper() for other platforms.
+        byte_string_construct_string_view(&name, sv_of(""))
+    return name
+
+## A StringView of NUL-terminated C text, or an empty one for none.
+func c_string_view(text: c.str?) -> StringView:
+    if let characters = text:
+        let bytes = (const u8*)characters
+        var view: StringView
+        string_view_construct_span_u8(&view, u8[]((u8*)bytes, c_string_length(bytes)))
+        return view
+    return sv_of("")
+
+var process_name_buf: u8[256]
+var process_name: StringView
+var process_name_retrieved: bool
+
+## Ported from AK/Format.cpp:1269 AK::process_name_for_logging.
+func process_name_for_logging() -> StringView:
+    # NOTE: We use AK::Format in the DynamicLoader and LibC, which cannot use thread-safe statics
+    # Also go to extraordinary lengths here to avoid strlen() on the process name every call to dbgln
+    if not process_name_retrieved:
+        var path: LexicalPath = ---
+        lexical_path_construct(&path, process_name_helper())
+        process_name_retrieved = true
+        let title = lexical_path_title(&path)
+        discard(string_view_copy_characters_to_buffer(&title, &process_name_buf[0], process_name_buf.length))
+        string_view_construct_span_u8(&process_name, process_name_buf[0..<c_string_length(&process_name_buf[0])])
+    return process_name
+
+## Ported from AK/Format.cpp:1287 AK::set_debug_enabled.
+pub func set_debug_enabled(value: bool):
+    is_debug_enabled = value
+
+## Ported from AK/Format.cpp:1300 AK::set_rich_debug_enabled.
+pub func set_rich_debug_enabled(value: bool):
+    is_rich_debug_enabled = value
+
+## Ported from AK/Format.cpp:1308 AK::current_process_id.
+func current_process_id() -> i64:
+    if os.windows:
+        return (i64)GetCurrentProcessId()
+    else:
+        return (i64)getpid()
+
+## Ported from AK/Format.cpp:1317 AK::current_thread_id.
+func current_thread_id() -> u64:
+    if os.linux:
+        return (u64)gettid()
+    elif os.windows:
+        return (u64)GetCurrentThreadId()
+    else:
+        var thread_id: u64 = 0
+        discard(pthread_threadid_np(none, &thread_id))
+        return thread_id
+
+# mark: vdbg ====================================================================================
+
+let default_format = "\u{1B}[0m"
+let bold_yellow_format = "\u{1B}[33;1m"
+
+## The prefix vdbg puts before a rich debug message (`<time> <process>(<pid>) <thread>(<tid>): `).
+func vdbg_append_rich_prefix(builder: StringBuilder*):
+    let name = process_name_for_logging()
+    if string_view_is_empty(&name):
+        return
+    let time = monotonic_time_now_coarse()
+    vformat_arguments(builder, sv_of("{}.{:03} \u{1B}[33;1m{}"), [arg_i64(monotonic_time_truncated_seconds(&time)), arg_i64(monotonic_time_nanoseconds_within_second(&time) // 1000000), arg_string_view(name)]) else trap("MUST: appendff")
+    let process_id = current_process_id()
+    vformat_arguments(builder, sv_of("({})"), [arg_i64(process_id)]) else trap("MUST: appendff")
+    let thread_id = current_thread_id()
+
+    if not s_main_thread_id_initialized:
+        s_main_thread_id = thread_id
+        s_main_thread_id_initialized = true
+    if thread_id != s_main_thread_id:
+        var thread_name: u8[16]
+        var thread_name_result: i32 = -1
+        if not os.windows:
+            thread_name_result = pthread_getname_np(pthread_self(), &thread_name[0], thread_name.length)
+        if thread_name_result == 0 and c_string_length(&thread_name[0]) > 0:
+            var name_view: StringView
+            string_view_construct_span_u8(&name_view, thread_name[0..<c_string_length(&thread_name[0])])
+            vformat_arguments(builder, sv_of(" {}"), [arg_string_view(name_view)]) else trap("MUST: appendff")
+        else:
+            string_builder_append_string_view(builder, sv_of(" Thread"))
+        vformat_arguments(builder, sv_of("({})"), [arg_u64(thread_id)]) else trap("MUST: appendff")
+    string_builder_append_string_view(builder, sv_of(default_format))
+    string_builder_append_string_view(builder, sv_of(": "))
+
+## Ported from AK/Format.cpp:1372 AK::vdbg: a debug message to standard error, with the rich
+## prefix when enabled.
+pub func vdbg(fmtstr: StringView, params: TypeErasedFormatParams*, newline: bool = false):
+    if not is_debug_enabled:
+        return
+
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+
+    if is_rich_debug_enabled:
+        vdbg_append_rich_prefix(&builder)
+
+    vformat(&builder, fmtstr, params) else trap("MUST: vformat")
+    if newline:
+        string_builder_append_u8(&builder, '\n')
+    write_to_stderr(string_builder_string_view(&builder))
+
+# mark: out, warn, dbg ==========================================================================
+
+## Ported from AK/Format.h:618 AK::out(FILE*, ...): writes `message` to `file`.
+pub func out_s_file(file: SFile*?, message: fmt):
+    var writer = SFileWriter(file = file)
+    discard(writer.write(message) else 0)
+
+## Ported from AK/Format.h:625 AK::outln(FILE*, ...) and AK/Format.h:636 AK::outln(FILE*):
+## writes `message` and a newline to `file`.
+pub func outln_s_file(file: SFile*?, message: fmt = ""):
+    var writer = SFileWriter(file = file)
+    discard(writer.write(message) else 0)
+    discard(writer.write(b"\n") else 0)
+
+## Ported from AK/Format.h:639 AK::out: writes `message` to standard output.
+pub func out(message: fmt):
+    discard(io.stdout().write(message) else 0)
+
+## Ported from AK/Format.h:645 AK::outln and AK/Format.h:648 AK::outln(): writes `message` and a
+## newline to standard output.
+pub func outln(message: fmt = ""):
+    discard(io.stdout().write(message) else 0)
+    discard(io.stdout().write(b"\n") else 0)
+
+## Ported from AK/Format.h:651 AK::warn: writes `message` to standard error.
+pub func warn(message: fmt):
+    discard(io.stderr().write(message) else 0)
+
+## Ported from AK/Format.h:656 AK::warnln and AK/Format.h:659 AK::warnln(): writes `message` and a
+## newline to standard error.
+pub func warnln(message: fmt = ""):
+    discard(io.stderr().write(message) else 0)
+    discard(io.stderr().write(b"\n") else 0)
+
+## Ported from AK/Format.h:735 AK::dbg: a debug message (see vdbg) without a newline.
+pub func dbg(message: fmt):
+    if not is_debug_enabled:
+        return
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    if is_rich_debug_enabled:
+        vdbg_append_rich_prefix(&builder)
+    write_to_stderr(string_builder_string_view(&builder))
+    discard(io.stderr().write(message) else 0)
+
+## Ported from AK/Format.h:741 AK::dbgln and AK/Format.h:743 AK::dbgln(): a debug message (see
+## vdbg) and a newline.
+pub func dbgln(message: fmt = ""):
+    if not is_debug_enabled:
+        return
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    if is_rich_debug_enabled:
+        vdbg_append_rich_prefix(&builder)
+    write_to_stderr(string_builder_string_view(&builder))
+    discard(io.stderr().write(message) else 0)
+    discard(io.stderr().write(b"\n") else 0)

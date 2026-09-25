@@ -1,0 +1,58 @@
+#==============================================================================================
+#
+#   byte_sequences - byte-lowercase, byte-uppercase and the byte-sequence orderings
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibWeb/Infra/ByteSequences.cpp (lines 1-57) and ByteSequences.h.
+#       ReadonlyBytes is `const u8[]`; Span::starts_with is written out (spans are native in
+#       luce-base, so AK::Span has no functions of its own).
+#
+#==============================================================================================
+
+## Ported from Libraries/LibWeb/Infra/ByteSequences.cpp:13 Web::Infra::byte_lowercase.
+# https://infra.spec.whatwg.org/#byte-lowercase
+pub func byte_lowercase(bytes: ak.ByteBuffer*):
+    # To byte-lowercase a byte sequence, increase each byte it contains, in the range 0x41 (A) to 0x5A (Z), inclusive, by 0x20.
+    for i in 0..<ak.byte_buffer_size(bytes):
+        let byte = ak.byte_buffer_at(bytes, i)
+        *byte = (u8)ak.to_ascii_lowercase((u32)*byte)
+
+## Ported from Libraries/LibWeb/Infra/ByteSequences.cpp:21 Web::Infra::byte_uppercase.
+# https://infra.spec.whatwg.org/#byte-uppercase
+pub func byte_uppercase(bytes: ak.ByteBuffer*):
+    # To byte-uppercase a byte sequence, subtract each byte it contains, in the range 0x61 (a) to 0x7A (z), inclusive, by 0x20.
+    for i in 0..<ak.byte_buffer_size(bytes):
+        let byte = ak.byte_buffer_at(bytes, i)
+        *byte = (u8)ak.to_ascii_uppercase((u32)*byte)
+
+## Ported from Libraries/LibWeb/Infra/ByteSequences.cpp:29 Web::Infra::is_prefix_of.
+# https://infra.spec.whatwg.org/#byte-sequence-starts-with
+pub func is_prefix_of(potential_prefix: const u8[], input: const u8[]) -> bool:
+    # "input starts with potentialPrefix" can be used as a synonym for "potentialPrefix is a prefix of input".
+    # input.starts_with(potential_prefix) (AK::Span::starts_with)
+    if input.length < potential_prefix.length:
+        return false
+    for i in 0..<potential_prefix.length:
+        if input[i] != potential_prefix[i]:
+            return false
+    return true
+
+## Ported from Libraries/LibWeb/Infra/ByteSequences.cpp:36 Web::Infra::is_byte_less_than.
+# https://infra.spec.whatwg.org/#byte-less-than
+pub func is_byte_less_than(a: const u8[], b: const u8[]) -> bool:
+    # 1. If b is a prefix of a, then return false.
+    if is_prefix_of(b, a):
+        return false
+
+    # 2. If a is a prefix of b, then return true.
+    if is_prefix_of(a, b):
+        return true
+
+    # 3. Let n be the smallest index such that the nth byte of a is different from the nth byte of b.
+    #    (There has to be such an index, since neither byte sequence is a prefix of the other.)
+    # 4. If the nth byte of a is less than the nth byte of b, then return true.
+    # 5. Return false.
+    for i in 0..<a.length:
+        if a[i] != b[i]:
+            return a[i] < b[i]
+    trap("VERIFY_NOT_REACHED")

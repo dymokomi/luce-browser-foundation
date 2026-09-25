@@ -1,0 +1,143 @@
+#==============================================================================================
+#
+#   tests_strings - tests of web_infra
+#
+#   DESCRIPTION:
+#       Port of Tests/LibWeb/TestStrings.cpp (Ladybird 47c82b38d0; is_code_unit_prefix), and
+#       tests of the other Infra helpers, pinned to the reference build's results. The tests
+#       that go through ak's String, Utf16String, StringBuilder and ByteBuffer (regions r01 and
+#       r02) run only when web_infra_tests_use_other_regions is set: until those regions are
+#       merged they are stubs that trap.
+#
+#==============================================================================================
+
+## Whether the tests that go through other regions' ak functions run; set to true when r01
+## and r02 are merged.
+var web_infra_tests_use_other_regions: bool = false
+
+## A StringView of a string literal.
+func sv(text: str) -> ak.StringView:
+    return ak.literalsv_u8(text.bytes.data, text.length)
+
+## A StringView over bytes that need not be UTF-8.
+func sv_bytes(bytes: const u8[]) -> ak.StringView:
+    return ak.literalsv_u8(bytes.data, bytes.length)
+
+## The text of a String.
+func text_of(string: ak.String) -> str:
+    let view = ak.string_bytes_as_string_view(&string)
+    return (str)ak.string_view_bytes(&view)
+
+## The text of a Utf16String, converted to UTF-8.
+func text_of_utf16(string: ak.Utf16String) -> str:
+    return text_of(ak.utf16_string_base_to_utf8(&string.utf16_string_base))
+
+## A String of a string literal.
+func string_of(text: str) -> ak.String:
+    return ak.string_from_utf8(sv(text)) else trap("MUST: String::from_utf8")
+
+# mark: Without other regions ===================================================================
+
+test "is_ascii_whitespace":
+    let whitespace: u32[5] = [0x09, 0x0a, 0x0c, 0x0d, 0x20]
+    for code_point in whitespace:
+        assert(is_ascii_whitespace(code_point))
+    # U+000B VT is not ASCII whitespace in Infra (it is in AK::is_ascii_space).
+    let not_whitespace: u32[5] = [0x0b, 0x00, 0x41, 0xa0, 0x3000]
+    for code_point in not_whitespace:
+        assert(not is_ascii_whitespace(code_point))
+    assert(ascii_whitespace == "\t\n\u{C}\r ")
+    for code_point in ascii_whitespace_code_points:
+        assert(is_ascii_whitespace(code_point))
+
+test "byte_sequence_prefix_and_order":
+    assert(is_prefix_of("ab".bytes, "abc".bytes))
+    assert(not is_prefix_of("abc".bytes, "ab".bytes))
+    assert(is_prefix_of("".bytes, "abc".bytes))
+    assert(is_byte_less_than("abc".bytes, "abd".bytes))
+    assert(is_byte_less_than("ab".bytes, "abc".bytes))
+    assert(not is_byte_less_than("abc".bytes, "ab".bytes))
+    assert(not is_byte_less_than("abc".bytes, "abc".bytes))
+
+# mark: TestStrings.cpp =========================================================================
+
+test "is_code_unit_prefix":
+    if not web_infra_tests_use_other_regions: return
+
+    # Basic prefix match
+    assert(is_code_unit_prefix(sv("abc"), sv("abcde")))
+
+    # Exact match
+    assert(is_code_unit_prefix(sv("abc"), sv("abc")))
+
+    # Empty prefix
+    assert(is_code_unit_prefix(sv(""), sv("abc")))
+
+    # Empty input string
+    assert(not is_code_unit_prefix(sv("abc"), sv("")))
+
+    # Both strings empty
+    assert(is_code_unit_prefix(sv(""), sv("")))
+
+    # Prefix longer than input string
+    assert(not is_code_unit_prefix(sv("abcdef"), sv("abc")))
+
+    # Non-ASCII characters
+    assert(is_code_unit_prefix(sv("こんにちは"), sv("こんにちは世界")))
+    assert(not is_code_unit_prefix(sv("世界"), sv("こんにちは世界")))
+
+    assert(is_code_unit_prefix(sv("こ"), sv("こん")))
+    assert(not is_code_unit_prefix(sv("こん"), sv("こ")))
+
+    # Special characters
+    assert(is_code_unit_prefix(sv("!@#"), sv("!@#$%^")))
+    assert(not is_code_unit_prefix(sv("!@#$"), sv("!@#")))
+
+    # Case sensitivity
+    assert(not is_code_unit_prefix(sv("abc"), sv("ABC")))
+    assert(not is_code_unit_prefix(sv("ABC"), sv("abc")))
+
+# mark: Reference-build cases ===================================================================
+
+test "normalize_newlines":
+    if not web_infra_tests_use_other_regions: return
+    assert(text_of(normalize_newlines_string(string_of("a\r\nb\rc\n\r\r\nd"))) == "a\nb\nc\n\n\nd")
+    assert(text_of(normalize_newlines_string(string_of("abc"))) == "abc")
+    let utf16 = ak.utf16_string_from_utf8_string_view(sv("x\r\ny\rz\r"))
+    assert(text_of_utf16(normalize_newlines_utf16_string(utf16)) == "x\ny\nz\n")
+
+test "strip_and_collapse_whitespace":
+    if not web_infra_tests_use_other_regions: return
+    let collapsed = strip_and_collapse_whitespace_string_view(sv("  a \t\n b\u{C}\u{C}c   ")) else trap("MUST")
+    assert(text_of(collapsed) == "a b c")
+    # U+000B VT is not ASCII whitespace.
+    let vertical_tab = strip_and_collapse_whitespace_string_view(sv("\u{B} a\u{B}b ")) else trap("MUST")
+    assert(text_of(vertical_tab) == "\u{B} a\u{B}b")
+    let utf16 = ak.utf16_string_from_utf8_string_view(sv("  a \t\n b\u{C}\u{C}c   "))
+    assert(text_of_utf16(strip_and_collapse_whitespace_utf16_string(utf16)) == "a b c")
+    let unchanged = ak.utf16_string_from_utf8_string_view(sv("abc"))
+    assert(text_of_utf16(strip_and_collapse_whitespace_utf16_string(unchanged)) == "abc")
+
+test "convert_to_scalar_value_string":
+    if not web_infra_tests_use_other_regions: return
+    # An encoded lone surrogate (U+D800) becomes U+FFFD.
+    let converted = convert_to_scalar_value_string(sv_bytes(b"a\xed\xa0\x80z")) else trap("MUST")
+    assert(text_of(converted) == "a\u{FFFD}z")
+
+test "code_unit_less_than":
+    if not web_infra_tests_use_other_regions: return
+    assert(code_unit_less_than(sv("abc"), sv("abd")))
+    assert(not code_unit_less_than(sv("abd"), sv("abc")))
+    assert(code_unit_less_than(sv("ab"), sv("abc")))
+    # U+FFFF is one code unit, U+10000 two starting with 0xD800: code-unit order differs from
+    # code-point order.
+    assert(not code_unit_less_than(sv("\u{FFFF}"), sv("\u{10000}")))
+    assert(code_unit_less_than(sv("\u{10000}"), sv("\u{FFFF}")))
+
+test "byte_lowercase_and_uppercase":
+    if not web_infra_tests_use_other_regions: return
+    var buffer = ak.byte_buffer_copy_span_u8("Hello, WORLD 123".bytes) else trap("MUST")
+    byte_lowercase(&buffer)
+    assert((str)ak.byte_buffer_bytes_const(&buffer) == "hello, world 123")
+    byte_uppercase(&buffer)
+    assert((str)ak.byte_buffer_bytes_const(&buffer) == "HELLO, WORLD 123")

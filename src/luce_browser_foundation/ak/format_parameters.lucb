@@ -1,0 +1,292 @@
+#==============================================================================================
+#
+#   format_parameters - type-erased format arguments and the formatter entry of each kind
+#
+#   DESCRIPTION:
+#       Port of the inline half of AK/Format.h (lines 1-367): __format_value, the
+#       TypeErasedParameter kinds, FormatBuilder's inline members and TypeErasedFormatParams.
+#
+#       C++ builds the arguments of `format("{} {}", a, b)` with a variadic template
+#       (VariadicFormatParams) that erases each argument to a TypeErasedParameter and, for any
+#       other type, remembers `__format_value<T>` as its formatter. luce-base has neither
+#       variadic functions nor templates that pick a formatter by type, so a caller writes the
+#       erased arguments itself, one `arg_*` call per argument, and hands the span to
+#       `vformat_arguments` (or builds a TypeErasedFormatParams with
+#       `type_erased_format_params_create` for `vformat`, String::vformatted and friends):
+#
+#           try ak.vformat_arguments(&builder, sv, [ak.arg_u64(x), ak.arg_custom(&v, ak.format_value_json_value)])
+#
+#       A custom type's formatter is any function with the CustomType formatter signature;
+#       `format_value_<type>` are the ported ones. The generic `__format_value<T>` becomes one
+#       such function per type, and TypeErasedParameter::visit becomes a `match` at its two
+#       users (vformat_impl and to_size).
+#
+#==============================================================================================
+
+# mark: Helpers =================================================================================
+
+## A StringView of a luce-base string literal: AK's `"..."sv`.
+func sv_of(text: str) -> StringView:
+    return literalsv_u8(text.bytes.data, text.length)
+
+## The largest usize: NumericLimits<size_t>::max().
+let size_max: usize = ~(usize)0
+
+## Ported from AK/Format.h:41 AK::is_debug_only_formatter. Only Formatter<ErrorOr<T>> is
+## debug-only in AK; ErrorOr<T> is `T!` in luce-base and never a value to format, so no
+## formatter of the port is.
+pub func is_debug_only_formatter[TFormatter]() -> bool:
+    return false
+
+# mark: __format_value ==========================================================================
+
+## The default Formatter<T> state: StandardFormatter's default member initializers.
+pub func standard_formatter_construct(this: StandardFormatter*):
+    standard_formatter_init_fields(this)
+
+## A default-constructed StandardFormatter (`Formatter<T> formatter;`).
+pub func standard_formatter_create() -> StandardFormatter:
+    var formatter: StandardFormatter
+    standard_formatter_construct(&formatter)
+    return formatter
+
+## The value behind a CustomType or parameter pointer; C++ dereferences it unchecked.
+func format_value_target(value: const void*?) -> const void*:
+    return value else trap("VERIFY_NOT_REACHED: null format value")
+
+## Ported from AK/Format.h:55 AK::__format_value<u64> (TypeErasedParameter::Type::UnsignedInteger).
+pub func format_value_u64(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_u64_format(&formatter, builder, *(const u64*)format_value_target(value))
+
+## Ported from AK/Format.h:55 AK::__format_value<i64> (TypeErasedParameter::Type::SignedInteger).
+pub func format_value_i64(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_i64_format(&formatter, builder, *(const i64*)format_value_target(value))
+
+## Ported from AK/Format.h:55 AK::__format_value<bool> (TypeErasedParameter::Type::Boolean).
+pub func format_value_bool(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_bool_format(&formatter, builder, *(const bool*)format_value_target(value))
+
+## Ported from AK/Format.h:55 AK::__format_value<char> (TypeErasedParameter::Type::Character).
+pub func format_value_char(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_char_format(&formatter, builder, *(const u8*)format_value_target(value))
+
+## Ported from AK/Format.h:55 AK::__format_value<float> (TypeErasedParameter::Type::Float).
+pub func format_value_f32(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_f32_format(&formatter, builder, *(const f32*)format_value_target(value))
+
+## Ported from AK/Format.h:55 AK::__format_value<double> (TypeErasedParameter::Type::Double).
+pub func format_value_f64(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_f64_format(&formatter, builder, *(const f64*)format_value_target(value))
+
+## Ported from AK/Format.h:55 AK::__format_value<StringView> (TypeErasedParameter::Type::StringView).
+pub func format_value_string_view(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_string_view_format(&formatter, builder, *(const StringView*)format_value_target(value))
+
+## Ported from AK/Format.h:55 AK::__format_value<char const*> (TypeErasedParameter::Type::CString).
+pub func format_value_c_string(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_c_string_format(&formatter, builder, *(const (const u8*?)*)format_value_target(value))
+
+# mark: TypeErasedParameter =====================================================================
+
+## Ported from AK/Format.h:85 AK::TypeErasedParameter::TypeErasedParameter (template<Unsigned U>):
+## an unsigned integer of any width, kept as u64.
+pub func type_erased_parameter_construct_u64(this: TypeErasedParameter*, value: u64):
+    this.value.as_unsigned = value
+    this.type_ = TypeErasedParameterType.unsigned_integer
+
+## Ported from AK/Format.h:92 AK::TypeErasedParameter::TypeErasedParameter (template<Signed I>):
+## a signed integer of any width, kept as i64.
+pub func type_erased_parameter_construct_i64(this: TypeErasedParameter*, value: i64):
+    this.value.as_signed = value
+    this.type_ = TypeErasedParameterType.signed_integer
+
+## Ported from AK/Format.h:100 AK::TypeErasedParameter::TypeErasedParameter.
+pub func type_erased_parameter_construct_bool(this: TypeErasedParameter*, value: bool):
+    this.value.as_bool = value
+    this.type_ = TypeErasedParameterType.boolean
+
+## Ported from AK/Format.h:106 AK::TypeErasedParameter::TypeErasedParameter (a `char`).
+pub func type_erased_parameter_construct_u8(this: TypeErasedParameter*, value: u8):
+    this.value.as_char = value
+    this.type_ = TypeErasedParameterType.character
+
+## Ported from AK/Format.h:112 AK::TypeErasedParameter::TypeErasedParameter.
+pub func type_erased_parameter_construct_f32(this: TypeErasedParameter*, value: f32):
+    this.value.as_float = value
+    this.type_ = TypeErasedParameterType.float
+
+## Ported from AK/Format.h:118 AK::TypeErasedParameter::TypeErasedParameter.
+pub func type_erased_parameter_construct_f64(this: TypeErasedParameter*, value: f64):
+    this.value.as_double = value
+    this.type_ = TypeErasedParameterType.double
+
+## Ported from AK/Format.h:124 AK::TypeErasedParameter::TypeErasedParameter.
+pub func type_erased_parameter_construct_string_view(this: TypeErasedParameter*, value: StringView):
+    this.value.as_string_view = value
+    this.type_ = TypeErasedParameterType.string_view
+
+## Ported from AK/Format.h:130 AK::TypeErasedParameter::TypeErasedParameter (a `char const*`).
+pub func type_erased_parameter_construct_u8_2(this: TypeErasedParameter*, value: const u8*?):
+    this.value.as_c_string = value
+    this.type_ = TypeErasedParameterType.c_string
+
+## Ported from AK/Format.h:136 AK::TypeErasedParameter::TypeErasedParameter (template<typename T>):
+## any other type, formatted by `formatter` (a `format_value_<type>` function).
+pub func type_erased_parameter_construct_custom(this: TypeErasedParameter*, value: const void*, formatter: func(TypeErasedFormatParams*, FormatBuilder*, FormatParser*, const void*?) -> unit!):
+    this.value.as_custom_type = TypeErasedParameterCustomType(value = value, formatter = formatter)
+    this.type_ = TypeErasedParameterType.custom_type
+
+## Ported from AK/Format.h:169 AK::TypeErasedParameter::to_size (the visit is a match).
+pub func type_erased_parameter_to_size(this: const TypeErasedParameter*) -> usize:
+    match this.type_:
+        .unsigned_integer:
+            return (usize)this.value.as_unsigned
+        .signed_integer:
+            assert(this.value.as_signed >= 0)
+            return (usize)this.value.as_signed
+        _:
+            trap("TODO")
+
+# mark: FormatBuilder ===========================================================================
+
+## Ported from AK/Format.h:219 AK::FormatBuilder::FormatBuilder.
+pub func format_builder_construct(this: FormatBuilder*, builder: StringBuilder*):
+    this.m_builder = builder
+
+## Ported from AK/Format.h:307 AK::FormatBuilder::builder.
+pub func format_builder_builder_const(this: const FormatBuilder*) -> const StringBuilder*:
+    return this.m_builder
+
+## Ported from AK/Format.h:311 AK::FormatBuilder::builder.
+pub func format_builder_builder(this: FormatBuilder*) -> StringBuilder*:
+    return this.m_builder
+
+# mark: TypeErasedFormatParams ==================================================================
+
+## Ported from AK/Format.h:332 AK::TypeErasedFormatParams::TypeErasedFormatParams. The C++
+## parameters follow the object (a trailing array filled by VariadicFormatParams); here they
+## are a separate array that m_parameters points to.
+pub func type_erased_format_params_construct(this: TypeErasedFormatParams*, size: u32):
+    this.m_size = size
+    this.m_next_index = 0
+
+## VariadicFormatParams<...>(parameters...) (AK/Format.h:352): format parameters over a span of
+## erased arguments, which must outlive them.
+pub func type_erased_format_params_create(parameters: const TypeErasedParameter[]) -> TypeErasedFormatParams:
+    assert(parameters.length <= max_format_arguments)
+    var params: TypeErasedFormatParams
+    type_erased_format_params_construct(&params, (u32)parameters.length)
+    if parameters.length > 0:
+        params.m_parameters = (TypeErasedParameter*?)parameters.data
+    return params
+
+## Ported from AK/Format.h:337 AK::TypeErasedFormatParams::parameters.
+pub func type_erased_format_params_parameters(this: const TypeErasedFormatParams*) -> const TypeErasedParameter[]:
+    if let parameters = this.m_parameters:
+        return TypeErasedParameter[](parameters, (usize)this.m_size)
+    var empty: const TypeErasedParameter[]
+    return empty
+
+## Ported from AK/Format.h:339 AK::TypeErasedFormatParams::take_next_index.
+pub func type_erased_format_params_take_next_index(this: TypeErasedFormatParams*) -> usize:
+    let index = this.m_next_index
+    this.m_next_index += 1
+    return (usize)index
+
+# mark: Luce entry points =======================================================================
+
+## An unsigned integer argument (`TypeErasedParameter { value }` for an unsigned value).
+pub func arg_u64(value: u64) -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    type_erased_parameter_construct_u64(&parameter, value)
+    return parameter
+
+## A signed integer argument (`TypeErasedParameter { value }` for a signed value).
+pub func arg_i64(value: i64) -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    type_erased_parameter_construct_i64(&parameter, value)
+    return parameter
+
+## A bool argument.
+pub func arg_bool(value: bool) -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    type_erased_parameter_construct_bool(&parameter, value)
+    return parameter
+
+## A `char` argument.
+pub func arg_char(value: u8) -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    type_erased_parameter_construct_u8(&parameter, value)
+    return parameter
+
+## A `float` argument.
+pub func arg_f32(value: f32) -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    type_erased_parameter_construct_f32(&parameter, value)
+    return parameter
+
+## A `double` argument.
+pub func arg_f64(value: f64) -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    type_erased_parameter_construct_f64(&parameter, value)
+    return parameter
+
+## A StringView argument.
+pub func arg_string_view(value: StringView) -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    type_erased_parameter_construct_string_view(&parameter, value)
+    return parameter
+
+## A string literal argument (a StringView of `value`).
+pub func arg_str(value: str) -> TypeErasedParameter:
+    return arg_string_view(sv_of(value))
+
+## A `char const*` argument: NUL-terminated text, or none (formatted as "(null)").
+pub func arg_c_string(value: const u8*?) -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    type_erased_parameter_construct_u8_2(&parameter, value)
+    return parameter
+
+## An argument of any other type: `value` points at it (and must outlive the formatting) and
+## `formatter` formats it (a `format_value_<type>` function, or the caller's own).
+pub func arg_custom(value: const void*, formatter: func(TypeErasedFormatParams*, FormatBuilder*, FormatParser*, const void*?) -> unit!) -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    type_erased_parameter_construct_custom(&parameter, value, formatter)
+    return parameter
+
+## Formats `fmtstr` with `arguments` onto `builder`: StringBuilder::try_appendff's body.
+pub func vformat_arguments(builder: StringBuilder*, fmtstr: StringView, arguments: const TypeErasedParameter[]) -> !:
+    var params = type_erased_format_params_create(arguments)
+    try vformat(builder, fmtstr, &params)
+
+## Appends `value` as `appendff("{}", value)` does (the float format of AK dumps, DESIGN.md §2.11).
+pub func format_f64(builder: StringBuilder*, value: f64):
+    vformat_arguments(builder, sv_of("{}"), [arg_f64(value)]) else trap("MUST: format_f64")
+
+## Appends `value` as `appendff("{}", value)` does for a float.
+pub func format_f32(builder: StringBuilder*, value: f32):
+    vformat_arguments(builder, sv_of("{}"), [arg_f32(value)]) else trap("MUST: format_f32")
+
+## Appends `value` as `appendff("{}", value)` does for a signed integer.
+pub func format_i64(builder: StringBuilder*, value: i64):
+    vformat_arguments(builder, sv_of("{}"), [arg_i64(value)]) else trap("MUST: format_i64")
+
+## Appends `value` as `appendff("{}", value)` does for an unsigned integer.
+pub func format_u64(builder: StringBuilder*, value: u64):
+    vformat_arguments(builder, sv_of("{}"), [arg_u64(value)]) else trap("MUST: format_u64")

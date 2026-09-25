@@ -1,0 +1,206 @@
+#==============================================================================================
+#
+#   tests_generic_shorthands - tests of generic_shorthands
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestGenericShorthands.cpp (Ladybird 47c82b38d0). The C++ checks each
+#       case twice, with static_assert and EXPECT; luce-base has no compile-time evaluation of
+#       calls, so each is checked once. The values after the first are an array; an empty
+#       pack is an empty span.
+#
+#==============================================================================================
+
+# mark: TestGenericShorthands.cpp ===============================================================
+
+test "first_is_one_of":
+    var no_values: i64[]
+    # Finds item if in list of arguments
+    assert(first_is_one_of(3, [1, 2, 3, 4, 5]))
+
+    # Finds item when single value in list
+    assert(first_is_one_of(42, [42]))
+
+    # Finds item when duplicate values in list
+    assert(first_is_one_of(42, [42, 42]))
+
+    # Doesn't find items not in list
+    assert(not first_is_one_of(10, [1, 2, 3, 4, 5]))
+
+    # Doesn't find item when single value in list
+    assert(not first_is_one_of(10, [1]))
+
+    # Doesn't find items when duplicate values in list
+    assert(not first_is_one_of(10, [1, 1]))
+
+    # Doesn't find item when empty list
+    assert(not first_is_one_of(10, no_values))
+
+test "first_is_smaller_or_equal_than_one_of":
+    var no_values: i64[]
+    # Finds smaller items
+    assert(first_is_smaller_or_equal_than_one_of(1, [1, -2, 3, -4, 5]))
+
+    assert(first_is_smaller_or_equal_than_one_of(-10, [1, -2, 3, -4, 5]))
+
+    assert(first_is_smaller_or_equal_than_one_of(42, [43]))
+
+    # Find equal items
+    assert(first_is_smaller_or_equal_than_one_of(1, [1, -2, 3, -4, 5]))
+
+    assert(first_is_smaller_or_equal_than_one_of(-2, [1, -2, 3, -4, 5]))
+
+    assert(first_is_smaller_or_equal_than_one_of(42, [42]))
+
+    # Doesn't find larger items
+    assert(not first_is_smaller_or_equal_than_one_of(10, [1, 2, 3, 4, 5]))
+
+    # Doesn't find item when empty list
+    assert(not first_is_smaller_or_equal_than_one_of(10, no_values))
+
+test "first_is_smaller_than_one_of":
+    var no_values: i64[]
+    # Finds smaller items
+    assert(first_is_smaller_than_one_of(1, [1, -2, 3, -4, 5]))
+
+    assert(first_is_smaller_than_one_of(-10, [1, -2, 3, -4, 5]))
+
+    assert(first_is_smaller_than_one_of(42, [43]))
+
+    # Doesn't find equal items
+    assert(not first_is_smaller_than_one_of(5, [1, -2, 3, -4, 5]))
+
+    # Doesn't find larger items
+    assert(not first_is_smaller_than_one_of(10, [1, 2, 3, 4, 5]))
+
+    # Doesn't find item when empty list
+    assert(not first_is_smaller_than_one_of(10, no_values))
+
+test "first_is_smaller_or_equal_than_all_of":
+    var no_values: i64[]
+    # Finds smaller than all items
+    assert(first_is_smaller_or_equal_than_all_of(-10, [1, -2, 3, -4, 5]))
+
+    assert(first_is_smaller_or_equal_than_all_of(42, [43]))
+
+    # Find equal items
+    assert(first_is_smaller_or_equal_than_all_of(42, [42]))
+
+    # Match on empty list
+    assert(first_is_smaller_or_equal_than_all_of(10, no_values))
+
+    # Doesn't find smaller than some items
+    assert(not first_is_smaller_or_equal_than_all_of(1, [1, -2, 3, -4, 5]))
+
+    # Doesn't find larger items
+    assert(not first_is_smaller_or_equal_than_all_of(10, [1, 2, 3, 4, 5]))
+
+test "first_is_smaller_than_all_of":
+    var no_values: i64[]
+    # Finds smaller than all items
+    assert(first_is_smaller_than_all_of(-10, [1, -2, 3, -4, 5]))
+
+    assert(first_is_smaller_than_all_of(42, [43]))
+
+    # Match on empty list
+    assert(first_is_smaller_than_all_of(10, no_values))
+
+    # Doesn't find equal items
+    assert(not first_is_smaller_than_all_of(42, [42]))
+
+    # Doesn't find smaller than some items
+    assert(not first_is_smaller_than_all_of(1, [1, -2, 3, -4, 5]))
+
+    # Doesn't find larger items
+    assert(not first_is_smaller_than_all_of(10, [1, 2, 3, 4, 5]))
+
+test "first_is_larger_or_equal_than_one_of":
+    var no_values: i64[]
+    # Finds larger items
+    assert(first_is_larger_or_equal_than_one_of(1, [1, -2, 3, -4, 5]))
+
+    assert(first_is_larger_or_equal_than_one_of(10, [1, -2, 3, -4, 5]))
+
+    assert(first_is_larger_or_equal_than_one_of(44, [43]))
+
+    # Finds equal items
+    assert(first_is_larger_or_equal_than_one_of(1, [1, -2, 3, -4, 5]))
+
+    assert(first_is_larger_or_equal_than_one_of(-2, [1, -2, 3, -4, 5]))
+
+    assert(first_is_larger_or_equal_than_one_of(42, [42]))
+
+    # Doesn't find smaller items
+    assert(not first_is_larger_or_equal_than_one_of(-10, [1, 2, 3, 4, 5]))
+
+    # Doesn't find item when empty list
+    assert(not first_is_larger_or_equal_than_one_of(10, no_values))
+
+test "first_is_larger_than_one_of":
+    var no_values: i64[]
+    # Finds larger items
+    assert(first_is_larger_than_one_of(1, [1, -2, 3, -4, 5]))
+
+    assert(first_is_larger_than_one_of(10, [1, -2, 3, -4, 5]))
+
+    assert(first_is_larger_than_one_of(44, [43]))
+
+    # Doesn't find equal items
+    assert(not first_is_larger_than_one_of(-4, [1, -2, 3, -4, 5]))
+
+    # Doesn't find smaller items
+    assert(not first_is_larger_than_one_of(-10, [1, 2, 3, 4, 5]))
+
+    # Doesn't find item when empty list
+    assert(not first_is_larger_than_one_of(10, no_values))
+
+test "first_is_equal_to_all_of":
+    var no_values: i64[]
+    assert(first_is_equal_to_all_of(1, no_values))
+
+    assert(first_is_equal_to_all_of(1, [1]))
+
+    assert(not first_is_equal_to_all_of(1, [2]))
+
+    assert(not first_is_equal_to_all_of(1, [1, 2]))
+
+    assert(not first_is_equal_to_all_of(2, [1, 1]))
+
+    assert(not first_is_equal_to_all_of(2, [2, 1]))
+
+test "first_is_larger_or_equal_than_all_of":
+    var no_values: i64[]
+    # Finds larger than all items
+    assert(first_is_larger_or_equal_than_all_of(10, [1, -2, 3, -4, 5]))
+
+    assert(first_is_larger_or_equal_than_all_of(44, [43]))
+
+    # Find equal items
+    assert(first_is_larger_or_equal_than_all_of(42, [42]))
+
+    # Match on empty list
+    assert(first_is_larger_or_equal_than_all_of(10, no_values))
+
+    # Doesn't find larger than some items
+    assert(not first_is_larger_or_equal_than_all_of(1, [1, -2, 3, -4, 5]))
+
+    # Doesn't find smaller items
+    assert(not first_is_larger_or_equal_than_all_of(-10, [1, 2, 3, 4, 5]))
+
+test "first_is_larger_than_all_of":
+    var no_values: i64[]
+    # Finds larger than all items
+    assert(first_is_larger_than_all_of(10, [1, -2, 3, -4, 5]))
+
+    assert(first_is_larger_than_all_of(44, [43]))
+
+    # Match on empty list
+    assert(first_is_larger_than_all_of(10, no_values))
+
+    # Doesn't find equal items
+    assert(not first_is_larger_than_all_of(42, [42]))
+
+    # Doesn't find larger than some items
+    assert(not first_is_larger_than_all_of(1, [1, -2, 3, -4, 5]))
+
+    # Doesn't find smaller items
+    assert(not first_is_larger_than_all_of(-10, [1, 2, 3, 4, 5]))

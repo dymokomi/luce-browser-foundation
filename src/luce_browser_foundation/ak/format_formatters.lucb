@@ -1,0 +1,578 @@
+#==============================================================================================
+#
+#   format_formatters - StandardFormatter::parse and the Formatter<T> of each value kind
+#
+#   DESCRIPTION:
+#       Port of AK/Format.cpp lines 826-1139 (StandardFormatter::parse and the out-of-line
+#       Formatter<T>::format bodies) with the Formatter<T> specializations defined in
+#       AK/Format.h (spans, bytes, C strings, pointers, nullptr, Checked, FormatIfSupported,
+#       FormatString, Optional).
+#
+#       A C++ Formatter<T> is a StandardFormatter plus a `format(builder, T)`; here the state
+#       is a StandardFormatter and `formatter_<type>_format(this, builder, value)` is the
+#       member. `Formatter<U> formatter { *this }` (reusing the parsed flags with another
+#       formatter) is a copy of the StandardFormatter handed to U's function. Integral T is
+#       one body over u64 and one over i64: those are the widths every integer argument has
+#       once erased, and sizeof(T) (which only hex-dump mode reads) is a parameter.
+#
+#==============================================================================================
+
+# mark: StandardFormatter::parse ================================================================
+
+## Ported from AK/Format.cpp:826 AK::StandardFormatter::parse: reads
+## `[[fill]align][sign][#]['][0][width][.precision][type]` from `parser`.
+pub func standard_formatter_parse(this: StandardFormatter*, params: TypeErasedFormatParams*, parser: FormatParser*):
+    let lexer = &parser.generic_lexer
+    let alignments = sv_of("<^>")
+    if string_view_contains_u8(&alignments, generic_lexer_peek(lexer, 1)):
+        # VERIFY(!parser.next_is(is_any_of("{}"sv)))
+        assert(not (generic_lexer_next_is_u8(lexer, '{') or generic_lexer_next_is_u8(lexer, '}')))
+        this.m_fill = generic_lexer_consume(lexer)
+
+    if generic_lexer_consume_specific_u8(lexer, '<'):
+        this.m_align = FormatBuilderAlign.left
+    elif generic_lexer_consume_specific_u8(lexer, '^'):
+        this.m_align = FormatBuilderAlign.center
+    elif generic_lexer_consume_specific_u8(lexer, '>'):
+        this.m_align = FormatBuilderAlign.right
+
+    if generic_lexer_consume_specific_u8(lexer, '-'):
+        this.m_sign_mode = FormatBuilderSignMode.only_if_needed
+    elif generic_lexer_consume_specific_u8(lexer, '+'):
+        this.m_sign_mode = FormatBuilderSignMode.always
+    elif generic_lexer_consume_specific_u8(lexer, ' '):
+        this.m_sign_mode = FormatBuilderSignMode.reserved
+
+    if generic_lexer_consume_specific_u8(lexer, '#'):
+        this.m_alternative_form = true
+
+    if generic_lexer_consume_specific_u8(lexer, '\''):
+        this.m_use_separator = true
+
+    if generic_lexer_consume_specific_u8(lexer, '0'):
+        this.m_zero_pad = true
+
+    var width_index: usize = 0
+    var width: usize = 0
+    if format_parser_consume_replacement_field(parser, &width_index):
+        if width_index == use_next_index:
+            width_index = type_erased_format_params_take_next_index(params)
+
+        this.m_width = (u64)type_erased_parameter_to_size(&type_erased_format_params_parameters(params)[width_index])
+    elif format_parser_consume_number(parser, &width):
+        this.m_width = (u64)width
+
+    if generic_lexer_consume_specific_u8(lexer, '.'):
+        var precision_index: usize = 0
+        var precision: usize = 0
+        if format_parser_consume_replacement_field(parser, &precision_index):
+            if precision_index == use_next_index:
+                precision_index = type_erased_format_params_take_next_index(params)
+
+            this.m_precision = (u64)type_erased_parameter_to_size(&type_erased_format_params_parameters(params)[precision_index])
+        elif format_parser_consume_number(parser, &precision):
+            this.m_precision = (u64)precision
+
+    if generic_lexer_consume_specific_u8(lexer, 'b'):
+        this.m_mode = StandardFormatterMode.binary
+    elif generic_lexer_consume_specific_u8(lexer, 'B'):
+        this.m_mode = StandardFormatterMode.binary_uppercase
+    elif generic_lexer_consume_specific_u8(lexer, 'd'):
+        this.m_mode = StandardFormatterMode.decimal
+    elif generic_lexer_consume_specific_u8(lexer, 'o'):
+        this.m_mode = StandardFormatterMode.octal
+    elif generic_lexer_consume_specific_u8(lexer, 'x'):
+        this.m_mode = StandardFormatterMode.hexadecimal
+    elif generic_lexer_consume_specific_u8(lexer, 'X'):
+        this.m_mode = StandardFormatterMode.hexadecimal_uppercase
+    elif generic_lexer_consume_specific_u8(lexer, 'c'):
+        this.m_mode = StandardFormatterMode.character
+    elif generic_lexer_consume_specific_u8(lexer, 's'):
+        this.m_mode = StandardFormatterMode.string
+    elif generic_lexer_consume_specific_u8(lexer, 'p'):
+        this.m_mode = StandardFormatterMode.pointer
+    elif generic_lexer_consume_specific_u8(lexer, 'f'):
+        this.m_mode = StandardFormatterMode.fixed_point
+    elif generic_lexer_consume_specific_u8(lexer, 'a'):
+        this.m_mode = StandardFormatterMode.hexfloat
+    elif generic_lexer_consume_specific_u8(lexer, 'A'):
+        this.m_mode = StandardFormatterMode.hexfloat_uppercase
+    elif generic_lexer_consume_specific_string_view(lexer, sv_of("hex-dump")):
+        this.m_mode = StandardFormatterMode.hex_dump
+
+    if not generic_lexer_is_eof(lexer):
+        dbgln(f"void AK::StandardFormatter::parse(TypeErasedFormatParams &, FormatParser &) did not consume '{string_view_text(generic_lexer_remaining(lexer))}'")
+
+    assert(generic_lexer_is_eof(lexer))
+
+## The bytes of a StringView as text for a luce-base interpolation (a debug message).
+func string_view_text(view: StringView) -> str:
+    return (str)string_view_bytes(&view)
+
+# mark: Formatter<StringView> ===================================================================
+
+## Ported from AK/Format.cpp:937 AK::Formatter<StringView>::format.
+pub func formatter_string_view_format(this: StandardFormatter*, builder: FormatBuilder*, value: StringView) -> !:
+    if this.m_sign_mode != format_builder_sign_mode_default:
+        trap("VERIFY_NOT_REACHED")
+    if this.m_zero_pad:
+        trap("VERIFY_NOT_REACHED")
+    if this.m_mode != StandardFormatterMode.default and this.m_mode != StandardFormatterMode.string and this.m_mode != StandardFormatterMode.character and this.m_mode != StandardFormatterMode.hex_dump:
+        trap("VERIFY_NOT_REACHED")
+
+    this.m_width = this.m_width else 0
+    this.m_precision = this.m_precision else (u64)size_max
+
+    let width = (usize)(this.m_width else 0)
+    if this.m_mode == StandardFormatterMode.hex_dump:
+        return try format_builder_put_hexdump(builder, string_view_bytes(&value), width, this.m_fill)
+    return try format_builder_put_string(builder, value, this.m_align, width, (usize)(this.m_precision else 0), this.m_fill)
+
+# mark: Formatter<FormatString> =================================================================
+
+## Ported from AK/Format.cpp:955 AK::Formatter<FormatString>::vformat: formats `fmtstr` into a
+## string first, then formats that string with this formatter's flags.
+pub func formatter_format_string_vformat(this: StandardFormatter*, builder: FormatBuilder*, fmtstr: StringView, params: TypeErasedFormatParams*) -> !:
+    var string_builder: StringBuilder
+    string_builder_construct(&string_builder)
+    try vformat(&string_builder, fmtstr, params)
+    try formatter_string_view_format(this, builder, string_builder_string_view(&string_builder))
+
+## Ported from AK/Format.h:785 AK::Formatter<FormatString>::format (the variadic helper for
+## formatters that "break down" their value into a format string).
+pub func formatter_format_string_format(this: StandardFormatter*, builder: FormatBuilder*, fmtstr: StringView, arguments: const TypeErasedParameter[]) -> !:
+    var variadic_format_params = type_erased_format_params_create(arguments)
+    try formatter_format_string_vformat(this, builder, fmtstr, &variadic_format_params)
+
+# mark: Formatter<Integral T> ===================================================================
+
+## Ported from AK/Format.cpp:963 AK::Formatter<T>::format for an unsigned integral T of `size`
+## bytes (sizeof(T), read by hex-dump mode).
+pub func formatter_u64_format(this: StandardFormatter*, builder: FormatBuilder*, value: u64, size: usize = 8) -> !:
+    try formatter_integral_format(this, builder, false, value, size)
+
+## Ported from AK/Format.cpp:963 AK::Formatter<T>::format for a signed integral T of `size`
+## bytes (sizeof(T), read by hex-dump mode).
+pub func formatter_i64_format(this: StandardFormatter*, builder: FormatBuilder*, value: i64, size: usize = 8) -> !:
+    try formatter_integral_format(this, builder, true, (u64)value, size)
+
+## The body of Formatter<Integral T>::format: `bits` is the value (reinterpreted as i64 when
+## `is_signed`), `size` is sizeof(T).
+func formatter_integral_format(this: StandardFormatter*, builder: FormatBuilder*, is_signed: bool, bits: u64, size: usize) -> !:
+    let signed_value = (i64)bits
+    if this.m_mode == StandardFormatterMode.character:
+        # FIXME: We just support ASCII for now, in the future maybe unicode?
+        #        VERIFY(value >= 0 && value <= 127);
+
+        this.m_mode = StandardFormatterMode.string
+
+        var formatter = *this
+
+        # convert value to single byte, important for big-endian because the LSB is the last byte.
+        if is_signed:
+            assert(signed_value >= 0 and signed_value <= 127)
+        else:
+            assert(bits <= 127)
+        var character: u8[1] = [(u8)(bits & 0x7f)]
+
+        var text: StringView
+        string_view_construct_span_u8(&text, character)
+        return try formatter_string_view_format(&formatter, builder, text)
+
+    if this.m_precision != none:
+        trap("VERIFY_NOT_REACHED")
+
+    if this.m_mode == StandardFormatterMode.pointer:
+        if this.m_sign_mode != format_builder_sign_mode_default:
+            trap("VERIFY_NOT_REACHED")
+        if this.m_align != FormatBuilderAlign.default:
+            trap("VERIFY_NOT_REACHED")
+        if this.m_alternative_form:
+            trap("VERIFY_NOT_REACHED")
+        if this.m_width != none:
+            trap("VERIFY_NOT_REACHED")
+
+        this.m_mode = StandardFormatterMode.hexadecimal
+        this.m_alternative_form = true
+        this.m_width = (u64)(2 * sizeof(void*))
+        this.m_zero_pad = true
+
+    var base_: u8 = 0
+    var upper_case = false
+    if this.m_mode == StandardFormatterMode.binary:
+        base_ = 2
+    elif this.m_mode == StandardFormatterMode.binary_uppercase:
+        base_ = 2
+        upper_case = true
+    elif this.m_mode == StandardFormatterMode.octal:
+        base_ = 8
+    elif this.m_mode == StandardFormatterMode.decimal or this.m_mode == StandardFormatterMode.default:
+        base_ = 10
+    elif this.m_mode == StandardFormatterMode.hexadecimal:
+        base_ = 16
+    elif this.m_mode == StandardFormatterMode.hexadecimal_uppercase:
+        base_ = 16
+        upper_case = true
+    elif this.m_mode == StandardFormatterMode.hex_dump:
+        this.m_width = this.m_width else 32
+        # put_hexdump({ &value, sizeof(value) }): the value's bytes in memory order (little-endian).
+        var bytes: u8[8]
+        for i in 0..<size:
+            bytes[i] = (u8)(bits >> (u64)(8 * i))
+        return try format_builder_put_hexdump(builder, bytes[0..<size], (usize)(this.m_width else 0), this.m_fill)
+    else:
+        trap("VERIFY_NOT_REACHED")
+
+    this.m_width = this.m_width else 0
+
+    if not is_signed:
+        return try format_builder_put_u64(builder, bits, base_, this.m_alternative_form, upper_case, this.m_zero_pad, this.m_use_separator, this.m_align, (usize)(this.m_width else 0), this.m_fill, this.m_sign_mode)
+    else:
+        return try format_builder_put_i64(builder, signed_value, base_, this.m_alternative_form, upper_case, this.m_zero_pad, this.m_use_separator, this.m_align, (usize)(this.m_width else 0), this.m_fill, this.m_sign_mode)
+
+## The numeric modes that make a character formatter format the character's number instead.
+func standard_formatter_is_numeric_mode(this: const StandardFormatter*) -> bool:
+    return this.m_mode == StandardFormatterMode.binary or this.m_mode == StandardFormatterMode.binary_uppercase or this.m_mode == StandardFormatterMode.decimal or this.m_mode == StandardFormatterMode.octal or this.m_mode == StandardFormatterMode.hexadecimal or this.m_mode == StandardFormatterMode.hexadecimal_uppercase
+
+# mark: Characters and booleans =================================================================
+
+## Ported from AK/Format.cpp:1002 AK::Formatter<char>::format.
+pub func formatter_char_format(this: StandardFormatter*, builder: FormatBuilder*, value: u8) -> !:
+    if standard_formatter_is_numeric_mode(this):
+        # Trick: signed char != char. (Sometimes weird features are actually helpful.)
+        var formatter = *this
+        return try formatter_i64_format(&formatter, builder, (i64)(i8)value, 1)
+    else:
+        var formatter = *this
+        var character: u8[1] = [value]
+        var text: StringView
+        string_view_construct_span_u8(&text, character)
+        return try formatter_string_view_format(&formatter, builder, text)
+
+## Ported from AK/Format.cpp:1015 AK::Formatter<char16_t>::format.
+pub func formatter_char16_format(this: StandardFormatter*, builder: FormatBuilder*, value: u16) -> !:
+    if standard_formatter_is_numeric_mode(this):
+        var formatter = *this
+        return try formatter_u64_format(&formatter, builder, (u64)value, 2)
+    else:
+        var codepoint: StringBuilder
+        string_builder_construct(&codepoint)
+        string_builder_append_code_point(&codepoint, (u32)value)
+
+        var formatter = *this
+        return try formatter_string_view_format(&formatter, builder, string_builder_string_view(&codepoint))
+
+## Ported from AK/Format.cpp:1030 AK::Formatter<char32_t>::format.
+pub func formatter_char32_format(this: StandardFormatter*, builder: FormatBuilder*, value: u32) -> !:
+    if standard_formatter_is_numeric_mode(this):
+        var formatter = *this
+        return try formatter_u64_format(&formatter, builder, (u64)value, 4)
+    else:
+        var codepoint: StringBuilder
+        string_builder_construct(&codepoint)
+        string_builder_append_code_point(&codepoint, value)
+
+        var formatter = *this
+        return try formatter_string_view_format(&formatter, builder, string_builder_string_view(&codepoint))
+
+## Ported from AK/Format.cpp:1045 AK::Formatter<bool>::format.
+pub func formatter_bool_format(this: StandardFormatter*, builder: FormatBuilder*, value: bool) -> !:
+    if standard_formatter_is_numeric_mode(this):
+        var formatter = *this
+        return try formatter_u64_format(&formatter, builder, (u64)value, 1)
+    elif this.m_mode == StandardFormatterMode.hex_dump:
+        var bytes: u8[1] = [(u8)value]
+        return try format_builder_put_hexdump(builder, bytes, (usize)(this.m_width else 32), this.m_fill)
+    else:
+        var formatter = *this
+        return try formatter_string_view_format(&formatter, builder, sv_of("true") if value else sv_of("false"))
+
+# mark: Floating point ==========================================================================
+
+## The base, case and display mode of the float modes (the head of each float formatter).
+func standard_formatter_float_base(this: const StandardFormatter*) -> (u8, bool, FormatBuilderRealNumberDisplayMode):
+    if this.m_mode == StandardFormatterMode.default or this.m_mode == StandardFormatterMode.fixed_point:
+        if this.m_mode == StandardFormatterMode.fixed_point:
+            return (10, false, FormatBuilderRealNumberDisplayMode.fixed_point)
+        return (10, false, FormatBuilderRealNumberDisplayMode.general)
+    elif this.m_mode == StandardFormatterMode.hexfloat:
+        return (16, false, FormatBuilderRealNumberDisplayMode.general)
+    elif this.m_mode == StandardFormatterMode.hexfloat_uppercase:
+        return (16, true, FormatBuilderRealNumberDisplayMode.general)
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from AK/Format.cpp:1058 AK::Formatter<long double>::format (`long double` is f64 here).
+pub func formatter_f80_format(this: StandardFormatter*, builder: FormatBuilder*, value: f64) -> !:
+    let (base_, upper_case, real_number_display_mode) = standard_formatter_float_base(this)
+
+    this.m_width = this.m_width else 0
+    this.m_precision = this.m_precision else 6
+
+    try format_builder_put_f80(builder, value, base_, upper_case, this.m_use_separator, this.m_align, (usize)(this.m_width else 0), (usize)(this.m_precision else 0), this.m_fill, this.m_sign_mode, real_number_display_mode)
+
+## Ported from AK/Format.cpp:1084 AK::Formatter<f16>::format.
+pub func formatter_f16_format(this: StandardFormatter*, builder: FormatBuilder*, value: f16) -> !:
+    # FIXME: Create a proper put_f16() implementation
+    var formatter = *this
+    try formatter_f64_format(&formatter, builder, (f64)value)
+
+## Ported from AK/Format.cpp:1091 AK::Formatter<double>::format.
+pub func formatter_f64_format(this: StandardFormatter*, builder: FormatBuilder*, value: f64) -> !:
+    let (base_, upper_case, real_number_display_mode) = standard_formatter_float_base(this)
+
+    this.m_width = this.m_width else 0
+
+    try format_builder_put_f32_or_f64_f64(builder, value, base_, upper_case, this.m_zero_pad, this.m_use_separator, this.m_align, (usize)(this.m_width else 0), standard_formatter_precision(this), this.m_fill, this.m_sign_mode, real_number_display_mode)
+
+## Ported from AK/Format.cpp:1116 AK::Formatter<float>::format.
+pub func formatter_f32_format(this: StandardFormatter*, builder: FormatBuilder*, value: f32) -> !:
+    let (base_, upper_case, real_number_display_mode) = standard_formatter_float_base(this)
+
+    this.m_width = this.m_width else 0
+
+    try format_builder_put_f32_or_f64_f32(builder, value, base_, upper_case, this.m_zero_pad, this.m_use_separator, this.m_align, (usize)(this.m_width else 0), standard_formatter_precision(this), this.m_fill, this.m_sign_mode, real_number_display_mode)
+
+## m_precision as the Optional<size_t> put_f32_or_f64 takes.
+func standard_formatter_precision(this: const StandardFormatter*) -> usize?:
+    if let precision = this.m_precision:
+        return (usize)precision
+    return none
+
+# mark: Formatter<ReadonlySpan<T>>, Formatter<ReadonlyBytes> ====================================
+
+## Formats one value with a default Formatter<T> (`Formatter<T> content_fmt; content_fmt.format(builder, value)`):
+## the value's formatter with empty flags.
+func format_builder_format_default(builder: FormatBuilder*, value: TypeErasedParameter) -> !:
+    var arguments: TypeErasedParameter[1] = [value]
+    var params = type_erased_format_params_create(arguments)
+    var parser: FormatParser
+    format_parser_construct(&parser, sv_of("{}"))
+    try vformat_impl(&params, builder, &parser)
+
+## Ported from AK/Format.h:434 AK::Formatter<ReadonlySpan<T>>::format (also Formatter<Span<T>>
+## and Formatter<Vector<T>>): `[ a, b, c ]`. The span is `count` elements of `element_size`
+## bytes at `data`; `element` erases one element for its default Formatter<T>.
+pub func formatter_span_format(this: StandardFormatter*, builder: FormatBuilder*, data: const void*?, count: usize, element_size: usize, element: func(const void*) -> TypeErasedParameter) -> !:
+    if this.m_mode == StandardFormatterMode.pointer:
+        var formatter = *this
+        try formatter_u64_format(&formatter, builder, pointer_address(data))
+        return
+
+    if this.m_sign_mode != format_builder_sign_mode_default:
+        trap("VERIFY_NOT_REACHED")
+    if this.m_alternative_form:
+        trap("VERIFY_NOT_REACHED")
+    if this.m_zero_pad:
+        trap("VERIFY_NOT_REACHED")
+    if this.m_mode != StandardFormatterMode.default:
+        trap("VERIFY_NOT_REACHED")
+    if this.m_width != none and this.m_precision != none:
+        trap("VERIFY_NOT_REACHED")
+
+    this.m_width = this.m_width else 0
+    this.m_precision = this.m_precision else (u64)size_max
+
+    try format_builder_put_literal(builder, sv_of("[ "))
+    var first = true
+    for index in 0..<count:
+        if not first:
+            try format_builder_put_literal(builder, sv_of(", "))
+        first = false
+        let content = (const u8*)(data else trap("VERIFY_NOT_REACHED: span without data")) + index * element_size
+        try format_builder_format_default(builder, element((const void*)content))
+    try format_builder_put_literal(builder, sv_of(" ]"))
+
+## Ported from AK/Format.h:487 AK::Formatter<ReadonlyBytes>::format (also Formatter<Bytes>):
+## a hex dump unless another mode was asked for.
+pub func formatter_bytes_format(this: StandardFormatter*, builder: FormatBuilder*, value: const u8[]) -> !:
+    if this.m_mode == StandardFormatterMode.pointer:
+        var formatter = *this
+        return try formatter_u64_format(&formatter, builder, pointer_address(value.data))
+    var text: StringView
+    string_view_construct_span_u8(&text, value)
+    if this.m_mode == StandardFormatterMode.default or this.m_mode == StandardFormatterMode.hex_dump:
+        this.m_mode = StandardFormatterMode.hex_dump
+        return try formatter_string_view_format(this, builder, text)
+    return try formatter_string_view_format(this, builder, text)
+
+# mark: Formatter<char const*>, Formatter<T*>, Formatter<nullptr_t> =============================
+
+## `reinterpret_cast<FlatPtr>(value)`: the address of a pointer, zero for null.
+func pointer_address(value: const void*?) -> u64:
+    if let pointer = value:
+        return (u64)(usize)pointer
+    return 0
+
+## Ported from AK/Format.h:508 AK::Formatter<char const*>::format (also char*, char[Size]).
+# FIXME: Printing raw char pointers is inherently dangerous. Remove this and
+#        its users and prefer StringView over it.
+pub func formatter_c_string_format(this: StandardFormatter*, builder: FormatBuilder*, value: const u8*?) -> !:
+    if this.m_mode == StandardFormatterMode.pointer:
+        var formatter = *this
+        return try formatter_u64_format(&formatter, builder, pointer_address(value))
+
+    if let characters = value:
+        # __builtin_strlen(value)
+        var length: usize = 0
+        while characters[length] != 0:
+            length += 1
+        var text: StringView
+        string_view_construct_span_u8(&text, u8[]((u8*)characters, length))
+        return try formatter_string_view_format(this, builder, text)
+    return try formatter_string_view_format(this, builder, sv_of("(null)"))
+
+## Ported from AK/Format.h:534 AK::Formatter<T*>::format: a pointer, as a zero-padded hex address.
+pub func formatter_pointer_format(this: StandardFormatter*, builder: FormatBuilder*, value: const void*?) -> !:
+    if this.m_mode == StandardFormatterMode.default:
+        this.m_mode = StandardFormatterMode.pointer
+
+    var formatter = *this
+    try formatter_u64_format(&formatter, builder, pointer_address(value))
+
+## Ported from AK/Format.h:601 AK::Formatter<nullptr_t>::format.
+pub func formatter_nullptr_format(this: StandardFormatter*, builder: FormatBuilder*) -> !:
+    if this.m_mode == StandardFormatterMode.default:
+        this.m_mode = StandardFormatterMode.pointer
+
+    try formatter_u64_format(this, builder, 0)
+
+## __format_value<T*>: formats the pointer `value` itself (the CustomType's value is the
+## pointer, not a pointer to it); see arg_pointer.
+pub func format_value_pointer(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_pointer_format(&formatter, builder, value)
+
+## __format_value<nullptr_t>.
+pub func format_value_nullptr(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_nullptr_format(&formatter, builder)
+
+## __format_value<char16_t>: `value` points at a u16.
+pub func format_value_char16(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_char16_format(&formatter, builder, *(const u16*)format_value_target(value))
+
+## __format_value<char32_t>: `value` points at a u32 code point.
+pub func format_value_char32(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_char32_format(&formatter, builder, *(const u32*)format_value_target(value))
+
+## A pointer argument (Formatter<T*>): formatted as its address.
+pub func arg_pointer(value: const void*?) -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    parameter.value.as_custom_type = TypeErasedParameterCustomType(value = value, formatter = format_value_pointer)
+    parameter.type_ = TypeErasedParameterType.custom_type
+    return parameter
+
+## A nullptr argument (Formatter<nullptr_t>).
+pub func arg_nullptr() -> TypeErasedParameter:
+    var parameter: TypeErasedParameter
+    parameter.value.as_custom_type = TypeErasedParameterCustomType(value = none, formatter = format_value_nullptr)
+    parameter.type_ = TypeErasedParameterType.custom_type
+    return parameter
+
+# mark: Formatter<Checked<T>> ===================================================================
+
+## Ported from AK/Format.h:612 AK::Formatter<Checked<T>>::format for a signed T.
+pub func formatter_checked_format_i64(this: StandardFormatter*, builder: FormatBuilder*, has_overflow: bool, value: i64, size: usize = 8) -> !:
+    if has_overflow:
+        return try format_builder_put_string(builder, sv_of("{ OVERFLOW }"))
+    return try formatter_i64_format(this, builder, value, size)
+
+## Ported from AK/Format.h:612 AK::Formatter<Checked<T>>::format for an unsigned T.
+pub func formatter_checked_format_u64(this: StandardFormatter*, builder: FormatBuilder*, has_overflow: bool, value: u64, size: usize = 8) -> !:
+    if has_overflow:
+        return try format_builder_put_string(builder, sv_of("{ OVERFLOW }"))
+    return try formatter_u64_format(this, builder, value, size)
+
+## __format_value<Checked<i8>>.
+pub func format_value_checked_i8(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let checked = (const Checked[i8]*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_checked_format_i64(&formatter, builder, checked_has_overflow(checked), (i64)checked.m_value, 1)
+
+## __format_value<Checked<i16>>.
+pub func format_value_checked_i16(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let checked = (const Checked[i16]*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_checked_format_i64(&formatter, builder, checked_has_overflow(checked), (i64)checked.m_value, 2)
+
+## __format_value<Checked<i32>>.
+pub func format_value_checked_i32(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let checked = (const Checked[i32]*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_checked_format_i64(&formatter, builder, checked_has_overflow(checked), (i64)checked.m_value, 4)
+
+## __format_value<Checked<i64>>.
+pub func format_value_checked_i64(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let checked = (const Checked[i64]*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_checked_format_i64(&formatter, builder, checked_has_overflow(checked), checked.m_value, 8)
+
+## __format_value<Checked<u8>>.
+pub func format_value_checked_u8(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let checked = (const Checked[u8]*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_checked_format_u64(&formatter, builder, checked_has_overflow(checked), (u64)checked.m_value, 1)
+
+## __format_value<Checked<u16>>.
+pub func format_value_checked_u16(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let checked = (const Checked[u16]*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_checked_format_u64(&formatter, builder, checked_has_overflow(checked), (u64)checked.m_value, 2)
+
+## __format_value<Checked<u32>>.
+pub func format_value_checked_u32(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let checked = (const Checked[u32]*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_checked_format_u64(&formatter, builder, checked_has_overflow(checked), (u64)checked.m_value, 4)
+
+## __format_value<Checked<u64>>.
+pub func format_value_checked_u64(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let checked = (const Checked[u64]*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_checked_format_u64(&formatter, builder, checked_has_overflow(checked), checked.m_value, 8)
+
+# mark: FormatIfSupported =======================================================================
+
+## Ported from AK/Format.h:751 AK::FormatIfSupported::FormatIfSupported<T>.
+pub func format_if_supported_construct[T](this: FormatIfSupported[T]*, value: const T*):
+    this.m_value = value
+
+## Ported from AK/Format.h:756 AK::FormatIfSupported::value.
+pub func format_if_supported_value[T](this: const FormatIfSupported[T]*) -> const T*:
+    return this.m_value
+
+## Ported from AK/Format.h:763 AK::__FormatIfSupported::format, for a T without a Formatter:
+## a "?" with the parsed flags. (__FormatIfSupported<T, true> is Formatter<T> itself: a value
+## whose type has a formatter is passed with that formatter.)
+pub func format_if_supported2_format[T](this: FormatIfSupported2[T]*, builder: FormatBuilder*, arg1: const FormatIfSupported[T]*) -> !:
+    try formatter_string_view_format(&this.formatter, builder, sv_of("?"))
+
+## __format_value<FormatIfSupported<T>> for a T without a Formatter; `value` points at the
+## FormatIfSupported.
+pub func format_value_format_if_supported(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = FormatIfSupported2[u8](formatter = standard_formatter_create())
+    standard_formatter_parse(&formatter.formatter, params, parser)
+    try format_if_supported2_format(&formatter, builder, (const FormatIfSupported[u8]*)format_value_target(value))
+
+# mark: Formatter<Optional<T>> ==================================================================
+
+## Ported from AK/Format.h:835 AK::Formatter<Optional<T>>::format: the value with its own
+## formatter ("{}"), or "None".
+pub func formatter_optional_format(this: StandardFormatter*, builder: FormatBuilder*, value: TypeErasedParameter?) -> !:
+    if let present = value:
+        return try formatter_format_string_format(this, builder, sv_of("{}"), [present])
+    return try format_builder_put_literal(builder, sv_of("None"))

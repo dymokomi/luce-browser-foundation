@@ -3395,8 +3395,8 @@ pub func result_construct_opaque_3[TValueT, TErrorT](this: Result[TValueT, TErro
     trap("unported: AK::Result::Result<ValueT, ErrorT>")
 
 ## Ported from AK/Result.h:44 AK::Result::value.
-# unmapped: T
-pub func result_value[TValueT, TErrorT](this: Result[TValueT, TErrorT]*) -> void*?:
+# r03: signature fixed (C++ returns ValueT&).
+pub func result_value[TValueT, TErrorT](this: Result[TValueT, TErrorT]*) -> TValueT*:
     trap("unported: AK::Result::value")
 
 ## Ported from AK/Result.h:49 AK::Result::error.
@@ -4971,13 +4971,13 @@ pub func vector_data_const[T](this: const Vector[T]*) -> void*?:
     trap("unported: AK::Vector::data")
 
 ## Ported from AK/Vector.h:162 AK::Vector::at.
-# unmapped: RemoveReference<T>
-pub func vector_at_const[T](this: const Vector[T]*, i: usize) -> void*?:
+# r03: signature fixed (C++ returns T const&).
+pub func vector_at_const[T](this: const Vector[T]*, i: usize) -> const T*:
     trap("unported: AK::Vector::at")
 
 ## Ported from AK/Vector.h:171 AK::Vector::at.
-# unmapped: RemoveReference<T>
-pub func vector_at[T](this: Vector[T]*, i: usize) -> void*?:
+# r03: signature fixed (C++ returns T&).
+pub func vector_at[T](this: Vector[T]*, i: usize) -> T*:
     trap("unported: AK::Vector::at")
 
 ## Ported from AK/Vector.h:180 AK::Vector::operator[].
@@ -5508,3 +5508,37 @@ pub func ladybird_rust_dealloc(ptr: void*?, alignment: usize):
 ## Ported from AK/kmalloc.cpp:220 ladybird_rust_realloc.
 pub func ladybird_rust_realloc(ptr: void*?, old_size: usize, new_size: usize, alignment: usize) -> void*?:
     trap("unported: ladybird_rust_realloc")
+
+## r03: AK::HashMap<K, V, KeyTraits, ValueTraits, IsOrdered = true> (OrderedHashMap), the members
+## JsonObject uses. The skeleton gives OrderedHashMap its own struct but no functions; these
+## mirror the hash_map_* stubs above (AK/HashMap.h:56 size).
+pub func ordered_hash_map_size[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> usize:
+    trap("unported: AK::OrderedHashMap::size")
+
+## r03: AK/HashMap.h:52 AK::HashMap::is_empty (IsOrdered = true).
+pub func ordered_hash_map_is_empty[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> bool:
+    trap("unported: AK::OrderedHashMap::is_empty")
+
+## r03: AK/HashMap.h:61 AK::HashMap::set (IsOrdered = true).
+pub func ordered_hash_map_set[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K, value: V, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> HashSetResult:
+    trap("unported: AK::OrderedHashMap::set")
+
+## r03: AK/HashMap.h:163 AK::HashMap::get (IsOrdered = true), for a V that is not a pointer.
+pub func ordered_hash_map_get_k[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K) -> V*?:
+    trap("unported: AK::OrderedHashMap::get")
+
+## r03: AK/HashMap.h:163 AK::HashMap::get const (IsOrdered = true), for a V that is not a pointer.
+pub func ordered_hash_map_get_k_const[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*, key: K) -> const V*?:
+    trap("unported: AK::OrderedHashMap::get")
+
+## r03: AK/HashMap.h:220 AK::HashMap::contains (IsOrdered = true).
+pub func ordered_hash_map_contains_k[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*, key: K) -> bool:
+    trap("unported: AK::OrderedHashMap::contains")
+
+## r03: AK/HashMap.h:74 AK::HashMap::remove (IsOrdered = true).
+pub func ordered_hash_map_remove_k[K, V, KT: Traits[K]](this: OrderedHashMap[K, V, KT]*, key: K) -> bool:
+    trap("unported: AK::OrderedHashMap::remove")
+
+## r03: AK/HashMap.h:295 AK::HashMap::keys (IsOrdered = true): the keys in insertion order.
+pub func ordered_hash_map_keys[K, V, KT: Traits[K]](this: const OrderedHashMap[K, V, KT]*) -> Vector[K]:
+    trap("unported: AK::OrderedHashMap::keys")
