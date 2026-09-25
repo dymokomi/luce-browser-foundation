@@ -1,0 +1,200 @@
+#==============================================================================================
+#
+#   tests_base64 - tests of Base64 (and its simdutf replacement)
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestBase64.cpp. Decoding fills a ByteBuffer (region r01), so the
+#       decoding tests are gated on ak_core_is_ported; encoding needs nothing of r01.
+#
+#==============================================================================================
+
+## The `decode_equal` lambda of test_decode / test_urldecode.
+func tests_base64_decode_equal(input: str, expected: str, url: bool):
+    let buffer = (decode_base64url(sv(input)) if url else decode_base64(sv(input))) else trap("decode failed")
+    let decoded = string_view_from_bytes(byte_buffer_span_const(&buffer))
+    assert(string_view_equals(&decoded, expected))
+
+## Whether decoding `input` fails.
+func tests_base64_decode_fails(input: const u8[], url: bool) -> bool:
+    var failed = false
+    let view = string_view_from_bytes(input)
+    if url:
+        discard(decode_base64url(view) catch:
+            failed = true
+            recover ByteBuffer())
+    else:
+        discard(decode_base64(view) catch:
+            failed = true
+            recover ByteBuffer())
+    return failed
+
+test "base64: decode":
+    if not ak_core_is_ported:
+        return
+    tests_base64_decode_equal("", "", false)
+    tests_base64_decode_equal("Zg==", "f", false)
+    tests_base64_decode_equal("Zm8=", "fo", false)
+    tests_base64_decode_equal("Zm9v", "foo", false)
+    tests_base64_decode_equal("Zm9vYg==", "foob", false)
+    tests_base64_decode_equal("Zm9vYmE=", "fooba", false)
+    tests_base64_decode_equal("Zm9vYmFy", "foobar", false)
+    tests_base64_decode_equal(" Zm9vYmFy ", "foobar", false)
+    tests_base64_decode_equal("  \n\r \t Zm   9v   \t YmFy \n", "foobar", false)
+
+    tests_base64_decode_equal("aGVsbG8/d29ybGQ=", "hello?world", false)
+
+## The `decode_equal` lambda of test_decode_into: decodes into a buffer of `buffer_size` bytes
+## (or size_required_to_decode_base64).
+func tests_base64_decode_into_equal(input: str, expected: str, buffer_size: usize?):
+    var buffer: ByteBuffer
+    byte_buffer_resize(&buffer, buffer_size else size_required_to_decode_base64(sv(input)))
+
+    match decode_base64_into(sv(input), &buffer):
+        .invalid(_): trap("decode_base64_into failed")
+        .decoded(_): discard(0)
+
+    let decoded = string_view_from_bytes(byte_buffer_span_const(&buffer))
+    assert(string_view_equals(&decoded, expected))
+
+test "base64: decode into":
+    if not ak_core_is_ported:
+        return
+    tests_base64_decode_into_equal("", "", none)
+
+    tests_base64_decode_into_equal("Zg==", "f", none)
+    tests_base64_decode_into_equal("Zm8=", "fo", none)
+    tests_base64_decode_into_equal("Zm9v", "foo", none)
+    tests_base64_decode_into_equal("Zm9vYg==", "foob", none)
+    tests_base64_decode_into_equal("Zm9vYmE=", "fooba", none)
+    tests_base64_decode_into_equal("Zm9vYmFy", "foobar", none)
+    tests_base64_decode_into_equal(" Zm9vYmFy ", "foobar", none)
+    tests_base64_decode_into_equal("  \n\r \t Zm   9v   \t YmFy \n", "foobar", none)
+    tests_base64_decode_into_equal("aGVsbG8/d29ybGQ=", "hello?world", none)
+
+    tests_base64_decode_into_equal("Zm9vYmFy", "", 0)
+    tests_base64_decode_into_equal("Zm9vYmFy", "", 1)
+    tests_base64_decode_into_equal("Zm9vYmFy", "", 2)
+    tests_base64_decode_into_equal("Zm9vYmFy", "foo", 3)
+    tests_base64_decode_into_equal("Zm9vYmFy", "foo", 4)
+    tests_base64_decode_into_equal("Zm9vYmFy", "foo", 5)
+    tests_base64_decode_into_equal("Zm9vYmFy", "foobar", 6)
+    tests_base64_decode_into_equal("Zm9vYmFy", "foobar", 7)
+
+test "base64: decode invalid":
+    if not ak_core_is_ported:
+        return
+    assert(tests_base64_decode_fails(b"asdf\xffqwe", false))
+    assert(tests_base64_decode_fails(b"asdf\x80qwe", false))
+    assert(tests_base64_decode_fails(b"asdf:qwe", false))
+    assert(tests_base64_decode_fails(b"asdf=qwe", false))
+
+    assert(tests_base64_decode_fails(b"aGVsbG8_d29ybGQ=", false))
+    assert(tests_base64_decode_fails(b"aGVsbG8/d29ybGQ=", true))
+
+    assert(tests_base64_decode_fails(b"Y", false))
+    assert(tests_base64_decode_fails(b"YQ=", false))
+
+test "base64: decode only padding":
+    if not ak_core_is_ported:
+        return
+    # Only padding is not allowed
+    assert(tests_base64_decode_fails(b"=", false))
+    assert(tests_base64_decode_fails(b"==", false))
+    assert(tests_base64_decode_fails(b"===", false))
+    assert(tests_base64_decode_fails(b"====", false))
+
+    assert(tests_base64_decode_fails(b"=", true))
+    assert(tests_base64_decode_fails(b"==", true))
+    assert(tests_base64_decode_fails(b"===", true))
+    assert(tests_base64_decode_fails(b"====", true))
+
+## The `encode_equal` lambdas of the encoding tests.
+func tests_base64_encode_equal(input: str, expected: str, url: bool, omit_padding: OmitPadding):
+    let encoded = (encode_base64url(input.bytes, omit_padding) if url else encode_base64(input.bytes, omit_padding)) else trap("MUST: encode")
+    assert(string_eq_string_view(&encoded, sv(expected)))
+
+test "base64: encode":
+    tests_base64_encode_equal("", "", false, .no)
+    tests_base64_encode_equal("f", "Zg==", false, .no)
+    tests_base64_encode_equal("fo", "Zm8=", false, .no)
+    tests_base64_encode_equal("foo", "Zm9v", false, .no)
+    tests_base64_encode_equal("foob", "Zm9vYg==", false, .no)
+    tests_base64_encode_equal("fooba", "Zm9vYmE=", false, .no)
+    tests_base64_encode_equal("foobar", "Zm9vYmFy", false, .no)
+
+test "base64: encode omit padding":
+    tests_base64_encode_equal("", "", false, .yes)
+    tests_base64_encode_equal("f", "Zg", false, .yes)
+    tests_base64_encode_equal("fo", "Zm8", false, .yes)
+    tests_base64_encode_equal("foo", "Zm9v", false, .yes)
+    tests_base64_encode_equal("foob", "Zm9vYg", false, .yes)
+    tests_base64_encode_equal("fooba", "Zm9vYmE", false, .yes)
+    tests_base64_encode_equal("foobar", "Zm9vYmFy", false, .yes)
+
+test "base64: urldecode":
+    if not ak_core_is_ported:
+        return
+    tests_base64_decode_equal("", "", true)
+    tests_base64_decode_equal("Zg==", "f", true)
+    tests_base64_decode_equal("Zm8=", "fo", true)
+    tests_base64_decode_equal("Zm9v", "foo", true)
+    tests_base64_decode_equal("Zm9vYg==", "foob", true)
+    tests_base64_decode_equal("Zm9vYmE=", "fooba", true)
+    tests_base64_decode_equal("Zm9vYmFy", "foobar", true)
+    tests_base64_decode_equal(" Zm9vYmFy ", "foobar", true)
+    tests_base64_decode_equal("  \n\r \t Zm9vYmFy \n", "foobar", true)
+
+    tests_base64_decode_equal("TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdCwgc2VkIGRvIGVpdXNtb2QgdGVtcG9yIGluY2lkaWR1bnQgdXQgbGFib3JlIGV0IGRvbG9yZSBtYWduYSBhbGlxdWEu", "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.", true)
+    tests_base64_decode_equal("aGVsbG8_d29ybGQ=", "hello?world", true)
+
+test "base64: urlencode":
+    tests_base64_encode_equal("", "", true, .no)
+    tests_base64_encode_equal("f", "Zg==", true, .no)
+    tests_base64_encode_equal("fo", "Zm8=", true, .no)
+    tests_base64_encode_equal("foo", "Zm9v", true, .no)
+    tests_base64_encode_equal("foob", "Zm9vYg==", true, .no)
+    tests_base64_encode_equal("fooba", "Zm9vYmE=", true, .no)
+    tests_base64_encode_equal("foobar", "Zm9vYmFy", true, .no)
+
+    tests_base64_encode_equal("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.", "TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdCwgc2VkIGRvIGVpdXNtb2QgdGVtcG9yIGluY2lkaWR1bnQgdXQgbGFib3JlIGV0IGRvbG9yZSBtYWduYSBhbGlxdWEu", true, .no)
+    tests_base64_encode_equal("hello?world", "aGVsbG8_d29ybGQ=", true, .no)
+
+    tests_base64_encode_equal("hello!!world", "aGVsbG8hIXdvcmxk", true, .no)
+
+test "base64: urlencode omit padding":
+    tests_base64_encode_equal("", "", true, .yes)
+    tests_base64_encode_equal("f", "Zg", true, .yes)
+    tests_base64_encode_equal("fo", "Zm8", true, .yes)
+    tests_base64_encode_equal("foo", "Zm9v", true, .yes)
+    tests_base64_encode_equal("foob", "Zm9vYg", true, .yes)
+    tests_base64_encode_equal("fooba", "Zm9vYmE", true, .yes)
+    tests_base64_encode_equal("foobar", "Zm9vYmFy", true, .yes)
+
+    tests_base64_encode_equal("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.", "TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdCwgc2VkIGRvIGVpdXNtb2QgdGVtcG9yIGluY2lkaWR1bnQgdXQgbGFib3JlIGV0IGRvbG9yZSBtYWduYSBhbGlxdWEu", true, .yes)
+    tests_base64_encode_equal("hello?world", "aGVsbG8_d29ybGQ", true, .yes)
+
+    tests_base64_encode_equal("hello!!world", "aGVsbG8hIXdvcmxk", true, .yes)
+
+test "base64: simdutf decoding without a ByteBuffer":
+    # The replacement kernel itself, pinned to the donor's results.
+    var output: u8[16]
+    var outlen: usize = 16
+    var result = simdutf_base64_to_binary_safe(b"Zm9vYmFy", output, &outlen, .base64_default, .loose, true)
+    assert(result.error == SimdutfErrorCode.success and result.count == 8 and outlen == 6)
+    assert(compare_bytes(output[..<6], b"foobar") == 0)
+
+    outlen = 16
+    result = simdutf_base64_to_binary_safe(b"YQ=", output, &outlen, .base64_default, .loose, true)
+    assert(result.error == SimdutfErrorCode.invalid_base64_character)
+
+    outlen = 16
+    result = simdutf_base64_to_binary_safe(b"Zm9vYmE", output, &outlen, .base64_default, .strict, true)
+    assert(result.error == SimdutfErrorCode.base64_input_remainder)
+
+    outlen = 16
+    result = simdutf_base64_to_binary_safe(b"Zm9vYmF", output, &outlen, .base64_default, .stop_before_partial, true)
+    assert(result.error == SimdutfErrorCode.success and outlen == 3 and result.count == 4)
+
+    outlen = 4
+    result = simdutf_base64_to_binary_safe(b"Zm9vYmFy", output, &outlen, .base64_default, .loose, true)
+    assert(result.error == SimdutfErrorCode.output_buffer_too_small and outlen == 3 and result.count == 4)

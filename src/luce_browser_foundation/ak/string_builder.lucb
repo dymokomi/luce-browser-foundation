@@ -1,0 +1,614 @@
+#==============================================================================================
+#
+#   string_builder - StringBuilder: builds UTF-8 or UTF-16 text in a ByteBuffer
+#
+#   DESCRIPTION:
+#       Port of AK/StringBuilder.h (lines 1-141) and AK/StringBuilder.cpp (lines 1-569), in the
+#       stub's (the header's) order.
+#
+#       The buffer starts with room for a StringData (UTF-8 mode) or Utf16StringData (UTF-16
+#       mode) header, so the C++ can turn a heap buffer into a string without copying; the port
+#       keeps that layout, and string creation copies (string_data). In UTF-16 mode the text is
+#       ASCII bytes while it is all ASCII (m_utf16_builder_is_ascii), then host-endian code units.
+#       A zero-initialized ByteBuffer is taken to be an empty buffer.
+#
+#==============================================================================================
+
+# mark: Construction ============================================================================
+
+## Ported from AK/StringBuilder.cpp:26 AK::string_builder_prefix_size: the bytes reserved at the
+## front of the buffer for a string data header.
+func string_builder_prefix_size(mode: StringBuilderMode) -> usize:
+    match mode:
+        .utf8: return sizeof(StringData)
+        .utf16: return utf16_string_data_offset_of_string_storage()
+        _: trap("VERIFY_NOT_REACHED")
+
+## Ported from AK/StringBuilder.cpp:45 AK::StringBuilder::StringBuilder().
+pub func string_builder_construct(this: StringBuilder*):
+    string_builder_init_fields(this)
+    this.m_mode = StringBuilderMode.utf8
+    string_builder_initialize_buffer(this, this.m_mode, string_builder_inline_capacity)
+
+## Ported from AK/StringBuilder.cpp:53 AK::StringBuilder::StringBuilder(size_t).
+pub func string_builder_construct_usize(this: StringBuilder*, initial_capacity: usize):
+    string_builder_init_fields(this)
+    this.m_mode = StringBuilderMode.utf8
+    string_builder_initialize_buffer(this, this.m_mode, initial_capacity)
+
+## Ported from AK/StringBuilder.cpp:58 AK::StringBuilder::StringBuilder(Mode).
+pub func string_builder_construct_string_builder_mode(this: StringBuilder*, mode: StringBuilderMode):
+    string_builder_init_fields(this)
+    this.m_mode = mode
+    string_builder_initialize_buffer(this, this.m_mode, string_builder_inline_capacity)
+
+## Ported from AK/StringBuilder.cpp:64 AK::StringBuilder::StringBuilder(Mode, size_t).
+pub func string_builder_construct_string_builder_mode_usize(this: StringBuilder*, mode: StringBuilderMode, initial_capacity_in_code_units: usize):
+    string_builder_init_fields(this)
+    this.m_mode = mode
+    string_builder_initialize_buffer(this, mode, initial_capacity_in_code_units * (1 if mode == StringBuilderMode.utf8 else 2))
+
+## `StringBuilder builder;`: a UTF-8 builder.
+pub func string_builder_new() -> StringBuilder:
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    return builder
+
+## `StringBuilder builder(initial_capacity);`
+pub func string_builder_new_usize(initial_capacity: usize) -> StringBuilder:
+    var builder: StringBuilder
+    string_builder_construct_usize(&builder, initial_capacity)
+    return builder
+
+## `StringBuilder builder(mode);`
+pub func string_builder_new_mode(mode: StringBuilderMode) -> StringBuilder:
+    var builder: StringBuilder
+    string_builder_construct_string_builder_mode(&builder, mode)
+    return builder
+
+## `StringBuilder builder(mode, initial_capacity_in_code_units);`
+pub func string_builder_new_mode_usize(mode: StringBuilderMode, initial_capacity_in_code_units: usize) -> StringBuilder:
+    var builder: StringBuilder
+    string_builder_construct_string_builder_mode_usize(&builder, mode, initial_capacity_in_code_units)
+    return builder
+
+# mark: try_append ==============================================================================
+
+## Ported from AK/StringBuilder.cpp:127 AK::StringBuilder::try_append(StringView).
+pub func string_builder_try_append_string_view(this: StringBuilder*, string: StringView) -> !:
+    if string_view_is_empty(&string):
+        return
+
+    if this.m_mode == StringBuilderMode.utf8 or (this.m_utf16_builder_is_ascii and string_view_is_ascii(&string)):
+        try string_builder_will_append(this, string_view_length(&string))
+        try byte_buffer_try_append_span_u8(&this.m_buffer, string_view_bytes(&string))
+    else:
+        try string_builder_ensure_storage_is_utf16(this)
+
+        try string_builder_will_append(this, string_view_length(&string) * 2)
+        let utf8 = Utf8View(m_string = string)
+        var it = utf8_view_begin(&utf8)
+        while not utf8_code_point_iterator_done(&it):
+            try string_builder_try_append_code_point(this, utf8_code_point_iterator_deref(&it))
+            utf8_code_point_iterator_inc(&it)
+
+## Ported from AK/StringBuilder.cpp:436 AK::StringBuilder::try_append(Utf16View const&).
+pub func string_builder_try_append_utf16_view(this: StringBuilder*, utf16_view: Utf16View) -> !:
+    if utf16_view_is_empty(&utf16_view):
+        return
+    if utf16_view_has_ascii_storage(&utf16_view):
+        try string_builder_try_append_ascii_without_validation(this, utf16_view_bytes(&utf16_view))
+        return
+
+    let append_as_utf8 = this.m_mode == StringBuilderMode.utf8 or (this.m_utf16_builder_is_ascii and utf16_view_is_ascii(&utf16_view))
+
+    if not append_as_utf8:
+        try string_builder_ensure_storage_is_utf16(this)
+        try string_builder_will_append(this, utf16_view_length_in_code_units(&utf16_view) * 2)
+
+        for i in 0..<utf16_view_length_in_code_units(&utf16_view):
+            try string_builder_try_append_code_unit(this, utf16_view_code_unit_at(&utf16_view, i))
+
+        return
+
+    var remaining_view = utf16_view_utf16_span(&utf16_view)
+    let maximum_utf8_length = unicode_utils_maximum_utf8_length_from_utf16(remaining_view)
+
+    # Possibly over-allocate a little to ensure we don't have to allocate later.
+    try string_builder_will_append(this, maximum_utf8_length)
+
+    while true:
+        let size = byte_buffer_size(&this.m_buffer)
+        let uninitialized_data_pointer = u8[]((u8*)(byte_buffer_end_pointer(&this.m_buffer) else trap("VERIFY: end_pointer")), byte_buffer_capacity(&this.m_buffer) - size)
+
+        # Fast path.
+        let (result, bytes_written) = simdutf_convert_utf16_to_utf8_with_errors(remaining_view, uninitialized_data_pointer)
+        if result.error == SimdutfErrorCode.success:
+            byte_buffer_set_size(&this.m_buffer, size + bytes_written)
+            break
+
+        # Slow path. Found unmatched surrogate code unit.
+        var first_invalid_code_unit = result.count
+        assert(first_invalid_code_unit < remaining_view.length)
+
+        # simdutf does not tell us how many bytes it just wrote in case of an error, so the C++
+        # calculates it; the replacement reports it.
+        var bytes_just_written = bytes_written
+
+        while true:
+            let code_unit = remaining_view[first_invalid_code_unit]
+            first_invalid_code_unit += 1
+
+            # Invalid surrogate code units are U+D800 - U+DFFF, so they are always encoded using 3 bytes.
+            assert(code_unit >= 0xd800 and code_unit <= 0xdfff)
+            assert(size + bytes_just_written + 3 < byte_buffer_capacity(&this.m_buffer))
+            uninitialized_data_pointer[bytes_just_written] = (u8)(((code_unit >> 12) & 0x0f) | 0xe0)
+            uninitialized_data_pointer[bytes_just_written + 1] = (u8)(((code_unit >> 6) & 0x3f) | 0x80)
+            uninitialized_data_pointer[bytes_just_written + 2] = (u8)(((code_unit >> 0) & 0x3f) | 0x80)
+            bytes_just_written += 3
+            if not (first_invalid_code_unit < remaining_view.length and unicode_utils_is_utf16_low_surrogate(remaining_view[first_invalid_code_unit])):
+                break
+
+        # Code unit might no longer be invalid, retry on the remaining data.
+        byte_buffer_set_size(&this.m_buffer, size + bytes_just_written)
+        remaining_view = remaining_view[first_invalid_code_unit..]
+
+## Ported from AK/StringBuilder.cpp:503 AK::StringBuilder::try_append(Utf32View const&).
+pub func string_builder_try_append_utf32_view(this: StringBuilder*, utf32_view: Utf32View) -> !:
+    for i in 0..<utf32_view_length(&utf32_view):
+        let code_point = utf32_view_at_const(&utf32_view, i)
+        try string_builder_try_append_code_point(this, code_point)
+
+## Ported from AK/StringBuilder.cpp:172 AK::StringBuilder::try_append(char).
+pub func string_builder_try_append_u8(this: StringBuilder*, ch: u8) -> !:
+    if this.m_mode == StringBuilderMode.utf8 or (this.m_utf16_builder_is_ascii and is_ascii(ch)):
+        try string_builder_will_append(this, 1)
+        try byte_buffer_try_append_u8(&this.m_buffer, ch)
+    else:
+        try string_builder_ensure_storage_is_utf16(this)
+        try string_builder_try_append_code_unit(this, ch)
+
+## Ported from AK/StringBuilder.cpp:185 AK::StringBuilder::try_append_code_unit.
+pub func string_builder_try_append_code_unit(this: StringBuilder*, ch: u16) -> !:
+    if this.m_mode == StringBuilderMode.utf8 or (this.m_utf16_builder_is_ascii and is_ascii(ch)):
+        try string_builder_try_append_code_point(this, ch)
+    else:
+        try string_builder_ensure_storage_is_utf16(this)
+        try string_builder_will_append(this, 2)
+        try string_builder_append_code_unit_bytes(this, ch)
+
+## Appends one host-endian code unit to the buffer (`m_buffer.try_append(&ch, sizeof(ch))`).
+func string_builder_append_code_unit_bytes(this: StringBuilder*, ch: u16) -> !:
+    var bytes: u8[2] = [(u8)(ch & 0xff), (u8)(ch >> 8)]
+    try byte_buffer_try_append_span_u8(&this.m_buffer, bytes)
+
+## The first lambda of StringBuilder::try_append_code_point: `try_append(c)`.
+struct StringBuilderAppendUtf8Byte: FallibleUtf8ByteCallback:
+    var builder: StringBuilder*
+
+    mutating func call(byte: u8) -> !:
+        try string_builder_try_append_u8(self.builder, byte)
+
+## The second lambda of StringBuilder::try_append_code_point: `m_buffer.try_append(&c, 2)`.
+struct StringBuilderAppendUtf16CodeUnit: FallibleUtf16CodeUnitCallback:
+    var builder: StringBuilder*
+
+    mutating func call(code_unit: u16) -> !:
+        try string_builder_append_code_unit_bytes(self.builder, code_unit)
+
+## Ported from AK/StringBuilder.cpp:367 AK::StringBuilder::try_append_code_point.
+pub func string_builder_try_append_code_point(this: StringBuilder*, code_point: u32) -> !:
+    if not is_unicode(code_point):
+        try string_builder_try_append_code_point(this, unicode_utils_replacement_code_point)
+        return
+
+    if this.m_mode == StringBuilderMode.utf8 or (this.m_utf16_builder_is_ascii and is_ascii(code_point)):
+        var append_byte = StringBuilderAppendUtf8Byte(builder = this)
+        discard(try unicode_utils_try_code_point_to_utf8(code_point, &append_byte))
+    else:
+        try string_builder_ensure_storage_is_utf16(this)
+
+        var append_code_unit = StringBuilderAppendUtf16CodeUnit(builder = this)
+        discard(try unicode_utils_try_code_point_to_utf16(code_point, &append_code_unit))
+
+## Ported from AK/StringBuilder.cpp:254 AK::StringBuilder::try_append(char const*, size_t).
+pub func string_builder_try_append_u8_usize(this: StringBuilder*, characters: const u8*?, length: usize) -> !:
+    try string_builder_try_append_string_view(this, literalsv_u8(characters, length))
+
+## Ported from AK/StringBuilder.cpp:198 AK::StringBuilder::try_append_repeated(char, size_t).
+pub func string_builder_try_append_repeated_u8(this: StringBuilder*, ch: u8, n: usize) -> !:
+    let append_as_utf8 = this.m_mode == StringBuilderMode.utf8 or (this.m_utf16_builder_is_ascii and is_ascii(ch))
+    try string_builder_will_append(this, n * (1 if append_as_utf8 else 2))
+
+    for _i in 0..<n:
+        try string_builder_try_append_u8(this, ch)
+
+## Ported from AK/StringBuilder.cpp:209 AK::StringBuilder::try_append_repeated(StringView, size_t).
+pub func string_builder_try_append_repeated_string_view(this: StringBuilder*, string: StringView, n: usize) -> !:
+    if string_view_is_empty(&string):
+        return
+
+    if this.m_mode == StringBuilderMode.utf8 or (this.m_utf16_builder_is_ascii and string_view_is_ascii(&string)):
+        try string_builder_will_append(this, string_view_length(&string) * n)
+    else:
+        let utf16_length = simdutf_utf16_length_from_utf8(string_view_bytes(&string))
+        try string_builder_will_append(this, utf16_length * n * 2)
+
+    for _i in 0..<n:
+        try string_builder_try_append_string_view(this, string)
+
+## Ported from AK/StringBuilder.cpp:227 AK::StringBuilder::try_append_repeated(Utf16View const&, size_t).
+pub func string_builder_try_append_repeated_utf16_view(this: StringBuilder*, string: Utf16View, n: usize) -> !:
+    if utf16_view_is_empty(&string):
+        return
+
+    if this.m_mode == StringBuilderMode.utf8 or (this.m_utf16_builder_is_ascii and utf16_view_is_ascii(&string)):
+        if utf16_view_has_ascii_storage(&string):
+            try string_builder_will_append(this, utf16_view_length_in_code_units(&string) * n)
+        else:
+            let utf8_length = simdutf_utf8_length_from_utf16(utf16_view_utf16_span(&string))
+            try string_builder_will_append(this, utf8_length * n)
+    else:
+        try string_builder_will_append(this, utf16_view_length_in_code_units(&string) * n * 2)
+
+    for _i in 0..<n:
+        try string_builder_try_append_utf16_view(this, string)
+
+## Ported from AK/StringBuilder.cpp:530 AK::StringBuilder::try_append_escaped_for_json.
+pub func string_builder_try_append_escaped_for_json(this: StringBuilder*, string: StringView) -> !:
+    for ch in string_view_bytes(&string):
+        match ch:
+            0x08:
+                try string_builder_try_append_string_view(this, sv("\\b"))
+            '\n':
+                try string_builder_try_append_string_view(this, sv("\\n"))
+            '\t':
+                try string_builder_try_append_string_view(this, sv("\\t"))
+            '"':
+                try string_builder_try_append_string_view(this, sv("\\\""))
+            '\\':
+                try string_builder_try_append_string_view(this, sv("\\\\"))
+            _:
+                if ch <= 0x1f:
+                    # try_appendff("\\u{:04x}", ch)
+                    let hex_digits = "0123456789abcdef".bytes
+                    try string_builder_try_append_string_view(this, sv("\\u00"))
+                    try string_builder_try_append_u8(this, hex_digits[ch >> 4])
+                    try string_builder_try_append_u8(this, hex_digits[ch & 0xf])
+                else:
+                    try string_builder_try_append_u8(this, ch)
+
+## Ported from AK/StringBuilder.cpp:151 AK::StringBuilder::try_append_ascii_without_validation.
+pub func string_builder_try_append_ascii_without_validation(this: StringBuilder*, string: const u8[]) -> !:
+    if string.length == 0:
+        return
+
+    if this.m_mode == StringBuilderMode.utf8 or this.m_utf16_builder_is_ascii:
+        try byte_buffer_try_append_span_u8(&this.m_buffer, string)
+    else:
+        if this.m_mode == StringBuilderMode.utf16:
+            try string_builder_ensure_storage_is_utf16(this)
+            try string_builder_will_append(this, string.length * 2)
+        else:
+            try string_builder_will_append(this, string.length)
+        let utf8 = Utf8View(m_string = string_view_from_bytes(string))
+        var it = utf8_view_begin(&utf8)
+        while not utf8_code_point_iterator_done(&it):
+            try string_builder_try_append_code_point(this, utf8_code_point_iterator_deref(&it))
+            utf8_code_point_iterator_inc(&it)
+
+# mark: append ==================================================================================
+
+## Ported from AK/StringBuilder.cpp:249 AK::StringBuilder::append(StringView).
+pub func string_builder_append_string_view(this: StringBuilder*, string: StringView):
+    string_builder_try_append_string_view(this, string) else trap("MUST: StringBuilder::append")
+
+## `builder.append("text"sv)`: appends a string literal or any other `str`.
+pub func string_builder_append(this: StringBuilder*, text: str):
+    string_builder_append_string_view(this, sv(text))
+
+## Ported from AK/StringBuilder.cpp:498 AK::StringBuilder::append(Utf16View const&).
+pub func string_builder_append_utf16_view(this: StringBuilder*, utf16_view: Utf16View):
+    string_builder_try_append_utf16_view(this, utf16_view) else trap("MUST: StringBuilder::append")
+
+## Ported from AK/StringBuilder.cpp:512 AK::StringBuilder::append(Utf32View const&).
+pub func string_builder_append_utf32_view(this: StringBuilder*, utf32_view: Utf32View):
+    string_builder_try_append_utf32_view(this, utf32_view) else trap("MUST: StringBuilder::append")
+
+## Ported from AK/StringBuilder.cpp:264 AK::StringBuilder::append(char).
+pub func string_builder_append_u8(this: StringBuilder*, ch: u8):
+    string_builder_try_append_u8(this, ch) else trap("MUST: StringBuilder::append")
+
+## Ported from AK/StringBuilder.cpp:269 AK::StringBuilder::append_code_unit.
+pub func string_builder_append_code_unit(this: StringBuilder*, ch: u16):
+    string_builder_try_append_code_unit(this, ch) else trap("MUST: StringBuilder::append_code_unit")
+
+## Ported from AK/StringBuilder.cpp:385 AK::StringBuilder::append_code_point.
+pub func string_builder_append_code_point(this: StringBuilder*, code_point: u32):
+    if not is_unicode(code_point):
+        string_builder_append_code_point(this, unicode_utils_replacement_code_point)
+        return
+
+    let append_as_utf8 = this.m_mode == StringBuilderMode.utf8 or (this.m_utf16_builder_is_ascii and is_ascii(code_point))
+
+    if not append_as_utf8:
+        string_builder_ensure_storage_is_utf16(this) else trap("MUST: ensure_storage_is_utf16")
+        discard(string_builder_will_append(this, 2) catch: recover ())
+
+        if code_point < unicode_utils_first_supplementary_plane_code_point:
+            string_builder_append_code_unit_bytes(this, (u16)code_point) else trap("MUST: append_code_point")
+            return
+
+        discard(string_builder_will_append(this, 2) catch: recover ())
+        let supplementary = code_point - unicode_utils_first_supplementary_plane_code_point
+
+        var code_unit = (u16)((u32)unicode_utils_high_surrogate_min | (supplementary >> 10))
+        string_builder_append_code_unit_bytes(this, code_unit) else trap("MUST: append_code_point")
+
+        code_unit = (u16)((u32)unicode_utils_low_surrogate_min | (supplementary & 0x3ff))
+        string_builder_append_code_unit_bytes(this, code_unit) else trap("MUST: append_code_point")
+
+        return
+
+    if code_point <= 0x7f:
+        byte_buffer_append_u8(&this.m_buffer, (u8)code_point)
+    elif code_point <= 0x07ff:
+        discard(string_builder_will_append(this, 2) catch: recover ())
+        byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 6) & 0x1f) | 0xc0))
+        byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 0) & 0x3f) | 0x80))
+    elif code_point <= 0xffff:
+        discard(string_builder_will_append(this, 3) catch: recover ())
+        byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 12) & 0x0f) | 0xe0))
+        byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 6) & 0x3f) | 0x80))
+        byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 0) & 0x3f) | 0x80))
+    else:
+        discard(string_builder_will_append(this, 4) catch: recover ())
+        byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 18) & 0x07) | 0xf0))
+        byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 12) & 0x3f) | 0x80))
+        byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 6) & 0x3f) | 0x80))
+        byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 0) & 0x3f) | 0x80))
+
+## Ported from AK/StringBuilder.cpp:259 AK::StringBuilder::append(char const*, size_t).
+pub func string_builder_append_u8_usize(this: StringBuilder*, characters: const u8*?, length: usize):
+    string_builder_try_append_u8_usize(this, characters, length) else trap("MUST: StringBuilder::append")
+
+## Ported from AK/StringBuilder.h:64 AK::StringBuilder::appendvf(char const*, va_list). The donor
+## declares it but never defines it; C variadic formatting has no luce-base form.
+pub func string_builder_appendvf(this: StringBuilder*, arg0: const u8*?, arg1: u8*?):
+    trap("StringBuilder::appendvf is declared but not defined in the donor")
+
+## Ported from AK/StringBuilder.cpp:274 AK::StringBuilder::append_repeated(char, size_t).
+pub func string_builder_append_repeated_u8(this: StringBuilder*, ch: u8, n: usize):
+    string_builder_try_append_repeated_u8(this, ch, n) else trap("MUST: StringBuilder::append_repeated")
+
+## Ported from AK/StringBuilder.cpp:279 AK::StringBuilder::append_repeated(StringView, size_t).
+pub func string_builder_append_repeated_string_view(this: StringBuilder*, string: StringView, n: usize):
+    string_builder_try_append_repeated_string_view(this, string, n) else trap("MUST: StringBuilder::append_repeated")
+
+## Ported from AK/StringBuilder.cpp:284 AK::StringBuilder::append_repeated(Utf16View const&, size_t).
+pub func string_builder_append_repeated_utf16_view(this: StringBuilder*, string: Utf16View, n: usize):
+    string_builder_try_append_repeated_utf16_view(this, string, n) else trap("MUST: StringBuilder::append_repeated")
+
+## Ported from AK/StringBuilder.cpp:525 AK::StringBuilder::append_escaped_for_json.
+pub func string_builder_append_escaped_for_json(this: StringBuilder*, string: StringView):
+    string_builder_try_append_escaped_for_json(this, string) else trap("MUST: append_escaped_for_json")
+
+## Ported from AK/StringBuilder.cpp:517 AK::StringBuilder::append_as_lowercase.
+pub func string_builder_append_as_lowercase(this: StringBuilder*, ch: u8):
+    if ch >= 'A' and ch <= 'Z':
+        string_builder_append_u8(this, ch + 0x20)
+    else:
+        string_builder_append_u8(this, ch)
+
+## Ported from AK/StringBuilder.cpp:146 AK::StringBuilder::append_ascii_without_validation.
+pub func string_builder_append_ascii_without_validation(this: StringBuilder*, string: const u8[]):
+    string_builder_try_append_ascii_without_validation(this, string) else trap("MUST: append_ascii_without_validation")
+
+# mark: Results =================================================================================
+
+## Ported from AK/StringBuilder.cpp:294 AK::StringBuilder::to_byte_string.
+pub func string_builder_to_byte_string(this: const StringBuilder*) -> ByteString:
+    assert(this.m_mode == StringBuilderMode.utf8)
+    if string_builder_is_empty(this):
+        return byte_string_empty()
+    let view = string_builder_string_view(this)
+    return byte_string_from_string_view(view)
+
+## Ported from AK/StringBuilder.cpp:310 AK::StringBuilder::to_string_without_validation.
+pub func string_builder_to_string_without_validation(this: StringBuilder*) -> String:
+    assert(this.m_mode == StringBuilderMode.utf8)
+    if byte_buffer_is_inline(&this.m_buffer):
+        let view = string_builder_string_view(this)
+        return string_from_utf8_without_validation(string_view_bytes(&view))
+    return string_from_string_builder_without_validation(this)
+
+## Ported from AK/StringBuilder.cpp:302 AK::StringBuilder::to_string: fails when the text is
+## not valid UTF-8.
+pub func string_builder_to_string(this: StringBuilder*) -> String!:
+    assert(this.m_mode == StringBuilderMode.utf8)
+    if byte_buffer_is_inline(&this.m_buffer):
+        return try string_from_utf8(string_builder_string_view(this))
+    return try string_from_string_builder(this)
+
+## Ported from AK/StringBuilder.cpp:318 AK::StringBuilder::to_fly_string_without_validation.
+pub func string_builder_to_fly_string_without_validation(this: const StringBuilder*) -> FlyString:
+    assert(this.m_mode == StringBuilderMode.utf8)
+    let view = string_builder_string_view(this)
+    return fly_string_from_utf8_without_validation(string_view_bytes(&view))
+
+## Ported from AK/StringBuilder.cpp:324 AK::StringBuilder::to_fly_string.
+pub func string_builder_to_fly_string(this: const StringBuilder*) -> FlyString!:
+    assert(this.m_mode == StringBuilderMode.utf8)
+    return try fly_string_from_utf8(string_builder_string_view(this))
+
+## Ported from AK/StringBuilder.cpp:330 AK::StringBuilder::to_utf16_string.
+pub func string_builder_to_utf16_string(this: StringBuilder*) -> Utf16String:
+    assert(this.m_mode == StringBuilderMode.utf16)
+    return utf16_string_from_string_builder(this)
+
+## Ported from AK/StringBuilder.cpp:289 AK::StringBuilder::to_byte_buffer.
+pub func string_builder_to_byte_buffer(this: const StringBuilder*) -> ByteBuffer!:
+    let data = string_builder_data_const(this) else return try byte_buffer_copy_span_u8(b"")
+    return try byte_buffer_copy_span_u8(u8[]((u8*)data, string_builder_length(this)))
+
+## Ported from AK/StringBuilder.cpp:346 AK::StringBuilder::string_view.
+pub func string_builder_string_view(this: const StringBuilder*) -> StringView:
+    assert(this.m_mode == StringBuilderMode.utf8)
+    return string_view_from_bytes(byte_buffer_span_const(&this.m_buffer)[string_builder_prefix_size(this.m_mode)..])
+
+## Ported from AK/StringBuilder.cpp:352 AK::StringBuilder::utf16_string_view.
+pub func string_builder_utf16_string_view(this: const StringBuilder*) -> Utf16View:
+    assert(this.m_mode == StringBuilderMode.utf16)
+    let view = byte_buffer_span_const(&this.m_buffer)[string_builder_prefix_size(this.m_mode)..]
+
+    if this.m_utf16_builder_is_ascii:
+        return utf16_view_from_ascii(view)
+    return utf16_view_from_utf16(u16[]((u16*)view.data, view.length // 2))
+
+## Ported from AK/StringBuilder.cpp:362 AK::StringBuilder::clear.
+pub func string_builder_clear(this: StringBuilder*):
+    byte_buffer_resize(&this.m_buffer, string_builder_prefix_size(this.m_mode))
+
+## Ported from AK/StringBuilder.cpp:108 AK::StringBuilder::length: the bytes (UTF-8) or bytes of
+## code units (UTF-16) appended.
+pub func string_builder_length(this: const StringBuilder*) -> usize:
+    return byte_buffer_size(&this.m_buffer) - string_builder_prefix_size(this.m_mode)
+
+## Ported from AK/StringBuilder.cpp:113 AK::StringBuilder::is_empty.
+pub func string_builder_is_empty(this: const StringBuilder*) -> bool:
+    return string_builder_length(this) == 0
+
+## Ported from AK/StringBuilder.cpp:118 AK::StringBuilder::trim: drops `count` code units from the end.
+pub func string_builder_trim(this: StringBuilder*, count: usize):
+    var units = count
+    if this.m_mode == StringBuilderMode.utf16:
+        units *= 2
+
+    let size = byte_buffer_size(&this.m_buffer)
+    let decrease_count = size if size < units else units
+    byte_buffer_resize(&this.m_buffer, size - decrease_count)
+
+# mark: Joining =================================================================================
+
+## Ported from AK/StringBuilder.h:100 AK::StringBuilder::join over StringViews with the default
+## "{}" format.
+pub func string_builder_join_string_view(this: StringBuilder*, separator: StringView, collection: const StringView[]):
+    string_builder_try_join_string_view(this, separator, collection) else trap("MUST: StringBuilder::join")
+
+## Ported from AK/StringBuilder.h:106 AK::StringBuilder::try_join over StringViews with the
+## default "{}" format.
+pub func string_builder_try_join_string_view(this: StringBuilder*, separator: StringView, collection: const StringView[]) -> !:
+    var first = true
+    for item in collection:
+        if not first:
+            try string_builder_try_append_string_view(this, separator)
+        try string_builder_try_append_string_view(this, item)
+        first = false
+
+## Ported from AK/StringBuilder.h:100 AK::StringBuilder::join over Strings with the default "{}"
+## format.
+pub func string_builder_join_string(this: StringBuilder*, separator: StringView, collection: const String[]):
+    string_builder_try_join_string(this, separator, collection) else trap("MUST: StringBuilder::join")
+
+## Ported from AK/StringBuilder.h:106 AK::StringBuilder::try_join over Strings with the default
+## "{}" format.
+pub func string_builder_try_join_string(this: StringBuilder*, separator: StringView, collection: const String[]) -> !:
+    var first = true
+    for item in &collection:
+        if not first:
+            try string_builder_try_append_string_view(this, separator)
+        try string_builder_try_append_string_view(this, string_bytes_as_string_view(item))
+        first = false
+
+## Ported from AK/StringBuilder.h:100 AK::StringBuilder::join over FlyStrings with the default
+## "{}" format.
+pub func string_builder_join_fly_string(this: StringBuilder*, separator: StringView, collection: const FlyString[]):
+    var first = true
+    for item in &collection:
+        if not first:
+            string_builder_append_string_view(this, separator)
+        string_builder_append_string_view(this, fly_string_bytes_as_string_view(item))
+        first = false
+
+## Ported from AK/StringBuilder.h:100 AK::StringBuilder::join over Utf16Views with the default "{}"
+## format (Formatter<Utf16View> appends the view).
+pub func string_builder_join_utf16_view(this: StringBuilder*, separator: Utf16View, collection: const Utf16View[]):
+    var first = true
+    for item in collection:
+        if not first:
+            string_builder_append_utf16_view(this, separator)
+        string_builder_append_utf16_view(this, item)
+        first = false
+
+# mark: Buffer management =======================================================================
+
+## Ported from AK/StringBuilder.h:118 AK::StringBuilder::leak_buffer_for_string_construction(Badge<StringData>).
+pub func string_builder_leak_buffer_for_string_construction_string_data(this: StringBuilder*) -> ByteBufferOutlineBuffer?:
+    return string_builder_leak_buffer_for_string_construction(this)
+
+## Ported from AK/StringBuilder.h:119 AK::StringBuilder::leak_buffer_for_string_construction(Badge<Utf16StringData>).
+pub func string_builder_leak_buffer_for_string_construction_utf16_string_data(this: StringBuilder*) -> ByteBufferOutlineBuffer?:
+    return string_builder_leak_buffer_for_string_construction(this)
+
+## Ported from AK/StringBuilder.cpp:37 AK::StringBuilder::initialize_buffer.
+func string_builder_initialize_buffer(this: StringBuilder*, mode: StringBuilderMode, capacity: usize):
+    let prefix_size = string_builder_prefix_size(mode)
+    if capacity > string_builder_inline_capacity:
+        byte_buffer_ensure_capacity(&this.m_buffer, prefix_size + capacity)
+    byte_buffer_resize(&this.m_buffer, prefix_size)
+
+## Ported from AK/StringBuilder.cpp:559 AK::StringBuilder::leak_buffer_for_string_construction:
+## the heap buffer (the ByteBuffer's OutlineBuffer), leaving the builder empty, or none while the
+## buffer is inline. String creation copies instead (string_data), so nothing calls it yet.
+func string_builder_leak_buffer_for_string_construction(this: StringBuilder*) -> ByteBufferOutlineBuffer?:
+    if let buffer = byte_buffer_leak_outline_buffer(&this.m_buffer):
+        string_builder_clear(this)
+        return buffer
+
+    return none
+
+## Ported from AK/StringBuilder.cpp:70 AK::StringBuilder::will_append: makes room for
+## `size_in_bytes` more bytes, doubling the needed capacity when it grows.
+func string_builder_will_append(this: StringBuilder*, size_in_bytes: usize) -> !:
+    let needed_capacity = byte_buffer_size(&this.m_buffer) +? size_in_bytes else trap("VERIFY: will_append overflow")
+    # Prefer to completely use the existing capacity first
+    if needed_capacity <= byte_buffer_capacity(&this.m_buffer):
+        return
+    let expanded_capacity = needed_capacity *? 2 else trap("VERIFY: will_append overflow")
+    try byte_buffer_try_ensure_capacity(&this.m_buffer, expanded_capacity)
+
+## Ported from AK/StringBuilder.cpp:85 AK::StringBuilder::ensure_storage_is_utf16: widens the
+## ASCII bytes written so far to code units.
+func string_builder_ensure_storage_is_utf16(this: StringBuilder*) -> !:
+    let was_ascii = this.m_utf16_builder_is_ascii
+    this.m_utf16_builder_is_ascii = false
+    if not was_ascii:
+        return
+    if string_builder_is_empty(this):
+        return
+
+    let ascii_length = string_builder_length(this)
+    try byte_buffer_try_resize(&this.m_buffer, byte_buffer_size(&this.m_buffer) + ascii_length)
+
+    let data = string_builder_data(this) else trap("VERIFY: builder data")
+    let source = u8[](data, ascii_length)
+    let target = u8[](data, ascii_length * 2)
+
+    var i = ascii_length
+    while i > 0:
+        let index = i - 1
+
+        let ch = source[index]
+        target[index * 2] = ch
+        target[index * 2 + 1] = 0
+        i -= 1
+
+## Ported from AK/StringBuilder.cpp:336 AK::StringBuilder::data.
+func string_builder_data(this: StringBuilder*) -> u8*?:
+    let data = byte_buffer_data(&this.m_buffer) else return none
+    return data + string_builder_prefix_size(this.m_mode)
+
+## Ported from AK/StringBuilder.cpp:341 AK::StringBuilder::data (const).
+func string_builder_data_const(this: const StringBuilder*) -> const u8*?:
+    let data = byte_buffer_data_const(&this.m_buffer) else return none
+    return data + string_builder_prefix_size(this.m_mode)

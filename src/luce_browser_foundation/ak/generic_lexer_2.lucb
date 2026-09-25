@@ -1,0 +1,489 @@
+#==============================================================================================
+#
+#   generic_lexer_2 - GenericLexer<char16_t> (Utf16GenericLexer) and LineTrackingLexer
+#
+#   DESCRIPTION:
+#       Port of AK/GenericLexer.h (lines 41-533) for CharType = char16_t, as the
+#       utf16_generic_lexer_* functions over `GenericLexer[u16]` (ViewType Utf16View, the
+#       m_utf16_input field), and of LineTrackingLexer (AK/GenericLexer.h:492-527,
+#       AK/GenericLexer.cpp lines 1-41). The char16_t lexer's extra overloads taking a `char`
+#       or a StringView are the `_u8` and `_string_view` functions; its predicates are
+#       CodePointPredicate structs.
+#
+#==============================================================================================
+
+# mark: Predicates ==============================================================================
+
+## The is_any_of lambda applied to a code unit (GenericLexer<char16_t> calls it with char16_t):
+## `values.contains(c)`.
+pub struct CodePointIsAnyOf: CodePointPredicate:
+    pub var values: StringView
+
+    pub func matches(code_point: u32) -> bool:
+        if code_point <= 0x7f:
+            return string_view_contains_u8(&self.values, (u8)code_point)
+        return string_view_contains_u32(&self.values, code_point)
+
+## A plain function (such as is_ascii_digit) used as a CodePointPredicate.
+pub struct CodePointPredicateFunction: CodePointPredicate:
+    pub var function: func(u32) -> bool
+
+    pub func matches(code_point: u32) -> bool:
+        return self.function(code_point)
+
+# mark: Construction and position ===============================================================
+
+## Ported from AK/GenericLexer.h:47 AK::Detail::GenericLexer::GenericLexer<char16_t>(Utf16View).
+pub func utf16_generic_lexer_construct(this: GenericLexer[u16]*, input: Utf16View):
+    this.m_utf16_input = input
+    this.m_index = 0
+
+## `Utf16GenericLexer lexer(input)`: the value form of the constructor.
+pub func utf16_generic_lexer_new(input: Utf16View) -> GenericLexer[u16]:
+    var lexer: GenericLexer[u16]
+    utf16_generic_lexer_construct(&lexer, input)
+    return lexer
+
+## Ported from AK/GenericLexer.h:52 AK::Detail::GenericLexer::tell.
+pub func utf16_generic_lexer_tell(this: const GenericLexer[u16]*) -> usize:
+    return this.m_index
+
+## Ported from AK/GenericLexer.h:53 AK::Detail::GenericLexer::tell_remaining.
+pub func utf16_generic_lexer_tell_remaining(this: const GenericLexer[u16]*) -> usize:
+    return utf16_generic_lexer_input_length(this) - this.m_index
+
+## Ported from AK/GenericLexer.h:55 AK::Detail::GenericLexer::remaining.
+pub func utf16_generic_lexer_remaining(this: const GenericLexer[u16]*) -> Utf16View:
+    return utf16_view_substring_view(&this.m_utf16_input, this.m_index)
+
+## Ported from AK/GenericLexer.h:56 AK::Detail::GenericLexer::input.
+pub func utf16_generic_lexer_input(this: const GenericLexer[u16]*) -> Utf16View:
+    return this.m_utf16_input
+
+## Ported from AK/GenericLexer.h:58 AK::Detail::GenericLexer::is_eof.
+pub func utf16_generic_lexer_is_eof(this: const GenericLexer[u16]*) -> bool:
+    return this.m_index >= utf16_generic_lexer_input_length(this)
+
+## Ported from AK/GenericLexer.h:60 AK::Detail::GenericLexer::peek.
+pub func utf16_generic_lexer_peek(this: const GenericLexer[u16]*, offset: usize = 0) -> u16:
+    return utf16_generic_lexer_code_unit_at(this, this.m_index + offset) if this.m_index + offset < utf16_generic_lexer_input_length(this) else 0
+
+## Ported from AK/GenericLexer.h:65 AK::Detail::GenericLexer::peek_string.
+pub func utf16_generic_lexer_peek_string(this: const GenericLexer[u16]*, length: usize, offset: usize = 0) -> Utf16View?:
+    if this.m_index + offset + length > utf16_generic_lexer_input_length(this):
+        return none
+    return utf16_view_substring_view_usize(&this.m_utf16_input, this.m_index + offset, length)
+
+# mark: Matching ================================================================================
+
+## Ported from AK/GenericLexer.h:72 AK::Detail::GenericLexer::next_is(CharType).
+pub func utf16_generic_lexer_next_is_t_char_type(this: const GenericLexer[u16]*, expected: u16) -> bool:
+    return utf16_generic_lexer_peek(this) == expected
+
+## Ported from AK/GenericLexer.h:77 AK::Detail::GenericLexer::next_is(char).
+pub func utf16_generic_lexer_next_is_u8(this: const GenericLexer[u16]*, expected: u8) -> bool:
+    return utf16_generic_lexer_peek(this) == expected
+
+## Ported from AK/GenericLexer.h:83 AK::Detail::GenericLexer::next_is(ViewType).
+pub func utf16_generic_lexer_next_is_utf16_view(this: const GenericLexer[u16]*, expected: Utf16View) -> bool:
+    let length = utf16_view_length_in_code_units(&expected)
+    let next = utf16_generic_lexer_peek_string(this, length) else return false
+    return utf16_view_eq_utf16_view(&next, &expected)
+
+## Ported from AK/GenericLexer.h:95 AK::Detail::GenericLexer::next_is(StringView).
+pub func utf16_generic_lexer_next_is_string_view(this: const GenericLexer[u16]*, expected: StringView) -> bool:
+    let next = utf16_generic_lexer_peek_string(this, string_view_length(&expected)) else return false
+    return utf16_view_eq_string_view(&next, expected)
+
+## Ported from AK/GenericLexer.h:101 AK::Detail::GenericLexer::retreat.
+pub func utf16_generic_lexer_retreat(this: GenericLexer[u16]*):
+    assert(this.m_index > 0)
+    this.m_index -= 1
+
+## Ported from AK/GenericLexer.h:107 AK::Detail::GenericLexer::retreat(size_t).
+pub func utf16_generic_lexer_retreat_usize(this: GenericLexer[u16]*, count: usize):
+    assert(this.m_index >= count)
+    this.m_index -= count
+
+## Ported from AK/GenericLexer.h:113 AK::Detail::GenericLexer::consume.
+pub func utf16_generic_lexer_consume(this: GenericLexer[u16]*) -> u16:
+    assert(not utf16_generic_lexer_is_eof(this))
+    let code_unit = utf16_generic_lexer_code_unit_at(this, this.m_index)
+    this.m_index += 1
+    return code_unit
+
+## Ported from AK/GenericLexer.h:119 AK::Detail::GenericLexer::consume_specific(CharType).
+pub func utf16_generic_lexer_consume_specific_t_char_type(this: GenericLexer[u16]*, next: u16) -> bool:
+    if not utf16_generic_lexer_next_is_t_char_type(this, next):
+        return false
+
+    utf16_generic_lexer_ignore(this)
+    return true
+
+## Ported from AK/GenericLexer.h:128 AK::Detail::GenericLexer::consume_specific(char).
+pub func utf16_generic_lexer_consume_specific_u8(this: GenericLexer[u16]*, next: u8) -> bool:
+    return utf16_generic_lexer_consume_specific_t_char_type(this, next)
+
+## Ported from AK/GenericLexer.h:134 AK::Detail::GenericLexer::consume_specific(ViewType).
+pub func utf16_generic_lexer_consume_specific_utf16_view(this: GenericLexer[u16]*, next: Utf16View) -> bool:
+    if not utf16_generic_lexer_next_is_utf16_view(this, next):
+        return false
+
+    utf16_generic_lexer_ignore(this, utf16_view_length_in_code_units(&next))
+    return true
+
+## Ported from AK/GenericLexer.h:147 AK::Detail::GenericLexer::consume_specific(StringView).
+pub func utf16_generic_lexer_consume_specific_string_view(this: GenericLexer[u16]*, next: StringView) -> bool:
+    if not utf16_generic_lexer_next_is_string_view(this, next):
+        return false
+
+    utf16_generic_lexer_ignore(this, string_view_length(&next))
+    return true
+
+## Ported from AK/GenericLexer.h:157 AK::Detail::GenericLexer::consume_escaped_character. An
+## `escape_map` without characters stands for the C++ default "n\nr\rt\tb\bf\f".
+pub func utf16_generic_lexer_consume_escaped_character(this: GenericLexer[u16]*, escape_char: u16 = 0x5c, escape_map: StringView = StringView()) -> u16:
+    let map = sv("n\nr\rt\tb\u{8}f\u{c}") if string_view_characters_without_null_termination(&escape_map) == none else escape_map
+    if not utf16_generic_lexer_consume_specific_t_char_type(this, escape_char):
+        return utf16_generic_lexer_consume(this)
+
+    let c_ = utf16_generic_lexer_consume(this)
+
+    var i: usize = 0
+    while i < string_view_length(&map):
+        if c_ == (u16)string_view_at(&map, i):
+            return string_view_at(&map, i + 1)
+        i += 2
+
+    return c_
+
+## Ported from AK/GenericLexer.h:173 AK::Detail::GenericLexer::consume(size_t).
+pub func utf16_generic_lexer_consume_usize(this: GenericLexer[u16]*, count: usize) -> Utf16View:
+    let start = this.m_index
+    let available = utf16_generic_lexer_input_length(this) - this.m_index
+    let length = count if count < available else available
+    this.m_index += length
+
+    return utf16_view_substring_view_usize(&this.m_utf16_input, start, length)
+
+## Ported from AK/GenericLexer.h:183 AK::Detail::GenericLexer::consume_all.
+pub func utf16_generic_lexer_consume_all(this: GenericLexer[u16]*) -> Utf16View:
+    let rest = utf16_view_substring_view_usize(&this.m_utf16_input, this.m_index, utf16_generic_lexer_input_length(this) - this.m_index)
+    this.m_index = utf16_generic_lexer_input_length(this)
+    return rest
+
+## Ported from AK/GenericLexer.h:191 AK::Detail::GenericLexer::consume_line.
+pub func utf16_generic_lexer_consume_line(this: GenericLexer[u16]*) -> Utf16View:
+    let start = this.m_index
+    while not utf16_generic_lexer_is_eof(this) and utf16_generic_lexer_peek(this) != (u16)'\r' and utf16_generic_lexer_peek(this) != (u16)'\n':
+        this.m_index += 1
+
+    let length = this.m_index - start
+    discard(utf16_generic_lexer_consume_specific_u8(this, '\r'))
+    discard(utf16_generic_lexer_consume_specific_u8(this, '\n'))
+
+    return utf16_view_substring_view_usize(&this.m_utf16_input, start, length)
+
+## Ported from AK/GenericLexer.h:205 AK::Detail::GenericLexer::consume_until(CharType).
+pub func utf16_generic_lexer_consume_until_t_char_type(this: GenericLexer[u16]*, stop: u16) -> Utf16View:
+    let start = this.m_index
+    while not utf16_generic_lexer_is_eof(this) and utf16_generic_lexer_peek(this) != stop:
+        this.m_index += 1
+
+    let length = this.m_index - start
+    return utf16_view_substring_view_usize(&this.m_utf16_input, start, length)
+
+## Ported from AK/GenericLexer.h:215 AK::Detail::GenericLexer::consume_until(char).
+pub func utf16_generic_lexer_consume_until_u8(this: GenericLexer[u16]*, stop: u8) -> Utf16View:
+    return utf16_generic_lexer_consume_until_t_char_type(this, stop)
+
+## Ported from AK/GenericLexer.h:222 AK::Detail::GenericLexer::consume_until(ViewType).
+pub func utf16_generic_lexer_consume_until_utf16_view(this: GenericLexer[u16]*, stop: Utf16View) -> Utf16View:
+    let start = this.m_index
+    while not utf16_generic_lexer_is_eof(this) and not utf16_generic_lexer_next_is_utf16_view(this, stop):
+        this.m_index += 1
+
+    let length = this.m_index - start
+    return utf16_view_substring_view_usize(&this.m_utf16_input, start, length)
+
+## Ported from AK/GenericLexer.h:235 AK::Detail::GenericLexer::consume_quoted_string.
+pub func utf16_generic_lexer_consume_quoted_string(this: GenericLexer[u16]*, escape_char: u16 = 0) -> Utf16View:
+    let quote = CodePointIsAnyOf(values = sv("'\""))
+    if not utf16_generic_lexer_next_is_tt_predicate(this, &quote):
+        return utf16_view_new()
+
+    let quote_char = utf16_generic_lexer_consume(this)
+    let start = this.m_index
+    while not utf16_generic_lexer_is_eof(this):
+        if utf16_generic_lexer_next_is_t_char_type(this, escape_char):
+            this.m_index += 1
+        elif utf16_generic_lexer_next_is_t_char_type(this, quote_char):
+            break
+        this.m_index += 1
+    let length = this.m_index - start
+
+    if utf16_generic_lexer_peek(this) != quote_char:
+        # Restore the index in case the string is unterminated
+        this.m_index = start - 1
+        return utf16_view_new()
+
+    # Ignore closing quote
+    utf16_generic_lexer_ignore(this)
+
+    return utf16_view_substring_view_usize(&this.m_utf16_input, start, length)
+
+# mark: Integers and escapes ====================================================================
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<T> (see
+## generic_lexer_consume_decimal_integer_magnitude).
+func utf16_generic_lexer_consume_decimal_integer_magnitude(this: GenericLexer[u16]*, maximum: u64, unsigned_maximum: u64, is_unsigned: bool) -> (u64, bool)!:
+    let rollback_position = this.m_index
+
+    var has_minus_sign = false
+
+    if utf16_generic_lexer_next_is_u8(this, '+') or utf16_generic_lexer_next_is_u8(this, '-'):
+        if utf16_generic_lexer_consume(this) == (u16)'-':
+            has_minus_sign = true
+
+    let digits = CodePointPredicateFunction(function = is_ascii_digit)
+    let number_view = utf16_generic_lexer_consume_while(this, &digits)
+    if utf16_view_is_empty(&number_view):
+        this.m_index = rollback_position
+        error(ak_errno_error, "EINVAL")
+
+    let parsed = utf16_view_to_number_u64(&number_view, TrimWhitespace.no)
+    let number = parsed else 0
+    if parsed == none or number > unsigned_maximum:
+        this.m_index = rollback_position
+        error(ak_errno_error, "ERANGE")
+
+    return try consume_decimal_integer_check_range(&this.m_index, rollback_position, number, has_minus_sign, maximum, is_unsigned)
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<i8>.
+pub func utf16_generic_lexer_consume_decimal_integer_i8(this: GenericLexer[u16]*) -> i8!:
+    let (magnitude, negative) = try utf16_generic_lexer_consume_decimal_integer_magnitude(this, 0x7f, 0xff, false)
+    return (i8)(0 -% magnitude) if negative else (i8)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<i16>.
+pub func utf16_generic_lexer_consume_decimal_integer_i16(this: GenericLexer[u16]*) -> i16!:
+    let (magnitude, negative) = try utf16_generic_lexer_consume_decimal_integer_magnitude(this, 0x7fff, 0xffff, false)
+    return (i16)(0 -% magnitude) if negative else (i16)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<i32>.
+pub func utf16_generic_lexer_consume_decimal_integer_i32(this: GenericLexer[u16]*) -> i32!:
+    let (magnitude, negative) = try utf16_generic_lexer_consume_decimal_integer_magnitude(this, 0x7fffffff, 0xffffffff, false)
+    return (i32)(0 -% magnitude) if negative else (i32)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<i64>.
+pub func utf16_generic_lexer_consume_decimal_integer_i64(this: GenericLexer[u16]*) -> i64!:
+    let (magnitude, negative) = try utf16_generic_lexer_consume_decimal_integer_magnitude(this, 0x7fffffffffffffff, 0xffffffffffffffff, false)
+    return (i64)(0 -% magnitude) if negative else (i64)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<u8>.
+pub func utf16_generic_lexer_consume_decimal_integer_u8(this: GenericLexer[u16]*) -> u8!:
+    let (magnitude, _negative) = try utf16_generic_lexer_consume_decimal_integer_magnitude(this, 0xff, 0xff, true)
+    return (u8)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<u16>.
+pub func utf16_generic_lexer_consume_decimal_integer_u16(this: GenericLexer[u16]*) -> u16!:
+    let (magnitude, _negative) = try utf16_generic_lexer_consume_decimal_integer_magnitude(this, 0xffff, 0xffff, true)
+    return (u16)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<u32>.
+pub func utf16_generic_lexer_consume_decimal_integer_u32(this: GenericLexer[u16]*) -> u32!:
+    let (magnitude, _negative) = try utf16_generic_lexer_consume_decimal_integer_magnitude(this, 0xffffffff, 0xffffffff, true)
+    return (u32)magnitude
+
+## Ported from AK/GenericLexer.h:264 AK::Detail::GenericLexer::consume_decimal_integer<u64>.
+pub func utf16_generic_lexer_consume_decimal_integer_u64(this: GenericLexer[u16]*) -> u64!:
+    let (magnitude, _negative) = try utf16_generic_lexer_consume_decimal_integer_magnitude(this, 0xffffffffffffffff, 0xffffffffffffffff, true)
+    return magnitude
+
+## Ported from AK/GenericLexer.h:311 AK::Detail::GenericLexer::consume_escaped_code_point.
+pub func utf16_generic_lexer_consume_escaped_code_point(this: GenericLexer[u16]*, combine_surrogate_pairs: bool = true) -> UnicodeEscapeResult:
+    if not utf16_generic_lexer_consume_specific_string_view(this, sv("\\u")):
+        return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.malformed_unicode_escape)
+
+    if utf16_generic_lexer_next_is_u8(this, '{'):
+        return utf16_generic_lexer_decode_code_point(this)
+    return utf16_generic_lexer_decode_single_or_paired_surrogate(this, combine_surrogate_pairs)
+
+## Ported from AK/GenericLexer.h:321 AK::Detail::GenericLexer::ignore.
+pub func utf16_generic_lexer_ignore(this: GenericLexer[u16]*, count: usize = 1):
+    let available = utf16_generic_lexer_input_length(this) - this.m_index
+    this.m_index += count if count < available else available
+
+## Ported from AK/GenericLexer.h:327 AK::Detail::GenericLexer::ignore_until(CharType).
+pub func utf16_generic_lexer_ignore_until_t_char_type(this: GenericLexer[u16]*, stop: u16):
+    while not utf16_generic_lexer_is_eof(this) and utf16_generic_lexer_peek(this) != stop:
+        this.m_index += 1
+
+## Ported from AK/GenericLexer.h:333 AK::Detail::GenericLexer::ignore_until(char).
+pub func utf16_generic_lexer_ignore_until_u8(this: GenericLexer[u16]*, stop: u8):
+    utf16_generic_lexer_ignore_until_t_char_type(this, stop)
+
+# mark: Predicates ==============================================================================
+
+## Ported from AK/GenericLexer.h:349 AK::Detail::GenericLexer::next_is(TPredicate).
+pub func utf16_generic_lexer_next_is_tt_predicate[TTPredicate: CodePointPredicate](this: const GenericLexer[u16]*, pred: const TTPredicate*) -> bool:
+    return pred.matches(utf16_generic_lexer_peek(this))
+
+## Ported from AK/GenericLexer.h:356 AK::Detail::GenericLexer::consume_while.
+pub func utf16_generic_lexer_consume_while[TTPredicate: CodePointPredicate](this: GenericLexer[u16]*, pred: const TTPredicate*) -> Utf16View:
+    let start = this.m_index
+    while not utf16_generic_lexer_is_eof(this) and pred.matches(utf16_generic_lexer_peek(this)):
+        this.m_index += 1
+
+    let length = this.m_index - start
+    return utf16_view_substring_view_usize(&this.m_utf16_input, start, length)
+
+## Ported from AK/GenericLexer.h:368 AK::Detail::GenericLexer::consume_until(TPredicate).
+pub func utf16_generic_lexer_consume_until_tt_predicate[TTPredicate: CodePointPredicate](this: GenericLexer[u16]*, pred: const TTPredicate*) -> Utf16View:
+    let start = this.m_index
+    while not utf16_generic_lexer_is_eof(this) and not pred.matches(utf16_generic_lexer_peek(this)):
+        this.m_index += 1
+
+    let length = this.m_index - start
+    return utf16_view_substring_view_usize(&this.m_utf16_input, start, length)
+
+## Ported from AK/GenericLexer.h:379 AK::Detail::GenericLexer::consume_specific_with_predicate.
+pub func utf16_generic_lexer_consume_specific_with_predicate[TTPredicate: CodePointPredicate](this: GenericLexer[u16]*, pred: const TTPredicate*) -> bool:
+    if utf16_generic_lexer_is_eof(this) or not pred.matches(utf16_generic_lexer_peek(this)):
+        return false
+
+    utf16_generic_lexer_ignore(this)
+    return true
+
+## Ported from AK/GenericLexer.h:390 AK::Detail::GenericLexer::ignore_while.
+pub func utf16_generic_lexer_ignore_while[TTPredicate: CodePointPredicate](this: GenericLexer[u16]*, pred: const TTPredicate*):
+    while not utf16_generic_lexer_is_eof(this) and pred.matches(utf16_generic_lexer_peek(this)):
+        this.m_index += 1
+
+## Ported from AK/GenericLexer.h:398 AK::Detail::GenericLexer::ignore_until(TPredicate).
+pub func utf16_generic_lexer_ignore_until_tt_predicate[TTPredicate: CodePointPredicate](this: GenericLexer[u16]*, pred: const TTPredicate*):
+    while not utf16_generic_lexer_is_eof(this) and not pred.matches(utf16_generic_lexer_peek(this)):
+        this.m_index += 1
+
+# mark: Decoding ================================================================================
+
+## Ported from AK/GenericLexer.h:405 AK::Detail::GenericLexer::decode_code_point.
+pub func utf16_generic_lexer_decode_code_point(this: GenericLexer[u16]*) -> UnicodeEscapeResult:
+    let starts_with_open_bracket = utf16_generic_lexer_consume_specific_u8(this, '{')
+    assert(starts_with_open_bracket)
+
+    let hex_digit = CodePointPredicateFunction(function = is_ascii_hex_digit)
+    var code_point: u32 = 0
+
+    while true:
+        if not utf16_generic_lexer_next_is_tt_predicate(this, &hex_digit):
+            return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.malformed_unicode_escape)
+
+        let new_code_point = (code_point << 4) | parse_ascii_hex_digit(utf16_generic_lexer_consume(this))
+        if new_code_point < code_point:
+            return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.unicode_escape_overflow)
+
+        code_point = new_code_point
+        if utf16_generic_lexer_consume_specific_u8(this, '}'):
+            break
+
+    if is_unicode(code_point):
+        return UnicodeEscapeResult.success(code_point = code_point)
+    return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.unicode_escape_overflow)
+
+## The `decode_one_surrogate` lambda of decode_single_or_paired_surrogate.
+func utf16_generic_lexer_decode_one_surrogate(this: GenericLexer[u16]*) -> u16?:
+    let surrogate_length: usize = 4
+    let hex_digit = CodePointPredicateFunction(function = is_ascii_hex_digit)
+    var surrogate: u16 = 0
+
+    for _i in 0..<surrogate_length:
+        if not utf16_generic_lexer_next_is_tt_predicate(this, &hex_digit):
+            return none
+
+        surrogate = (surrogate << 4) | (u16)parse_ascii_hex_digit(utf16_generic_lexer_consume(this))
+
+    return surrogate
+
+## Ported from AK/GenericLexer.h:430 AK::Detail::GenericLexer::decode_single_or_paired_surrogate.
+pub func utf16_generic_lexer_decode_single_or_paired_surrogate(this: GenericLexer[u16]*, combine_surrogate_pairs: bool = true) -> UnicodeEscapeResult:
+    let high_surrogate = utf16_generic_lexer_decode_one_surrogate(this) else return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.malformed_unicode_escape)
+    if not unicode_utils_is_utf16_high_surrogate(high_surrogate):
+        return UnicodeEscapeResult.success(code_point = high_surrogate)
+    if not combine_surrogate_pairs or not utf16_generic_lexer_consume_specific_string_view(this, sv("\\u")):
+        return UnicodeEscapeResult.success(code_point = high_surrogate)
+
+    if utf16_generic_lexer_next_is_u8(this, '{'):
+        utf16_generic_lexer_retreat_usize(this, 2)
+        return UnicodeEscapeResult.success(code_point = high_surrogate)
+
+    let low_surrogate = utf16_generic_lexer_decode_one_surrogate(this) else return UnicodeEscapeResult.failure(reason = UnicodeEscapeError.malformed_unicode_escape)
+    if unicode_utils_is_utf16_low_surrogate(low_surrogate):
+        return UnicodeEscapeResult.success(code_point = unicode_utils_decode_utf16_surrogate_pair(high_surrogate, low_surrogate))
+
+    utf16_generic_lexer_retreat_usize(this, 6)
+    return UnicodeEscapeResult.success(code_point = high_surrogate)
+
+## Ported from AK/GenericLexer.h:470 AK::Detail::GenericLexer::input_length.
+pub func utf16_generic_lexer_input_length(this: const GenericLexer[u16]*) -> usize:
+    return utf16_view_length_in_code_units(&this.m_utf16_input)
+
+## Ported from AK/GenericLexer.h:478 AK::Detail::GenericLexer::code_unit_at.
+pub func utf16_generic_lexer_code_unit_at(this: const GenericLexer[u16]*, index: usize) -> u16:
+    return utf16_view_code_unit_at(&this.m_utf16_input, index)
+
+# mark: LineTrackingLexer =======================================================================
+
+## Ported from AK/GenericLexer.h:500 AK::LineTrackingLexer::LineTrackingLexer(StringView, Position).
+pub func line_tracking_lexer_construct_line_tracking_lexer_position(this: LineTrackingLexer*, input: StringView, start_position: LineTrackingLexerPosition):
+    generic_lexer_construct(&this.generic_lexer, input)
+    this.m_first_line_start_position = start_position
+    this.m_line_start_positions = new RedBlackTree[usize, usize] else trap("out of memory")
+    this.m_largest_known_line_start_position = 0
+
+    red_black_tree_insert(this.m_line_start_positions, 0, 0)
+    var first_newline = string_view_length(&input)
+    if let newline = string_view_find_u8(&input, '\n'):
+        first_newline = newline + 1
+    red_black_tree_insert(this.m_line_start_positions, first_newline, 1)
+    this.m_largest_known_line_start_position = first_newline
+
+## Ported from AK/GenericLexer.h:511 AK::LineTrackingLexer::LineTrackingLexer(StringView).
+pub func line_tracking_lexer_construct(this: LineTrackingLexer*, input: StringView):
+    line_tracking_lexer_construct_line_tracking_lexer_position(this, input, LineTrackingLexerPosition(offset = 0, line = 1, column = 1))
+
+## `m_line_start_positions->size()`: a RedBlackTree starts with its BaseRedBlackTree.
+func line_tracking_lexer_known_line_count(this: const LineTrackingLexer*) -> usize:
+    return base_red_black_tree_size((const BaseRedBlackTree[usize]*)this.m_line_start_positions)
+
+## Ported from AK/GenericLexer.cpp:11 AK::LineTrackingLexer::position_for: the line and column
+## of `index` (line starts are cached in the `mutable` tree).
+pub func line_tracking_lexer_position_for(this: const LineTrackingLexer*, index: usize) -> LineTrackingLexerPosition:
+    let mutable_this = (LineTrackingLexer*)this
+    let input = &this.generic_lexer.m_input
+    # Sad case: we have no idea where the nearest newline is, so we have to scan ahead a bit.
+    while index > this.m_largest_known_line_start_position:
+        let maybe_next_newline = string_view_find_u8(input, '\n', this.m_largest_known_line_start_position)
+        if maybe_next_newline == none:
+            # No more newlines, add the end of the input as a line start to avoid searching again.
+            red_black_tree_insert(mutable_this.m_line_start_positions, generic_lexer_input_length(&this.generic_lexer), line_tracking_lexer_known_line_count(this))
+            mutable_this.m_largest_known_line_start_position = generic_lexer_input_length(&this.generic_lexer)
+            break
+        let next_newline = maybe_next_newline else trap("unreachable")
+        red_black_tree_insert(mutable_this.m_line_start_positions, next_newline + 1, line_tracking_lexer_known_line_count(this))
+        mutable_this.m_largest_known_line_start_position = next_newline + 1
+    # We should always have at least the first line start position.
+    var previous_line_it = red_black_tree_find_largest_not_above_iterator(mutable_this.m_line_start_positions, index)
+    let previous_line_index = red_black_tree_iterator_key(&previous_line_it)
+
+    var line = *red_black_tree_iterator_deref(&previous_line_it)
+    var column = index - previous_line_index
+    if line == 0:
+        # First line, take into account the start position.
+        column += this.m_first_line_start_position.column
+
+    line += this.m_first_line_start_position.line
+    return LineTrackingLexerPosition(offset = index, line = line, column = column)
+
+## Ported from AK/GenericLexer.h:517 AK::LineTrackingLexer::current_position.
+pub func line_tracking_lexer_current_position(this: const LineTrackingLexer*) -> LineTrackingLexerPosition:
+    return line_tracking_lexer_position_for(this, this.generic_lexer.m_index)

@@ -1,0 +1,87 @@
+#==============================================================================================
+#
+#   mem_mem - substring search over bytes (bitap for short needles, KMP otherwise)
+#
+#   DESCRIPTION:
+#       Port of AK/MemMem.h (lines 1-139). The header belongs to no region of regions.tsv; region
+#       r02 ports it here because StringUtils, StringView and String search with it. The KMP
+#       walk over a list of chunks is reduced to the one-chunk case memmem_optional uses.
+#
+#==============================================================================================
+
+## Ported from AK/MemMem.h:19 AK::Detail::bitap_bitwise: the offset of the first match, or none.
+func bitap_bitwise(haystack: const u8[], needle: const u8[]) -> usize?:
+    assert(needle.length < 32)
+
+    var lookup: u32 = 0xfffffffe
+
+    var needle_mask: u32[256]
+    for i in 0..<256:
+        needle_mask[i] = 0xffffffff
+
+    for i in 0..<needle.length:
+        needle_mask[needle[i]] &= ~((u32)1 << (u32)i)
+
+    for i in 0..<haystack.length:
+        lookup |= needle_mask[haystack[i]]
+        lookup <<= 1
+
+        if 0 == (lookup & ((u32)1 << (u32)needle.length)):
+            return i + 1 - needle.length
+
+    return none
+
+## Ported from AK/MemMem.h:46 AK::memmem (the KMP search, over one chunk).
+func memmem_kmp(haystack: const u8[], needle: const u8[]) -> usize?:
+    # prepare_kmp_partial_table
+    let table = new i32[needle.length] else trap("out of memory")
+    var position: usize = 1
+    var candidate: i32 = 0
+
+    table[0] = -1
+    while position < needle.length:
+        if needle[position] == needle[usize(candidate)]:
+            table[position] = table[usize(candidate)]
+        else:
+            table[position] = candidate
+            candidate = table[usize(candidate)]
+            while candidate >= 0 and needle[usize(candidate)] != needle[position]:
+                candidate = table[usize(candidate)]
+        position += 1
+        candidate += 1
+
+    var total_haystack_index: usize = 0
+    var needle_index: i32 = 0
+
+    while total_haystack_index < haystack.length:
+        if needle[usize(needle_index)] == haystack[total_haystack_index]:
+            needle_index += 1
+            total_haystack_index += 1
+            if usize(needle_index) == needle.length:
+                return total_haystack_index - usize(needle_index)
+            continue
+        needle_index = table[usize(needle_index)]
+        if needle_index < 0:
+            needle_index += 1
+            total_haystack_index += 1
+
+    return none
+
+## Ported from AK/MemMem.h:108 AK::memmem_optional: the offset of `needle` in `haystack`.
+pub func memmem_optional(haystack: const u8[], needle: const u8[]) -> usize?:
+    if needle.length == 0:
+        return 0
+
+    if haystack.length < needle.length:
+        return none
+
+    if haystack.length == needle.length:
+        if compare_bytes(haystack, needle) == 0:
+            return 0
+        return none
+
+    if needle.length < 32:
+        return bitap_bitwise(haystack, needle)
+
+    # Fallback to KMP.
+    return memmem_kmp(haystack, needle)

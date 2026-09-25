@@ -1,0 +1,361 @@
+#==============================================================================================
+#
+#   tests_utf16_string_2 - Utf16String tests (trimming, copies, equality, iteration)
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestUtf16String.cpp (lines 1028-1309). Moves are copies in the port
+#       (DESIGN.md §3.3), so move_operations keeps only the checks on the moved-to strings.
+#
+#==============================================================================================
+
+## The `make_copy` helper of the donor: a new string equal to `string`.
+func t16s_make_copy(string: const Utf16String*) -> Utf16String:
+    if utf16_string_base_has_ascii_storage(&string.utf16_string_base):
+        return utf16_string_from_utf8_string_view(utf16_string_base_ascii_view(&string.utf16_string_base))
+    return utf16_string_from_utf16(t16s_view(string))
+
+## `EXPECT_EQ(string1, string2)` for two Utf16Strings.
+func t16s_equals(a: const Utf16String*, b: const Utf16String*) -> bool:
+    return utf16_string_base_eq_utf16_string_base(&a.utf16_string_base, &b.utf16_string_base)
+
+## The `expect_same_string` lambda of the trim test: equal, and the same storage.
+func t16s_expect_same_string(string: const Utf16String*, trimmed: Utf16String):
+    let result = &trimmed
+    assert(t16s_equals(string, result))
+
+    assert(utf16_string_base_has_ascii_storage(&string.utf16_string_base) == utf16_string_base_has_ascii_storage(&result.utf16_string_base))
+    let string_view = t16s_view(string)
+    let result_view = t16s_view(result)
+
+    if utf16_string_base_has_ascii_storage(&string.utf16_string_base):
+        assert(utf16_view_ascii_span(&string_view).data == utf16_view_ascii_span(&result_view).data)
+    else:
+        assert(utf16_view_utf16_span(&string_view).data == utf16_view_utf16_span(&result_view).data)
+
+## `EXPECT_EQ(string.trim(code_units, mode), expected)`.
+func t16s_trim_is(string: const Utf16String*, code_units: Utf16View, mode: TrimMode, expected: Utf16View) -> bool:
+    let result = utf16_string_trim(string, code_units, mode)
+    return t16s_eq(&result, expected)
+
+## `string.trim(code_units, mode)`.
+func t16s_trim(string: const Utf16String*, code_units: Utf16View, mode: TrimMode) -> Utf16String:
+    return utf16_string_trim(string, code_units, mode)
+
+test "trim":
+    let whitespace = t16(" ")
+
+    let string1 = t16_lit("looooong word")
+    t16s_expect_same_string(&string1, t16s_trim(&string1, whitespace, TrimMode.both))
+    t16s_expect_same_string(&string1, t16s_trim(&string1, whitespace, TrimMode.left))
+    t16s_expect_same_string(&string1, t16s_trim(&string1, whitespace, TrimMode.right))
+
+    let string2 = t16_lit("   looooong word")
+    assert(t16s_trim_is(&string2, whitespace, TrimMode.both, t16("looooong word")))
+    assert(t16s_trim_is(&string2, whitespace, TrimMode.left, t16("looooong word")))
+    t16s_expect_same_string(&string2, t16s_trim(&string2, whitespace, TrimMode.right))
+
+    let string3 = t16_lit("looooong word   ")
+    assert(t16s_trim_is(&string3, whitespace, TrimMode.both, t16("looooong word")))
+    t16s_expect_same_string(&string3, t16s_trim(&string3, whitespace, TrimMode.left))
+    assert(t16s_trim_is(&string3, whitespace, TrimMode.right, t16("looooong word")))
+
+    let string4 = t16_lit("   looooong word   ")
+    assert(t16s_trim_is(&string4, whitespace, TrimMode.both, t16("looooong word")))
+    assert(t16s_trim_is(&string4, whitespace, TrimMode.left, t16("looooong word   ")))
+    assert(t16s_trim_is(&string4, whitespace, TrimMode.right, t16("   looooong word")))
+
+    let string5 = t16_lit("   \u{180e}   ")
+    assert(t16s_trim_is(&string5, whitespace, TrimMode.both, t16("\u{180e}")))
+    assert(t16s_trim_is(&string5, whitespace, TrimMode.left, t16("\u{180e}   ")))
+    assert(t16s_trim_is(&string5, whitespace, TrimMode.right, t16("   \u{180e}")))
+
+    let string6 = t16_lit("😀wfh😀")
+    assert(t16s_trim_is(&string6, t16("😀"), TrimMode.both, t16("wfh")))
+    assert(t16s_trim_is(&string6, t16("😀"), TrimMode.left, t16("wfh😀")))
+    assert(t16s_trim_is(&string6, t16("😀"), TrimMode.right, t16("😀wfh")))
+
+    t16s_expect_same_string(&string6, t16s_trim(&string6, whitespace, TrimMode.both))
+    t16s_expect_same_string(&string6, t16s_trim(&string6, whitespace, TrimMode.left))
+    t16s_expect_same_string(&string6, t16s_trim(&string6, whitespace, TrimMode.right))
+
+## The `test` lambda of copy_operations.
+func t16s_test_copy_operations(string1_value: Utf16String):
+    let string1 = &string1_value
+    let original = t16s_make_copy(string1)
+
+    # Copy constructor.
+    let string2 = *string1
+
+    assert(t16s_equals(string1, &original))
+    assert(t16s_equals(string1, &string2))
+
+    # Copy assignment.
+    var string3 = utf16_string_new()
+    string3 = *string1
+
+    assert(t16s_equals(string1, &original))
+    assert(t16s_equals(string1, &string3))
+
+test "copy_operations":
+    t16s_test_copy_operations(utf16_string_new())
+    t16s_test_copy_operations(utf16_string_from_str("hello"))
+    t16s_test_copy_operations(utf16_string_from_str("hello there general!"))
+    t16s_test_copy_operations(utf16_string_from_str("hello 😀 there!"))
+
+## The `test` lambda of move_operations; a move is a copy, so the moved-from checks are left out.
+func t16s_test_move_operations(string1: Utf16String):
+    let original = t16s_make_copy(&string1)
+
+    # Move constructor.
+    let string2 = string1
+
+    assert(t16s_equals(&string2, &original))
+
+    # Move assignment.
+    var string3 = utf16_string_new()
+    string3 = string2
+
+    assert(t16s_equals(&string3, &original))
+
+test "move_operations":
+    t16s_test_move_operations(utf16_string_new())
+    t16s_test_move_operations(utf16_string_from_str("hello"))
+    t16s_test_move_operations(utf16_string_from_str("hello there general!"))
+    t16s_test_move_operations(utf16_string_from_str("hello 😀 there!"))
+
+## The `test` lambda of equals.
+func t16s_test_equals(string1_value: Utf16String, inequal_value: Utf16String):
+    let string1 = &string1_value
+    let inequal_string = &inequal_value
+    let string2 = t16s_make_copy(string1)
+
+    assert(t16s_equals(string1, string1))
+    assert(t16s_equals(string1, &string2))
+    assert(t16s_equals(&string2, string1))
+    assert(t16s_equals(&string2, &string2))
+
+    if utf16_string_base_has_long_utf16_storage(&string1.utf16_string_base):
+        assert(t16s_eq(string1, t16s_view(string1)))
+        assert(t16s_eq(string1, t16s_view(&string2)))
+        assert(t16s_eq(&string2, t16s_view(string1)))
+        assert(t16s_eq(&string2, t16s_view(&string2)))
+
+    assert(not t16s_equals(string1, inequal_string))
+    assert(not t16s_equals(&string2, inequal_string))
+    assert(not t16s_equals(inequal_string, string1))
+    assert(not t16s_equals(inequal_string, &string2))
+
+    if utf16_string_base_has_long_utf16_storage(&string1.utf16_string_base):
+        assert(not t16s_eq(string1, t16s_view(inequal_string)))
+        assert(not t16s_eq(&string2, t16s_view(inequal_string)))
+        assert(not t16s_eq(inequal_string, t16s_view(string1)))
+        assert(not t16s_eq(inequal_string, t16s_view(&string2)))
+
+test "equals":
+    # Short (empty) ASCII string comparison.
+    t16s_test_equals(utf16_string_new(), utf16_string_from_str("hello"))
+
+    # Short ASCII string comparison.
+    t16s_test_equals(utf16_string_from_str("hello"), utf16_string_from_str("there"))
+
+    # Short and long ASCII string comparison.
+    t16s_test_equals(utf16_string_from_str("hello"), utf16_string_from_str("hello there general!"))
+
+    # Long ASCII string comparison.
+    t16s_test_equals(utf16_string_from_str("hello there!"), utf16_string_from_str("hello there general!"))
+
+    # UTF-16 string comparison.
+    t16s_test_equals(utf16_string_from_str("😀"), utf16_string_from_str("hello 😀"))
+
+    # Short ASCII and UTF-16 string comparison.
+    t16s_test_equals(utf16_string_from_str("hello"), utf16_string_from_str("😀"))
+
+    # Short ASCII and UTF-16 string of same code unit length comparison.
+    t16s_test_equals(utf16_string_from_str("ab"), utf16_string_from_str("😀"))
+
+    # Long ASCII and UTF-16 string comparison.
+    t16s_test_equals(utf16_string_from_str("hello there general!"), utf16_string_from_str("😀"))
+
+    # Long ASCII and UTF-16 string of same code unit length comparison.
+    t16s_test_equals(utf16_string_from_str("ababababab"), utf16_string_from_str("😀😀😀😀😀"))
+
+## The `test` lambda of equals_ascii.
+func t16s_test_equals_ascii(ascii: StringView, inequal_value: Utf16String):
+    let inequal_string = &inequal_value
+    let string = utf16_string_from_utf8_string_view(ascii)
+
+    assert(utf16_string_base_eq_string_view(&string.utf16_string_base, ascii))
+    assert(utf16_string_base_eq_string_view(&string.utf16_string_base, ascii))
+
+    assert(not utf16_string_base_eq_string_view(&inequal_string.utf16_string_base, ascii))
+    assert(not utf16_string_base_eq_string_view(&inequal_string.utf16_string_base, ascii))
+
+test "equals_ascii":
+    # Short (empty) ASCII string comparison.
+    t16s_test_equals_ascii(StringView(), utf16_string_from_str("hello"))
+
+    # Short ASCII string comparison.
+    t16s_test_equals_ascii(sv("hello"), utf16_string_from_str("there"))
+
+    # Short and long ASCII string comparison.
+    t16s_test_equals_ascii(sv("hello"), utf16_string_from_str("hello there general!"))
+
+    # Long ASCII string comparison.
+    t16s_test_equals_ascii(sv("hello there!"), utf16_string_from_str("hello there general!"))
+
+    # Short ASCII and UTF-16 string comparison.
+    t16s_test_equals_ascii(sv("hello"), utf16_string_from_str("😀"))
+
+    # Short ASCII and UTF-16 string of same code unit length comparison.
+    t16s_test_equals_ascii(sv("ab"), utf16_string_from_str("😀"))
+
+    # Long ASCII and UTF-16 string comparison.
+    t16s_test_equals_ascii(sv("hello there general!"), utf16_string_from_str("😀"))
+
+    # Long ASCII and UTF-16 string of same code unit length comparison.
+    t16s_test_equals_ascii(sv("ababababab"), utf16_string_from_str("😀😀😀😀😀"))
+
+    # Non-ASCII string comparison.
+    let emoji = utf16_string_from_str("😀")
+    assert(t16s_eq_str(&emoji, "😀"))
+
+## `string1.equals_ignoring_ascii_case(string2)`.
+func t16s_equals_ignoring_ascii_case(a: const Utf16String*, b: const Utf16String*) -> bool:
+    return utf16_string_base_equals_ignoring_ascii_case_utf16_string_base(&a.utf16_string_base, &b.utf16_string_base)
+
+## `string1.equals_ignoring_ascii_case(view)`.
+func t16s_equals_ignoring_ascii_case_view(a: const Utf16String*, b: Utf16View) -> bool:
+    return utf16_string_base_equals_ignoring_ascii_case_utf16_view(&a.utf16_string_base, &b)
+
+## The `test` lambda of equals_ignoring_ascii_case.
+func t16s_test_equals_ignoring_ascii_case(string1_value: Utf16String, inequal_value: Utf16String):
+    let string1 = &string1_value
+    let inequal_string = &inequal_value
+    var builder = string_builder_new()
+    var i: usize = 0
+    var it = utf16_string_base_begin(&string1.utf16_string_base)
+    while not utf16_code_point_iterator_done(&it):
+        let code_point = utf16_code_point_iterator_deref(&it)
+        string_builder_append_code_point(&builder, to_ascii_uppercase(code_point) if i % 2 == 0 else code_point)
+        i += 1
+        discard(utf16_code_point_iterator_inc(&it))
+
+    let string2 = utf16_string_from_utf8_string_view(string_builder_string_view(&builder))
+
+    assert(t16s_equals_ignoring_ascii_case(string1, string1))
+    assert(t16s_equals_ignoring_ascii_case(string1, &string2))
+    assert(t16s_equals_ignoring_ascii_case(&string2, string1))
+    assert(t16s_equals_ignoring_ascii_case(&string2, &string2))
+
+    if utf16_string_base_has_long_utf16_storage(&string1.utf16_string_base):
+        assert(t16s_equals_ignoring_ascii_case_view(string1, t16s_view(string1)))
+        assert(t16s_equals_ignoring_ascii_case_view(string1, t16s_view(&string2)))
+        assert(t16s_equals_ignoring_ascii_case_view(&string2, t16s_view(string1)))
+        assert(t16s_equals_ignoring_ascii_case_view(&string2, t16s_view(&string2)))
+
+    assert(not t16s_equals_ignoring_ascii_case(string1, inequal_string))
+    assert(not t16s_equals_ignoring_ascii_case(&string2, inequal_string))
+    assert(not t16s_equals_ignoring_ascii_case(inequal_string, string1))
+    assert(not t16s_equals_ignoring_ascii_case(inequal_string, &string2))
+
+    if utf16_string_base_has_long_utf16_storage(&string1.utf16_string_base):
+        assert(not t16s_equals_ignoring_ascii_case_view(string1, t16s_view(inequal_string)))
+        assert(not t16s_equals_ignoring_ascii_case_view(&string2, t16s_view(inequal_string)))
+        assert(not t16s_equals_ignoring_ascii_case_view(inequal_string, t16s_view(string1)))
+        assert(not t16s_equals_ignoring_ascii_case_view(inequal_string, t16s_view(&string2)))
+
+test "equals_ignoring_ascii_case":
+    if not ak_core_is_ported:
+        return
+    # Short (empty) ASCII string comparison.
+    t16s_test_equals_ignoring_ascii_case(utf16_string_new(), utf16_string_from_str("hello"))
+
+    # Short ASCII string comparison.
+    t16s_test_equals_ignoring_ascii_case(utf16_string_from_str("hello"), utf16_string_from_str("there"))
+
+    # Short and long ASCII string comparison.
+    t16s_test_equals_ignoring_ascii_case(utf16_string_from_str("hello"), utf16_string_from_str("hello there general!"))
+
+    # Long ASCII string comparison.
+    t16s_test_equals_ignoring_ascii_case(utf16_string_from_str("hello there!"), utf16_string_from_str("hello there general!"))
+
+    # UTF-16 string comparison.
+    t16s_test_equals_ignoring_ascii_case(utf16_string_from_str("😀"), utf16_string_from_str("hello 😀"))
+
+    # Short ASCII and UTF-16 string comparison.
+    t16s_test_equals_ignoring_ascii_case(utf16_string_from_str("hello"), utf16_string_from_str("😀"))
+
+    # Short ASCII and UTF-16 string of same code unit length comparison.
+    t16s_test_equals_ignoring_ascii_case(utf16_string_from_str("ab"), utf16_string_from_str("😀"))
+
+    # Long ASCII and UTF-16 string comparison.
+    t16s_test_equals_ignoring_ascii_case(utf16_string_from_str("hello there general!"), utf16_string_from_str("😀"))
+
+    # Long ASCII and UTF-16 string of same code unit length comparison.
+    t16s_test_equals_ignoring_ascii_case(utf16_string_from_str("ababababab"), utf16_string_from_str("😀😀😀😀😀"))
+
+## The `test` lambda of iteration (the EXPECT_DEATH checks are not ported).
+func t16s_test_iteration(string_value: Utf16String, code_points: const u32[]):
+    let string = &string_value
+    assert(utf16_string_base_length_in_code_points(&string.utf16_string_base) == code_points.length)
+
+    var i: usize = 0
+    var it = utf16_string_base_begin(&string.utf16_string_base)
+    while not utf16_code_point_iterator_done(&it):
+        assert(code_points.length != 0)
+        assert(utf16_code_point_iterator_deref(&it) == code_points[i])
+        i += 1
+        discard(utf16_code_point_iterator_inc(&it))
+
+test "iteration":
+    let no_code_points: u32[1] = [0]
+    t16s_test_iteration(utf16_string_new(), no_code_points[..<0])
+    t16s_test_iteration(utf16_string_from_str("hello"), [0x68, 0x65, 0x6c, 0x6c, 0x6f])
+    t16s_test_iteration(utf16_string_from_str("hello there general!"), [0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x74, 0x68, 0x65, 0x72, 0x65, 0x20, 0x67, 0x65, 0x6e, 0x65, 0x72, 0x61, 0x6c, 0x21])
+    t16s_test_iteration(utf16_string_from_str("😀"), [0x1f600])
+    t16s_test_iteration(utf16_string_from_str("hello 😀 there!"), [0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x1f600, 0x20, 0x74, 0x68, 0x65, 0x72, 0x65, 0x21])
+
+## The `test` lambda of code_unit_at.
+func t16s_test_code_unit_at(view: Utf16View, length_in_code_units: usize):
+    let string = utf16_string_from_utf16(view)
+    assert(utf16_string_base_length_in_code_units(&string.utf16_string_base) == length_in_code_units)
+
+    for i in 0..<length_in_code_units:
+        assert(utf16_string_base_code_unit_at(&string.utf16_string_base, i) == utf16_view_code_unit_at(&view, i))
+
+test "code_unit_at":
+    t16s_test_code_unit_at(utf16_view_new(), 0)
+    t16s_test_code_unit_at(t16("hello"), 5)
+    t16s_test_code_unit_at(t16("hello there general!"), 20)
+    t16s_test_code_unit_at(t16("😀"), 2)
+    t16s_test_code_unit_at(t16("hello 😀 there!"), 15)
+
+## The `test` lambda of code_point_at.
+func t16s_test_code_point_at(view: Utf16View, length_in_code_points: usize):
+    let string = utf16_string_from_utf16(view)
+    assert(utf16_string_base_length_in_code_points(&string.utf16_string_base) == length_in_code_points)
+
+    for i in 0..<utf16_string_base_length_in_code_units(&string.utf16_string_base):
+        assert(utf16_string_base_code_point_at(&string.utf16_string_base, i) == utf16_view_code_point_at(&view, i))
+
+test "code_point_at":
+    t16s_test_code_point_at(utf16_view_new(), 0)
+    t16s_test_code_point_at(t16("hello"), 5)
+    t16s_test_code_point_at(t16("hello there general!"), 20)
+    t16s_test_code_point_at(t16("😀"), 1)
+    t16s_test_code_point_at(t16("hello 😀 there!"), 14)
+
+test "optional":
+    # Optional<Utf16String> is the null sentinel (is_invalid) in the C++; a `Utf16String?` is a
+    # tagged optional here, so this checks the sentinel directly.
+    var string = utf16_string_new()
+    utf16_string_construct_utf16_string(&string)
+    assert(utf16_string_is_invalid(&string))
+
+    string = utf16_string_from_str("ascii")
+    assert(not utf16_string_is_invalid(&string))
+    assert(t16s_eq_str(&string, "ascii"))
+
+    string = t16_lit("well 😀 hello")
+    assert(not utf16_string_is_invalid(&string))
+    assert(t16s_eq(&string, t16("well 😀 hello")))

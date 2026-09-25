@@ -1,0 +1,44 @@
+#==============================================================================================
+#
+#   source_location - SourceLocation: a file, line and function name
+#
+#   DESCRIPTION:
+#       Port of AK/SourceLocation.h (lines 1-56). The C++ fills SourceLocation::current's
+#       defaults with __builtin_FILE/LINE/FUNCTION; a luce-base caller passes the pieces of
+#       `luce.location` (whose strings are NUL-terminated literals) explicitly.
+#
+#==============================================================================================
+
+## The view of a NUL-terminated string (`{ s, __builtin_strlen(s) }`).
+func source_location_c_string_view(characters: const u8*?) -> StringView:
+    let pointer = characters else trap("VERIFY: SourceLocation without a string")
+    var length: usize = 0
+    while pointer[length] != 0:
+        length += 1
+    return StringView(m_characters = pointer, m_length = length)
+
+## Ported from AK/SourceLocation.h:18 AK::SourceLocation::function_name.
+pub func source_location_function_name(this: const SourceLocation*) -> StringView:
+    return source_location_c_string_view(this.m_function)
+
+## Ported from AK/SourceLocation.h:19 AK::SourceLocation::filename.
+pub func source_location_filename(this: const SourceLocation*) -> StringView:
+    return source_location_c_string_view(this.m_file)
+
+## Ported from AK/SourceLocation.h:20 AK::SourceLocation::line_number.
+pub func source_location_line_number(this: const SourceLocation*) -> u32:
+    return this.m_line
+
+## Ported from AK/SourceLocation.h:22 AK::SourceLocation::current: the location of the given
+## NUL-terminated file and function names and line (pass `luce.file`, `luce.line`,
+## `luce.function` at the call site).
+pub func source_location_current(file: const u8*?, line: u32, function: const u8*?) -> SourceLocation:
+    var location = SourceLocation()
+    source_location_construct(&location, file, line, function)
+    return location
+
+## Ported from AK/SourceLocation.h:32 AK::SourceLocation::SourceLocation(char const*, u32, char const*).
+pub func source_location_construct(this: SourceLocation*, file: const u8*?, line: u32, function: const u8*?):
+    this.m_function = function
+    this.m_file = file
+    this.m_line = line

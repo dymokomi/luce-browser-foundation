@@ -1,0 +1,213 @@
+#==============================================================================================
+#
+#   string_conversions_3 - convert_to_decimal_exponential_form: shortest decimal digits
+#
+#   DESCRIPTION:
+#       Port of AK/StringConversions.cpp (lines 155-173). The C++ asks {fmt}'s Dragonbox for the
+#       shortest decimal significand and exponent that round-trips to the value (the closest
+#       such, trailing zeros removed). Dragonbox is replaced, not ported: the same digits come
+#       from Burger and Dybvig's free-format algorithm ("Printing Floating-Point Numbers Quickly
+#       and Accurately", 1996) over exact big integers, which yields the shortest correctly
+#       rounded digits with the same round-to-even interval.
+#
+#==============================================================================================
+
+# mark: Big integers ============================================================================
+
+## The number of 32-bit limbs of a DecimalBignum: 1280 bits, enough for 2^1076 * 10^324.
+let decimal_bignum_limbs: usize = 40
+
+## An unsigned big integer, little-endian 32-bit limbs.
+struct DecimalBignum:
+    var limbs: u32[40]
+
+## A big integer of a u64.
+func decimal_bignum_from_u64(value: u64) -> DecimalBignum:
+    var result = DecimalBignum()
+    result.limbs[0] = (u32)value
+    result.limbs[1] = (u32)(value >> 32)
+    return result
+
+## `value <<= bits`.
+func decimal_bignum_shift_left(value: DecimalBignum*, bits: usize):
+    let limb_shift = bits // 32
+    let bit_shift = (u32)(bits % 32)
+    var i = decimal_bignum_limbs
+    while i > 0:
+        i -= 1
+        var limb: u32 = 0
+        if i >= limb_shift:
+            limb = value.limbs[i - limb_shift] << bit_shift
+            if bit_shift != 0 and i >= limb_shift + 1:
+                limb |= value.limbs[i - limb_shift - 1] >> (32 - bit_shift)
+        value.limbs[i] = limb
+
+## `value *= factor`.
+func decimal_bignum_multiply_small(value: DecimalBignum*, factor: u32):
+    var carry: u64 = 0
+    for i in 0..<decimal_bignum_limbs:
+        let product = (u64)value.limbs[i] * (u64)factor + carry
+        value.limbs[i] = (u32)product
+        carry = product >> 32
+    assert(carry == 0, "DecimalBignum overflow")
+
+## `value *= 10^exponent`.
+func decimal_bignum_multiply_power_of_ten(value: DecimalBignum*, exponent: usize):
+    for _i in 0..<exponent:
+        decimal_bignum_multiply_small(value, 10)
+
+## `a + b`.
+func decimal_bignum_add(a: const DecimalBignum*, b: const DecimalBignum*) -> DecimalBignum:
+    var result = DecimalBignum()
+    var carry: u64 = 0
+    for i in 0..<decimal_bignum_limbs:
+        let sum = (u64)a.limbs[i] + (u64)b.limbs[i] + carry
+        result.limbs[i] = (u32)sum
+        carry = sum >> 32
+    assert(carry == 0, "DecimalBignum overflow")
+    return result
+
+## `a <=> b`: negative, zero or positive.
+func decimal_bignum_compare(a: const DecimalBignum*, b: const DecimalBignum*) -> i32:
+    var i = decimal_bignum_limbs
+    while i > 0:
+        i -= 1
+        if a.limbs[i] != b.limbs[i]:
+            return -1 if a.limbs[i] < b.limbs[i] else 1
+    return 0
+
+## `a -= b` for a >= b.
+func decimal_bignum_subtract(a: DecimalBignum*, b: const DecimalBignum*):
+    var borrow: u64 = 0
+    for i in 0..<decimal_bignum_limbs:
+        let subtrahend = (u64)b.limbs[i] + borrow
+        if (u64)a.limbs[i] >= subtrahend:
+            a.limbs[i] = (u32)((u64)a.limbs[i] - subtrahend)
+            borrow = 0
+        else:
+            a.limbs[i] = (u32)((u64)a.limbs[i] + 0x100000000 - subtrahend)
+            borrow = 1
+    assert(borrow == 0, "DecimalBignum underflow")
+
+# mark: Shortest digits =========================================================================
+
+## The shortest decimal form of `significand * 2^exponent` (a finite, non-zero binary float of
+## `precision` significand bits whose smallest exponent is `minimum_exponent`).
+func shortest_decimal_form(significand: u64, exponent: i32, precision: u32, minimum_exponent: i32, sign: bool) -> DecimalExponentialForm:
+    let hidden_bit = (u64)1 << (u64)(precision - 1)
+    # IEEE rounds to even, so the rounding interval includes its bounds for even significands.
+    let is_even = (significand & 1) == 0
+
+    var r = decimal_bignum_from_u64(significand)
+    var s = decimal_bignum_from_u64(1)
+    var m_plus = decimal_bignum_from_u64(1)
+    var m_minus = decimal_bignum_from_u64(1)
+    if exponent >= 0:
+        let shift = usize(exponent)
+        if significand != hidden_bit:
+            decimal_bignum_shift_left(&r, shift + 1)
+            s = decimal_bignum_from_u64(2)
+            decimal_bignum_shift_left(&m_plus, shift)
+            decimal_bignum_shift_left(&m_minus, shift)
+        else:
+            decimal_bignum_shift_left(&r, shift + 2)
+            s = decimal_bignum_from_u64(4)
+            decimal_bignum_shift_left(&m_plus, shift + 1)
+            decimal_bignum_shift_left(&m_minus, shift)
+    elif exponent == minimum_exponent or significand != hidden_bit:
+        decimal_bignum_shift_left(&r, 1)
+        decimal_bignum_shift_left(&s, usize(1 - exponent))
+    else:
+        decimal_bignum_shift_left(&r, 2)
+        decimal_bignum_shift_left(&s, usize(2 - exponent))
+        m_plus = decimal_bignum_from_u64(2)
+
+    # k estimates ceil(log10(value)), low by at most one.
+    var bit_length: i32 = 0
+    while bit_length < 64 and (significand >> (u64)bit_length) != 0:
+        bit_length += 1
+    let estimate = f64(exponent + bit_length - 1) * 0.30102999566398114 - 1e-10
+    var k = (i32)estimate
+    if f64(k) < estimate:
+        k += 1
+
+    if k >= 0:
+        decimal_bignum_multiply_power_of_ten(&s, usize(k))
+    else:
+        decimal_bignum_multiply_power_of_ten(&r, usize(-k))
+        decimal_bignum_multiply_power_of_ten(&m_plus, usize(-k))
+        decimal_bignum_multiply_power_of_ten(&m_minus, usize(-k))
+
+    # Fix the estimate: the upper bound must stay below 10^k.
+    var high = decimal_bignum_add(&r, &m_plus)
+    let too_low = decimal_bignum_compare(&high, &s)
+    if too_low > 0 or (is_even and too_low == 0):
+        k += 1
+        decimal_bignum_multiply_small(&s, 10)
+
+    var digits: u64 = 0
+    var digit_count: i32 = 0
+    while true:
+        decimal_bignum_multiply_small(&r, 10)
+        decimal_bignum_multiply_small(&m_plus, 10)
+        decimal_bignum_multiply_small(&m_minus, 10)
+        var digit: u64 = 0
+        while decimal_bignum_compare(&r, &s) >= 0:
+            decimal_bignum_subtract(&r, &s)
+            digit += 1
+
+        let low_comparison = decimal_bignum_compare(&r, &m_minus)
+        let termination_low = low_comparison < 0 or (is_even and low_comparison == 0)
+        high = decimal_bignum_add(&r, &m_plus)
+        let high_comparison = decimal_bignum_compare(&high, &s)
+        let termination_high = high_comparison > 0 or (is_even and high_comparison == 0)
+
+        digit_count += 1
+        if not termination_low and not termination_high:
+            digits = digits * 10 + digit
+            continue
+        if termination_low and not termination_high:
+            digits = digits * 10 + digit
+        elif not termination_low and termination_high:
+            digits = digits * 10 + digit + 1
+        else:
+            var twice_r = r
+            decimal_bignum_multiply_small(&twice_r, 2)
+            digits = digits * 10 + (digit if decimal_bignum_compare(&twice_r, &s) < 0 else digit + 1)
+        break
+
+    var decimal_exponent = k - digit_count
+    while digits % 10 == 0:
+        digits //= 10
+        decimal_exponent += 1
+
+    return DecimalExponentialForm(sign = sign, fraction = digits, exponent = decimal_exponent)
+
+## Ported from AK/StringConversions.cpp:155 AK::convert_to_decimal_exponential_form<double>: the
+## sign, shortest round-trip decimal significand and exponent of a finite double.
+pub func convert_to_decimal_exponential_form_f64(value: f64) -> DecimalExponentialForm:
+    let bits = value.bits()
+    let sign = (bits >> 63) != 0
+    let biased_exponent = (i32)((bits >> 52) & 0x7ff)
+    let fraction = bits & 0xfffffffffffff
+    assert(biased_exponent != 0x7ff, "convert_to_decimal_exponential_form: infinity or NaN")
+
+    if biased_exponent == 0 and fraction == 0:
+        return DecimalExponentialForm(sign = sign, fraction = 0, exponent = 0)
+    if biased_exponent == 0:
+        return shortest_decimal_form(fraction, -1074, 53, -1074, sign)
+    return shortest_decimal_form(fraction | ((u64)1 << 52), biased_exponent - 1075, 53, -1074, sign)
+
+## Ported from AK/StringConversions.cpp:155 AK::convert_to_decimal_exponential_form<float>.
+pub func convert_to_decimal_exponential_form_f32(value: f32) -> DecimalExponentialForm:
+    let bits = value.bits()
+    let sign = (bits >> 31) != 0
+    let biased_exponent = (i32)((bits >> 23) & 0xff)
+    let fraction = (u64)(bits & 0x7fffff)
+    assert(biased_exponent != 0xff, "convert_to_decimal_exponential_form: infinity or NaN")
+
+    if biased_exponent == 0 and fraction == 0:
+        return DecimalExponentialForm(sign = sign, fraction = 0, exponent = 0)
+    if biased_exponent == 0:
+        return shortest_decimal_form(fraction, -149, 24, -149, sign)
+    return shortest_decimal_form(fraction | ((u64)1 << 23), biased_exponent - 150, 24, -149, sign)

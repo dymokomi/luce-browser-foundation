@@ -44,6 +44,13 @@ test "string_hash: pinned values":
     assert(string_hash("ladybird".bytes.data, 8) == 473966972)
     let units: u16[3] = [0x61, 0x62, 0x63]
     assert(string_hash_u16(&units[0], 3) == string_hash("abc".bytes.data, 3))
+    # Bytes >= 0x80 sign-extend (signed char); UTF-16 code units do not.
+    let high: u8[5] = [0xff, 0x80, 0xc3, 0xa9, 0x7a]
+    assert(string_hash(&high[0], 5) == 1158673978)
+    assert(string_hash(&high[2], 2) == 26298542)
+    assert(case_insensitive_string_hash(&high[0], 5) == 1158673978)
+    let high_units: u16[3] = [0xffff, 0x8000, 0xe9]
+    assert(string_hash_u16(&high_units[0], 3) == 3255188876)
 
 # mark: TestIntegerMath =========================================================================
 

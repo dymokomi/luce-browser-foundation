@@ -1,0 +1,301 @@
+#==============================================================================================
+#
+#   fly_string - FlyString: interned UTF-8 strings that compare by identity
+#
+#   DESCRIPTION:
+#       Port of AK/FlyString.h (lines 1-159) and AK/FlyString.cpp (lines 1-217).
+#
+#       A FlyString is a StringBase: short strings inline, longer ones a StringData marked as a
+#       fly string and registered in the all_fly_strings table, so equal FlyStrings share one
+#       StringData and `==` is a comparison of the eight bytes. The table is a module global;
+#       its HashTable calls are gathered in the fly_string_table_* helpers, which compare the
+#       found iterator with end() as the C++ does.
+#
+#==============================================================================================
+
+# mark: The table ===============================================================================
+
+## Ported from AK/FlyString.cpp:18 AK::FlyStringTableHashTraits::hash.
+pub func fly_string_table_hash_traits_hash(string: const StringData*?) -> u32:
+    return string_data_hash(string else trap("VERIFY: null StringData in the FlyString table"))
+
+## Ported from AK/FlyString.cpp:19 AK::FlyStringTableHashTraits::equals.
+pub func fly_string_table_hash_traits_equals(a: const StringData*?, b: const StringData*?) -> bool:
+    return string_data_eq(a else trap("VERIFY: null StringData"), b else trap("VERIFY: null StringData"))
+
+## Ported from AK/FlyString.cpp:20 AK::FlyStringTableHashTraits::may_have_slow_equality_check.
+pub func fly_string_table_hash_traits_may_have_slow_equality_check() -> bool:
+    return true
+
+## `static Singleton<HashTable<StringData const*, FlyStringTableHashTraits>> table`.
+var s_all_fly_strings: HashTable[const StringData*?, FlyStringTableHashTraits]
+
+## Ported from AK/FlyString.cpp:23 AK::all_fly_strings.
+func all_fly_strings() -> HashTable[const StringData*?, FlyStringTableHashTraits]*:
+    return &s_all_fly_strings
+
+## The captures of the `[&](auto& entry) { return entry->bytes_as_string_view() == string; }`
+## predicate of FlyString::from_utf8.
+struct FlyStringTableViewPredicate:
+    var string: StringView
+
+# The predicate's body: whether the interned `entry` holds the bytes of `string`.
+func fly_string_table_view_predicate_call(context: void*?, entry: const (const StringData*?)*) -> bool:
+    let captures = (const FlyStringTableViewPredicate*)(context else trap("FlyString: no captures"))
+    let view = string_data_bytes_as_string_view(*entry else trap("VERIFY: null StringData"))
+    return string_view_eq_string_view(&view, captures.string)
+
+## `all_fly_strings().find(hash, predicate)`: the interned StringData equal to `string`, if any.
+func fly_string_table_find_view(string: StringView) -> const StringData*?:
+    var captures = FlyStringTableViewPredicate(string = string)
+    let predicate = Function1[const (const StringData*?)*, bool](call = fly_string_table_view_predicate_call, context = &captures)
+    var it = hash_table_find_u32_tt_unary_predicate(all_fly_strings(), string_view_hash(&string), predicate)
+    if hash_table_iterator_eq(&it, hash_table_end(all_fly_strings())):
+        return none
+    return *hash_table_iterator_deref(&it)
+
+## `all_fly_strings().find(data)`: the interned StringData equal to `data`, if any.
+func fly_string_table_find(data: const StringData*) -> const StringData*?:
+    var it = hash_table_find_t(all_fly_strings(), (const StringData*?)data)
+    if hash_table_iterator_eq(&it, hash_table_end(all_fly_strings())):
+        return none
+    return *hash_table_iterator_deref(&it)
+
+## Ported from AK/FlyString.cpp:210 AK::Detail::did_destroy_fly_string_data: drops a StringData
+## from the table when it dies (the StringData destructor's call; the collector's finalizer
+## will make it).
+pub func did_destroy_fly_string_data(string_data: const StringData*):
+    discard(hash_table_remove_t(all_fly_strings(), string_data))
+
+# mark: Creation ================================================================================
+
+## Ported from AK/FlyString.cpp:29 AK::FlyString::from_utf8: fails when `string` is not valid UTF-8.
+pub func fly_string_from_utf8(string: StringView) -> FlyString!:
+    if string_view_is_empty(&string):
+        return fly_string_new()
+    if string_view_length(&string) <= max_short_string_byte_count:
+        return fly_string_from_string(try string_from_utf8(string))
+    if let data = fly_string_table_find_view(string):
+        var result = FlyString(m_data = StringBase())
+        string_base_construct_string_data(&result.m_data, data)
+        return result
+    return fly_string_from_string(try string_from_utf8(string))
+
+## Ported from AK/FlyString.cpp:40 AK::FlyString::from_utf8_without_validation.
+pub func fly_string_from_utf8_without_validation(string: const u8[]) -> FlyString:
+    if string.length == 0:
+        return fly_string_new()
+    if string.length <= max_short_string_byte_count:
+        return fly_string_from_string(string_from_utf8_without_validation(string))
+    if let data = fly_string_table_find_view(string_view_from_bytes(string)):
+        var result = FlyString(m_data = StringBase())
+        string_base_construct_string_data(&result.m_data, data)
+        return result
+    return fly_string_from_string(string_from_utf8_without_validation(string))
+
+## Ported from AK/FlyString.h:30 AK::FlyString::from_ascii_short_string_without_validation.
+pub func fly_string_from_ascii_short_string_without_validation(data: const u8[]) -> FlyString:
+    assert(data.length <= max_short_string_byte_count)
+    var short_string = short_string_create_with_byte_count(data.length)
+    for i in 0..<data.length:
+        short_string.storage[i] = data[i]
+    var result = FlyString(m_data = StringBase())
+    string_base_construct_short_string(&result.m_data, short_string)
+    return result
+
+## Ported from AK/FlyString.cpp:51 AK::FlyString::FlyString(String const&): interns `string`.
+pub func fly_string_construct_string(this: FlyString*, string: const String*):
+    assert(not string_is_invalid(string))
+
+    if string_base_is_short_string(&string.string_base):
+        this.m_data = string.string_base
+        return
+
+    let data = string_base_data_without_union_member_assertion(&string.string_base) else trap("VERIFY: string data")
+    if string_data_is_fly_string(data):
+        this.m_data = string.string_base
+        return
+
+    if let existing = fly_string_table_find(data):
+        string_base_construct_string_data(&this.m_data, existing)
+    else:
+        this.m_data = string.string_base
+        discard(hash_table_set(all_fly_strings(), (const StringData*?)data))
+        string_data_set_fly_string(data, true)
+
+## `FlyString { string }`: the value form of the String constructor (and of `operator=(String)`).
+pub func fly_string_from_string(string: String) -> FlyString:
+    var result = fly_string_new()
+    fly_string_construct_string(&result, &string)
+    return result
+
+## `FlyString {}`: the empty string.
+pub func fly_string_new() -> FlyString:
+    return FlyString(m_data = string_base_new())
+
+## `"text"_fly_string` from a `str` (DESIGN.md §2.6's generated FlyString constants are built on it).
+pub func fly_string_from_str(text: str) -> FlyString:
+    return literalfly_string(text.bytes.data, text.length)
+
+# mark: Accessors and comparison ================================================================
+
+## Ported from AK/FlyString.h:46 AK::FlyString::is_empty.
+pub func fly_string_is_empty(this: const FlyString*) -> bool:
+    return string_base_byte_count(&this.m_data) == 0
+
+## Ported from AK/FlyString.h:47 AK::FlyString::hash.
+pub func fly_string_hash(this: const FlyString*) -> u32:
+    return string_base_hash(&this.m_data)
+
+## Ported from AK/FlyString.cpp:82 AK::FlyString::ascii_case_insensitive_hash.
+pub func fly_string_ascii_case_insensitive_hash(this: const FlyString*) -> u32:
+    let bytes = fly_string_bytes(this)
+    return case_insensitive_string_hash(bytes.data, bytes.length)
+
+## Ported from AK/FlyString.cpp:87 AK::FlyString::operator String.
+pub func fly_string_to_string_const(this: const FlyString*) -> String:
+    return fly_string_to_string_const_2(this)
+
+## Ported from AK/FlyString.cpp:92 AK::FlyString::to_string.
+pub func fly_string_to_string_const_2(this: const FlyString*) -> String:
+    return String(string_base = this.m_data)
+
+## Ported from AK/FlyString.cpp:98 AK::FlyString::code_points.
+pub func fly_string_code_points(this: const FlyString*) -> Utf8View:
+    return Utf8View(m_string = fly_string_bytes_as_string_view(this))
+
+## Ported from AK/FlyString.h:54 AK::FlyString::bytes.
+pub func fly_string_bytes(this: const FlyString*) -> const u8[]:
+    return string_base_bytes(&this.m_data)
+
+## Ported from AK/FlyString.h:55 AK::FlyString::bytes_as_string_view.
+pub func fly_string_bytes_as_string_view(this: const FlyString*) -> StringView:
+    return string_view_from_bytes(string_base_bytes(&this.m_data))
+
+## Ported from AK/FlyString.h:57 AK::FlyString::operator==(FlyString const&): identity of the
+## eight bytes. `==` on two FlyStrings is a compile error (the union), so compare with this.
+pub func fly_string_eq_fly_string(this: const FlyString*, other: const FlyString*) -> bool:
+    return string_base_raw_fly_string(&this.m_data) == string_base_raw_fly_string(&other.m_data)
+
+## Ported from AK/FlyString.h:58 AK::FlyString::operator==(String const&).
+pub func fly_string_eq_string(this: const FlyString*, other: const String*) -> bool:
+    return string_base_eq(&this.m_data, &other.string_base)
+
+## Ported from AK/FlyString.cpp:103 AK::FlyString::operator==(StringView).
+pub func fly_string_eq_string_view(this: const FlyString*, string: StringView) -> bool:
+    let view = fly_string_bytes_as_string_view(this)
+    return string_view_eq_string_view(&view, string)
+
+## Ported from AK/FlyString.cpp:108 AK::FlyString::operator==(char const*).
+pub func fly_string_eq_u8(this: const FlyString*, string: const u8*?) -> bool:
+    let view = fly_string_bytes_as_string_view(this)
+    return string_view_eq_u8_const(&view, string)
+
+## Ported from AK/FlyString.cpp:128 AK::FlyString::operator<=>.
+pub func fly_string_cmp(this: const FlyString*, other: const FlyString*) -> i32:
+    let view = fly_string_bytes_as_string_view(this)
+    return string_view_compare(&view, fly_string_bytes_as_string_view(other))
+
+## Ported from AK/FlyString.cpp:113 AK::FlyString::data(Badge<String>).
+pub func fly_string_data(this: const FlyString*) -> StringBase:
+    return this.m_data
+
+## Ported from AK/FlyString.cpp:118 AK::FlyString::number_of_fly_strings. This is primarily
+## interesting to unit tests.
+pub func fly_string_number_of_fly_strings() -> usize:
+    return hash_table_size(all_fly_strings())
+
+## Ported from AK/FlyString.cpp:186 AK::FlyString::equals_ignoring_ascii_case(FlyString const&).
+pub func fly_string_equals_ignoring_ascii_case_fly_string(this: const FlyString*, other: const FlyString*) -> bool:
+    if fly_string_eq_fly_string(this, other):
+        return true
+    return string_utils_equals_ignoring_ascii_case(fly_string_bytes_as_string_view(this), fly_string_bytes_as_string_view(other))
+
+## Ported from AK/FlyString.cpp:193 AK::FlyString::equals_ignoring_ascii_case(StringView).
+pub func fly_string_equals_ignoring_ascii_case_string_view(this: const FlyString*, other: StringView) -> bool:
+    return string_utils_equals_ignoring_ascii_case(fly_string_bytes_as_string_view(this), other)
+
+## Ported from AK/FlyString.cpp:138 AK::FlyString::to_ascii_lowercase.
+pub func fly_string_to_ascii_lowercase(this: const FlyString*) -> FlyString:
+    let bytes = fly_string_bytes(this)
+    var has_ascii_uppercase = false
+    for byte in bytes:
+        if is_ascii_upper_alpha(byte):
+            has_ascii_uppercase = true
+            break
+
+    if not has_ascii_uppercase:
+        return *this
+
+    let lowercase_bytes = new u8[bytes.length] else trap("out of memory")
+    for i in 0..<bytes.length:
+        lowercase_bytes[i] = (u8)to_ascii_lowercase(bytes[i])
+    return fly_string_from_string(string_from_utf8_without_validation(lowercase_bytes))
+
+## Ported from AK/FlyString.cpp:162 AK::FlyString::to_ascii_uppercase.
+pub func fly_string_to_ascii_uppercase(this: const FlyString*) -> FlyString:
+    let bytes = fly_string_bytes(this)
+    var has_ascii_lowercase = false
+    for byte in bytes:
+        if is_ascii_lower_alpha(byte):
+            has_ascii_lowercase = true
+            break
+
+    if not has_ascii_lowercase:
+        return *this
+
+    let uppercase_bytes = new u8[bytes.length] else trap("out of memory")
+    for i in 0..<bytes.length:
+        uppercase_bytes[i] = (u8)to_ascii_uppercase(bytes[i])
+    return fly_string_from_string(string_from_utf8_without_validation(uppercase_bytes))
+
+## Ported from AK/FlyString.h:79 AK::FlyString::is_ascii.
+pub func fly_string_is_ascii(this: const FlyString*) -> bool:
+    let view = fly_string_bytes_as_string_view(this)
+    return string_view_is_ascii(&view)
+
+## Ported from AK/FlyString.cpp:198 AK::FlyString::starts_with_bytes.
+pub func fly_string_starts_with_bytes(this: const FlyString*, bytes: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    let view = fly_string_bytes_as_string_view(this)
+    return string_view_starts_with_string_view(&view, bytes, case_sensitivity)
+
+## Ported from AK/FlyString.cpp:203 AK::FlyString::ends_with_bytes.
+pub func fly_string_ends_with_bytes(this: const FlyString*, bytes: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    let view = fly_string_bytes_as_string_view(this)
+    return string_view_ends_with_string_view(&view, bytes, case_sensitivity)
+
+## Ported from AK/FlyString.h:100 AK::FlyString::FlyString(nullptr_t): the invalid sentinel.
+pub func fly_string_construct_void(this: FlyString*):
+    string_base_construct_void(&this.m_data)
+
+## Ported from AK/FlyString.h:105 AK::FlyString::FlyString(StringBase).
+pub func fly_string_construct_string_base(this: FlyString*, data: StringBase):
+    this.m_data = data
+
+## Ported from AK/FlyString.h:112 AK::FlyString::is_invalid.
+pub func fly_string_is_invalid(this: const FlyString*) -> bool:
+    return string_base_raw_fly_string(&this.m_data) == 0
+
+# mark: Traits and literals =====================================================================
+
+## Ported from AK/FlyString.h:139 AK::ASCIICaseInsensitiveFlyStringTraits::hash.
+pub func ascii_case_insensitive_fly_string_traits_hash(s: const FlyString*) -> u32:
+    return fly_string_ascii_case_insensitive_hash(s)
+
+## Ported from AK/FlyString.h:140 AK::ASCIICaseInsensitiveFlyStringTraits::equals.
+pub func ascii_case_insensitive_fly_string_traits_equals(a: const FlyString*, b: const FlyString*) -> bool:
+    return fly_string_equals_ignoring_ascii_case_fly_string(a, b)
+
+## Ported from AK/FlyString.h:145 operator""_fly_string: short ASCII literals become inline fly
+## strings without validation or table lookup; anything else must be valid UTF-8.
+pub func literalfly_string(cstring: const u8*?, length: usize) -> FlyString:
+    let view = literalsv_u8(cstring, length)
+    let bytes = string_view_bytes(&view)
+    # OPTIMIZATION: Short ASCII strings become compile-time constants with no runtime validation
+    # or table lookup.
+    if length <= max_short_string_byte_count and simdutf_validate_ascii(bytes):
+        return fly_string_from_ascii_short_string_without_validation(bytes)
+
+    let utf8 = Utf8View(m_string = view)
+    assert(utf8_view_validate_allow_lonely_surrogates(&utf8))
+    return fly_string_from_utf8_without_validation(bytes)

@@ -1,0 +1,332 @@
+#==============================================================================================
+#
+#   string_1 - String: creation from UTF-8, UTF-16, streams, builders and code points
+#
+#   DESCRIPTION:
+#       Port of AK/String.h (lines 1-289) and AK/String.cpp (lines 1-201): String's
+#       constructors and static creators, in the stub's (the header's) order.
+#
+#       String is a strongly owned sequence of Unicode code points encoded as UTF-8. The data
+#       may or may not be heap-allocated. There is no guarantee that the underlying bytes are
+#       null-terminated. Strings of up to seven bytes are stored inline (string_base).
+#       `==` on String does not compile (its StringBase holds a union): compare with
+#       string_equals or string_base_eq.
+#
+#==============================================================================================
+
+# mark: Construction ============================================================================
+
+## `String {}`: the empty string (a zero-initialized String is the invalid sentinel instead).
+pub func string_new() -> String:
+    return String(string_base = string_base_new())
+
+## `"text"_string`: a String of a literal or any other `str` (DESIGN.md §2.6's `ak.string`; a
+## module function named `string` would collide with the many parameters named `string`).
+pub func string_from_str(text: str) -> String:
+    return literalstring(text.bytes.data, text.length)
+
+## Ported from AK/String.cpp:62 AK::String::from_utf8: a String of `view`, failing when it is
+## not valid UTF-8.
+pub func string_from_utf8(view: StringView) -> String!:
+    let utf8 = Utf8View(m_string = view)
+    if not utf8_view_validate_allow_lonely_surrogates(&utf8):
+        error(ak_error, "String::from_utf8: Input was not valid UTF-8")
+
+    var result = string_new()
+    var copy = CopyBytesToBuffer(source = string_view_bytes(&view))
+    try string_base_replace_with_new_string_usize(&result.string_base, string_view_length(&view), &copy)
+    return result
+
+## Ported from AK/String.cpp:25 AK::String::from_utf8_with_replacement_character: a String of
+## `view` with lonely surrogates and invalid bytes replaced by U+FFFD.
+pub func string_from_utf8_with_replacement_character(view: StringView, with_bom_handling: StringWithBomHandling = StringWithBomHandling.yes) -> String:
+    var input = view
+    let bytes = string_view_bytes(&view)
+    if with_bom_handling == StringWithBomHandling.yes and bytes.length >= 3 and bytes[0] == 0xef and bytes[1] == 0xbb and bytes[2] == 0xbf:
+        input = string_view_substring_view(&view, 3)
+
+    let utf8_view = Utf8View(m_string = input)
+
+    if utf8_view_validate_allow_lonely_surrogates(&utf8_view, AllowLonelySurrogates.no):
+        return string_from_utf8_without_validation(string_view_bytes(&input))
+
+    var builder = string_builder_new_usize(string_view_length(&input))
+
+    var it = utf8_view_begin(&utf8_view)
+    while not utf8_code_point_iterator_done(&it):
+        let code_point = utf8_code_point_iterator_deref(&it)
+        if is_unicode_surrogate(code_point):
+            string_builder_append_code_point(&builder, unicode_utils_replacement_code_point)
+        else:
+            string_builder_append_code_point(&builder, code_point)
+        utf8_code_point_iterator_inc(&it)
+
+    return string_builder_to_string_without_validation(&builder)
+
+## Ported from AK/String.cpp:47 AK::String::from_utf8_without_validation.
+pub func string_from_utf8_without_validation(bytes: const u8[]) -> String:
+    var result = string_new()
+    var copy = CopyBytesToBuffer(source = bytes)
+    string_base_replace_with_new_string_usize(&result.string_base, bytes.length, &copy) else trap("MUST: from_utf8_without_validation")
+    return result
+
+## Ported from AK/String.cpp:57 AK::String::from_ascii_without_validation.
+pub func string_from_ascii_without_validation(bytes: const u8[]) -> String:
+    return string_from_utf8_without_validation(bytes)
+
+## Ported from AK/String.h:60 AK::String::from_ascii_short_string_without_validation.
+pub func string_from_ascii_short_string_without_validation(data: const u8[]) -> String:
+    assert(data.length <= max_short_string_byte_count)
+    var short_string = short_string_create_with_byte_count(data.length)
+    for i in 0..<data.length:
+        short_string.storage[i] = data[i]
+    var result = String(string_base = StringBase())
+    string_base_construct_short_string(&result.string_base, short_string)
+    return result
+
+## Ported from AK/String.cpp:145 AK::String::from_string_builder.
+pub func string_from_string_builder(builder: StringBuilder*) -> String!:
+    let view = string_builder_string_view(builder)
+    let utf8 = Utf8View(m_string = view)
+    if not utf8_view_validate_allow_lonely_surrogates(&utf8):
+        error(ak_error, "String::from_string_builder: Input was not valid UTF-8")
+
+    var result = string_new()
+    string_base_replace_with_string_builder(&result.string_base, builder)
+    return result
+
+## Ported from AK/String.cpp:155 AK::String::from_string_builder_without_validation.
+pub func string_from_string_builder_without_validation(builder: StringBuilder*) -> String:
+    var result = string_new()
+    string_base_replace_with_string_builder(&result.string_base, builder)
+    return result
+
+## The lambda of String::from_utf16_le/be_with_replacement_character: transcodes the
+## well-formed UTF-16 into the new string.
+struct StringFromUtf16Transcode: BytesCallback:
+    var utf16_data: const u16[]
+
+    mutating func call(buffer: u8[]) -> !:
+        let result = simdutf_convert_utf16_to_utf8(self.utf16_data, buffer)
+        assert(result == buffer.length)
+
+## The shared body of from_utf16_le/be_with_replacement_character.
+func string_from_utf16_with_replacement_character(bytes: const u8[], big_endian: bool) -> String!:
+    if bytes.length == 0:
+        return string_new()
+
+    # simdutf reads the bytes in the stated order; the well-formed copy is in host order.
+    let well_formed_utf16 = simdutf_to_well_formed_utf16_bytes(bytes, big_endian)
+
+    let utf8_length = simdutf_utf8_length_from_utf16(well_formed_utf16)
+
+    var result = string_new()
+    var transcode = StringFromUtf16Transcode(utf16_data = well_formed_utf16)
+    try string_base_replace_with_new_string_usize(&result.string_base, utf8_length, &transcode)
+
+    return result
+
+## Ported from AK/String.cpp:75 AK::String::from_utf16_le_with_replacement_character: a String
+## of little-endian UTF-16 bytes, lonely surrogates replaced by U+FFFD.
+pub func string_from_utf16_le_with_replacement_character(bytes: const u8[]) -> String!:
+    # The C++ copies into a well-formed buffer only when validate_utf16_le fails; converting a
+    # host-order copy always gives the same bytes.
+    return try string_from_utf16_with_replacement_character(bytes, false)
+
+## Ported from AK/String.cpp:104 AK::String::from_utf16_be_with_replacement_character.
+pub func string_from_utf16_be_with_replacement_character(bytes: const u8[]) -> String!:
+    return try string_from_utf16_with_replacement_character(bytes, true)
+
+## The lambda of String::from_stream: fills the buffer from the stream and validates it.
+struct StringFromStreamRead: BytesCallback:
+    var stream: Stream*
+
+    mutating func call(buffer: u8[]) -> !:
+        try stream_read_until_filled(self.stream, buffer)
+        let utf8 = Utf8View(m_string = string_view_from_bytes(buffer))
+        if not utf8_view_validate_allow_lonely_surrogates(&utf8):
+            error(ak_error, "String::from_stream: Input was not valid UTF-8")
+
+## Ported from AK/String.cpp:133 AK::String::from_stream: a String of the next `byte_count`
+## UTF-8 bytes of `stream`.
+pub func string_from_stream(stream: Stream*, byte_count: usize) -> String!:
+    var result = string_new()
+    var read = StringFromStreamRead(stream = stream)
+    try string_base_replace_with_new_string_usize(&result.string_base, byte_count, &read)
+    return result
+
+## The lambdas of String::from_code_point: encode the code point into the short string.
+struct StringFromCodePointEncode: ShortStringBytesCallback:
+    var code_point: u32
+
+    mutating func call(buffer: u8[]):
+        var utf8 = CodePointAsUtf8()
+        discard(unicode_utils_code_point_to_utf8(self.code_point, &utf8))
+        copy_bytes(buffer, utf8.bytes[..<utf8.length])
+
+## Ported from AK/String.h:80 AK::String::from_code_point: a String of a single code point.
+pub func string_from_code_point(code_point: u32) -> String:
+    assert(is_unicode(code_point))
+
+    var string = string_new()
+    var encode = StringFromCodePointEncode(code_point = code_point)
+    string_base_replace_with_new_short_string(&string.string_base, (usize)unicode_utils_bytes_to_store_code_point_in_utf8(code_point), &encode)
+
+    return string
+
+## The lambda of String::repeated(u32, size_t).
+struct StringRepeatedCodePoint: BytesCallback:
+    var code_point_as_utf8: const u8[]
+    var count: usize
+
+    mutating func call(buffer: u8[]) -> !:
+        let code_point_byte_length = self.code_point_as_utf8.length
+        if code_point_byte_length == 1:
+            memory.set(buffer, self.code_point_as_utf8[0])
+        else:
+            for i in 0..<self.count:
+                copy_bytes(buffer[(i * code_point_byte_length)..], self.code_point_as_utf8)
+
+## Ported from AK/String.cpp:162 AK::String::repeated(u32, size_t): a String of one code point
+## repeated `count` times.
+pub func string_repeated_u32(code_point: u32, count: usize) -> String!:
+    assert(is_unicode(code_point))
+
+    var code_point_as_utf8 = CodePointAsUtf8()
+    let code_point_byte_length = (usize)unicode_utils_code_point_to_utf8(code_point, &code_point_as_utf8)
+
+    let total_byte_count = code_point_byte_length * count
+
+    var result = string_new()
+    var repeat = StringRepeatedCodePoint(code_point_as_utf8 = code_point_as_utf8.bytes[..<code_point_byte_length], count = count)
+    try string_base_replace_with_new_string_usize(&result.string_base, total_byte_count, &repeat)
+    return result
+
+## The lambda of String::repeated(String const&, size_t).
+struct StringRepeatedString: BytesCallback:
+    var input: const u8[]
+    var count: usize
+
+    mutating func call(buffer: u8[]) -> !:
+        let input_size = self.input.length
+        if input_size == 1:
+            memory.set(buffer, self.input[0])
+        else:
+            for i in 0..<self.count:
+                copy_bytes(buffer[(i * input_size)..<(i * input_size + input_size)], self.input)
+
+## Ported from AK/String.cpp:451 AK::String::repeated(String const&, size_t): `input` repeated
+## `count` times.
+pub func string_repeated_string(input: const String*, count: usize) -> String!:
+    let input_bytes = string_base_bytes(&input.string_base)
+    let total = (u64)count *? (u64)input_bytes.length else error(ak_errno_error, "EOVERFLOW")
+    if total > 0xffffffff:
+        error(ak_errno_error, "EOVERFLOW")
+
+    var result = string_new()
+    let input_size = input_bytes.length
+    var repeat = StringRepeatedString(input = input_bytes, count = count)
+    try string_base_replace_with_new_string_usize(&result.string_base, count * input_size, &repeat)
+
+    return result
+
+## Ported from AK/String.cpp:471 AK::String::bijective_base_from: `value` + 1 in bijective
+## base `base_` over `maybe_map` (default A-Z or a-z).
+pub func string_bijective_base_from(value: usize, target_case: StringCase, base_: u32 = 26, maybe_map: StringView? = none) -> String:
+    var remaining = value + 1
+    let map = maybe_map else (sv("ABCDEFGHIJKLMNOPQRSTUVWXYZ") if target_case == StringCase.upper else sv("abcdefghijklmnopqrstuvwxyz"))
+
+    assert(base_ >= 2 and (usize)base_ <= string_view_length(&map))
+
+    # The '8 bits per byte' assumption may need to go?
+    var buffer: u8[128]
+    var i: usize = 0
+    while true:
+        var remainder = remaining % (usize)base_
+        var new_value = remaining // (usize)base_
+        if remainder == 0:
+            new_value -= 1
+            remainder = string_view_length(&map)
+
+        buffer[i] = string_view_at(&map, remainder - 1)
+        i += 1
+        remaining = new_value
+        if remaining == 0:
+            break
+
+    for j in 0..<(i // 2):
+        let swapped = buffer[j]
+        buffer[j] = buffer[i - j - 1]
+        buffer[i - j - 1] = swapped
+
+    return string_from_utf8(string_view_from_bytes(buffer[..<i])) else trap("MUST: bijective_base_from")
+
+## Ported from AK/String.cpp:501 AK::String::greek_letter_from.
+pub func string_greek_letter_from(value: usize) -> String:
+    let map = sv("αβγδεζηθικλμνξοπρστυφχψω")
+    let base_: usize = 24
+
+    var builder = string_builder_new()
+    var remaining = value
+    while remaining > 0:
+        remaining -= 1
+        string_builder_append_string_view(&builder, string_view_substring_view_usize(&map, (remaining % base_) * 2, 2))
+        remaining //= base_
+
+    let letters = string_builder_to_string_without_validation(&builder)
+    return string_reverse(&letters) else trap("MUST: greek_letter_from")
+
+## The `target_case == Case::Upper ? upper : lower` of String::roman_number_from.
+func string_roman_number_digits(builder: StringBuilder*, target_case: StringCase, upper: str, lower: str):
+    string_builder_append_string_view(builder, sv(upper) if target_case == StringCase.upper else sv(lower))
+
+## Ported from AK/String.cpp:516 AK::String::roman_number_from.
+pub func string_roman_number_from(value: usize, target_case: StringCase) -> String:
+    if value > 3999:
+        return string_number_u64((u64)value)
+
+    var builder = string_builder_new()
+
+    var remaining = value
+    while remaining > 0:
+        if remaining >= 1000:
+            string_roman_number_digits(&builder, target_case, "M", "m")
+            remaining -= 1000
+        elif remaining >= 900:
+            string_roman_number_digits(&builder, target_case, "CM", "cm")
+            remaining -= 900
+        elif remaining >= 500:
+            string_roman_number_digits(&builder, target_case, "D", "d")
+            remaining -= 500
+        elif remaining >= 400:
+            string_roman_number_digits(&builder, target_case, "CD", "cd")
+            remaining -= 400
+        elif remaining >= 100:
+            string_roman_number_digits(&builder, target_case, "C", "c")
+            remaining -= 100
+        elif remaining >= 90:
+            string_roman_number_digits(&builder, target_case, "XC", "xc")
+            remaining -= 90
+        elif remaining >= 50:
+            string_roman_number_digits(&builder, target_case, "L", "l")
+            remaining -= 50
+        elif remaining >= 40:
+            string_roman_number_digits(&builder, target_case, "XL", "xl")
+            remaining -= 40
+        elif remaining >= 10:
+            string_roman_number_digits(&builder, target_case, "X", "x")
+            remaining -= 10
+        elif remaining == 9:
+            string_roman_number_digits(&builder, target_case, "IX", "ix")
+            remaining -= 9
+        elif remaining >= 5 and remaining <= 8:
+            string_roman_number_digits(&builder, target_case, "V", "v")
+            remaining -= 5
+        elif remaining == 4:
+            string_roman_number_digits(&builder, target_case, "IV", "iv")
+            remaining -= 4
+        elif remaining <= 3:
+            string_roman_number_digits(&builder, target_case, "I", "i")
+            remaining -= 1
+
+    return string_builder_to_string_without_validation(&builder)

@@ -1,0 +1,338 @@
+#==============================================================================================
+#
+#   tests_string_conversions_3 - integer parsing and decimal exponential forms
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestStringConversions.cpp: signed_integer, unsigned_integer,
+#       unicode_emojis_with_low_byte_in_UTF_16_matching_the_value_of_an_ascii_digit, octal,
+#       double_conversion and float_conversion.
+#
+#==============================================================================================
+
+test "StringConversions: signed_integer":
+    assert(parse_number_string_view_i32(StringView()) == none)
+    assert(parse_number_string_view_i32(sv("")) == none)
+    assert(parse_number_string_view_i32(sv("a")) == none)
+    assert(parse_number_string_view_i32(sv("+")) == none)
+    assert(parse_number_string_view_i32(sv("-")) == none)
+
+    assert(parse_number_string_view_i32(sv("0")) == 0)
+    assert(parse_number_string_view_i32(sv("1")) == 1)
+    assert(parse_number_string_view_i32(sv("+1")) == 1)
+    assert(parse_number_string_view_i32(sv("-1")) == -1)
+    assert(parse_number_string_view_i32(sv("01")) == 1)
+    assert(parse_number_string_view_i32(sv("12345")) == 12345)
+    assert(parse_number_string_view_i32(sv("-12345")) == -12345)
+    assert(parse_number_string_view_i32(sv(" \t-12345 \n\n")) == -12345)
+
+    assert(parse_number_string_view_i8(sv("-1")) == -1)
+    assert(parse_number_string_view_i8(sv("128")) == none)
+    assert(parse_number_string_view_i16(sv("-1")) == -1)
+    assert(parse_number_string_view_i16(sv("32768")) == none)
+    assert(parse_number_string_view_i32(sv("-1")) == -1)
+    assert(parse_number_string_view_i32(sv("2147483648")) == none)
+    assert(parse_number_string_view_i64(sv("-1")) == -1)
+    assert(parse_number_string_view_i64(sv("9223372036854775808")) == none)
+
+test "StringConversions: unsigned_integer":
+    assert(parse_number_string_view_u32(StringView()) == none)
+    assert(parse_number_string_view_u32(sv("")) == none)
+    assert(parse_number_string_view_u32(sv("a")) == none)
+    assert(parse_number_string_view_u32(sv("+")) == none)
+    assert(parse_number_string_view_u32(sv("-")) == none)
+    assert(parse_number_string_view_u32(sv("+1")) == none)
+    assert(parse_number_string_view_u32(sv("-1")) == none)
+
+    assert(parse_number_string_view_u32(sv("0")) == 0)
+    assert(parse_number_string_view_u32(sv("1")) == 1)
+    assert(parse_number_string_view_u32(sv("01")) == 1)
+    assert(parse_number_string_view_u32(sv("12345")) == 12345)
+    assert(parse_number_string_view_u32(sv(" \t12345 \n\n")) == 12345)
+
+    assert(parse_number_string_view_u8(sv("255")) == 255)
+    assert(parse_number_string_view_u8(sv("256")) == none)
+    assert(parse_number_string_view_u16(sv("65535")) == 65535)
+    assert(parse_number_string_view_u16(sv("65536")) == none)
+    assert(parse_number_string_view_u32(sv("4294967295")) == 4294967295)
+    assert(parse_number_string_view_u32(sv("4294967296")) == none)
+    assert(parse_number_string_view_u64(sv("18446744073709551615")) == 18446744073709551615)
+    assert(parse_number_string_view_u64(sv("18446744073709551616")) == none)
+
+test "StringConversions: unicode_emojis_with_low_byte_in_UTF_16_matching_the_value_of_an_ascii_digit":
+    let emojis: str[16] = ["ℹ", "ℹ️", "☸", "☸️", "☹", "☹️", "✳", "✳️", "✴", "✴️", "⤴", "⤴️", "⤵", "⤵️", "〰", "〰️"]
+    for emoji in emojis:
+        assert(parse_number_string_view_u32(sv(emoji)) == none)
+        let utf16 = utf16_string_from_utf8_without_validation(sv(emoji))
+        let view = utf16_string_base_utf16_view(&utf16.utf16_string_base)
+        assert(not utf16_view_has_ascii_storage(&view))
+        assert(parse_number_utf16_view_u32(view) == none)
+
+test "StringConversions: octal":
+    assert(parse_number_string_view_u16(StringView(), TrimWhitespace.no, 8) == none)
+    assert(parse_number_string_view_u16(sv(""), TrimWhitespace.no, 8) == none)
+    assert(parse_number_string_view_u16(sv("a"), TrimWhitespace.no, 8) == none)
+    assert(parse_number_string_view_u16(sv("+"), TrimWhitespace.no, 8) == none)
+    assert(parse_number_string_view_u16(sv("-"), TrimWhitespace.no, 8) == none)
+    assert(parse_number_string_view_u16(sv("+1"), TrimWhitespace.no, 8) == none)
+    assert(parse_number_string_view_u16(sv("-1"), TrimWhitespace.no, 8) == none)
+    assert(parse_number_string_view_u16(sv("8"), TrimWhitespace.no, 8) == none)
+    assert(parse_number_string_view_u16(sv("77777777"), TrimWhitespace.no, 8) == none)
+
+    assert(parse_number_string_view_u16(sv("0"), TrimWhitespace.no, 8) == 0)
+    assert(parse_number_string_view_u16(sv("1"), TrimWhitespace.no, 8) == 1)
+    assert(parse_number_string_view_u16(sv("0755"), TrimWhitespace.no, 8) == 0o755)
+    assert(parse_number_string_view_u16(sv("755"), TrimWhitespace.no, 8) == 0o755)
+    assert(parse_number_string_view_u16(sv(" \t644 \n\n"), TrimWhitespace.yes, 8) == 0o644)
+    assert(parse_number_string_view_u16(sv("177777"), TrimWhitespace.no, 8) == 0o177777)
+
+## DOES_CONVERT_TO for double.
+func test_converts_f64(value: f64, sign: bool, fraction: u64, exponent: i32):
+    let form = convert_to_decimal_exponential_form_f64(value)
+    assert(form.sign == sign)
+    assert(form.fraction == fraction)
+    assert(form.exponent == exponent)
+
+## DOES_CONVERT_TO for float.
+func test_converts_f32(value: f32, sign: bool, fraction: u64, exponent: i32):
+    let form = convert_to_decimal_exponential_form_f32(value)
+    assert(form.sign == sign)
+    assert(form.fraction == fraction)
+    assert(form.exponent == exponent)
+
+test "StringConversions: double_conversion":
+    test_converts_f64(0.0, false, 0, 0)
+    test_converts_f64(-0.0, true, 0, 0)
+    test_converts_f64(1.0, false, 1, 0)
+    test_converts_f64(-1.0, true, 1, 0)
+    test_converts_f64(0.1, false, 1, -1)
+    test_converts_f64(0.2, false, 2, -1)
+    test_converts_f64(0.3, false, 3, -1)
+    test_converts_f64(0.12345, false, 12345, -5)
+    test_converts_f64(0.0012345, false, 12345, -7)
+    test_converts_f64(0.1 + 0.2, false, 30000000000000004, -17)
+    test_converts_f64(17976931348623157e292, false, 17976931348623157, 292)
+    test_converts_f64(-17976931348623157e292, true, 17976931348623157, 292)
+    test_converts_f64(22250738585072014e-324, false, 22250738585072014, -324)
+    test_converts_f64(-22250738585072014e-324, true, 22250738585072014, -324)
+    test_converts_f64(f64.bits(0xc3c04222300db8ac), true, 23430728857074627, 2)
+
+test "StringConversions: float_conversion":
+    test_converts_f32(0.0f32, false, 0, 0)
+    test_converts_f32(-0.0f32, true, 0, 0)
+    test_converts_f32(1.0f32, false, 1, 0)
+    test_converts_f32(-1.0f32, true, 1, 0)
+    test_converts_f32(0.1f32, false, 1, -1)
+    test_converts_f32(0.2f32, false, 2, -1)
+    test_converts_f32(0.3f32, false, 3, -1)
+    test_converts_f32(0.025f32, false, 25, -3)
+    test_converts_f32(34028235e31f32, false, 34028235, 31)
+    test_converts_f32(-34028235e31f32, true, 34028235, 31)
+    test_converts_f32(11754944e-45f32, false, 11754944, -45)
+    test_converts_f32(-11754944e-45f32, true, 11754944, -45)
+
+## Shortest digits of random doubles, checked against Python's repr (also shortest round-trip).
+test "StringConversions: double_conversion (random values)":
+    let cases: (u64, bool, u64, i32)[200] = [
+        (0xdcf4bb99f4bea973, true, 6172432358286022, 124),
+        (0xd95bafc8f2a4d27b, true, 2859754973339552, 107),
+        (0x177219d30e7a269f, false, 9685954788681827, -211),
+        (0x5c6e433715ba2bdd, false, 17596799983890588, 121),
+        (0x2b491044d5e34124, false, 3580915253331874, -115),
+        (0xcf1822ffbc688778, true, 10661470889645967, 57),
+        (0xda94e3e8ab73738f, true, 2262570928962826, 113),
+        (0x4067c3584ee207f8, false, 19010452980181412, -14),
+        (0x3653f8dd9b1f282e, false, 5466194748801392, -62),
+        (0x925e4749b575bd1, false, 13578984091672322, -280),
+        (0xae66267594c9c950, true, 3563112281934616, -100),
+        (0xffed9235288bc781, true, 16612439357625544, 292),
+        (0xa372db8f6e405d93, true, 6334170280534827, -153),
+        (0xcdbd47d364be8049, true, 30836038605891957, 50),
+        (0xdc38f519b91751da, true, 18140022041619748, 120),
+        (0x82523e86feac7eb7, true, 17435332921043034, -313),
+        (0x5f3f57ebf30b94fa, false, 6412458461194689, 135),
+        (0xef8acd128b4f2fc1, true, 20316961465603147, 213),
+        (0x80877b6f71e1f6d2, true, 4179964877544359, -321),
+        (0xe6b58de744ab6cce, true, 5861536263905739, 171),
+        (0xdefc044a09325626, true, 35824133474207516, 133),
+        (0x5d300cb90706a045, false, 7645129758400049, 125),
+        (0xee8d7ee9770348a0, true, 34118209296939738, 208),
+        (0xe8624fab5186ee32, true, 6683503880702411, 179),
+        (0x6c71c4a66148a86f, false, 23926516757936505, 198),
+        (0xe2520e33e44c5055, true, 4158978299712768, 150),
+        (0x2a1be9cd8697bbd0, false, 7606635373981541, -121),
+        (0x2d6c797f8f7d9b78, false, 6989224294447309, -105),
+        (0x3b08c6e33c729578, false, 2561871916174794, -39),
+        (0x2d3d854e061b9030, false, 9057498904828172, -106),
+        (0x2c70501e533c9135, false, 12219521898306743, -110),
+        (0x829a48d422fe99a2, true, 4019053428839938, -311),
+        (0x5c14bc4a829e07b0, false, 37678432607562434, 119),
+        (0x83844b40ffa9b9f1, true, 1016812840899728, -306),
+        (0x8f54f8ceacaab39e, true, 8244821233154428, -250),
+        (0xfec3f6b32e8d4b8a, true, 4278249189649476, 287),
+        (0x72154e76e4c11ab2, false, 3551801516565029, 226),
+        (0x6a27e0dfcbf87544, false, 23395513615921, 190),
+        (0x867e5e15bc01bfce, true, 214137792037775, -291),
+        (0xe89204e2e8168561, true, 5261505016355935, 180),
+        (0x5d3fd983c34c769f, false, 15171302968782111, 125),
+        (0x97eeab64ca2ce6bc, true, 2100678483425042, -208),
+        (0x5ca495fa5a91c89b, false, 1915212023116058, 123),
+        (0xdbe53fcafb2147df, true, 4826479648226183, 119),
+        (0x721dea3bf63f23d0, false, 49868375342297837, 225),
+        (0xf4767f26294365b2, true, 10308482299102521, 237),
+        (0x665d7435c1066932, false, 12515287476177559, 169),
+        (0xbd143fa9b714210c, true, 1798444362116689, -29),
+        (0xa7a83ee0761ebfd2, true, 12018350460661752, -133),
+        (0x3ff98ff387c56473, false, 15976443580205142, -16),
+        (0x47733e847d718d73, false, 15987463463670853, 20),
+        (0x7f81375eecc1cb63, false, 15112114391666088, 290),
+        (0x83f0be4e80371eb9, true, 1073810019627686, -304),
+        (0xcbd4d3e2d4dec9ef, true, 20427729030849164, 41),
+        (0xa9643a295a9ac6de, true, 269145555140897, -123),
+        (0x74667bffe202849d, false, 51514224327871985, 236),
+        (0xe73695c3e652c71a, true, 15723085726220776, 173),
+        (0x59cc60b17604e4b4, false, 3751850629663593, 109),
+        (0xb9d39cca91551e82, true, 3867876908343556, -45),
+        (0x8ebdbfe3eb9ac688, true, 11421526438570614, -253),
+        (0x74e088a9b9492f25, false, 9697506280272084, 239),
+        (0xa8acb5137c9260dc, true, 9325763874730265, -128),
+        (0xf0caeef038c89b38, true, 2140903311842153, 220),
+        (0xd08f1bb2531d6460, true, 11526663314186998, 64),
+        (0xd5c44a4eb3172062, true, 14542403417064858, 89),
+        (0xe06f291b2a838af8, true, 33423595831146825, 140),
+        (0x9dc8db48e86ec9c6, true, 3372203578282024, -180),
+        (0xc5e2486c44a4a8f6, true, 4526627294096172, 13),
+        (0x7ad1f45ae9500ec9, false, 4171666128313944, 268),
+        (0x4da4daeb4f3f8777, false, 1098151979817159, 51),
+        (0xcc9c3adcf515a823, true, 11340938749662184, 45),
+        (0xd4c0dca8b4c9e755, true, 1844065536179179, 85),
+        (0x8feb994a81167346, true, 5555247880742425, -247),
+        (0x81e220df848b1df7, true, 13534868867003608, -315),
+        (0x9da59b74a6c3181c, true, 732844560561446, -180),
+        (0x681b8f5896838b76, false, 31435153686188845, 177),
+        (0xbb1e386c4fd5079e, true, 6249432805814946, -39),
+        (0x7d28f93435339774, false, 7974883827577112, 279),
+        (0x5dd961e6830b54fa, false, 12380866253382668, 128),
+        (0xaf29d115ef24bd62, true, 17010324576511781, -97),
+        (0xe1cf4f589f8e4ce0, true, 14086074811745146, 147),
+        (0xc8c69069134bccd3, true, 3931221240931894, 27),
+        (0x5769da05d205bbfc, false, 12434166567291675, 97),
+        (0x227eeb7b9d7d01f, false, 2858921355553976, -313),
+        (0xd0a7bd04e85bfcdd, true, 35183537304498, 67),
+        (0xff3fe32a30ffc4ee, true, 8746901355973897, 289),
+        (0x1b2d19a2beaa14a7, false, 8976512556882003, -193),
+        (0x930cdbd30f0ad2a8, true, 6540180534072436, -232),
+        (0xc855fdfa7251af0, false, 2388304410914235, -263),
+        (0x9779ac1f45e9dd32, true, 13737524790105488, -211),
+        (0xaeb6db2c3a038a70, true, 1176533154264189, -98),
+        (0xea748db9e020307a, true, 6444145514909996, 189),
+        (0xc11e60de1b343f52, true, 4977195265664953, -10),
+        (0x22f1a83185b98f5f, false, 2316749538983408, -155),
+        (0x440e2b4fda9c025a, false, 6956540945520835, 4),
+        (0xd322a7353ead4efe, true, 3039772020397425, 77),
+        (0xf18e859835e1f291, true, 9937507892606777, 223),
+        (0xf756132e16dce72, false, 33620536240540177, -250),
+        (0xe5e138e26c4454b9, true, 5717104602166197, 167),
+        (0xc268a20eb78ac332, true, 8463847086940999, -4),
+        (0xe8a35b10828d569, false, 12578128763618191, -254),
+        (0x5c3747465cc36c27, false, 16919655202538766, 120),
+        (0x3fdf57cd2c006497, false, 48973397538208857, -17),
+        (0x600571fac3a5b26, false, 9001912374534393, -295),
+        (0x1d7f427515392480, false, 13252744155681651, -182),
+        (0x11457d9cf45e2fa0, false, 18143594738725503, -241),
+        (0xa76c196067cfdcb, false, 2960079561706237, -273),
+        (0xeb2b5693babb7fbb, true, 17554028747300424, 192),
+        (0x5f834da70569c018, false, 126374676874156, 138),
+        (0x20b6a8464174e75a, false, 4326042308031576, -166),
+        (0xef9b6bf2d037fe2e, true, 4157484831705025, 214),
+        (0xbc1b00d92838e766, true, 36596314025338847, -35),
+        (0x85e951862f0981ae, true, 3486994192615966, -295),
+        (0x7ee4fab105d83e, false, 274969734484877, -320),
+        (0x96e6bc4d62b47204, true, 2376175106969727, -213),
+        (0xcb4deeec0b0c995e, true, 5734079034089997, 39),
+        (0x3f719726fd70bdda, false, 42945406958518565, -19),
+        (0xf8877acf26c377c1, true, 3969347025324443, 257),
+        (0x112ff0f0948ecca, false, 17313063783329543, -319),
+        (0xf03f2d71581d8e83, true, 4840364950490738, 217),
+        (0xa0b4a2969d8055a9, true, 3939934378819699, -166),
+        (0xbf67da14be11d56b, true, 29116063238300758, -19),
+        (0x49390aa51cf5192b, false, 5584459379041322, 29),
+        (0x7d1f71575653a45c, false, 5020374860719832, 279),
+        (0x4ef25c0707e33868, false, 20273998362625867, 56),
+        (0x8d2f527e72daf0a5, true, 3583821598928303, -260),
+        (0x9aeb7fa0c4169b14, true, 53015435440699934, -195),
+        (0xbb7be72bd6d2500, false, 32385931814871076, -268),
+        (0x4391b6e2e6eacb0f, false, 3191142564539115, 2),
+        (0x66dfe717c1731339, false, 34702826196636165, 171),
+        (0x9f20dbb0dcc93f0e, true, 9592739638984366, -174),
+        (0x2748dd1db4917fc0, false, 19257419453160052, -135),
+        (0xf572df00790813e3, true, 5667004322624942, 242),
+        (0x17ec940639bc2ccd, false, 19574378050279514, -209),
+        (0xaff9261aa92c0e6f, true, 13574353652743736, -93),
+        (0xd6a179fa50f96cd4, true, 20522123775687797, 93),
+        (0x63238da1a1fe3f9, false, 8030857586357787, -294),
+        (0xc9d531ae72a47403, true, 4839869570022654, 32),
+        (0xf2b64df6dff07870, true, 38074124727323007, 228),
+        (0x84ae65e920a63ac1, true, 3992642333195255, -301),
+        (0xc7f3860895bfa813, true, 415220381160719, 24),
+        (0x7ca6e706649889c0, false, 28568509706704303, 276),
+        (0x53f53d6883ca1c10, false, 28355062388657892, 80),
+        (0xdfdb839424d201e6, true, 576409607986482, 139),
+        (0x574f1eedf5b0f16c, false, 37421346511265816, 96),
+        (0x4307c68c425424a1, false, 8365287718596041, -1),
+        (0xf87eb8a09b27ec71, true, 25967747672911712, 256),
+        (0xa73fa0b26b75196c, true, 1224812623201524, -134),
+        (0xb310b730049dd332, true, 10158328867986936, -78),
+        (0xf58105748ed5d1b7, true, 10223021571638433, 242),
+        (0xaba9e7b823fc5ad2, true, 2368741106685511, -113),
+        (0x40c270b00e893302, false, 9441375443601519, -12),
+        (0x21b7379f0897246a, false, 29051815376957525, -162),
+        (0x2bb3b36f29421c40, false, 36028635787464805, -114),
+        (0x74115c86188b1044, false, 1243030179836284, 236),
+        (0x3b4dbf2ca294523d, false, 4921191084608872, -38),
+        (0xea990e94821d4606, true, 31424279447651448, 189),
+        (0xb5459d83fbc46f1a, true, 4513484226263957, -67),
+        (0x809eae3ef232a32, false, 6132360589437739, -285),
+        (0x3f2bb31efe9934ad, false, 2113318762887775, -19),
+        (0xb6c004cc3b8367dc, true, 5611759410123016, -60),
+        (0x12d4050771d7b14e, false, 5671259459702015, -233),
+        (0x1497024640332b06, false, 1749679846490068, -224),
+        (0x3a6b86a7975b54a3, false, 27794151842795596, -43),
+        (0xcaa538a09fc9370d, true, 39698969479257927, 35),
+        (0x9fb8883accda6559, true, 7147230970095531, -171),
+        (0x5c1dc12fb5a1ae51, false, 54067050980703435, 119),
+        (0xaf3f5d7841b1256d, true, 41332157963267773, -97),
+        (0x475b51096c4ad652, false, 5673425477066097, 20),
+        (0xc02c6b9586b4625b, true, 14210125169295841, -15),
+        (0x26af8090013c3273, false, 2382717865545885, -137),
+        (0x627f285509167d41, false, 28707864663287844, 150),
+        (0x290535d868a24b7f, false, 440980213608267, -125),
+        (0x8317cba01c75f67e, true, 931445538055751, -308),
+        (0x167b75dfb948f82a, false, 22421799632639162, -216),
+        (0x1a16daff3da95cd2, false, 5378888696447427, -198),
+        (0x511baeb198ababb, false, 2980825190480873, -299),
+        (0xc02659fe2e87d415, true, 1117576737793028, -14),
+        (0x1aeffafc3b45402a, false, 616561826878807, -193),
+        (0x641b4fa37a47ce4, false, 15607653292141072, -294),
+        (0xab63ad02854efa60, true, 11244606922770789, -115),
+        (0x7430051376e31f5a, false, 4587903221344766, 236),
+        (0x8918b6824f4a353e, true, 7664220497628843, -280),
+        (0x6147db98a44a4d46, false, 4192741249318462, 145),
+        (0xaf479f2936631b3e, true, 6225621885779556, -96),
+        (0xc2b1c26be8147dc9, true, 19526731699325785, -3),
+        (0x35cbc4d3f68ed036, false, 14843925435570951, -65),
+        (0xce5b3e7eba9b398d, true, 29380002214196463, 53),
+        (0x6cf40d8a6f092ec5, false, 6912799241411335, 201),
+        (0x575665b82f1c080, false, 23025786709152807, -298),
+        (0x97623f4094c16aad, true, 4882094572347935, -211),
+        (0xe1a5dbb00d1db848, true, 24584488851656434, 146),
+        (0xedcb1f9a6b031f3d, true, 7659700135732135, 205),
+        (0x94d2c3a6866aa110, true, 2283044857795083, -223),
+        (0xebad83042e64c3e0, true, 48511245910066114, 194),
+        (0xa9cd831118026938, true, 25132164770570757, -123),
+        (0x7ad45a77cd7acfcb, false, 47290368567116316, 267),
+        (0x4fcd49f5dbe3b83, false, 12117614706756206, -300),
+        (0xf5ee773384eaed1f, true, 11710526922486568, 244),
+        (0x1e5bfa6bebe42b82, false, 19434002939624406, -178),
+    ]
+    for (bits, sign, fraction, exponent) in cases:
+        test_converts_f64(f64.bits(bits), sign, fraction, exponent)

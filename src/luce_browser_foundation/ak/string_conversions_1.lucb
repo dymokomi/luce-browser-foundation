@@ -1,0 +1,255 @@
+#==============================================================================================
+#
+#   string_conversions_1 - from_chars: the number scanner behind parse_number and to_number
+#
+#   DESCRIPTION:
+#       Port of AK/StringConversions.cpp (lines 1-68), the static from_chars.
+#
+#       The C++ calls fast_float::from_chars_advanced with base `base`, no inf/nan, and a
+#       leading '+' allowed for signed and floating-point types. fast_float is replaced, not
+#       ported: integers are scanned here with its rules (parse_int_string); floats are
+#       scanned with its grammar (parse_number_string) and the accepted text is converted,
+#       correctly rounded, by the standard `strings` module (strtod/strtof in the C locale),
+#       which gives the same values. Out-of-range floats become ±infinity or ±0 as the C++
+#       post-check makes them. The template over the value type is instantiated by the typed
+#       wrappers of string_conversions_2.
+#
+#==============================================================================================
+
+# mark: Input ===================================================================================
+
+## The characters from_chars reads: bytes (CharType char) or UTF-16 code units (char16_t).
+struct FromCharsInput:
+    var bytes: const u8[]
+    var code_units: const u16[]
+    var is_utf16: bool
+
+    func length() -> usize:
+        return self.code_units.length if self.is_utf16 else self.bytes.length
+
+    func at(index: usize) -> u32:
+        return (u32)self.code_units[index] if self.is_utf16 else (u32)self.bytes[index]
+
+## from_chars input over bytes.
+func from_chars_input_bytes(bytes: const u8[]) -> FromCharsInput:
+    return FromCharsInput(bytes = bytes, code_units = u16[](&from_chars_no_code_units[0], 0), is_utf16 = false)
+
+## from_chars input over UTF-16 code units.
+func from_chars_input_code_units(code_units: const u16[]) -> FromCharsInput:
+    return FromCharsInput(bytes = b"", code_units = code_units, is_utf16 = true)
+
+## Storage for an empty span of code units.
+var from_chars_no_code_units: u16[1]
+
+# mark: Integers ================================================================================
+
+## The magnitude and sign of a scanned integer.
+struct FromCharsInteger:
+    var magnitude: u64
+    var negative: bool
+    var characters_parsed: usize
+
+## fast_float's ch_to_digit: the value of a digit in bases up to 36, or 255.
+func from_chars_digit_value(code_unit: u32) -> u32:
+    if code_unit >= (u32)'0' and code_unit <= (u32)'9':
+        return code_unit - (u32)'0'
+    if code_unit >= (u32)'a' and code_unit <= (u32)'z':
+        return code_unit - (u32)'a' + 10
+    if code_unit >= (u32)'A' and code_unit <= (u32)'Z':
+        return code_unit - (u32)'A' + 10
+    return 255
+
+## Ported from AK/StringConversions.cpp:40 AK::from_chars for an integral ValueType (fast_float's
+## parse_int_string): an optional sign ('+' only when signed), digits of `base`, and a magnitude
+## at most `maximum` (plus one when negative). `is_signed` is IsSigned<ValueType>.
+func from_chars_integer(input: FromCharsInput, base_: i32, is_signed: bool, maximum: u64) -> FromCharsInteger?:
+    let pend = input.length()
+    if pend == 0 or base_ < 2 or base_ > 36:
+        return none
+
+    var p: usize = 0
+    let negative = input.at(0) == (u32)'-'
+    if not is_signed and negative:
+        return none
+    if input.at(0) == (u32)'-' or (is_signed and input.at(0) == (u32)'+'):
+        p += 1
+
+    let start_num = p
+
+    while p != pend and input.at(p) == (u32)'0':
+        p += 1
+
+    let has_leading_zeros = p > start_num
+
+    let start_digits = p
+
+    var value: u64 = 0
+    var overflowed = false
+    while p != pend:
+        let digit = from_chars_digit_value(input.at(p))
+        if digit >= (u32)base_:
+            break
+        # might overflow, check this later
+        if let multiplied = value *? (u64)base_:
+            if let added = multiplied +? (u64)digit:
+                value = added
+            else:
+                overflowed = true
+        else:
+            overflowed = true
+        p += 1
+
+    let digit_count = p - start_digits
+
+    if digit_count == 0:
+        if has_leading_zeros:
+            return FromCharsInteger(magnitude = 0, negative = false, characters_parsed = p)
+        return none
+
+    # check u64 overflow
+    if overflowed:
+        return none
+
+    # check other types overflow
+    if value > maximum + (1 if negative else 0):
+        return none
+
+    return FromCharsInteger(magnitude = value, negative = negative and value != 0, characters_parsed = p)
+
+# mark: Floating point ==========================================================================
+
+## The number fast_float's parse_number_string accepts at the start of the input, rewritten as
+## ASCII strtod accepts it: `[-]int.frac[e[-]exp]`, with a missing part written as 0.
+struct FromCharsFloatText:
+    var text: str
+    var negative: bool
+    var characters_parsed: usize
+
+## Whether a code unit is an ASCII digit.
+func from_chars_is_digit(code_unit: u32) -> bool:
+    return code_unit >= (u32)'0' and code_unit <= (u32)'9'
+
+## fast_float's parse_number_string with chars_format::general | allow_leading_plus: scans the
+## number at the start of `input`, or none.
+func from_chars_float_text(input: FromCharsInput) -> FromCharsFloatText?:
+    let pend = input.length()
+    if pend == 0:
+        return none
+
+    var p: usize = 0
+    let negative = input.at(0) == (u32)'-'
+    if input.at(0) == (u32)'-' or input.at(0) == (u32)'+':
+        p += 1
+        if p == pend:
+            return none
+        # a sign must be followed by an integer or the dot
+        if not from_chars_is_digit(input.at(p)) and input.at(p) != (u32)'.':
+            return none
+
+    let start_digits = p
+    while p != pend and from_chars_is_digit(input.at(p)):
+        p += 1
+    let end_of_integer_part = p
+
+    var fraction_start = p
+    var fraction_end = p
+    let has_decimal_point = p != pend and input.at(p) == (u32)'.'
+    if has_decimal_point:
+        p += 1
+        fraction_start = p
+        while p != pend and from_chars_is_digit(input.at(p)):
+            p += 1
+        fraction_end = p
+
+    # we must have encountered at least one integer!
+    if (end_of_integer_part - start_digits) + (fraction_end - fraction_start) == 0:
+        return none
+
+    var exponent_start = p
+    var exponent_end = p
+    var negative_exponent = false
+    if p != pend and (input.at(p) == (u32)'e' or input.at(p) == (u32)'E'):
+        let location_of_e = p
+        p += 1
+        if p != pend and input.at(p) == (u32)'-':
+            negative_exponent = true
+            p += 1
+        elif p != pend and input.at(p) == (u32)'+':
+            # '+' on exponent is allowed by C++17 20.19.3.(7.1)
+            p += 1
+        if p == pend or not from_chars_is_digit(input.at(p)):
+            # We will be ignoring the 'e'.
+            p = location_of_e
+            negative_exponent = false
+        else:
+            exponent_start = p
+            while p != pend and from_chars_is_digit(input.at(p)):
+                p += 1
+            exponent_end = p
+
+    let text = new u8[pend + 8] else trap("out of memory")
+    var length: usize = 0
+    if negative:
+        text[length] = '-'
+        length += 1
+    if end_of_integer_part == start_digits:
+        text[length] = '0'
+        length += 1
+    for i in start_digits..<end_of_integer_part:
+        text[length] = (u8)input.at(i)
+        length += 1
+    text[length] = '.'
+    length += 1
+    if fraction_end == fraction_start:
+        text[length] = '0'
+        length += 1
+    for i in fraction_start..<fraction_end:
+        text[length] = (u8)input.at(i)
+        length += 1
+    if exponent_end != exponent_start:
+        text[length] = 'e'
+        length += 1
+        if negative_exponent:
+            text[length] = '-'
+            length += 1
+        for i in exponent_start..<exponent_end:
+            text[length] = (u8)input.at(i)
+            length += 1
+
+    return FromCharsFloatText(text = (str)text[..<length], negative = negative, characters_parsed = p)
+
+## Ported from AK/StringConversions.cpp:40 AK::from_chars for ValueType double.
+func from_chars_f64(input: FromCharsInput) -> ParseFirstNumberResult[f64]?:
+    let scanned = from_chars_float_text(input) else return none
+    let value = number_strings.parse_f64(scanned.text) catch failure:
+        # result_out_of_range with an infinite value is accepted by the C++.
+        if failure.code == number_strings.number_out_of_range:
+            let infinity = f64.bits(0x7ff0000000000000)
+            recover -infinity if scanned.negative else infinity
+        return none
+    return ParseFirstNumberResult[f64](value = value, characters_parsed = scanned.characters_parsed)
+
+## Ported from AK/StringConversions.cpp:40 AK::from_chars for ValueType float.
+func from_chars_f32(input: FromCharsInput) -> ParseFirstNumberResult[f32]?:
+    let scanned = from_chars_float_text(input) else return none
+    let value = number_strings.parse_f32(scanned.text) catch failure:
+        # result_out_of_range with an infinite value is accepted by the C++.
+        if failure.code == number_strings.number_out_of_range:
+            let infinity = f32.bits(0x7f800000)
+            recover -infinity if scanned.negative else infinity
+        return none
+    return ParseFirstNumberResult[f32](value = value, characters_parsed = scanned.characters_parsed)
+
+# mark: Trimming ================================================================================
+
+## The trimming parse_first_number(StringView) applies.
+func string_conversions_trim_string_view(string: StringView, trim_whitespace: TrimWhitespace) -> StringView:
+    if trim_whitespace == TrimWhitespace.yes:
+        return string_utils_trim_whitespace(string, TrimMode.both)
+    return string
+
+## The trimming parse_first_number(Utf16View) applies.
+func string_conversions_trim_utf16_view(string: Utf16View, trim_whitespace: TrimWhitespace) -> Utf16View:
+    if trim_whitespace == TrimWhitespace.yes:
+        return utf16_view_trim_ascii_whitespace(&string)
+    return string

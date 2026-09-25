@@ -1,0 +1,396 @@
+#==============================================================================================
+#
+#   utf16_string_base - Utf16StringBase: the eight bytes shared by Utf16String and Utf16FlyString
+#
+#   DESCRIPTION:
+#       Port of AK/Utf16StringBase.h (lines 1-365).
+#
+#       A Utf16StringBase is a union of a short ASCII string (up to seven bytes inline, flagged
+#       like StringBase's) and a pointer to a Utf16StringData. Copies are plain copies (no
+#       reference count). The pointer member is read through the union's bits (`raw`).
+#
+#==============================================================================================
+
+# mark: Construction ============================================================================
+
+## Ported from AK/Utf16StringBase.h:20 AK::Detail::Utf16StringBase::Utf16StringBase(): empty.
+pub func utf16_string_base_construct(this: Utf16StringBase*):
+    utf16_string_base_construct_short_string(this, short_string_create_empty())
+
+## Ported from AK/Utf16StringBase.h:25 AK::Detail::Utf16StringBase::Utf16StringBase(ShortString).
+pub func utf16_string_base_construct_short_string(this: Utf16StringBase*, short_string: ShortString):
+    this.m_value.short_ascii_string = short_string
+
+## Ported from AK/Utf16StringBase.h:30 AK::Detail::Utf16StringBase::Utf16StringBase(NonnullRefPtr<Utf16StringData const>).
+pub func utf16_string_base_construct_utf16_string_data(this: Utf16StringBase*, value: const Utf16StringData*):
+    this.m_value.data = value
+
+## `Utf16StringBase {}`: the empty string.
+pub func utf16_string_base_new() -> Utf16StringBase:
+    var base: Utf16StringBase
+    utf16_string_base_construct(&base)
+    return base
+
+# mark: Views and conversions ===================================================================
+
+## Ported from AK/Utf16StringBase.h:57 AK::Detail::Utf16StringBase::operator Utf16View.
+pub func utf16_string_base_to_utf16_view(this: const Utf16StringBase*) -> Utf16View:
+    return utf16_string_base_utf16_view(this)
+
+## Ported from AK/Utf16StringBase.h:60 AK::Detail::Utf16StringBase::to_utf8.
+pub func utf16_string_base_to_utf8(this: const Utf16StringBase*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> String:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_utf8(&view, allow_lonely_surrogates) else trap("MUST: to_utf8")
+
+## Ported from AK/Utf16StringBase.h:65 AK::Detail::Utf16StringBase::to_utf8_but_should_be_ported_to_utf16.
+pub func utf16_string_base_to_utf8_but_should_be_ported_to_utf16(this: const Utf16StringBase*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> String:
+    return utf16_string_base_to_utf8(this, allow_lonely_surrogates)
+
+## Ported from AK/Utf16StringBase.h:70 AK::Detail::Utf16StringBase::to_byte_string.
+pub func utf16_string_base_to_byte_string(this: const Utf16StringBase*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> ByteString:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_byte_string(&view, allow_lonely_surrogates) else trap("MUST: to_byte_string")
+
+## Ported from AK/Utf16StringBase.h:75 AK::Detail::Utf16StringBase::ascii_view: the ASCII
+## storage (inside this Utf16StringBase for a short string).
+pub func utf16_string_base_ascii_view(this: const Utf16StringBase*) -> StringView:
+    if utf16_string_base_has_short_ascii_storage(this):
+        return string_view_from_bytes(short_string_bytes(&this.m_value.short_ascii_string))
+
+    let data = utf16_string_base_data_without_union_member_assertion(this) else return StringView()
+    return utf16_string_data_ascii_view(data)
+
+## Ported from AK/Utf16StringBase.h:84 AK::Detail::Utf16StringBase::utf16_view.
+pub func utf16_string_base_utf16_view(this: const Utf16StringBase*) -> Utf16View:
+    if utf16_string_base_has_short_ascii_storage(this):
+        return utf16_view_from_ascii(short_string_bytes(&this.m_value.short_ascii_string))
+
+    let data = utf16_string_base_data_without_union_member_assertion(this) else return utf16_view_new()
+    return utf16_string_data_utf16_view(data)
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<i8>.
+pub func utf16_string_base_to_number_i8(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_i8(&view, trim_whitespace, base_)
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<i16>.
+pub func utf16_string_base_to_number_i16(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_i16(&view, trim_whitespace, base_)
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<i32>.
+pub func utf16_string_base_to_number_i32(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_i32(&view, trim_whitespace, base_)
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<i64>.
+pub func utf16_string_base_to_number_i64(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_i64(&view, trim_whitespace, base_)
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<u8>.
+pub func utf16_string_base_to_number_u8(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_u8(&view, trim_whitespace, base_)
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<u16>.
+pub func utf16_string_base_to_number_u16(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_u16(&view, trim_whitespace, base_)
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<u32>.
+pub func utf16_string_base_to_number_u32(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_u32(&view, trim_whitespace, base_)
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<u64>.
+pub func utf16_string_base_to_number_u64(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_u64(&view, trim_whitespace, base_)
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<f32>.
+pub func utf16_string_base_to_number_f32(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_f32(&view, trim_whitespace, base_)
+
+## Ported from AK/Utf16StringBase.h:98 AK::Detail::Utf16StringBase::to_number<f64>.
+pub func utf16_string_base_to_number_f64(this: const Utf16StringBase*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_to_number_f64(&view, trim_whitespace, base_)
+
+# mark: Comparison ==============================================================================
+
+## Ported from AK/Utf16StringBase.h:131 AK::Detail::Utf16StringBase::operator==(Utf16StringBase const&).
+pub func utf16_string_base_eq_utf16_string_base(this: const Utf16StringBase*, other: const Utf16StringBase*) -> bool:
+    if utf16_string_base_has_short_ascii_storage(this) and utf16_string_base_has_short_ascii_storage(other):
+        return utf16_string_base_raw(this) == utf16_string_base_raw(other)
+
+    if utf16_string_base_has_long_storage(this) and utf16_string_base_has_long_storage(other):
+        let this_data = utf16_string_base_data_without_union_member_assertion(this)
+        let other_data = utf16_string_base_data_without_union_member_assertion(other)
+
+        if this_data == none or other_data == none:
+            return this_data == other_data
+
+        return utf16_string_data_eq_utf16_string_data(this_data else trap("unreachable"), other_data else trap("unreachable"))
+
+    let view = utf16_string_base_utf16_view(this)
+    let other_view = utf16_string_base_utf16_view(other)
+    return utf16_view_eq_utf16_view(&view, &other_view)
+
+## Ported from AK/Utf16StringBase.h:149 AK::Detail::Utf16StringBase::operator==(Utf16View const&).
+pub func utf16_string_base_eq_utf16_view(this: const Utf16StringBase*, other: const Utf16View*) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_eq_utf16_view(&view, other)
+
+## Ported from AK/Utf16StringBase.h:150 AK::Detail::Utf16StringBase::operator==(StringView).
+pub func utf16_string_base_eq_string_view(this: const Utf16StringBase*, other: StringView) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_eq_string_view(&view, other)
+
+## Ported from AK/Utf16StringBase.h:152 AK::Detail::Utf16StringBase::operator<=>(Utf16StringBase const&).
+pub func utf16_string_base_cmp_utf16_string_base(this: const Utf16StringBase*, other: const Utf16StringBase*) -> i32:
+    let view = utf16_string_base_utf16_view(this)
+    let other_view = utf16_string_base_utf16_view(other)
+    return utf16_view_cmp(&view, &other_view)
+
+## Ported from AK/Utf16StringBase.h:153 AK::Detail::Utf16StringBase::operator<=>(Utf16View const&).
+pub func utf16_string_base_cmp_utf16_view(this: const Utf16StringBase*, other: const Utf16View*) -> i32:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_cmp(&view, other)
+
+## Ported from AK/Utf16StringBase.h:155 AK::Detail::Utf16StringBase::equals_ignoring_ascii_case(Utf16View const&).
+pub func utf16_string_base_equals_ignoring_ascii_case_utf16_view(this: const Utf16StringBase*, other: const Utf16View*) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_equals_ignoring_ascii_case(&view, other)
+
+## Ported from AK/Utf16StringBase.h:156 AK::Detail::Utf16StringBase::equals_ignoring_ascii_case(Utf16StringBase const&).
+pub func utf16_string_base_equals_ignoring_ascii_case_utf16_string_base(this: const Utf16StringBase*, other: const Utf16StringBase*) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    let other_view = utf16_string_base_utf16_view(other)
+    return utf16_view_equals_ignoring_ascii_case(&view, &other_view)
+
+## Ported from AK/Utf16StringBase.h:170 AK::Detail::Utf16StringBase::hash.
+pub func utf16_string_base_hash(this: const Utf16StringBase*) -> u32:
+    if utf16_string_base_has_short_ascii_storage(this):
+        let view = string_view_from_bytes(short_string_bytes(&this.m_value.short_ascii_string))
+        return string_view_hash(&view)
+
+    let data = utf16_string_base_data_without_union_member_assertion(this) else return string_hash_u16(none, 0)
+    return utf16_string_data_hash(data)
+
+# mark: Queries =================================================================================
+
+## Ported from AK/Utf16StringBase.h:179 AK::Detail::Utf16StringBase::is_empty.
+pub func utf16_string_base_is_empty(this: const Utf16StringBase*) -> bool:
+    return utf16_string_base_length_in_code_units(this) == 0
+
+## Ported from AK/Utf16StringBase.h:180 AK::Detail::Utf16StringBase::is_ascii.
+pub func utf16_string_base_is_ascii(this: const Utf16StringBase*) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_is_ascii(&view)
+
+## Ported from AK/Utf16StringBase.h:181 AK::Detail::Utf16StringBase::is_ascii_whitespace.
+pub func utf16_string_base_is_ascii_whitespace(this: const Utf16StringBase*) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_is_ascii_whitespace(&view)
+
+## Ported from AK/Utf16StringBase.h:183 AK::Detail::Utf16StringBase::length_in_code_units.
+pub func utf16_string_base_length_in_code_units(this: const Utf16StringBase*) -> usize:
+    if utf16_string_base_has_short_ascii_storage(this):
+        return short_string_byte_count(&this.m_value.short_ascii_string)
+
+    let data = utf16_string_base_data_without_union_member_assertion(this) else return 0
+    return utf16_string_data_length_in_code_units(data)
+
+## Ported from AK/Utf16StringBase.h:192 AK::Detail::Utf16StringBase::length_in_code_points.
+pub func utf16_string_base_length_in_code_points(this: const Utf16StringBase*) -> usize:
+    if utf16_string_base_has_short_ascii_storage(this):
+        return short_string_byte_count(&this.m_value.short_ascii_string)
+
+    let data = utf16_string_base_data_without_union_member_assertion(this) else return 0
+    return utf16_string_data_length_in_code_points(data)
+
+## Ported from AK/Utf16StringBase.h:201 AK::Detail::Utf16StringBase::code_unit_at.
+pub func utf16_string_base_code_unit_at(this: const Utf16StringBase*, code_unit_offset: usize) -> u16:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_code_unit_at(&view, code_unit_offset)
+
+## Ported from AK/Utf16StringBase.h:202 AK::Detail::Utf16StringBase::code_point_at.
+pub func utf16_string_base_code_point_at(this: const Utf16StringBase*, code_unit_offset: usize) -> u32:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_code_point_at(&view, code_unit_offset)
+
+## Ported from AK/Utf16StringBase.h:204 AK::Detail::Utf16StringBase::code_unit_offset_of.
+pub func utf16_string_base_code_unit_offset_of(this: const Utf16StringBase*, code_point_offset: usize) -> usize:
+    if utf16_string_base_has_ascii_storage(this):
+        return code_point_offset
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_code_unit_offset_of(&view, code_point_offset)
+
+## Ported from AK/Utf16StringBase.h:211 AK::Detail::Utf16StringBase::code_point_offset_of.
+pub func utf16_string_base_code_point_offset_of(this: const Utf16StringBase*, code_unit_offset: usize) -> usize:
+    if utf16_string_base_has_ascii_storage(this):
+        return code_unit_offset
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_code_point_offset_of(&view, code_unit_offset)
+
+## Ported from AK/Utf16StringBase.h:218 AK::Detail::Utf16StringBase::begin.
+pub func utf16_string_base_begin(this: const Utf16StringBase*) -> Utf16CodePointIterator:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_begin(&view)
+
+## Ported from AK/Utf16StringBase.h:219 AK::Detail::Utf16StringBase::end.
+pub func utf16_string_base_end(this: const Utf16StringBase*) -> Utf16CodePointIterator:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_end(&view)
+
+## Ported from AK/Utf16StringBase.h:221 AK::Detail::Utf16StringBase::substring_view(size_t, size_t).
+pub func utf16_string_base_substring_view_usize(this: const Utf16StringBase*, code_unit_offset: usize, code_unit_length: usize) -> Utf16View:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_substring_view_usize(&view, code_unit_offset, code_unit_length)
+
+## Ported from AK/Utf16StringBase.h:226 AK::Detail::Utf16StringBase::substring_view(size_t).
+pub func utf16_string_base_substring_view(this: const Utf16StringBase*, code_unit_offset: usize) -> Utf16View:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_substring_view(&view, code_unit_offset)
+
+## Ported from AK/Utf16StringBase.h:231 AK::Detail::Utf16StringBase::find_code_unit_offset(char16_t, size_t).
+pub func utf16_string_base_find_code_unit_offset_u16(this: const Utf16StringBase*, needle: u16, start_offset: usize = 0) -> usize?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_find_code_unit_offset_u16(&view, needle, start_offset)
+
+## Ported from AK/Utf16StringBase.h:236 AK::Detail::Utf16StringBase::find_code_unit_offset(Utf16View const&, size_t).
+pub func utf16_string_base_find_code_unit_offset_utf16_view(this: const Utf16StringBase*, needle: Utf16View, start_offset: usize = 0) -> usize?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_find_code_unit_offset_utf16_view(&view, needle, start_offset)
+
+## Ported from AK/Utf16StringBase.h:241 AK::Detail::Utf16StringBase::find_code_unit_offset_ignoring_case.
+pub func utf16_string_base_find_code_unit_offset_ignoring_case(this: const Utf16StringBase*, needle: Utf16View, start_offset: usize = 0) -> usize?:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_find_code_unit_offset_ignoring_case(&view, needle, start_offset)
+
+## Ported from AK/Utf16StringBase.h:246 AK::Detail::Utf16StringBase::contains(char16_t).
+pub func utf16_string_base_contains_u16(this: const Utf16StringBase*, needle: u16) -> bool:
+    return utf16_string_base_find_code_unit_offset_u16(this, needle) != none
+
+## Ported from AK/Utf16StringBase.h:247 AK::Detail::Utf16StringBase::contains(Utf16View const&).
+pub func utf16_string_base_contains_utf16_view(this: const Utf16StringBase*, needle: Utf16View) -> bool:
+    return utf16_string_base_find_code_unit_offset_utf16_view(this, needle) != none
+
+## Ported from AK/Utf16StringBase.h:248 AK::Detail::Utf16StringBase::contains_any_of.
+pub func utf16_string_base_contains_any_of(this: const Utf16StringBase*, needles: const u32[]) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_contains_any_of(&view, needles)
+
+## Ported from AK/Utf16StringBase.h:250 AK::Detail::Utf16StringBase::count.
+pub func utf16_string_base_count(this: const Utf16StringBase*, needle: Utf16View) -> usize:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_count(&view, needle)
+
+## Ported from AK/Utf16StringBase.h:252 AK::Detail::Utf16StringBase::starts_with(char16_t).
+pub func utf16_string_base_starts_with_u16(this: const Utf16StringBase*, needle: u16) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_starts_with_u16(&view, needle)
+
+## Ported from AK/Utf16StringBase.h:253 AK::Detail::Utf16StringBase::starts_with(Utf16View const&).
+pub func utf16_string_base_starts_with_utf16_view(this: const Utf16StringBase*, needle: Utf16View) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_starts_with_utf16_view(&view, needle)
+
+## Ported from AK/Utf16StringBase.h:255 AK::Detail::Utf16StringBase::ends_with(char16_t).
+pub func utf16_string_base_ends_with_u16(this: const Utf16StringBase*, needle: u16) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_ends_with_u16(&view, needle)
+
+## Ported from AK/Utf16StringBase.h:256 AK::Detail::Utf16StringBase::ends_with(Utf16View const&).
+pub func utf16_string_base_ends_with_utf16_view(this: const Utf16StringBase*, needle: Utf16View) -> bool:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_ends_with_utf16_view(&view, needle)
+
+## Ported from AK/Utf16StringBase.h:258 AK::Detail::Utf16StringBase::split_view(char16_t, SplitBehavior).
+pub func utf16_string_base_split_view_u16(this: const Utf16StringBase*, needle: u16, split_behavior: SplitBehavior) -> Vector[Utf16View]:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_split_view_u16(&view, needle, split_behavior)
+
+## Ported from AK/Utf16StringBase.h:259 AK::Detail::Utf16StringBase::split_view(Utf16View const&, SplitBehavior).
+pub func utf16_string_base_split_view_utf16_view(this: const Utf16StringBase*, needle: Utf16View, split_behavior: SplitBehavior) -> Vector[Utf16View]:
+    let view = utf16_string_base_utf16_view(this)
+    return utf16_view_split_view_utf16_view(&view, needle, split_behavior)
+
+## Ported from AK/Utf16StringBase.h:262 AK::Detail::Utf16StringBase::for_each_split_view(char16_t, ...).
+pub func utf16_string_base_for_each_split_view_u16[TCallback: Utf16ViewCallback](this: const Utf16StringBase*, separator: u16, split_behavior: SplitBehavior, callback: TCallback*):
+    let view = utf16_string_base_utf16_view(this)
+    utf16_view_for_each_split_view_u16(&view, separator, split_behavior, callback)
+
+## Ported from AK/Utf16StringBase.h:268 AK::Detail::Utf16StringBase::for_each_split_view(Utf16View const&, ...).
+pub func utf16_string_base_for_each_split_view_utf16_view[TCallback: Utf16ViewCallback](this: const Utf16StringBase*, separator: Utf16View, split_behavior: SplitBehavior, callback: TCallback*):
+    let view = utf16_string_base_utf16_view(this)
+    utf16_view_for_each_split_view_utf16_view(&view, separator, split_behavior, callback)
+
+# mark: Storage =================================================================================
+
+## Ported from AK/Utf16StringBase.h:274 AK::Detail::Utf16StringBase::has_short_ascii_storage.
+## This is primarily interesting to unit tests.
+pub func utf16_string_base_has_short_ascii_storage(this: const Utf16StringBase*) -> bool:
+    return (utf16_string_base_short_ascii_string_without_union_member_assertion(this).byte_count_and_short_string_flag & (u8)string_base_short_string_flag) != 0
+
+## Ported from AK/Utf16StringBase.h:284 AK::Detail::Utf16StringBase::has_long_ascii_storage.
+## This is primarily interesting to unit tests.
+pub func utf16_string_base_has_long_ascii_storage(this: const Utf16StringBase*) -> bool:
+    if utf16_string_base_has_short_ascii_storage(this):
+        return false
+
+    let data = utf16_string_base_data_without_union_member_assertion(this) else return false
+    return utf16_string_data_has_ascii_storage(data)
+
+## Ported from AK/Utf16StringBase.h:294 AK::Detail::Utf16StringBase::has_ascii_storage.
+pub func utf16_string_base_has_ascii_storage(this: const Utf16StringBase*) -> bool:
+    return utf16_string_base_has_short_ascii_storage(this) or utf16_string_base_has_long_ascii_storage(this)
+
+## Ported from AK/Utf16StringBase.h:300 AK::Detail::Utf16StringBase::has_long_utf16_storage.
+pub func utf16_string_base_has_long_utf16_storage(this: const Utf16StringBase*) -> bool:
+    if utf16_string_base_has_short_ascii_storage(this):
+        return false
+
+    let data = utf16_string_base_data_without_union_member_assertion(this) else return false
+    return utf16_string_data_has_utf16_storage(data)
+
+## Ported from AK/Utf16StringBase.h:310 AK::Detail::Utf16StringBase::has_long_storage.
+pub func utf16_string_base_has_long_storage(this: const Utf16StringBase*) -> bool:
+    return not utf16_string_base_has_short_ascii_storage(this)
+
+## Ported from AK/Utf16StringBase.h:315 AK::Detail::Utf16StringBase::data(Badge<Utf16FlyString>).
+pub func utf16_string_base_data(this: const Utf16StringBase*) -> const Utf16StringData*?:
+    assert(utf16_string_base_has_long_storage(this))
+    return utf16_string_base_data_without_union_member_assertion(this)
+
+## Ported from AK/Utf16StringBase.h:321 AK::Detail::Utf16StringBase::set_data(Badge<Utf16FlyString>, ...).
+pub func utf16_string_base_set_data(this: Utf16StringBase*, data: const Utf16StringData*?):
+    this.m_value.data = data
+
+## Ported from AK/Utf16StringBase.h:329 AK::Detail::Utf16StringBase::Utf16StringBase(Badge<T>, nullptr_t):
+## the invalid (null) string, the sentinel of Optional<Utf16String> and Optional<Utf16FlyString>.
+pub func utf16_string_base_utf16_string_base(this: Utf16StringBase*):
+    this.m_value.data = none
+
+## Ported from AK/Utf16StringBase.h:335 AK::Detail::Utf16StringBase::raw(Badge<Utf16FlyString>).
+pub func utf16_string_base_raw_utf16_fly_string(this: const Utf16StringBase*) -> usize:
+    return utf16_string_base_raw(this)
+
+## Ported from AK/Utf16StringBase.h:338 AK::Detail::Utf16StringBase::raw: the union's bits.
+pub func utf16_string_base_raw(this: const Utf16StringBase*) -> usize:
+    return memory.read[usize](&this.m_value)
+
+## Ported from AK/Utf16StringBase.h:340 AK::Detail::Utf16StringBase::destroy_string: nothing to
+## release in managed memory.
+pub func utf16_string_base_destroy_string(this: const Utf16StringBase*):
+    return
+
+## Ported from AK/Utf16StringBase.h:349 AK::Detail::Utf16StringBase::short_ascii_string_without_union_member_assertion.
+pub func utf16_string_base_short_ascii_string_without_union_member_assertion(this: const Utf16StringBase*) -> ShortString:
+    return this.m_value.short_ascii_string
+
+## Ported from AK/Utf16StringBase.h:350 AK::Detail::Utf16StringBase::data_without_union_member_assertion.
+pub func utf16_string_base_data_without_union_member_assertion(this: const Utf16StringBase*) -> const Utf16StringData*?:
+    return (const Utf16StringData*?)utf16_string_base_raw(this)

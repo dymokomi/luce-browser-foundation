@@ -17,7 +17,7 @@ pub struct String:
 
 ## AK::String::MAX_SHORT_STRING_BYTE_COUNT (AK/String.h:38).
 # C++ initializer: Detail :: MAX_SHORT_STRING_BYTE_COUNT
-pub var string_max_short_string_byte_count: usize
+pub let string_max_short_string_byte_count: usize = max_short_string_byte_count
 
 ## AK::String::WithBOMHandling (AK/String.h:45).
 pub enum StringWithBomHandling as i32:

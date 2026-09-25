@@ -1,0 +1,288 @@
+#==============================================================================================
+#
+#   lexical_path - LexicalPath: slash-separated paths, canonicalized without the file system
+#
+#   DESCRIPTION:
+#       Port of AK/LexicalPath.h (lines 1-110) and AK/LexicalPath.cpp (lines 1-215), in the
+#       header's order with the .cpp bodies in place of their declarations. The variadic
+#       `join(first, rest...)` takes the rest as a span of views. The views of m_parts,
+#       m_dirname, m_basename, m_title and m_extension point into m_string's impl.
+#
+#==============================================================================================
+
+# mark: Construction ============================================================================
+
+## The element at `index` of a vector (Vector's accessors belong to region r01).
+func lexical_path_vector_at[T](vector: const Vector[T]*, index: usize) -> T:
+    assert(index < vector.m_size)
+    let buffer = vector.m_outline_buffer else trap("VERIFY: empty vector")
+    return buffer[index]
+
+## Ported from AK/LexicalPath.cpp:17 AK::LexicalPath::LexicalPath: canonicalizes `path` and
+## splits it into its parts, dirname, basename, title and extension.
+pub func lexical_path_construct(this: LexicalPath*, path: ByteString):
+    this.m_string = lexical_path_canonicalized_path(path)
+    if byte_string_is_empty(&this.m_string):
+        this.m_string = byte_string_from_str(".")
+        this.m_dirname = byte_string_view(&this.m_string)
+        this.m_basename = StringView()
+        this.m_title = StringView()
+        this.m_extension = StringView()
+        vector_clear(&this.m_parts)
+        return
+
+    this.m_parts = byte_string_split_view_u8(&this.m_string, '/')
+
+    let view = byte_string_view(&this.m_string)
+    if let last_slash_index = string_view_find_last_u8(&view, '/'):
+        if last_slash_index == 0:
+            # The path contains a single part and is absolute. m_dirname = "/"sv
+            this.m_dirname = byte_string_substring_view_usize(&this.m_string, 0, 1)
+        else:
+            this.m_dirname = byte_string_substring_view_usize(&this.m_string, 0, last_slash_index)
+    else:
+        # The path contains a single part and is not absolute. m_dirname = "."sv
+        this.m_dirname = StringView(m_characters = &s_single_dot, m_length = 1)
+
+    if byte_string_eq_string_view(&this.m_string, sv("/")):
+        this.m_basename = byte_string_view(&this.m_string)
+    else:
+        assert(vector_size(&this.m_parts) > 0)
+        this.m_basename = lexical_path_vector_at(&this.m_parts, vector_size(&this.m_parts) - 1)
+
+    let last_dot_index = string_view_find_last_u8(&this.m_basename, '.')
+    # NOTE: if the dot index is 0, this means we have ".foo", it's not an extension, as the title
+    # would then be "".
+    if let dot = last_dot_index:
+        if dot != 0:
+            this.m_title = string_view_substring_view_usize(&this.m_basename, 0, dot)
+            this.m_extension = string_view_substring_view(&this.m_basename, dot + 1)
+            return
+    this.m_title = this.m_basename
+    this.m_extension = StringView()
+
+## `LexicalPath { path }`: the value form of the constructor.
+pub func lexical_path_new(path: ByteString) -> LexicalPath:
+    var lexical_path = LexicalPath(m_string = byte_string_empty())
+    lexical_path_construct(&lexical_path, path)
+    return lexical_path
+
+# mark: Queries =================================================================================
+
+## Ported from AK/LexicalPath.cpp:61 AK::LexicalPath::is_absolute_path.
+pub func lexical_path_is_absolute_path(path: StringView) -> bool:
+    return string_view_starts_with_u8(&path, '/')
+
+## Ported from AK/LexicalPath.h:30 AK::LexicalPath::is_absolute.
+pub func lexical_path_is_absolute(this: const LexicalPath*) -> bool:
+    return lexical_path_is_absolute_path(byte_string_view(&this.m_string))
+
+## Ported from AK/LexicalPath.cpp:66 AK::LexicalPath::is_root.
+pub func lexical_path_is_root(this: const LexicalPath*) -> bool:
+    return byte_string_eq_string_view(&this.m_string, sv("/"))
+
+## Ported from AK/LexicalPath.h:33 AK::LexicalPath::string.
+pub func lexical_path_string(this: const LexicalPath*) -> ByteString:
+    return this.m_string
+
+## Ported from AK/LexicalPath.h:35 AK::LexicalPath::dirname.
+pub func lexical_path_dirname(this: const LexicalPath*) -> StringView:
+    return this.m_dirname
+
+## Ported from AK/LexicalPath.h:36 AK::LexicalPath::basename.
+pub func lexical_path_basename_lexical_path_strip_extension(this: const LexicalPath*, s: LexicalPathStripExtension = LexicalPathStripExtension.no) -> StringView:
+    return this.m_basename if s == LexicalPathStripExtension.no else this.m_title
+
+## Ported from AK/LexicalPath.h:37 AK::LexicalPath::title.
+pub func lexical_path_title(this: const LexicalPath*) -> StringView:
+    return this.m_title
+
+## Ported from AK/LexicalPath.h:38 AK::LexicalPath::extension: without the dot.
+pub func lexical_path_extension(this: const LexicalPath*) -> StringView:
+    return this.m_extension
+
+## Ported from AK/LexicalPath.h:40 AK::LexicalPath::parts_view.
+pub func lexical_path_parts_view(this: const LexicalPath*) -> const Vector[StringView]*:
+    return &this.m_parts
+
+## Ported from AK/LexicalPath.cpp:71 AK::LexicalPath::parts.
+pub func lexical_path_parts(this: const LexicalPath*) -> Vector[ByteString]:
+    var vector: Vector[ByteString]
+    vector_ensure_capacity(&vector, vector_size(&this.m_parts))
+    for i in 0..<vector_size(&this.m_parts):
+        vector_append_t(&vector, byte_string_from_string_view(lexical_path_vector_at(&this.m_parts, i)))
+    return vector
+
+## Ported from AK/LexicalPath.cpp:80 AK::LexicalPath::has_extension (case-insensitive).
+pub func lexical_path_has_extension(this: const LexicalPath*, extension: StringView) -> bool:
+    return byte_string_ends_with_string_view(&this.m_string, extension, CaseSensitivity.case_insensitive)
+
+## Ported from AK/LexicalPath.cpp:85 AK::LexicalPath::is_child_of.
+pub func lexical_path_is_child_of(this: const LexicalPath*, possible_parent: const LexicalPath*) -> bool:
+    # Any relative path is a child of an absolute path.
+    if not lexical_path_is_absolute(this) and lexical_path_is_absolute(possible_parent):
+        return true
+    # An absolute path can't meaningfully be a child of a relative path.
+    if lexical_path_is_absolute(this) and not lexical_path_is_absolute(possible_parent):
+        return false
+
+    # Two relative paths and two absolute paths can be meaningfully compared.
+    let parent_size = vector_size(&possible_parent.m_parts)
+    if parent_size > vector_size(&this.m_parts):
+        return false
+    for i in 0..<parent_size:
+        let part = lexical_path_vector_at(&this.m_parts, i)
+        if not string_view_eq_string_view(&part, lexical_path_vector_at(&possible_parent.m_parts, i)):
+            return false
+    return true
+
+## Ported from AK/LexicalPath.cpp:200 AK::LexicalPath::append.
+pub func lexical_path_append(this: const LexicalPath*, value: StringView) -> LexicalPath:
+    var rest: StringView[1] = [value]
+    return lexical_path_join(byte_string_view(&this.m_string), rest)
+
+## Ported from AK/LexicalPath.cpp:205 AK::LexicalPath::prepend.
+pub func lexical_path_prepend(this: const LexicalPath*, value: StringView) -> LexicalPath:
+    var rest: StringView[1] = [byte_string_view(&this.m_string)]
+    return lexical_path_join(value, rest)
+
+## Ported from AK/LexicalPath.cpp:210 AK::LexicalPath::parent.
+pub func lexical_path_parent(this: const LexicalPath*) -> LexicalPath:
+    return lexical_path_append(this, sv(".."))
+
+# mark: Static helpers ==========================================================================
+
+## Ported from AK/LexicalPath.cpp:101 AK::LexicalPath::canonicalized_path: resolves ".", ".."
+## and repeated or trailing slashes lexically.
+pub func lexical_path_canonicalized_path(path: ByteString) -> ByteString:
+    # NOTE: We never allow an empty m_string, if it's empty, we just set it to '.'.
+    if byte_string_is_empty(&path):
+        return byte_string_from_str(".")
+
+    # NOTE: If there are no dots, no '//' and the path doesn't end with a slash, it is already
+    # canonical.
+    if not byte_string_contains_string_view(&path, sv(".")) and not byte_string_contains_string_view(&path, sv("//")) and not byte_string_ends_with_u8(&path, '/'):
+        return path
+
+    let is_absolute = byte_string_at(&path, 0) == '/'
+    let parts = byte_string_split_view_u8(&path, '/')
+    var approximate_canonical_length: usize = 0
+    var canonical_parts: Vector[ByteString]
+
+    for i in 0..<vector_size(&parts):
+        let part = lexical_path_vector_at(&parts, i)
+        if string_view_equals(&part, "."):
+            continue
+        if string_view_equals(&part, ".."):
+            if vector_is_empty(&canonical_parts):
+                if is_absolute:
+                    # At the root, .. does nothing.
+                    continue
+            else:
+                let last = lexical_path_vector_at(&canonical_parts, vector_size(&canonical_parts) - 1)
+                if not byte_string_eq_string_view(&last, sv("..")):
+                    # A .. and a previous non-.. part cancel each other.
+                    discard(vector_take_last(&canonical_parts))
+                    continue
+        approximate_canonical_length += string_view_length(&part) + 1
+        vector_append_t(&canonical_parts, byte_string_from_string_view(part))
+
+    if vector_is_empty(&canonical_parts) and not is_absolute:
+        vector_append_t(&canonical_parts, byte_string_from_str("."))
+
+    var builder = string_builder_new_usize(approximate_canonical_length)
+    if is_absolute:
+        string_builder_append_u8(&builder, '/')
+    # builder.join('/', canonical_parts)
+    for i in 0..<vector_size(&canonical_parts):
+        if i != 0:
+            string_builder_append_u8(&builder, '/')
+        let part = lexical_path_vector_at(&canonical_parts, i)
+        string_builder_append_string_view(&builder, byte_string_view(&part))
+    return string_builder_to_byte_string(&builder)
+
+## Ported from AK/LexicalPath.cpp:147 AK::LexicalPath::absolute_path: `target`, relative to
+## `dir_path` unless absolute, canonicalized.
+pub func lexical_path_absolute_path(dir_path: ByteString, target: ByteString) -> ByteString:
+    let target_path = lexical_path_new(target)
+    if lexical_path_is_absolute(&target_path):
+        return lexical_path_canonicalized_path(target)
+    var rest: StringView[1] = [byte_string_view(&target)]
+    let joined = lexical_path_join(byte_string_view(&dir_path), rest)
+    return lexical_path_canonicalized_path(lexical_path_string(&joined))
+
+## Ported from AK/LexicalPath.cpp:155 AK::LexicalPath::relative_path: `a_path` relative to
+## `a_prefix` (both absolute), or none.
+pub func lexical_path_relative_path(a_path: StringView, a_prefix: StringView) -> ByteString?:
+    if not string_view_starts_with_u8(&a_path, '/') or not string_view_starts_with_u8(&a_prefix, '/'):
+        return none
+
+    if string_view_eq_string_view(&a_path, a_prefix):
+        return byte_string_from_str(".")
+
+    # NOTE: Strip optional trailing slashes, except if the full path is only "/".
+    let path = lexical_path_canonicalized_path(byte_string_from_string_view(a_path))
+    let prefix = lexical_path_canonicalized_path(byte_string_from_string_view(a_prefix))
+
+    if byte_string_eq_byte_string(&path, &prefix):
+        return byte_string_from_str(".")
+
+    # NOTE: Handle this special case first.
+    if byte_string_eq_string_view(&prefix, sv("/")):
+        return byte_string_from_string_view(byte_string_substring_view(&path, 1))
+
+    # NOTE: This means the path is a direct child of the prefix.
+    if byte_string_starts_with_string_view(&path, byte_string_view(&prefix)) and byte_string_at(&path, byte_string_length(&prefix)) == '/':
+        return byte_string_from_string_view(byte_string_substring_view(&path, byte_string_length(&prefix) + 1))
+
+    let path_parts = byte_string_split_view_u8(&path, '/')
+    let prefix_parts = byte_string_split_view_u8(&prefix, '/')
+    var index_of_first_part_that_differs: usize = 0
+    while index_of_first_part_that_differs < vector_size(&path_parts) and index_of_first_part_that_differs < vector_size(&prefix_parts):
+        let path_part = lexical_path_vector_at(&path_parts, index_of_first_part_that_differs)
+        if string_view_ne(&path_part, lexical_path_vector_at(&prefix_parts, index_of_first_part_that_differs)):
+            break
+        index_of_first_part_that_differs += 1
+
+    var builder = string_builder_new()
+    for _part_index in index_of_first_part_that_differs..<vector_size(&prefix_parts):
+        string_builder_append(&builder, "../")
+    for part_index in index_of_first_part_that_differs..<vector_size(&path_parts):
+        string_builder_append_string_view(&builder, lexical_path_vector_at(&path_parts, part_index))
+        if part_index != vector_size(&path_parts) - 1:
+            # We don't need a slash after the file name or the name of the last directory
+            string_builder_append_u8(&builder, '/')
+
+    return string_builder_to_byte_string(&builder)
+
+## Ported from AK/LexicalPath.h:51 AK::LexicalPath::join: `first` and each of `rest`, joined
+## with slashes. The C++ takes the rest as a parameter pack.
+pub func lexical_path_join(first: StringView, rest: const StringView[]) -> LexicalPath:
+    var builder = string_builder_new()
+    string_builder_append_string_view(&builder, first)
+    # NOTE: On Windows slashes will be converted to backslashes in LexicalPath constructor
+    for part in rest:
+        string_builder_append_u8(&builder, '/')
+        string_builder_append_string_view(&builder, part)
+
+    return lexical_path_new(string_builder_to_byte_string(&builder))
+
+## Ported from AK/LexicalPath.h:65 AK::LexicalPath::dirname(ByteString).
+pub func lexical_path_dirname_byte_string(path: ByteString) -> ByteString:
+    let lexical_path = lexical_path_new(path)
+    return byte_string_from_string_view(lexical_path_dirname(&lexical_path))
+
+## Ported from AK/LexicalPath.h:71 AK::LexicalPath::basename(ByteString, StripExtension).
+pub func lexical_path_basename_byte_string(path: ByteString, s: LexicalPathStripExtension = LexicalPathStripExtension.no) -> ByteString:
+    let lexical_path = lexical_path_new(path)
+    return byte_string_from_string_view(lexical_path_basename_lexical_path_strip_extension(&lexical_path, s))
+
+## Ported from AK/LexicalPath.h:77 AK::LexicalPath::title(ByteString).
+pub func lexical_path_title_byte_string(path: ByteString) -> ByteString:
+    let lexical_path = lexical_path_new(path)
+    return byte_string_from_string_view(lexical_path_title(&lexical_path))
+
+## Ported from AK/LexicalPath.h:83 AK::LexicalPath::extension(ByteString).
+pub func lexical_path_extension_byte_string(path: ByteString) -> ByteString:
+    let lexical_path = lexical_path_new(path)
+    return byte_string_from_string_view(lexical_path_extension(&lexical_path))

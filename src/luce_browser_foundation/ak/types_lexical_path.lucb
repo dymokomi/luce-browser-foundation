@@ -12,7 +12,7 @@
 
 ## AK::s_single_dot (AK/LexicalPath.cpp:15).
 # C++ initializer: '.'
-pub var s_single_dot: u8
+pub var s_single_dot: u8 = '.'
 
 # mark: LexicalPath =============================================================================
 

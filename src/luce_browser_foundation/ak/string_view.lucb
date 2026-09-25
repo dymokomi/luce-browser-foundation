@@ -1,0 +1,607 @@
+#==============================================================================================
+#
+#   string_view - StringView: a non-owning view of bytes (usually UTF-8)
+#
+#   DESCRIPTION:
+#       Port of AK/StringView.h (lines 1-406) and AK/StringView.cpp (lines 1-314), in the
+#       header's order with the .cpp bodies in place of their declarations.
+#
+#       StringView is `m_characters` + `m_length`. A zero-initialized view has no characters
+#       pointer (the C++ default is ""); every accessor treats that as the empty view. The
+#       `Optional<StringView>` sentinel (a null pointer) is not needed: `StringView?` is an
+#       ordinary optional. Views of a String or FlyString take the owner by pointer, since a
+#       short string's bytes live inside the owner.
+#
+#==============================================================================================
+
+# mark: Construction ============================================================================
+
+## Ported from AK/StringView.h:27 AK::StringView::StringView(char const*, size_t).
+pub func string_view_construct_u8_usize(this: StringView*, characters: const u8*?, length: usize):
+    this.m_characters = characters
+    this.m_length = length
+    assert(characters != none)
+
+## Ported from AK/StringView.h:37 AK::StringView::StringView(unsigned char const*, size_t).
+pub func string_view_construct_u8_usize_2(this: StringView*, characters: const u8*?, length: usize):
+    this.m_characters = characters
+    this.m_length = length
+    assert(characters != none)
+
+## Ported from AK/StringView.h:45 AK::StringView::StringView(ReadonlyBytes).
+pub func string_view_construct_span_u8(this: StringView*, bytes: const u8[]):
+    this.m_characters = "".bytes.data if bytes.length == 0 else bytes.data
+    this.m_length = bytes.length
+
+## Ported from AK/StringView.cpp:40 AK::StringView::StringView(ByteBuffer const&).
+pub func string_view_construct_byte_buffer(this: StringView*, buffer: const ByteBuffer*):
+    this.m_characters = byte_buffer_data_const(buffer)
+    this.m_length = byte_buffer_size(buffer)
+    assert(byte_buffer_data_const(buffer) != none)
+
+## Ported from AK/StringView.cpp:22 AK::StringView::StringView(String const&).
+pub func string_view_construct_string(this: StringView*, string: const String*):
+    let bytes = string_base_bytes(&string.string_base)
+    this.m_characters = bytes.data
+    this.m_length = bytes.length
+
+## Ported from AK/StringView.cpp:28 AK::StringView::StringView(FlyString const&).
+pub func string_view_construct_fly_string(this: StringView*, string: const FlyString*):
+    let bytes = fly_string_bytes(string)
+    this.m_characters = bytes.data
+    this.m_length = bytes.length
+
+## Ported from AK/StringView.cpp:34 AK::StringView::StringView(ByteString const&).
+pub func string_view_construct_byte_string(this: StringView*, string: ByteString):
+    this.m_characters = byte_string_characters(&string)
+    this.m_length = byte_string_length(&string)
+
+## A view of `bytes` (the value form of StringView(ReadonlyBytes)).
+pub func string_view_from_bytes(bytes: const u8[]) -> StringView:
+    var view = StringView()
+    string_view_construct_span_u8(&view, bytes)
+    return view
+
+## `"text"sv`: a view of a string literal or any other `str` (DESIGN.md §2.6).
+pub func sv(text: str) -> StringView:
+    return StringView(m_characters = text.bytes.data, m_length = text.length)
+
+## Ported from AK/StringView.cpp:63 AK::for_each_line: calls back with each line of `string`
+## split at "\n", "\r" and "\r\n".
+func for_each_line[TCallback: StringViewCallback](string: StringView, callback: TCallback*):
+    let characters = string_view_bytes(&string)
+
+    var substart: usize = 0
+    var last_ch_was_cr = false
+
+    for i in 0..<characters.length:
+        let ch = characters[i]
+        var split_view = false
+
+        match ch:
+            '\n':
+                if last_ch_was_cr:
+                    substart = i + 1
+                else:
+                    split_view = true
+
+                last_ch_was_cr = false
+            '\r':
+                split_view = true
+                last_ch_was_cr = true
+            _:
+                last_ch_was_cr = false
+
+        if split_view:
+            discard(callback.call(string_view_substring_view_usize(&string, substart, i - substart)) else trap("MUST: for_each_line"))
+            substart = i + 1
+
+    let taillen = string.m_length - substart
+    if taillen != 0:
+        discard(callback.call(string_view_substring_view_usize(&string, substart, taillen)) else trap("MUST: for_each_line"))
+
+# mark: Accessors ===============================================================================
+
+## Ported from AK/StringView.h:64 AK::StringView::is_empty.
+pub func string_view_is_empty(this: const StringView*) -> bool:
+    return this.m_length == 0
+
+## Ported from AK/StringView.h:66 AK::StringView::characters_without_null_termination.
+pub func string_view_characters_without_null_termination(this: const StringView*) -> const u8*?:
+    return this.m_characters
+
+## Ported from AK/StringView.h:67 AK::StringView::length.
+pub func string_view_length(this: const StringView*) -> usize:
+    return this.m_length
+
+## Ported from AK/StringView.h:69 AK::StringView::bytes.
+pub func string_view_bytes(this: const StringView*) -> const u8[]:
+    if let characters = this.m_characters:
+        return u8[]((u8*)characters, this.m_length)
+    return b""
+
+## Ported from AK/StringView.h:71 AK::StringView::operator[].
+pub func string_view_at(this: const StringView*, index: usize) -> u8:
+    assert(index < this.m_length)
+    return string_view_bytes(this)[index]
+
+## Ported from AK/StringView.h:81 AK::StringView::begin.
+pub func string_view_begin(this: const StringView*) -> SimpleIterator[StringView, u8]:
+    return SimpleIterator[StringView, u8](m_container = (StringView*)this, m_index = 0)
+
+## Ported from AK/StringView.h:82 AK::StringView::end.
+pub func string_view_end(this: const StringView*) -> SimpleIterator[StringView, u8]:
+    return SimpleIterator[StringView, u8](m_container = (StringView*)this, m_index = this.m_length)
+
+## Ported from AK/StringView.h:84 AK::StringView::hash.
+pub func string_view_hash(this: const StringView*) -> u32:
+    if string_view_is_empty(this):
+        return 0
+    return string_hash(string_view_characters_without_null_termination(this), string_view_length(this))
+
+# mark: Queries =================================================================================
+
+## Ported from AK/StringView.cpp:139 AK::StringView::starts_with(StringView, CaseSensitivity).
+pub func string_view_starts_with_string_view(this: const StringView*, str_: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    return string_utils_starts_with(*this, str_, case_sensitivity)
+
+## Ported from AK/StringView.cpp:151 AK::StringView::ends_with(StringView, CaseSensitivity).
+pub func string_view_ends_with_string_view(this: const StringView*, str_: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    return string_utils_ends_with(*this, str_, case_sensitivity)
+
+## Ported from AK/StringView.cpp:132 AK::StringView::starts_with(char).
+pub func string_view_starts_with_u8(this: const StringView*, ch: u8) -> bool:
+    if string_view_is_empty(this):
+        return false
+    return ch == string_view_bytes(this)[0]
+
+## Ported from AK/StringView.cpp:144 AK::StringView::ends_with(char).
+pub func string_view_ends_with_u8(this: const StringView*, ch: u8) -> bool:
+    if string_view_is_empty(this):
+        return false
+    return ch == string_view_bytes(this)[string_view_length(this) - 1]
+
+## Ported from AK/StringView.cpp:161 AK::StringView::matches(StringView, CaseSensitivity).
+pub func string_view_matches_case_sensitivity(this: const StringView*, mask: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_insensitive) -> bool:
+    return string_utils_matches(*this, mask, case_sensitivity)
+
+## Ported from AK/StringView.cpp:156 AK::StringView::matches(StringView, Vector<MaskSpan>&, CaseSensitivity).
+pub func string_view_matches_vector(this: const StringView*, mask: StringView, mask_spans: Vector[MaskSpan]*, case_sensitivity: CaseSensitivity = CaseSensitivity.case_insensitive) -> bool:
+    return string_utils_matches(*this, mask, case_sensitivity, mask_spans)
+
+## Ported from AK/StringView.cpp:166 AK::StringView::contains(char).
+pub func string_view_contains_u8(this: const StringView*, needle: u8) -> bool:
+    for current in string_view_bytes(this):
+        if current == needle:
+            return true
+    return false
+
+## Ported from AK/StringView.cpp:175 AK::StringView::contains(u32).
+pub func string_view_contains_u32(this: const StringView*, needle: u32) -> bool:
+    # A code point should be at most four UTF-8 bytes, which easily fits into StringBuilder's
+    # inline-buffer. Therefore, this will not allocate.
+    var needle_builder = string_builder_new()
+    string_builder_try_append_code_point(&needle_builder, needle) catch:
+        # The needle is invalid, therefore the string does not contain it.
+        return false
+
+    return string_view_contains_string_view(this, string_builder_string_view(&needle_builder))
+
+## Ported from AK/StringView.cpp:189 AK::StringView::contains(StringView, CaseSensitivity).
+pub func string_view_contains_string_view(this: const StringView*, needle: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    if needle.m_length == 1:
+        return string_view_contains_u8(this, string_view_bytes(&needle)[0])
+    return string_utils_contains(*this, needle, case_sensitivity)
+
+## Ported from AK/StringView.cpp:196 AK::StringView::equals_ignoring_ascii_case.
+pub func string_view_equals_ignoring_ascii_case(this: const StringView*, other: StringView) -> bool:
+    return string_utils_equals_ignoring_ascii_case(*this, other)
+
+## Ported from AK/StringView.cpp:201 AK::StringView::is_ascii.
+pub func string_view_is_ascii(this: const StringView*) -> bool:
+    if string_view_is_empty(this):
+        return true
+    return simdutf_validate_ascii(string_view_bytes(this))
+
+## Ported from AK/StringView.h:103 AK::StringView::trim.
+pub func string_view_trim(this: const StringView*, characters: StringView, mode: TrimMode = TrimMode.both) -> StringView:
+    return string_utils_trim(*this, characters, mode)
+
+## Ported from AK/StringView.h:104 AK::StringView::trim_whitespace.
+pub func string_view_trim_whitespace(this: const StringView*, mode: TrimMode = TrimMode.both) -> StringView:
+    return string_utils_trim_whitespace(*this, mode)
+
+## The lambda of StringView::to_ascii_lowercase_string and to_ascii_uppercase_string: writes the
+## view's bytes with ASCII case mapped.
+struct StringViewToAsciiCaseCopy: BytesCallback:
+    var source: const u8[]
+    var to_uppercase: bool
+
+    mutating func call(buffer: u8[]) -> !:
+        for i in 0..<self.source.length:
+            let character = (u32)self.source[i]
+            buffer[i] = (u8)(to_ascii_uppercase(character) if self.to_uppercase else to_ascii_lowercase(character))
+
+## Ported from AK/StringView.cpp:208 AK::StringView::to_ascii_lowercase_string.
+pub func string_view_to_ascii_lowercase_string(this: const StringView*) -> String:
+    let utf8 = Utf8View(m_string = *this)
+    assert(utf8_view_validate_allow_lonely_surrogates(&utf8))
+
+    var result = string_new()
+
+    var copy = StringViewToAsciiCaseCopy(source = string_view_bytes(this), to_uppercase = false)
+    string_base_replace_with_new_string_string_view(&result.string_base, string_view_length(this), &copy) else trap("MUST: to_ascii_lowercase_string")
+
+    return result
+
+## Ported from AK/StringView.cpp:223 AK::StringView::to_ascii_uppercase_string.
+pub func string_view_to_ascii_uppercase_string(this: const StringView*) -> String:
+    let utf8 = Utf8View(m_string = *this)
+    assert(utf8_view_validate_allow_lonely_surrogates(&utf8))
+
+    var result = string_new()
+
+    var copy = StringViewToAsciiCaseCopy(source = string_view_bytes(this), to_uppercase = true)
+    string_base_replace_with_new_string_string_view(&result.string_base, string_view_length(this), &copy) else trap("MUST: to_ascii_uppercase_string")
+
+    return result
+
+## Ported from AK/StringView.cpp:238 AK::StringView::to_ascii_titlecase_string.
+pub func string_view_to_ascii_titlecase_string(this: const StringView*) -> String:
+    return string_utils_to_titlecase(*this)
+
+# mark: Searching ===============================================================================
+
+## Ported from AK/StringView.h:110 AK::StringView::find(char, size_t).
+pub func string_view_find_u8(this: const StringView*, needle: u8, start: usize = 0) -> usize?:
+    return string_utils_find_u8(*this, needle, start)
+
+## Ported from AK/StringView.h:111 AK::StringView::find(StringView, size_t).
+pub func string_view_find_string_view(this: const StringView*, needle: StringView, start: usize = 0) -> usize?:
+    return string_utils_find_string_view(*this, needle, start)
+
+## Ported from AK/StringView.h:112 AK::StringView::find_last(char).
+pub func string_view_find_last_u8(this: const StringView*, needle: u8) -> usize?:
+    return string_utils_find_last_u8(*this, needle)
+
+## Ported from AK/StringView.h:113 AK::StringView::find_last(StringView).
+pub func string_view_find_last_string_view(this: const StringView*, needle: StringView) -> usize?:
+    return string_utils_find_last_string_view(*this, needle)
+
+## Ported from AK/StringView.h:114 AK::StringView::find_last_not.
+pub func string_view_find_last_not(this: const StringView*, needle: u8) -> usize?:
+    return string_utils_find_last_not(*this, needle)
+
+## Ported from AK/StringView.cpp:285 AK::StringView::find_all.
+pub func string_view_find_all(this: const StringView*, needle: StringView) -> Vector[usize]:
+    return string_utils_find_all(*this, needle)
+
+## Ported from AK/StringView.h:119 AK::StringView::find_any_of.
+pub func string_view_find_any_of(this: const StringView*, needles: StringView, direction: SearchDirection = SearchDirection.forward) -> usize?:
+    return string_utils_find_any_of(*this, needles, direction)
+
+# mark: Substrings and splitting ================================================================
+
+## Ported from AK/StringView.h:121 AK::StringView::substring_view(size_t, size_t).
+pub func string_view_substring_view_usize(this: const StringView*, start: usize, length: usize) -> StringView:
+    assert(start + length <= this.m_length)
+    if let characters = this.m_characters:
+        return StringView(m_characters = characters + start, m_length = length)
+    return StringView(m_characters = none, m_length = length)
+
+## Ported from AK/StringView.h:129 AK::StringView::substring_view(size_t).
+pub func string_view_substring_view(this: const StringView*, start: usize) -> StringView:
+    assert(start <= string_view_length(this))
+    return string_view_substring_view_usize(this, start, string_view_length(this) - start)
+
+## The lambda of StringView::split_view: appends each part to a vector.
+struct StringViewSplitViewCollect: StringViewCallback:
+    var parts: Vector[StringView]*
+
+    mutating func call(part: StringView) -> IterationDecision!:
+        vector_append_t(self.parts, part)
+        return IterationDecision.continue_
+
+## Ported from AK/StringView.cpp:47 AK::StringView::split_view(char, SplitBehavior).
+pub func string_view_split_view_u8(this: const StringView*, separator: u8, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[StringView]:
+    var separator_bytes: u8[1] = [separator]
+    let separator_view = string_view_from_bytes(separator_bytes)
+    return string_view_split_view_string_view(this, separator_view, split_behavior)
+
+## Ported from AK/StringView.cpp:53 AK::StringView::split_view(StringView, SplitBehavior).
+pub func string_view_split_view_string_view(this: const StringView*, separator: StringView, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[StringView]:
+    var parts: Vector[StringView]
+    var collect = StringViewSplitViewCollect(parts = &parts)
+    string_view_for_each_split_view_string_view(this, separator, split_behavior, &collect) else trap("MUST: split_view")
+    return parts
+
+## Ported from AK/StringView.cpp:290 AK::StringView::split_view_if. The predicate is a
+## CharPredicate (the C++ takes a Function<bool(char)>).
+pub func string_view_split_view_if[P: CharPredicate](this: const StringView*, predicate: const P*, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[StringView]:
+    var v: Vector[StringView]
+    if string_view_is_empty(this):
+        return v
+
+    var substart: usize = 0
+    let keep_empty = has_flag(split_behavior, SplitBehavior.keep_empty)
+    let keep_separator = has_flag(split_behavior, SplitBehavior.keep_trailing_separator)
+    let characters = string_view_bytes(this)
+    for i in 0..<string_view_length(this):
+        let ch = characters[i]
+        if predicate.matches(ch):
+            let sublen = i - substart
+            if sublen != 0 or keep_empty:
+                vector_append_t(&v, string_view_substring_view_usize(this, substart, sublen + 1 if keep_separator else sublen))
+            substart = i + 1
+    let taillen = string_view_length(this) - substart
+    if taillen != 0 or keep_empty:
+        vector_append_t(&v, string_view_substring_view_usize(this, substart, taillen))
+    return v
+
+## Ported from AK/StringView.h:142 AK::StringView::find_last_split_view.
+pub func string_view_find_last_split_view(this: const StringView*, separator: u8) -> StringView:
+    let begin = string_view_find_last_u8(this, separator) else return *this
+    return string_view_substring_view(this, begin + 1)
+
+## Ported from AK/StringView.h:150 AK::StringView::find_first_split_view.
+pub func string_view_find_first_split_view(this: const StringView*, separator: u8) -> StringView:
+    let needle_begin = string_view_find_u8(this, separator) else return *this
+    return string_view_substring_view_usize(this, 0, needle_begin)
+
+## Ported from AK/StringView.h:159 AK::StringView::for_each_split_view(char, SplitBehavior, Callback).
+pub func string_view_for_each_split_view_u8[TCallback: StringViewCallback](this: const StringView*, separator: u8, split_behavior: SplitBehavior, callback: TCallback*) -> !:
+    var separator_bytes: u8[1] = [separator]
+    let separator_view = string_view_from_bytes(separator_bytes)
+    try string_view_for_each_split_view_string_view(this, separator_view, split_behavior, callback)
+
+## Ported from AK/StringView.h:166 AK::StringView::for_each_split_view(StringView, SplitBehavior,
+## Callback). The callback answers IterationDecision and may fail; a failure propagates.
+pub func string_view_for_each_split_view_string_view[TCallback: StringViewCallback](this: const StringView*, separator: StringView, split_behavior: SplitBehavior, callback: TCallback*) -> !:
+    assert(not string_view_is_empty(&separator))
+    if string_view_is_empty(this):
+        return
+
+    var view = *this
+    var maybe_separator_index = string_view_find_string_view(&view, separator)
+    let keep_empty = has_flag(split_behavior, SplitBehavior.keep_empty)
+    let keep_separator = has_flag(split_behavior, SplitBehavior.keep_trailing_separator)
+    while let separator_index = maybe_separator_index:
+        let part_with_separator = string_view_substring_view_usize(&view, 0, separator_index + separator.m_length)
+        if keep_empty or separator_index > 0:
+            var part = part_with_separator
+            if not keep_separator:
+                part = string_view_substring_view_usize(&part_with_separator, 0, separator_index)
+            if try callback.call(part) == IterationDecision.break_:
+                return
+        view = string_view_substring_view_starting_after_substring(&view, part_with_separator)
+        maybe_separator_index = string_view_find_string_view(&view, separator)
+    if keep_empty or not string_view_is_empty(&view):
+        discard(try callback.call(view))
+
+## The lambda of StringView::lines: appends each line to a vector.
+struct StringViewLinesCollect: StringViewCallback:
+    var lines: Vector[StringView]*
+
+    mutating func call(part: StringView) -> IterationDecision!:
+        vector_append_t(self.lines, part)
+        return IterationDecision.continue_
+
+## The lambda of StringView::count_lines: counts the lines.
+struct StringViewCountLines: StringViewCallback:
+    var lines: usize
+
+    mutating func call(part: StringView) -> IterationDecision!:
+        self.lines += 1
+        return IterationDecision.continue_
+
+## Ported from AK/StringView.cpp:104 AK::StringView::lines. Splits by line endings; as of
+## CommonMark 0.29 a line ending is "a newline (U+000A), a carriage return (U+000D) not followed
+## by a newline, or a carriage return and a following newline".
+pub func string_view_lines(this: const StringView*, consider_carriage_return: StringViewConsiderCarriageReturn = StringViewConsiderCarriageReturn.yes) -> Vector[StringView]:
+    var lines: Vector[StringView]
+    if string_view_is_empty(this):
+        return lines
+
+    if consider_carriage_return == StringViewConsiderCarriageReturn.no:
+        return string_view_split_view_u8(this, '\n', SplitBehavior.keep_empty)
+
+    var collect = StringViewLinesCollect(lines = &lines)
+    for_each_line(*this, &collect)
+
+    return lines
+
+## Ported from AK/StringView.cpp:118 AK::StringView::count_lines.
+pub func string_view_count_lines(this: const StringView*, consider_carriage_return: StringViewConsiderCarriageReturn = StringViewConsiderCarriageReturn.yes) -> usize:
+    if string_view_is_empty(this):
+        return 1
+
+    if consider_carriage_return == StringViewConsiderCarriageReturn.no:
+        return string_view_count_u8(this, '\n') + 1
+
+    var counter = StringViewCountLines(lines = 0)
+    for_each_line(*this, &counter)
+
+    return counter.lines
+
+## Ported from AK/StringView.cpp:243 AK::StringView::substring_view_starting_from_substring:
+## the rest of this view from the start of `substring`, which must be a view into this one.
+pub func string_view_substring_view_starting_from_substring(this: const StringView*, substring: StringView) -> StringView:
+    let remaining_characters = (usize)(substring.m_characters else trap("VERIFY: substring view"))
+    let characters = (usize)(this.m_characters else trap("VERIFY: substring view"))
+    assert(remaining_characters >= characters)
+    assert(remaining_characters <= characters + this.m_length)
+    let remaining_length = this.m_length - (remaining_characters - characters)
+    return string_view_substring_view_usize(this, remaining_characters - characters, remaining_length)
+
+## Ported from AK/StringView.cpp:252 AK::StringView::substring_view_starting_after_substring:
+## the rest of this view after the end of `substring`, which must be a view into this one.
+pub func string_view_substring_view_starting_after_substring(this: const StringView*, substring: StringView) -> StringView:
+    let remaining_characters = (usize)(substring.m_characters else trap("VERIFY: substring view")) + substring.m_length
+    let characters = (usize)(this.m_characters else trap("VERIFY: substring view"))
+    assert(remaining_characters >= characters)
+    assert(remaining_characters <= characters + this.m_length)
+    let remaining_length = this.m_length - (remaining_characters - characters)
+    return string_view_substring_view_usize(this, remaining_characters - characters, remaining_length)
+
+## Ported from AK/StringView.cpp:261 AK::StringView::copy_characters_to_buffer: copies as much as
+## fits and a NUL; answers whether everything fit.
+pub func string_view_copy_characters_to_buffer(this: const StringView*, buffer: u8[]) -> bool:
+    # We must fit at least the NUL-terminator.
+    assert(buffer.length > 0)
+
+    let characters_to_copy = this.m_length if this.m_length < buffer.length - 1 else buffer.length - 1
+    copy_bytes(buffer, string_view_bytes(this)[..<characters_to_copy])
+    buffer[characters_to_copy] = 0
+
+    return characters_to_copy == this.m_length
+
+# mark: Comparison ==============================================================================
+
+## Ported from AK/StringView.h:256 AK::StringView::operator==(char const*): compares with a
+## NUL-terminated string.
+pub func string_view_eq_u8_const(this: const StringView*, cstring: const u8*?) -> bool:
+    let cp = cstring else return false
+    # NOTE: `m_characters` is not guaranteed to be null-terminated, but `cstring` is.
+    let characters = string_view_bytes(this)
+    for i in 0..<this.m_length:
+        if cp[i] == 0:
+            return false
+        if characters[i] != cp[i]:
+            return false
+    return cp[this.m_length] == 0
+
+## Ported from AK/StringView.h:271 AK::StringView::operator==(char).
+pub func string_view_eq_u8_const_2(this: const StringView*, c_: u8) -> bool:
+    return this.m_length == 1 and string_view_bytes(this)[0] == c_
+
+## Ported from AK/StringView.cpp:273 AK::StringView::operator==(ByteString const&).
+pub func string_view_eq_byte_string(this: const StringView*, string: ByteString) -> bool:
+    return string_view_eq_string_view(this, byte_string_view(&string))
+
+## Ported from AK/StringView.h:278 AK::StringView::compare.
+pub func string_view_compare(this: const StringView*, other: StringView) -> i32:
+    if this.m_length == 0 and other.m_length == 0:
+        return 0
+
+    let c_ = compare_bytes(string_view_bytes(this), string_view_bytes(&other))
+    if c_ == 0:
+        if string_view_length(this) < string_view_length(&other):
+            return -1
+        if string_view_length(this) == string_view_length(&other):
+            return 0
+        return 1
+    return c_
+
+## Ported from AK/StringView.h:295 AK::StringView::operator==(StringView).
+pub func string_view_eq_string_view(this: const StringView*, other: StringView) -> bool:
+    return string_view_length(this) == string_view_length(&other) and string_view_compare(this, other) == 0
+
+## Ported from AK/StringView.h:300 AK::StringView::operator!=.
+pub func string_view_ne(this: const StringView*, other: StringView) -> bool:
+    return string_view_length(this) != string_view_length(&other) or string_view_compare(this, other) != 0
+
+## Ported from AK/StringView.h:305 AK::StringView::operator<.
+pub func string_view_lt(this: const StringView*, other: StringView) -> bool:
+    return string_view_compare(this, other) < 0
+
+## Ported from AK/StringView.h:306 AK::StringView::operator<=.
+pub func string_view_le(this: const StringView*, other: StringView) -> bool:
+    return string_view_compare(this, other) <= 0
+
+## Ported from AK/StringView.h:307 AK::StringView::operator>.
+pub func string_view_gt(this: const StringView*, other: StringView) -> bool:
+    return string_view_compare(this, other) > 0
+
+## Ported from AK/StringView.h:308 AK::StringView::operator>=.
+pub func string_view_ge(this: const StringView*, other: StringView) -> bool:
+    return string_view_compare(this, other) >= 0
+
+## `view == "text"`: compares with a string literal (the C++'s `sv == "text"sv`).
+pub func string_view_equals(this: const StringView*, text: str) -> bool:
+    return string_view_eq_string_view(this, sv(text))
+
+# mark: Conversions =============================================================================
+
+## Ported from AK/StringView.cpp:278 AK::StringView::to_byte_string.
+pub func string_view_to_byte_string(this: const StringView*) -> ByteString:
+    return byte_string_from_string_view(*this)
+
+## Ported from AK/StringView.h:312 AK::StringView::is_whitespace.
+pub func string_view_is_whitespace(this: const StringView*) -> bool:
+    return string_utils_is_whitespace(*this)
+
+## Ported from AK/StringView.cpp:280 AK::StringView::replace.
+pub func string_view_replace(this: const StringView*, needle: StringView, replacement: StringView, replace_mode: ReplaceMode) -> ByteString:
+    return string_utils_replace_string_view(*this, needle, replacement, replace_mode)
+
+## Ported from AK/StringView.h:319 AK::StringView::count(StringView).
+pub func string_view_count_string_view(this: const StringView*, needle: StringView) -> usize:
+    return string_utils_count_string_view(*this, needle)
+
+## Ported from AK/StringView.h:324 AK::StringView::count(char).
+pub func string_view_count_u8(this: const StringView*, needle: u8) -> usize:
+    return string_utils_count_u8(*this, needle)
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<i8>.
+pub func string_view_to_number_i8(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    return parse_number_string_view_i8(*this, trim_whitespace, base_)
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<i16>.
+pub func string_view_to_number_i16(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    return parse_number_string_view_i16(*this, trim_whitespace, base_)
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<i32>.
+pub func string_view_to_number_i32(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    return parse_number_string_view_i32(*this, trim_whitespace, base_)
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<i64>.
+pub func string_view_to_number_i64(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    return parse_number_string_view_i64(*this, trim_whitespace, base_)
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<u8>.
+pub func string_view_to_number_u8(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    return parse_number_string_view_u8(*this, trim_whitespace, base_)
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<u16>.
+pub func string_view_to_number_u16(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    return parse_number_string_view_u16(*this, trim_whitespace, base_)
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<u32>.
+pub func string_view_to_number_u32(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    return parse_number_string_view_u32(*this, trim_whitespace, base_)
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<u64>.
+pub func string_view_to_number_u64(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    return parse_number_string_view_u64(*this, trim_whitespace, base_)
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<f32>.
+pub func string_view_to_number_f32(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    return parse_number_string_view_f32(*this, trim_whitespace, base_)
+
+## Ported from AK/StringView.h:348 AK::StringView::to_number<f64>.
+pub func string_view_to_number_f64(this: const StringView*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    return parse_number_string_view_f64(*this, trim_whitespace, base_)
+
+## Ported from AK/StringView.h:357 AK::StringView::StringView(Badge<SentinelOptionalTraits>,
+## nullptr_t): the view with no characters pointer.
+pub func string_view_construct_string_view(this: StringView*):
+    this.m_characters = none
+    this.m_length = 0
+
+# mark: Traits and literals =====================================================================
+
+## Ported from AK/StringView.h:387 AK::CaseInsensitiveASCIIStringViewTraits::hash.
+pub func case_insensitive_ascii_string_view_traits_hash(s: StringView) -> u32:
+    if string_view_is_empty(&s):
+        return 0
+    return case_insensitive_string_hash(string_view_characters_without_null_termination(&s), string_view_length(&s))
+
+## Ported from AK/StringView.h:393 AK::CaseInsensitiveASCIIStringViewTraits::equals.
+pub func case_insensitive_ascii_string_view_traits_equals(a: StringView, b: StringView) -> bool:
+    return string_view_equals_ignoring_ascii_case(&a, b)
+
+## Ported from AK/StringView.h:398 operator""sv: a view of `length` characters.
+pub func literalsv_u8(cstring: const u8*?, length: usize) -> StringView:
+    var view = StringView()
+    string_view_construct_u8_usize(&view, cstring, length)
+    return view

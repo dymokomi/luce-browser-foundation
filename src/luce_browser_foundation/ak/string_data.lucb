@@ -1,0 +1,138 @@
+#==============================================================================================
+#
+#   string_data - StringData: the heap block behind a long String or FlyString
+#
+#   DESCRIPTION:
+#       Port of AK/StringData.h (lines 1-156).
+#
+#       A StringData is its header followed by either the UTF-8 bytes or, for a substring that
+#       shares its superstring's bytes, a SubstringData (the C++'s flexible array member
+#       `m_bytes_or_substring_data`, at `sizeof(StringData)`). The block comes from the current
+#       allocator (the managed heap once region gc lands); there is no reference count and no
+#       destructor (DESIGN.md §3.3), so the destructor's two effects move: a substring keeps its
+#       superstring alive by pointing at it, and a fly string's entry in the FlyString table is
+#       removed by did_destroy_fly_string_data, which the collector's finalizer will call.
+#
+#==============================================================================================
+
+# mark: Creation ================================================================================
+
+## Ported from AK/StringData.h:25 AK::Detail::StringData::create_uninitialized: a StringData of
+## `byte_count` uninitialized bytes; `buffer` receives the address of those bytes.
+pub func string_data_create_uninitialized(byte_count: usize, buffer: (u8*?)*) -> StringData*!:
+    assert(byte_count != 0)
+
+    let capacity = string_data_allocation_size_for_string_data(byte_count)
+    let slot = alloc(capacity, alignof(StringData)) catch:
+        error(ak_errno_error, "ENOMEM")
+
+    let new_string_data = (StringData*)slot.data
+    memory.set(slot[..<sizeof(StringData)], 0)
+    string_data_construct_usize(new_string_data, byte_count)
+    *buffer = (u8*)new_string_data + sizeof(StringData)
+    return new_string_data
+
+## Ported from AK/StringData.h:39 AK::Detail::StringData::create_from_string_builder. The C++
+## adopts the builder's heap buffer, whose first sizeof(StringData) bytes the builder reserved
+## for this header; here the bytes are copied into a new block, so StringData's layout does not
+## depend on ByteBuffer's, and the builder is cleared as when its buffer is leaked.
+pub func string_data_create_from_string_builder(builder: StringBuilder*) -> StringData*:
+    let byte_count = string_builder_length(builder)
+    assert(byte_count > max_short_string_byte_count)
+
+    var buffer: u8*? = none
+    let string_data = string_data_create_uninitialized(byte_count, &buffer) else trap("MUST: create_from_string_builder")
+    let destination = buffer else trap("VERIFY: create_from_string_builder")
+    let view = string_builder_string_view(builder)
+    copy_bytes(u8[](destination, byte_count), string_view_bytes(&view))
+    string_builder_clear(builder)
+    return string_data
+
+## Ported from AK/StringData.h:50 AK::Detail::StringData::create_substring: a StringData that
+## shares `byte_count` bytes of `superstring` from `start`.
+pub func string_data_create_substring(superstring: const StringData*, start: usize, byte_count: usize) -> StringData*!:
+    # Strings of MAX_SHORT_STRING_BYTE_COUNT bytes or less should be handled by the String
+    # short string optimization.
+    assert(byte_count > max_short_string_byte_count)
+
+    let capacity = sizeof(StringData) + sizeof(StringDataSubstringData)
+    let slot = alloc(capacity, alignof(StringData)) catch:
+        error(ak_errno_error, "ENOMEM")
+
+    let new_string_data = (StringData*)slot.data
+    memory.set(slot, 0)
+    string_data_construct_string_data(new_string_data, superstring, start, byte_count)
+    return new_string_data
+
+# mark: Accessors ===============================================================================
+
+## Ported from AK/StringData.h:81 AK::Detail::StringData::substring_data.
+pub func string_data_substring_data(this: const StringData*) -> const StringDataSubstringData*:
+    return (const StringDataSubstringData*)((u8*)this + sizeof(StringData))
+
+## Ported from AK/StringData.h:87 AK::Detail::StringData::bytes. NOTE: There is no guarantee
+## about null-termination.
+pub func string_data_bytes(this: const StringData*) -> const u8[]:
+    if this.m_substring:
+        let data = string_data_substring_data(this)
+        let superstring = data.superstring else trap("VERIFY: substring without superstring")
+        return string_data_bytes(superstring)[(usize)data.start_offset..<(usize)data.start_offset + (usize)this.m_byte_count]
+    return u8[]((u8*)this + sizeof(StringData), (usize)this.m_byte_count)
+
+## Ported from AK/StringData.h:96 AK::Detail::StringData::bytes_as_string_view.
+pub func string_data_bytes_as_string_view(this: const StringData*) -> StringView:
+    return string_view_from_bytes(string_data_bytes(this))
+
+## Ported from AK/StringData.h:98 AK::Detail::StringData::operator==.
+pub func string_data_eq(this: const StringData*, other: const StringData*) -> bool:
+    let this_view = string_data_bytes_as_string_view(this)
+    return string_view_eq_string_view(&this_view, string_data_bytes_as_string_view(other))
+
+## Ported from AK/StringData.h:103 AK::Detail::StringData::hash.
+pub func string_data_hash(this: const StringData*) -> u32:
+    if not this.m_has_hash:
+        string_data_compute_hash(this)
+    return this.m_hash
+
+## Ported from AK/StringData.h:110 AK::Detail::StringData::is_fly_string.
+pub func string_data_is_fly_string(this: const StringData*) -> bool:
+    return this.m_is_fly_string
+
+## Ported from AK/StringData.h:111 AK::Detail::StringData::set_fly_string (a `mutable` field).
+pub func string_data_set_fly_string(this: const StringData*, is_fly_string: bool):
+    let mutable_this = (StringData*)this
+    mutable_this.m_is_fly_string = is_fly_string
+
+## Ported from AK/StringData.h:113 AK::Detail::StringData::byte_count.
+pub func string_data_byte_count(this: const StringData*) -> usize:
+    return (usize)this.m_byte_count
+
+## Ported from AK/StringData.h:116 AK::Detail::StringData::allocation_size_for_string_data.
+func string_data_allocation_size_for_string_data(length: usize) -> usize:
+    return sizeof(StringData) + (sizeof(u8) * length)
+
+# mark: Construction ============================================================================
+
+## Ported from AK/StringData.h:121 AK::Detail::StringData::StringData(size_t).
+func string_data_construct_usize(this: StringData*, byte_count: usize):
+    this.m_byte_count = u32(byte_count)
+
+## Ported from AK/StringData.h:126 AK::Detail::StringData::StringData(StringData const&, size_t,
+## size_t): a substring of `superstring` (the C++ also refs the superstring).
+func string_data_construct_string_data(this: StringData*, superstring: const StringData*, start: usize, byte_count: usize):
+    this.m_byte_count = u32(byte_count)
+    this.m_substring = true
+    let data = (StringDataSubstringData*)string_data_substring_data(this)
+    data.start_offset = u32(start)
+    data.superstring = superstring
+
+## Ported from AK/StringData.h:136 AK::Detail::StringData::compute_hash (the hash fields are
+## `mutable`).
+func string_data_compute_hash(this: const StringData*):
+    let mutable_this = (StringData*)this
+    let bytes = string_data_bytes(this)
+    if bytes.length == 0:
+        mutable_this.m_hash = 0
+    else:
+        mutable_this.m_hash = string_hash(bytes.data, bytes.length)
+    mutable_this.m_has_hash = true

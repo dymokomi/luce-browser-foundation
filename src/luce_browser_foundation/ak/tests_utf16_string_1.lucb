@@ -1,0 +1,304 @@
+#==============================================================================================
+#
+#   tests_utf16_string_1 - Utf16String tests (creation from UTF-8, UTF-16, UTF-32, builders)
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestUtf16String.cpp (lines 1-525). `"..."_utf16` is
+#       utf16_string_from_str; `u"..."_utf16` is t16_lit. Utf16String::formatted is a variadic
+#       template the port does not have: its checks are left out (String::number's are kept).
+#       The LibUnicode-backed case mappings (to_lowercase/to_uppercase/to_titlecase/to_casefold,
+#       lines 526-1027 of the donor) are not in AK and are not ported.
+#
+#==============================================================================================
+
+# mark: Helpers =================================================================================
+
+## `u"text"_utf16`: the char16_t literal operator over UTF-16 text.
+func t16_lit(text: str) -> Utf16String:
+    let view = t16(text)
+    let units = utf16_view_utf16_span(&view)
+    return literalutf16_u16(units.data, units.length)
+
+## The storage and length checks every creation test makes.
+func t16s_expect(string: const Utf16String*, is_ascii_: bool, long_ascii: bool, short_ascii: bool, code_units: usize, code_points: usize):
+    let base = &string.utf16_string_base
+    assert(utf16_string_base_is_empty(base) == (code_units == 0))
+    assert(utf16_string_base_is_ascii(base) == is_ascii_)
+    assert(utf16_string_base_has_long_ascii_storage(base) == long_ascii)
+    assert(utf16_string_base_has_short_ascii_storage(base) == short_ascii)
+    assert(utf16_string_base_length_in_code_units(base) == code_units)
+    assert(utf16_string_base_length_in_code_points(base) == code_points)
+
+## `EXPECT_EQ(string.ascii_view(), "text"sv)`.
+func t16s_ascii_view_is(string: const Utf16String*, text: str) -> bool:
+    let view = utf16_string_base_ascii_view(&string.utf16_string_base)
+    return string_view_eq_string_view(&view, sv(text))
+
+## A Utf32View of code points (the `to_utf32_view(U"...")` lambda).
+func t16_utf32(code_points: const u32[]) -> Utf32View:
+    let storage = new u32[code_points.length + 1] else trap("t16_utf32: out of memory")
+    for i in 0..<code_points.length:
+        storage[i] = code_points[i]
+    return utf32_view_from_span(storage[..<code_points.length])
+
+# mark: Creation ================================================================================
+
+test "short_ascii_literal_is_constexpr":
+    # The _utf16 UDL folds short ASCII literals to compile-time constants, both for char and
+    # char16_t inputs.
+    let from_char = literalutf16_u8("foo".bytes.data, 3)
+    let from_char16 = t16_lit("bar")
+    assert(t16s_eq_str(&from_char, "foo"))
+    assert(t16s_eq_str(&from_char16, "bar"))
+    assert(utf16_string_base_length_in_code_units(&from_char.utf16_string_base) == 3)
+    assert(utf16_string_base_length_in_code_units(&from_char16.utf16_string_base) == 3)
+
+test "empty_string":
+    let string = utf16_string_new()
+    t16s_expect(&string, true, false, true, 0, 0)
+    let ascii = utf16_string_base_ascii_view(&string.utf16_string_base)
+    assert(string_view_eq_string_view(&ascii, StringView()))
+
+test "from_utf8":
+    let string1 = utf16_string_from_utf8_string_view(sv("hello!"))
+    t16s_expect(&string1, true, false, true, 6, 6)
+    assert(t16s_ascii_view_is(&string1, "hello!"))
+
+    let string2 = utf16_string_from_utf8_string_view(sv("hello there!"))
+    t16s_expect(&string2, true, true, false, 12, 12)
+    assert(t16s_ascii_view_is(&string2, "hello there!"))
+
+    let string3 = utf16_string_from_utf8_string_view(sv("😀"))
+    t16s_expect(&string3, false, false, false, 2, 1)
+    assert(t16_eq(t16s_view(&string3), t16("😀")))
+
+    let string4 = utf16_string_from_utf8_string_view(sv("hello 😀 there!"))
+    t16s_expect(&string4, false, false, false, 15, 14)
+    assert(t16_eq(t16s_view(&string4), t16("hello 😀 there!")))
+
+    let string5 = utf16_string_from_utf8_string_view(string_view_from_bytes(b"hello \xed\xa0\x80!"))
+    t16s_expect(&string5, false, false, false, 8, 8)
+    assert(t16_eq(t16s_view(&string5), t16u([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xd800, 0x21])))
+
+    let string6 = utf16_string_from_utf8_string_view(string_view_from_bytes(b"hello \xed\xb0\x80!"))
+    t16s_expect(&string6, false, false, false, 8, 8)
+    assert(t16_eq(t16s_view(&string6), t16u([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xdc00, 0x21])))
+
+test "from_utf8_with_replacement_character":
+    if ak_core_is_ported:
+        # U+110000
+        let string1 = utf16_string_from_utf8_with_replacement_character(string_view_from_bytes(b"long string \xf4\x8f\xbf\xc0"), Utf16StringWithBomHandling.no)
+        assert(t16s_eq(&string1, t16("long string \u{fffd}\u{fffd}\u{fffd}\u{fffd}")))
+
+    let string3 = utf16_string_from_utf8_with_replacement_character(sv("A valid string!"), Utf16StringWithBomHandling.no)
+    assert(t16s_eq_str(&string3, "A valid string!"))
+
+    let string4 = utf16_string_from_utf8_with_replacement_character(sv(""), Utf16StringWithBomHandling.no)
+    assert(t16s_eq_str(&string4, ""))
+
+    let string5 = utf16_string_from_utf8_with_replacement_character(string_view_from_bytes(b"\xef\xbb\xbfWHF!"), Utf16StringWithBomHandling.yes)
+    assert(t16s_eq_str(&string5, "WHF!"))
+
+    let string6 = utf16_string_from_utf8_with_replacement_character(string_view_from_bytes(b"\xef\xbb\xbfWHF!"), Utf16StringWithBomHandling.no)
+    assert(t16s_eq(&string6, t16("\u{feff}WHF!")))
+
+    if ak_core_is_ported:
+        # U+D800
+        let string7 = utf16_string_from_utf8_with_replacement_character(string_view_from_bytes(b"\xed\xa0\x80WHF!"))
+        assert(t16s_eq(&string7, t16("\u{fffd}WHF!")))
+
+test "from_utf16":
+    let string1 = utf16_string_from_utf16(t16("hello!"))
+    t16s_expect(&string1, true, false, true, 6, 6)
+    assert(t16s_ascii_view_is(&string1, "hello!"))
+
+    let string2 = utf16_string_from_utf16(t16("hello there!"))
+    t16s_expect(&string2, true, true, false, 12, 12)
+    assert(t16s_ascii_view_is(&string2, "hello there!"))
+
+    let string3 = utf16_string_from_utf16(t16("😀"))
+    t16s_expect(&string3, false, false, false, 2, 1)
+    assert(t16_eq(t16s_view(&string3), t16("😀")))
+
+    let string4 = utf16_string_from_utf16(t16("hello 😀 there!"))
+    t16s_expect(&string4, false, false, false, 15, 14)
+    assert(t16_eq(t16s_view(&string4), t16("hello 😀 there!")))
+
+    let high = t16u([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xd800, 0x21])
+    let string5 = utf16_string_from_utf16(high)
+    t16s_expect(&string5, false, false, false, 8, 8)
+    assert(t16_eq(t16s_view(&string5), high))
+
+    let low = t16u([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xdc00, 0x21])
+    let string6 = utf16_string_from_utf16(low)
+    t16s_expect(&string6, false, false, false, 8, 8)
+    assert(t16_eq(t16s_view(&string6), low))
+
+test "from_utf32":
+    let string1 = utf16_string_from_utf32(t16_utf32([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x21]))
+    t16s_expect(&string1, true, false, true, 6, 6)
+    assert(t16s_ascii_view_is(&string1, "hello!"))
+
+    let string2 = utf16_string_from_utf32(t16_utf32([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x74, 0x68, 0x65, 0x72, 0x65, 0x21]))
+    t16s_expect(&string2, true, true, false, 12, 12)
+    assert(t16s_ascii_view_is(&string2, "hello there!"))
+
+    let string3 = utf16_string_from_utf32(t16_utf32([0x1f600]))
+    t16s_expect(&string3, false, false, false, 2, 1)
+    assert(t16_eq(t16s_view(&string3), t16("😀")))
+
+    let string4 = utf16_string_from_utf32(t16_utf32([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x1f600, 0x20, 0x74, 0x68, 0x65, 0x72, 0x65, 0x21]))
+    t16s_expect(&string4, false, false, false, 15, 14)
+    assert(t16_eq(t16s_view(&string4), t16("hello 😀 there!")))
+
+    let string5 = utf16_string_from_utf32(t16_utf32([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xd800, 0x21]))
+    t16s_expect(&string5, false, false, false, 8, 8)
+    assert(t16_eq(t16s_view(&string5), t16u([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xd800, 0x21])))
+
+    let string6 = utf16_string_from_utf32(t16_utf32([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xdc00, 0x21]))
+    t16s_expect(&string6, false, false, false, 8, 8)
+    assert(t16_eq(t16s_view(&string6), t16u([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xdc00, 0x21])))
+
+## Collects the code units code_point_to_utf16 produces.
+struct T16CodeUnits: Utf16CodeUnitCallback:
+    var units: u16[2]
+    var count: usize
+
+    mutating func call(code_unit: u16):
+        self.units[self.count] = code_unit
+        self.count += 1
+
+test "from_code_point":
+    with memory.heap:
+        var code_point: u32 = 0
+
+        while code_point < unicode_utils_first_supplementary_plane_code_point:
+            let string = utf16_string_from_code_point(code_point)
+            assert(utf16_string_base_length_in_code_units(&string.utf16_string_base) == 1)
+            assert(utf16_string_base_length_in_code_points(&string.utf16_string_base) == 1)
+            assert(utf16_string_base_code_point_at(&string.utf16_string_base, 0) == code_point)
+            assert((u32)utf16_string_base_code_unit_at(&string.utf16_string_base, 0) == code_point)
+            code_point += 1
+
+        while code_point < unicode_utils_first_supplementary_plane_code_point + 10_000:
+            let string = utf16_string_from_code_point(code_point)
+            assert(utf16_string_base_length_in_code_units(&string.utf16_string_base) == 2)
+            assert(utf16_string_base_length_in_code_points(&string.utf16_string_base) == 1)
+            assert(utf16_string_base_code_point_at(&string.utf16_string_base, 0) == code_point)
+
+            var units = T16CodeUnits()
+            discard(unicode_utils_code_point_to_utf16(code_point, &units))
+            assert(units.count == 2)
+            for i in 0..<units.count:
+                assert(utf16_string_base_code_unit_at(&string.utf16_string_base, i) == units.units[i])
+            code_point += 1
+
+test "formatted":
+    # Utf16String::formatted("{}", 42) and formatted("whf {} {} {}!", ...) are variadic
+    # templates the port does not have.
+    let string = utf16_string_number_i64(42)
+    t16s_expect(&string, true, false, true, 2, 2)
+    assert(t16s_eq(&string, t16("42")))
+
+    if not ak_core_is_ported:
+        return
+    let segments1: Utf16View[6] = [t16("abcdefghijklmnopqrstuvwxyz"), t16("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), t16("abcdefghijklmnopqrstuvwxyz"), t16("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), t16("abcdefghijklmnopqrstuvwxyz"), t16("ABCDEFGHIJKLMNOPQRSTUVWXYZ")]
+    let joined1 = utf16_string_join_utf16_view(t16("--"), segments1)
+    t16s_expect(&joined1, true, true, false, 166, 166)
+    assert(t16s_eq(&joined1, t16("abcdefghijklmnopqrstuvwxyz--ABCDEFGHIJKLMNOPQRSTUVWXYZ--abcdefghijklmnopqrstuvwxyz--ABCDEFGHIJKLMNOPQRSTUVWXYZ--abcdefghijklmnopqrstuvwxyz--ABCDEFGHIJKLMNOPQRSTUVWXYZ")))
+
+    let segments2: Utf16View[9] = [t16("abcdefghijklmnopqrstuvwxyz"), t16("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), t16u([0xd83d, 0xde00]), t16("abcdefghijklmnopqrstuvwxyz"), t16u([0xd800, 0xdc00]), t16("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), t16("🍕"), t16("abcdefghijklmnopqrstuvwxyz"), t16("ABCDEFGHIJKLMNOPQRSTUVWXYZ")]
+    let joined2 = utf16_string_join_utf16_view(t16("--"), segments2)
+    t16s_expect(&joined2, false, false, false, 178, 175)
+    assert(t16s_eq(&joined2, t16("abcdefghijklmnopqrstuvwxyz--ABCDEFGHIJKLMNOPQRSTUVWXYZ--😀--abcdefghijklmnopqrstuvwxyz--𐀀--ABCDEFGHIJKLMNOPQRSTUVWXYZ--🍕--abcdefghijklmnopqrstuvwxyz--ABCDEFGHIJKLMNOPQRSTUVWXYZ")))
+
+## `Utf16String::repeated(code_point, count)` has `length` code units and equals `expected`.
+func t16_repeated_is(code_point: u32, count: usize, length: usize, expected: str) -> bool:
+    let string = utf16_string_repeated(code_point, count)
+    return utf16_string_base_length_in_code_units(&string.utf16_string_base) == length and t16s_eq(&string, t16(expected))
+
+test "repeated":
+    let empty1 = utf16_string_repeated(0x61, 0)
+    assert(utf16_string_base_is_empty(&empty1.utf16_string_base))
+
+    if not ak_core_is_ported:
+        return
+    let empty2 = utf16_string_repeated(0x03c9, 0)
+    assert(utf16_string_base_is_empty(&empty2.utf16_string_base))
+    let empty3 = utf16_string_repeated(0x10300, 0)
+    assert(utf16_string_base_is_empty(&empty3.utf16_string_base))
+
+    assert(t16_repeated_is(0x61, 1, 1, "a"))
+    assert(t16_repeated_is(0x03c9, 1, 1, "ω"))
+    assert(t16_repeated_is(0x10300, 1, 2, "𐌀"))
+
+    assert(t16_repeated_is(0x61, 3, 3, "aaa"))
+    assert(t16_repeated_is(0x03c9, 3, 3, "ωωω"))
+    assert(t16_repeated_is(0x10300, 3, 6, "𐌀𐌀𐌀"))
+
+    assert(t16_repeated_is(0x61, 10, 10, "aaaaaaaaaa"))
+    assert(t16_repeated_is(0x03c9, 10, 10, "ωωωωωωωωωω"))
+    assert(t16_repeated_is(0x10300, 10, 20, "𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀"))
+
+test "from_string_builder":
+    if not ak_core_is_ported:
+        return
+    var builder = string_builder_new_mode(StringBuilderMode.utf16)
+    string_builder_append_code_point(&builder, 0x61)
+    string_builder_append_code_point(&builder, 0x62)
+    string_builder_append_code_point(&builder, 0x1f600)
+    string_builder_append_code_point(&builder, 0x10000)
+    string_builder_append_code_point(&builder, 0x1f355)
+    string_builder_append_code_point(&builder, 0x63)
+    string_builder_append_code_point(&builder, 0x64)
+
+    let string = string_builder_to_utf16_string(&builder)
+    assert(utf16_string_base_length_in_code_units(&string.utf16_string_base) == 10)
+    assert(utf16_string_base_length_in_code_points(&string.utf16_string_base) == 7)
+    assert(t16s_eq_str(&string, "ab😀𐀀🍕cd"))
+
+## `Utf16String::from_ipc_stream(FixedMemoryStream { bytes }, length, is_ascii)`.
+func t16_from_ipc_stream(bytes: const u8[], length_in_code_units: usize, is_ascii_: bool) -> Utf16String!:
+    var stream: FixedMemoryStream = ---
+    fixed_memory_stream_construct(&stream, bytes)
+    return try utf16_string_from_ipc_stream((Stream*)&stream, length_in_code_units, is_ascii_)
+
+## Whether from_ipc_stream fails.
+func t16_from_ipc_stream_fails(bytes: const u8[], length_in_code_units: usize, is_ascii_: bool) -> bool:
+    var failed = false
+    discard(t16_from_ipc_stream(bytes, length_in_code_units, is_ascii_) catch:
+        failed = true
+        recover utf16_string_new())
+    return failed
+
+## The bytes of a UTF-16 builder holding `view` (`builder.to_byte_buffer()`).
+func t16_utf16_bytes(view: Utf16View) -> ByteBuffer:
+    var builder = string_builder_new_mode(StringBuilderMode.utf16)
+    string_builder_append_utf16_view(&builder, view)
+    return string_builder_to_byte_buffer(&builder) else trap("MUST: to_byte_buffer")
+
+test "from_ipc_stream":
+    # FixedMemoryStream belongs to region r01.
+    if not ak_core_is_ported:
+        return
+    let string1 = t16_from_ipc_stream("abc".bytes, 3, true) else trap("from_ipc_stream")
+    t16s_expect(&string1, true, false, true, 3, 3)
+    assert(t16s_eq_str(&string1, "abc"))
+
+    let string2 = t16_from_ipc_stream("abcdefghijklmnopqrstuvwxyz".bytes, 26, true) else trap("from_ipc_stream")
+    t16s_expect(&string2, true, true, false, 26, 26)
+    assert(t16s_eq_str(&string2, "abcdefghijklmnopqrstuvwxyz"))
+
+    let data3 = t16("hello 😀 there!")
+    let buffer3 = t16_utf16_bytes(data3)
+    let string3 = t16_from_ipc_stream(byte_buffer_bytes_const(&buffer3), 15, false) else trap("from_ipc_stream")
+    t16s_expect(&string3, false, false, false, 15, 14)
+    assert(t16s_eq(&string3, data3))
+
+    assert(t16_from_ipc_stream_fails("abc".bytes, 4, true))
+
+    let buffer5 = t16_utf16_bytes(t16("😀"))
+    assert(t16_from_ipc_stream_fails(byte_buffer_bytes_const(&buffer5), 2, true))
+
+    let buffer6 = t16_utf16_bytes(data3)
+    assert(t16_from_ipc_stream_fails(byte_buffer_bytes_const(&buffer6), 15, true))

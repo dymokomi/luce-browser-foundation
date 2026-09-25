@@ -11,7 +11,7 @@
 
 ## AK::Detail::UTF16_FLAG (AK/Utf16View.h:32).
 # C++ initializer: NumericLimits < size_t > :: digits ( ) - 1
-pub var utf16_flag: u64
+pub let utf16_flag: usize = 63
 
 # mark: Utf16CodePointIterator ==================================================================
 

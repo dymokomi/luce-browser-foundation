@@ -1,0 +1,484 @@
+#==============================================================================================
+#
+#   utf8_view - Utf8View: code point iteration over UTF-8 bytes
+#
+#   DESCRIPTION:
+#       Port of AK/Utf8View.h (lines 1-329) and AK/Utf8View.cpp (lines 1-228), in the header's
+#       order with the .cpp bodies in place of their declarations.
+#
+#       Invalid UTF-8 decodes to U+FFFD one byte at a time. Utf8View's `mutable` cached length
+#       is not stored (views are values here): length() computes it, and m_length/m_have_length
+#       are left as they were initialized.
+#
+#==============================================================================================
+
+# mark: Utf8CodePointIterator ===================================================================
+
+## Ported from AK/Utf8View.h:242 AK::Utf8CodePointIterator::operator++.
+pub func utf8_code_point_iterator_inc(this: Utf8CodePointIterator*) -> Utf8CodePointIterator*:
+    assert(this.m_length > 0)
+    let ptr = this.m_ptr else trap("VERIFY: iterator without bytes")
+
+    # OPTIMIZATION: Fast path for ASCII characters.
+    if ptr[0] <= 0x7f:
+        this.m_ptr = ptr + 1
+        this.m_length -= 1
+        return this
+
+    let code_point_length_in_bytes = utf8_code_point_iterator_underlying_code_point_length_in_bytes(this)
+    if code_point_length_in_bytes > this.m_length:
+        # We don't have enough data for the next code point. Skip one character and try again.
+        # The rest of the code will output replacement characters as needed for any eventual
+        # extension bytes we might encounter afterwards.
+        this.m_ptr = ptr + 1
+        this.m_length -= 1
+        return this
+
+    this.m_ptr = ptr + code_point_length_in_bytes
+    this.m_length -= code_point_length_in_bytes
+    return this
+
+## Ported from AK/Utf8View.h:283 AK::Utf8CodePointIterator::operator*: the code point, or U+FFFD
+## for an invalid sequence.
+pub func utf8_code_point_iterator_deref(this: const Utf8CodePointIterator*) -> u32:
+    assert(this.m_length > 0)
+    let ptr = this.m_ptr else trap("VERIFY: iterator without bytes")
+
+    # OPTIMIZATION: Fast path for ASCII characters.
+    if ptr[0] <= 0x7f:
+        return ptr[0]
+
+    let leading = utf8_view_decode_leading_byte(ptr[0])
+    var code_point_value_so_far = leading.code_point_bits
+
+    if not leading.is_valid:
+        # The first byte of the code point doesn't make sense: output a replacement character
+        return 0xfffd
+
+    if leading.byte_length > this.m_length:
+        # There is not enough data left for the full code point: output a replacement character
+        return 0xfffd
+
+    for offset in 1..<leading.byte_length:
+        if ptr[offset] >> 6 != 2:
+            # One of the extension bytes of the code point doesn't make sense: output a
+            # replacement character
+            return 0xfffd
+
+        code_point_value_so_far <<= 6
+        code_point_value_so_far |= (u32)ptr[offset] & 63
+
+    if code_point_value_so_far > 0x10ffff:
+        return 0xfffd
+    return code_point_value_so_far
+
+## Ported from AK/Utf8View.cpp:153 AK::Utf8CodePointIterator::peek: the code point `offset` code
+## points ahead. NOTE: This returns none if the peek is at or past EOF.
+pub func utf8_code_point_iterator_peek(this: const Utf8CodePointIterator*, offset: usize = 0) -> u32?:
+    if offset == 0:
+        if utf8_code_point_iterator_done(this):
+            return none
+        return utf8_code_point_iterator_deref(this)
+
+    var new_iterator = *this
+    for _index in 0..<offset:
+        discard(utf8_code_point_iterator_inc(&new_iterator))
+        if utf8_code_point_iterator_done(&new_iterator):
+            return none
+    return utf8_code_point_iterator_deref(&new_iterator)
+
+## Ported from AK/Utf8View.h:37 AK::Utf8CodePointIterator::operator-: the byte distance.
+pub func utf8_code_point_iterator_sub(this: const Utf8CodePointIterator*, other: const Utf8CodePointIterator*) -> isize:
+    let this_address = (isize)(usize)(this.m_ptr else trap("VERIFY: iterator without bytes"))
+    let other_address = (isize)(usize)(other.m_ptr else trap("VERIFY: iterator without bytes"))
+    return this_address - other_address
+
+## `Utf8CodePointIterator::operator== = default`.
+pub func utf8_code_point_iterator_eq(this: const Utf8CodePointIterator*, other: const Utf8CodePointIterator*) -> bool:
+    return this.m_ptr == other.m_ptr and this.m_length == other.m_length
+
+## Ported from AK/Utf8View.h:42 AK::Utf8CodePointIterator::ptr.
+pub func utf8_code_point_iterator_ptr(this: const Utf8CodePointIterator*) -> const u8*?:
+    return this.m_ptr
+
+## Ported from AK/Utf8View.h:264 AK::Utf8CodePointIterator::underlying_code_point_length_in_bytes:
+## the bytes of the current sequence (1 for an invalid one). If the UTF-8 is not valid here,
+## these bytes may differ from the decoded character's re-encoded bytes (a U+FFFD of three).
+pub func utf8_code_point_iterator_underlying_code_point_length_in_bytes(this: const Utf8CodePointIterator*) -> usize:
+    assert(this.m_length > 0)
+    let ptr = this.m_ptr else trap("VERIFY: iterator without bytes")
+    let leading = utf8_view_decode_leading_byte(ptr[0])
+
+    # If any of these tests fail, we will output a replacement character for this byte and
+    # treat it as a code point of size 1.
+    if not leading.is_valid:
+        return 1
+
+    if leading.byte_length > this.m_length:
+        return 1
+
+    for offset in 1..<leading.byte_length:
+        if ptr[offset] >> 6 != 2:
+            return 1
+
+    return leading.byte_length
+
+## Ported from AK/Utf8View.h:51 AK::Utf8CodePointIterator::underlying_code_point_bytes.
+pub func utf8_code_point_iterator_underlying_code_point_bytes(this: const Utf8CodePointIterator*) -> const u8[]:
+    let ptr = this.m_ptr else trap("VERIFY: iterator without bytes")
+    return u8[]((u8*)ptr, utf8_code_point_iterator_underlying_code_point_length_in_bytes(this))
+
+## Ported from AK/Utf8View.h:52 AK::Utf8CodePointIterator::done.
+pub func utf8_code_point_iterator_done(this: const Utf8CodePointIterator*) -> bool:
+    return this.m_length == 0
+
+## Ported from AK/Utf8View.h:55 AK::Utf8CodePointIterator::Utf8CodePointIterator(u8 const*, size_t).
+pub func utf8_code_point_iterator_construct(this: Utf8CodePointIterator*, ptr: const u8*?, length: usize):
+    this.m_ptr = ptr
+    this.m_length = length
+
+# mark: Utf8View ================================================================================
+
+## Ported from AK/Utf8View.h:72 AK::Utf8View::Utf8View(StringView).
+pub func utf8_view_construct_string_view(this: Utf8View*, string: StringView):
+    this.m_string = string
+    this.m_length = 0
+    this.m_have_length = false
+
+## Ported from AK/Utf8View.h:77 AK::Utf8View::Utf8View(ByteString&).
+pub func utf8_view_construct_byte_string(this: Utf8View*, string: const ByteString*):
+    utf8_view_construct_string_view(this, byte_string_view(string))
+
+## Ported from AK/Utf8View.h:85 AK::Utf8View::as_string.
+pub func utf8_view_as_string(this: const Utf8View*) -> StringView:
+    return this.m_string
+
+## Ported from AK/Utf8View.h:87 AK::Utf8View::begin.
+pub func utf8_view_begin(this: const Utf8View*) -> Utf8CodePointIterator:
+    var it: Utf8CodePointIterator
+    utf8_code_point_iterator_construct(&it, utf8_view_begin_ptr(this), string_view_length(&this.m_string))
+    return it
+
+## Ported from AK/Utf8View.h:88 AK::Utf8View::end.
+pub func utf8_view_end(this: const Utf8View*) -> Utf8CodePointIterator:
+    var it: Utf8CodePointIterator
+    utf8_code_point_iterator_construct(&it, utf8_view_end_ptr(this), 0)
+    return it
+
+## Ported from AK/Utf8View.cpp:15 AK::Utf8View::iterator_at_byte_offset: the iterator at the
+## first code point starting at or after `byte_offset`.
+pub func utf8_view_iterator_at_byte_offset(this: const Utf8View*, byte_offset: usize) -> Utf8CodePointIterator:
+    var current_offset: usize = 0
+    var iterator = utf8_view_begin(this)
+    while not utf8_code_point_iterator_done(&iterator):
+        if current_offset >= byte_offset:
+            return iterator
+        current_offset += utf8_code_point_iterator_underlying_code_point_length_in_bytes(&iterator)
+        discard(utf8_code_point_iterator_inc(&iterator))
+    return utf8_view_end(this)
+
+## Ported from AK/Utf8View.cpp:26 AK::Utf8View::iterator_at_byte_offset_without_validation.
+pub func utf8_view_iterator_at_byte_offset_without_validation(this: const Utf8View*, byte_offset: usize) -> Utf8CodePointIterator:
+    var it: Utf8CodePointIterator
+    let begin = utf8_view_begin_ptr(this)
+    if let ptr = begin:
+        utf8_code_point_iterator_construct(&it, ptr + byte_offset, string_view_length(&this.m_string) - byte_offset)
+    return it
+
+## Ported from AK/Utf8View.h:93 AK::Utf8View::bytes.
+pub func utf8_view_bytes(this: const Utf8View*) -> const u8*?:
+    return utf8_view_begin_ptr(this)
+
+## Ported from AK/Utf8View.h:94 AK::Utf8View::byte_length.
+pub func utf8_view_byte_length(this: const Utf8View*) -> usize:
+    return string_view_length(&this.m_string)
+
+## Ported from AK/Utf8View.h:95 AK::Utf8View::length_in_code_units.
+pub func utf8_view_length_in_code_units(this: const Utf8View*) -> usize:
+    return utf8_view_byte_length(this)
+
+## Ported from AK/Utf8View.cpp:31 AK::Utf8View::code_point_offset_of: the code points before
+## `byte_offset`.
+pub func utf8_view_code_point_offset_of(this: const Utf8View*, byte_offset: usize) -> usize:
+    assert(byte_offset <= utf8_view_byte_length(this))
+
+    # Fast path: each code point is represented by a single byte.
+    if utf8_view_length(this) == utf8_view_byte_length(this):
+        return byte_offset
+
+    let limit = (usize)(utf8_view_begin_ptr(this) else trap("VERIFY: view without bytes")) + byte_offset
+    var code_point_offset: usize = 0
+    var it = utf8_view_begin(this)
+    while not utf8_code_point_iterator_done(&it):
+        discard(utf8_code_point_iterator_inc(&it))
+        if (usize)(it.m_ptr else trap("VERIFY: iterator without bytes")) > limit:
+            break
+        code_point_offset += 1
+    return code_point_offset
+
+## Ported from AK/Utf8View.h:99 AK::Utf8View::byte_offset_of(Utf8CodePointIterator const&).
+pub func utf8_view_byte_offset_of_utf8_code_point_iterator(this: const Utf8View*, it: Utf8CodePointIterator) -> usize:
+    let position = (usize)(it.m_ptr else trap("VERIFY: iterator without bytes"))
+    let begin = (usize)(utf8_view_begin_ptr(this) else trap("VERIFY: view without bytes"))
+    assert(position >= begin)
+    assert(position <= begin + utf8_view_byte_length(this))
+
+    return position - begin
+
+## Ported from AK/Utf8View.cpp:51 AK::Utf8View::byte_offset_of(size_t): the byte offset of a code
+## point offset.
+pub func utf8_view_byte_offset_of_usize(this: const Utf8View*, code_point_offset: usize) -> usize:
+    assert(code_point_offset <= utf8_view_length(this))
+
+    # Fast path: each code point is represented by a single byte.
+    if utf8_view_length(this) == utf8_view_byte_length(this):
+        return code_point_offset
+
+    var remaining = code_point_offset
+    var byte_offset: usize = 0
+    var it = utf8_view_begin(this)
+    while not utf8_code_point_iterator_done(&it):
+        if remaining == 0:
+            return byte_offset
+
+        byte_offset += utf8_code_point_iterator_underlying_code_point_length_in_bytes(&it)
+        remaining -= 1
+        discard(utf8_code_point_iterator_inc(&it))
+    return byte_offset
+
+## Ported from AK/Utf8View.h:109 AK::Utf8View::substring_view(size_t, size_t).
+pub func utf8_view_substring_view_usize(this: const Utf8View*, byte_offset: usize, byte_length: usize) -> Utf8View:
+    return Utf8View(m_string = string_view_substring_view_usize(&this.m_string, byte_offset, byte_length))
+
+## Ported from AK/Utf8View.h:110 AK::Utf8View::substring_view(size_t).
+pub func utf8_view_substring_view(this: const Utf8View*, byte_offset: usize) -> Utf8View:
+    return utf8_view_substring_view_usize(this, byte_offset, utf8_view_byte_length(this) - byte_offset)
+
+## Ported from AK/Utf8View.cpp:69 AK::Utf8View::unicode_substring_view(size_t, size_t).
+pub func utf8_view_unicode_substring_view_usize(this: const Utf8View*, code_point_offset: usize, code_point_length: usize) -> Utf8View:
+    if code_point_length == 0:
+        return Utf8View()
+
+    var code_point_index: usize = 0
+    var offset_in_bytes: usize = 0
+    var iterator = utf8_view_begin(this)
+    while not utf8_code_point_iterator_done(&iterator):
+        if code_point_index == code_point_offset:
+            offset_in_bytes = utf8_view_byte_offset_of_utf8_code_point_iterator(this, iterator)
+        if code_point_index == code_point_offset + code_point_length - 1:
+            discard(utf8_code_point_iterator_inc(&iterator))
+            let length_in_bytes = utf8_view_byte_offset_of_utf8_code_point_iterator(this, iterator) - offset_in_bytes
+            return utf8_view_substring_view_usize(this, offset_in_bytes, length_in_bytes)
+        code_point_index += 1
+        discard(utf8_code_point_iterator_inc(&iterator))
+
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from AK/Utf8View.h:112 AK::Utf8View::unicode_substring_view(size_t).
+pub func utf8_view_unicode_substring_view(this: const Utf8View*, code_point_offset: usize) -> Utf8View:
+    return utf8_view_unicode_substring_view_usize(this, code_point_offset, utf8_view_length(this) - code_point_offset)
+
+## Ported from AK/Utf8View.h:114 AK::Utf8View::is_empty.
+pub func utf8_view_is_empty(this: const Utf8View*) -> bool:
+    return string_view_is_empty(&this.m_string)
+
+## Ported from AK/Utf8View.cpp:109 AK::Utf8View::starts_with.
+pub func utf8_view_starts_with(this: const Utf8View*, start: const Utf8View*) -> bool:
+    if utf8_view_is_empty(start):
+        return true
+    if utf8_view_is_empty(this):
+        return false
+    if utf8_view_length(start) > utf8_view_length(this):
+        return false
+    if utf8_view_begin_ptr(this) == utf8_view_begin_ptr(start):
+        return true
+
+    var k = utf8_view_begin(this)
+    var l = utf8_view_begin(start)
+    while not utf8_code_point_iterator_done(&l):
+        if utf8_code_point_iterator_deref(&k) != utf8_code_point_iterator_deref(&l):
+            return false
+        discard(utf8_code_point_iterator_inc(&k))
+        discard(utf8_code_point_iterator_inc(&l))
+    return true
+
+## Ported from AK/Utf8View.cpp:126 AK::Utf8View::contains.
+pub func utf8_view_contains(this: const Utf8View*, needle: u32) -> bool:
+    if needle <= 0x7f:
+        # OPTIMIZATION: Fast path for ASCII
+        for code_point in string_view_bytes(&this.m_string):
+            if (u32)code_point == needle:
+                return true
+    else:
+        var it = utf8_view_begin(this)
+        while not utf8_code_point_iterator_done(&it):
+            if utf8_code_point_iterator_deref(&it) == needle:
+                return true
+            discard(utf8_code_point_iterator_inc(&it))
+
+    return false
+
+## Ported from AK/Utf8View.cpp:143 AK::Utf8View::contains_any_of.
+pub func utf8_view_contains_any_of(this: const Utf8View*, needles: const u32[]) -> bool:
+    var it = utf8_view_begin(this)
+    while not utf8_code_point_iterator_done(&it):
+        let code_point = utf8_code_point_iterator_deref(&it)
+        for needle in needles:
+            if code_point == needle:
+                return true
+        discard(utf8_code_point_iterator_inc(&it))
+
+    return false
+
+## Ported from AK/Utf8View.cpp:155 AK::Utf8View::trim: without leading and/or trailing code
+## points that occur in `characters`.
+pub func utf8_view_trim(this: const Utf8View*, characters: Utf8View, mode: TrimMode = TrimMode.both) -> Utf8View:
+    var substring_start: usize = 0
+    var substring_length = utf8_view_byte_length(this)
+
+    if mode == TrimMode.left or mode == TrimMode.both:
+        var code_point = utf8_view_begin(this)
+        while not utf8_code_point_iterator_done(&code_point):
+            if substring_length == 0:
+                return Utf8View()
+            if not utf8_view_contains(&characters, utf8_code_point_iterator_deref(&code_point)):
+                break
+            substring_start += utf8_code_point_iterator_underlying_code_point_length_in_bytes(&code_point)
+            substring_length -= utf8_code_point_iterator_underlying_code_point_length_in_bytes(&code_point)
+            discard(utf8_code_point_iterator_inc(&code_point))
+
+    if mode == TrimMode.right or mode == TrimMode.both:
+        var seen_whitespace_length: usize = 0
+        var code_point = utf8_view_begin(this)
+        while not utf8_code_point_iterator_done(&code_point):
+            if utf8_view_contains(&characters, utf8_code_point_iterator_deref(&code_point)):
+                seen_whitespace_length += utf8_code_point_iterator_underlying_code_point_length_in_bytes(&code_point)
+            else:
+                seen_whitespace_length = 0
+            discard(utf8_code_point_iterator_inc(&code_point))
+        if seen_whitespace_length >= substring_length:
+            return Utf8View()
+        substring_length -= seen_whitespace_length
+
+    return utf8_view_substring_view_usize(this, substring_start, substring_length)
+
+## Ported from AK/Utf8View.h:121 AK::Utf8View::iterator_offset.
+pub func utf8_view_iterator_offset(this: const Utf8View*, it: Utf8CodePointIterator) -> usize:
+    return utf8_view_byte_offset_of_utf8_code_point_iterator(this, it)
+
+## Ported from AK/Utf8View.h:126 AK::Utf8View::length: the number of code points (computed each
+## time; the C++ caches it in `mutable` fields).
+pub func utf8_view_length(this: const Utf8View*) -> usize:
+    if this.m_have_length:
+        return this.m_length
+    return utf8_view_calculate_length(this)
+
+## Ported from AK/Utf8View.h:135 AK::Utf8View::validate: whether the bytes are UTF-8 (by default
+## allowing encoded lonely surrogates, WTF-8).
+pub func utf8_view_validate_allow_lonely_surrogates(this: const Utf8View*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> bool:
+    var valid_bytes: usize = 0
+    return utf8_view_validate_usize(this, &valid_bytes, allow_lonely_surrogates)
+
+## Ported from AK/Utf8View.cpp:178 AK::Utf8View::validate(size_t&, AllowLonelySurrogates):
+## `valid_bytes` receives the length of the valid prefix.
+pub func utf8_view_validate_usize(this: const Utf8View*, valid_bytes: usize*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> bool:
+    let result = simdutf_validate_utf8_with_errors(string_view_bytes(&this.m_string))
+    *valid_bytes = result.count
+
+    if result.error == SimdutfErrorCode.surrogate and allow_lonely_surrogates == AllowLonelySurrogates.yes:
+        *valid_bytes += 3  # All surrogates have a UTF-8 byte length of 3.
+
+        var substring_valid_bytes: usize = 0
+        let rest = utf8_view_substring_view(this, *valid_bytes)
+        let is_valid = utf8_view_validate_usize(&rest, &substring_valid_bytes, allow_lonely_surrogates)
+
+        *valid_bytes += substring_valid_bytes
+        return is_valid
+
+    return result.error == SimdutfErrorCode.success
+
+## Ported from AK/Utf8View.h:143 AK::Utf8View::for_each_split_view: calls back with the parts
+## between code points that `splitter` matches.
+pub func utf8_view_for_each_split_view[P: CodePointPredicate, TCallback: Utf8ViewCallback](this: const Utf8View*, splitter: const P*, split_behavior: SplitBehavior, callback: TCallback*):
+    let keep_empty = has_flag(split_behavior, SplitBehavior.keep_empty)
+    let keep_trailing_separator = has_flag(split_behavior, SplitBehavior.keep_trailing_separator)
+
+    var start_offset: usize = 0
+    var offset: usize = 0
+
+    var iterator = utf8_view_begin(this)
+    while not utf8_code_point_iterator_done(&iterator):
+        if splitter.matches(utf8_code_point_iterator_deref(&iterator)):
+            if keep_trailing_separator:
+                offset += 1
+
+            utf8_view_for_each_split_view_run_callback(this, splitter, callback, start_offset, offset, keep_empty, keep_trailing_separator)
+
+            if not keep_trailing_separator:
+                offset += 1
+
+            start_offset = offset
+            discard(utf8_code_point_iterator_inc(&iterator))
+            continue
+
+        offset += 1
+        discard(utf8_code_point_iterator_inc(&iterator))
+    utf8_view_for_each_split_view_run_callback(this, splitter, callback, start_offset, offset, keep_empty, keep_trailing_separator)
+
+## The `run_callback` lambda of Utf8View::for_each_split_view.
+func utf8_view_for_each_split_view_run_callback[P: CodePointPredicate, TCallback: Utf8ViewCallback](this: const Utf8View*, splitter: const P*, callback: TCallback*, start_offset: usize, offset: usize, keep_empty: bool, keep_trailing_separator: bool):
+    let length = offset - start_offset
+
+    if length == 0 and not keep_empty:
+        return
+
+    let substring = utf8_view_unicode_substring_view_usize(this, start_offset, length)
+
+    # Reject splitter-only entries if we're not keeping empty results
+    if keep_trailing_separator and not keep_empty and length == 1:
+        let first = utf8_view_begin(&substring)
+        if splitter.matches(utf8_code_point_iterator_deref(&first)):
+            return
+
+    callback.call(substring)
+
+## Ported from AK/Utf8View.h:190 AK::Utf8View::begin_ptr.
+func utf8_view_begin_ptr(this: const Utf8View*) -> const u8*?:
+    return string_view_characters_without_null_termination(&this.m_string)
+
+## Ported from AK/Utf8View.h:191 AK::Utf8View::end_ptr.
+func utf8_view_end_ptr(this: const Utf8View*) -> const u8*?:
+    let begin = utf8_view_begin_ptr(this) else return none
+    return begin + string_view_length(&this.m_string)
+
+## Ported from AK/Utf8View.cpp:89 AK::Utf8View::calculate_length.
+func utf8_view_calculate_length(this: const Utf8View*) -> usize:
+    # FIXME: simdutf's code point length method assumes valid UTF-8, whereas Utf8View uses U+FFFD
+    #        as a replacement for invalid code points. If we change Utf8View to only accept valid
+    #        encodings as an invariant, we can remove this branch.
+    if utf8_view_validate_allow_lonely_surrogates(this):
+        return simdutf_count_utf8(string_view_bytes(&this.m_string))
+
+    var length: usize = 0
+
+    let bytes = string_view_bytes(&this.m_string)
+    var i: usize = 0
+    while i < bytes.length:
+        let leading = utf8_view_decode_leading_byte(bytes[i])
+
+        # Similar to Utf8CodePointIterator::operator++, if the byte is invalid, try the next byte.
+        i += leading.byte_length if leading.is_valid else 1
+        length += 1
+
+    return length
+
+## Ported from AK/Utf8View.h:216 AK::Utf8View::decode_leading_byte: the sequence length and
+## payload bits a leading byte announces, or not valid.
+func utf8_view_decode_leading_byte(byte: u8) -> Utf8ViewLeadingByte:
+    for data in utf8_view_utf8_encoded_byte_data:
+        if (byte & data.encoding_mask) != data.encoding_bits:
+            continue
+
+        return Utf8ViewLeadingByte(byte_length = data.byte_length, code_point_bits = (u32)(byte & ~data.encoding_mask), is_valid = true)
+
+    return Utf8ViewLeadingByte(byte_length = 0, code_point_bits = 0, is_valid = false)

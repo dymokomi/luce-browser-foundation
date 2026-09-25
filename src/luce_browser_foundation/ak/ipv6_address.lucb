@@ -1,0 +1,295 @@
+#==============================================================================================
+#
+#   ipv6_address - IPv6Address: an IPv6 address as sixteen network-order bytes
+#
+#   DESCRIPTION:
+#       Port of AK/IPv6Address.h (lines 1-311). The `formatted` / `appendff("{:x}")` of
+#       to_string write the same text directly (AK's formatter belongs to region r03).
+#
+#==============================================================================================
+
+# mark: Construction ============================================================================
+
+## Ported from AK/IPv6Address.h:28 AK::IPv6Address::IPv6Address(in6_addr_t const&).
+pub func i_pv6_address_construct_array_u8(this: IPv6Address*, data: u8[16]):
+    for i in 0..<16:
+        this.m_data[i] = data[i]
+
+## Ported from AK/IPv6Address.h:34 AK::IPv6Address::IPv6Address(Array<u8, 16> const&).
+pub func i_pv6_address_construct_array_u8_2(this: IPv6Address*, data: u8[16]):
+    for i in 0..<16:
+        this.m_data[i] = data[i]
+
+## Ported from AK/IPv6Address.h:40 AK::IPv6Address::IPv6Address(Array<u16, 8> const&): eight
+## pieces, most significant byte first.
+pub func i_pv6_address_construct_array_u16(this: IPv6Address*, data: u16[8]):
+    for i in 0..<8:
+        let piece = data[i]
+        this.m_data[2 * i] = (u8)(piece >> 8)
+        this.m_data[(2 * i) + 1] = (u8)(piece & 0xff)
+
+## Ported from AK/IPv6Address.h:52 AK::IPv6Address::IPv6Address(IPv4Address const&): the IPv4
+## mapped IPv6 address.
+pub func i_pv6_address_construct_i_pv4_address(this: IPv6Address*, ipv4_address: IPv4Address):
+    # IPv4 mapped IPv6 address
+    this.m_data[10] = 0xff
+    this.m_data[11] = 0xff
+    this.m_data[12] = i_pv4_address_at(&ipv4_address, 0)
+    this.m_data[13] = i_pv4_address_at(&ipv4_address, 1)
+    this.m_data[14] = i_pv4_address_at(&ipv4_address, 2)
+    this.m_data[15] = i_pv4_address_at(&ipv4_address, 3)
+
+## Ported from AK/IPv6Address.h:63 AK::IPv6Address::operator[]: piece `i`.
+pub func i_pv6_address_at(this: const IPv6Address*, i: usize) -> u16:
+    return i_pv6_address_piece(this, i)
+
+# mark: Text ====================================================================================
+
+## `builder.try_appendff("{:x}", value)`: lowercase hex digits without leading zeros.
+func i_pv6_address_append_hex(builder: StringBuilder*, value: u16) -> !:
+    let hex_digits = "0123456789abcdef".bytes
+    var digits: u8[4]
+    var count: usize = 0
+    var remaining = value
+    while true:
+        digits[count] = hex_digits[remaining & 0xf]
+        count += 1
+        remaining >>= 4
+        if remaining == 0:
+            break
+    while count > 0:
+        count -= 1
+        try string_builder_try_append_u8(builder, digits[count])
+
+## Ported from AK/IPv6Address.h:65 AK::IPv6Address::to_string: the RFC 5952 text, with the
+## longest run of zero pieces compressed to "::".
+pub func i_pv6_address_to_string(this: const IPv6Address*) -> String!:
+    if i_pv6_address_is_zero(this):
+        return string_from_str("::")
+
+    var builder = string_builder_new()
+
+    if i_pv6_address_is_ipv4_mapped(this):
+        try string_builder_try_append_string_view(&builder, sv("::ffff:"))
+        let mapped = i_pv4_address_from_octets(this.m_data[12], this.m_data[13], this.m_data[14], this.m_data[15])
+        let dotted = try i_pv4_address_to_string(&mapped)
+        try string_builder_try_append_string_view(&builder, string_bytes_as_string_view(&dotted))
+        return try string_builder_to_string(&builder)
+
+    # Find the start of the longest span of 0 values
+    var longest_zero_span_start: i32? = none
+    var zero_span_length: i32 = 0
+    var i: i32 = 0
+    while i < 8:
+        if i_pv6_address_piece(this, (usize)i) != 0:
+            i += 1
+            continue
+        var contiguous_zeros: i32 = 1
+        for j in (i + 1)..<8:
+            if i_pv6_address_piece(this, (usize)j) != 0:
+                break
+            contiguous_zeros += 1
+
+        var replace = true
+        if let start = longest_zero_span_start:
+            replace = start < contiguous_zeros
+        if replace:
+            longest_zero_span_start = i
+            zero_span_length = contiguous_zeros
+
+        i += contiguous_zeros
+
+    i = 0
+    while i < 8:
+        if let start = longest_zero_span_start:
+            if start == i:
+                if start + zero_span_length >= 8:
+                    try string_builder_try_append_string_view(&builder, sv("::"))
+                else:
+                    try string_builder_try_append_u8(&builder, ':')
+                i += zero_span_length
+                continue
+
+        if i != 0:
+            try string_builder_try_append_u8(&builder, ':')
+        try i_pv6_address_append_hex(&builder, i_pv6_address_piece(this, (usize)i))
+
+        i += 1
+    return try string_builder_to_string(&builder)
+
+## The element at `index` of a vector of parts.
+func i_pv6_address_part_at(parts: const Vector[StringView]*, index: usize) -> StringView:
+    let buffer = parts.m_outline_buffer else trap("VERIFY: empty parts")
+    return buffer[index]
+
+## The `is_ipv4_prefix` lambda of IPv6Address::from_string: whether the parts before the last
+## are an IPv4-mapped prefix (zeros, then ffff).
+func i_pv6_address_is_ipv4_prefix(parts: const Vector[StringView]*) -> bool:
+    let size = vector_size(parts)
+    let separator = i_pv6_address_part_at(parts, size - 2)
+    let separator_part = string_view_trim_whitespace(&separator)
+    if string_view_is_empty(&separator_part):
+        return false
+    let separator_value = parse_hexadecimal_number_string_view_u32(separator_part) else return false
+    if separator_value != 0xffff:
+        return false
+    var found_compressed = false
+    var i: usize = 0
+    while i < size - 2:
+        let raw_part = i_pv6_address_part_at(parts, i)
+        let part = string_view_trim_whitespace(&raw_part)
+        if string_view_is_empty(&part):
+            if found_compressed:
+                return false
+            let is_leading = i == 0
+            var empty_parts: i32 = 1
+
+            for j in (i + 1)..<(size - 2):
+                let next_part = i_pv6_address_part_at(parts, j)
+                let trimmed = string_view_trim_whitespace(&next_part)
+                if not string_view_is_empty(&trimmed):
+                    break
+                empty_parts += 1
+
+            if is_leading:
+                if empty_parts != 2:
+                    return false
+            elif empty_parts != 1:
+                return false
+            found_compressed = true
+            i += (usize)empty_parts
+            continue
+        let value = parse_hexadecimal_number_string_view_u32(part) else return false
+        if value != 0:
+            return false
+        i += 1
+    return true
+
+## Ported from AK/IPv6Address.h:120 AK::IPv6Address::from_string: parses the textual forms,
+## including "::" compression, an IPv4-mapped suffix and URI brackets.
+pub func i_pv6_address_from_string(string: StringView) -> IPv6Address?:
+    # NOTE: This supports URI syntax (square brackets) for IPv6 addresses.
+    #       See: https://datatracker.ietf.org/doc/html/rfc3986#section-3.2.2
+    var input = string
+    let starts_with_bracket = string_view_starts_with_u8(&input, '[')
+    let ends_with_bracket = string_view_ends_with_u8(&input, ']')
+
+    if starts_with_bracket or ends_with_bracket:
+        if not starts_with_bracket or not ends_with_bracket:
+            return none
+
+        input = string_view_substring_view_usize(&input, 1, string_view_length(&input) - 2)
+
+    let parts = string_view_split_view_u8(&input, ':', SplitBehavior.keep_empty)
+    let size = vector_size(&parts)
+    if size == 0:
+        return none
+    if size > 9:
+        # We may have 9 parts if the address is compressed at the beginning or end, e.g. by
+        # substituting the leading or trailing 0 with a : character. Otherwise, the maximum
+        # number of parts is 8, which we validate when expanding the compression.
+        return none
+    let last_part = i_pv6_address_part_at(&parts, size - 1)
+    if size >= 4 and string_view_contains_u8(&last_part, '.'):
+        # Check if this may be an ipv4 mapped address
+        if i_pv6_address_is_ipv4_prefix(&parts):
+            let ipv4_address = i_pv4_address_from_string(last_part) else return none
+            var mapped = IPv6Address()
+            i_pv6_address_construct_i_pv4_address(&mapped, ipv4_address)
+            return mapped
+
+    var addr: u8[16]
+    var piece: i32 = 0
+    var have_pieces: i32 = 0
+    var found_compressed = false
+    var i: usize = 0
+    while i < size:
+        let raw_part = i_pv6_address_part_at(&parts, i)
+        let trimmed_part = string_view_trim_whitespace(&raw_part)
+        if string_view_is_empty(&trimmed_part):
+            if found_compressed:
+                return none
+            var empty_parts: i32 = 1
+            let is_leading = i == 0
+            var is_trailing = false
+            for j in (i + 1)..<size:
+                let next_part = i_pv6_address_part_at(&parts, j)
+                let trimmed = string_view_trim_whitespace(&next_part)
+                if not string_view_is_empty(&trimmed):
+                    break
+                empty_parts += 1
+                if j == size - 1:
+                    is_trailing = true
+            if is_leading and is_trailing:
+                if empty_parts > 3:
+                    return none
+                return IPv6Address()
+            if is_leading or is_trailing:
+                if empty_parts > 2:
+                    return none
+            elif empty_parts > 1:
+                return none
+
+            let remaining_parts = (i32)size - empty_parts - have_pieces
+            found_compressed = true
+            piece = 8 - remaining_parts
+            assert(piece >= 0)
+            i += (usize)empty_parts
+            continue
+        i += 1
+        let part = parse_hexadecimal_number_string_view_u32(trimmed_part) else return none
+        if part > 0xffff:
+            return none
+
+        have_pieces += 1
+        if have_pieces > 8:
+            return none
+
+        assert(piece < 8)
+        addr[(usize)piece * sizeof(u16)] = (u8)(part >> 8)
+        addr[(usize)piece * sizeof(u16) + 1] = (u8)part
+        piece += 1
+
+    var address = IPv6Address()
+    i_pv6_address_construct_array_u8(&address, addr)
+    return address
+
+# mark: Queries =================================================================================
+
+## Ported from AK/IPv6Address.h:251 AK::IPv6Address::to_in6_addr_t.
+pub func i_pv6_address_to_in6_addr_t(this: const IPv6Address*) -> u8[16]:
+    return this.m_data
+
+## Ported from AK/IPv6Address.h:256 AK::IPv6Address::is_zero.
+pub func i_pv6_address_is_zero(this: const IPv6Address*) -> bool:
+    for d in this.m_data:
+        if d != 0:
+            return false
+    return true
+
+## Ported from AK/IPv6Address.h:265 AK::IPv6Address::is_ipv4_mapped.
+pub func i_pv6_address_is_ipv4_mapped(this: const IPv6Address*) -> bool:
+    for i in 0..<10:
+        if this.m_data[i] != 0:
+            return false
+    if this.m_data[10] != 0xff or this.m_data[11] != 0xff:
+        return false
+    return true
+
+## Ported from AK/IPv6Address.h:274 AK::IPv6Address::ipv4_mapped_address.
+pub func i_pv6_address_ipv4_mapped_address(this: const IPv6Address*) -> IPv4Address?:
+    if i_pv6_address_is_ipv4_mapped(this):
+        return i_pv4_address_from_octets(this.m_data[12], this.m_data[13], this.m_data[14], this.m_data[15])
+    return none
+
+## Ported from AK/IPv6Address.h:282 AK::IPv6Address::loopback: ::1.
+## https://datatracker.ietf.org/doc/html/rfc4291#section-2.5.3
+pub func i_pv6_address_loopback() -> IPv6Address:
+    var address = IPv6Address()
+    i_pv6_address_construct_array_u8(&address, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+    return address
+
+## Ported from AK/IPv6Address.h:288 AK::IPv6Address::piece.
+func i_pv6_address_piece(this: const IPv6Address*, i: usize) -> u16:
+    assert(i < 8)
+    return ((u16)this.m_data[i * sizeof(u16)] << 8) | (u16)this.m_data[i * sizeof(u16) + 1]

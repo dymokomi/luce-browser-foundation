@@ -1,0 +1,428 @@
+#==============================================================================================
+#
+#   string_utils - StringUtils: matching, searching, trimming and replacing over StringViews
+#
+#   DESCRIPTION:
+#       Port of AK/StringUtils.h (lines 1-119) and AK/StringUtils.cpp (lines 1-438). The
+#       AK_ENUM_BITWISE_OPERATORS(SplitBehavior) instantiations come first, as in the header.
+#
+#==============================================================================================
+
+# mark: SplitBehavior operators =================================================================
+
+## Ported from AK/StringUtils.h:57 AK::operator&= (AK_ENUM_BITWISE_OPERATORS(SplitBehavior)).
+pub func and_assign(lhs: SplitBehavior*, rhs: SplitBehavior) -> SplitBehavior*:
+    *lhs = *lhs & rhs
+    return lhs
+
+## Ported from AK/StringUtils.h:57 AK::operator& (AK_ENUM_BITWISE_OPERATORS(SplitBehavior)).
+pub func bit_and(lhs: SplitBehavior, rhs: SplitBehavior) -> SplitBehavior:
+    return lhs & rhs
+
+## Ported from AK/StringUtils.h:57 AK::operator~ (AK_ENUM_BITWISE_OPERATORS(SplitBehavior)).
+pub func bit_not(rhs: SplitBehavior) -> SplitBehavior:
+    return ~rhs
+
+## Ported from AK/StringUtils.h:57 AK::operator| (AK_ENUM_BITWISE_OPERATORS(SplitBehavior)).
+pub func bit_or(lhs: SplitBehavior, rhs: SplitBehavior) -> SplitBehavior:
+    return lhs | rhs
+
+## Ported from AK/StringUtils.h:57 AK::operator^ (AK_ENUM_BITWISE_OPERATORS(SplitBehavior)).
+pub func bit_xor(lhs: SplitBehavior, rhs: SplitBehavior) -> SplitBehavior:
+    return lhs ^ rhs
+
+## Ported from AK/StringUtils.h:57 AK::has_any_flag (AK_ENUM_BITWISE_OPERATORS(SplitBehavior)).
+pub func has_any_flag(value: SplitBehavior, mask: SplitBehavior) -> bool:
+    return (u32)(value & mask) != 0
+
+## Ported from AK/StringUtils.h:57 AK::has_flag (AK_ENUM_BITWISE_OPERATORS(SplitBehavior)).
+pub func has_flag(value: SplitBehavior, mask: SplitBehavior) -> bool:
+    return (value & mask) == mask
+
+## Ported from AK/StringUtils.h:57 AK::operator|= (AK_ENUM_BITWISE_OPERATORS(SplitBehavior)).
+pub func or_assign(lhs: SplitBehavior*, rhs: SplitBehavior) -> SplitBehavior*:
+    *lhs = *lhs | rhs
+    return lhs
+
+## Ported from AK/StringUtils.h:57 AK::operator^= (AK_ENUM_BITWISE_OPERATORS(SplitBehavior)).
+pub func xor_assign(lhs: SplitBehavior*, rhs: SplitBehavior) -> SplitBehavior*:
+    *lhs = *lhs ^ rhs
+    return lhs
+
+## Ported from AK/StringUtils.h:70 AK::MaskSpan::operator==.
+pub func mask_span_eq(this: const MaskSpan*, other: MaskSpan) -> bool:
+    return this.start == other.start and this.length == other.length
+
+# mark: Matching ================================================================================
+
+## The `record_span` lambda of StringUtils::matches.
+func string_utils_matches_record_span(match_spans: Vector[MaskSpan]*?, start: usize, length: usize):
+    if let spans = match_spans:
+        vector_append_t(spans, MaskSpan(start = start, length = length))
+
+## Ported from AK/StringUtils.cpp:25 AK::StringUtils::matches: glob matching with `*`, `?` and
+## `\` escapes, optionally recording the span each mask character matched.
+pub func string_utils_matches(str_: StringView, mask: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_insensitive, match_spans: Vector[MaskSpan]*? = none) -> bool:
+    if string_view_equals(&mask, "*"):
+        string_utils_matches_record_span(match_spans, 0, string_view_length(&str_))
+        return true
+
+    # The C++ walks char pointers; these are offsets from the view starts.
+    let string_bytes = string_view_bytes(&str_)
+    let mask_bytes = string_view_bytes(&mask)
+    var string_ptr: usize = 0
+    let string_end = string_bytes.length
+    var mask_ptr: usize = 0
+    let mask_end = mask_bytes.length
+
+    while string_ptr < string_end and mask_ptr < mask_end:
+        let string_start_ptr = string_ptr
+        var exact = false
+        match mask_bytes[mask_ptr]:
+            '*':
+                if mask_ptr == mask_end - 1:
+                    string_utils_matches_record_span(match_spans, string_ptr, string_end - string_ptr)
+                    return true
+                while string_ptr < string_end and not string_utils_matches(string_view_substring_view(&str_, string_ptr), string_view_substring_view(&mask, mask_ptr + 1), case_sensitivity):
+                    string_ptr += 1
+                string_utils_matches_record_span(match_spans, string_start_ptr, string_ptr - string_start_ptr)
+                string_ptr = string_ptr -% 1
+            '?':
+                string_utils_matches_record_span(match_spans, string_ptr, 1)
+            '\\':
+                # if backslash is last character in mask, just treat it as an exact match
+                # otherwise use it as escape for next character
+                if mask_ptr + 1 < mask_end:
+                    mask_ptr += 1
+                exact = true  # [[fallthrough]]
+            _:
+                exact = true
+        if exact:
+            let p = mask_bytes[mask_ptr]
+            let ch = string_bytes[string_ptr]
+            if (p != ch) if case_sensitivity == CaseSensitivity.case_sensitive else (to_ascii_lowercase(p) != to_ascii_lowercase(ch)):
+                return false
+        string_ptr = string_ptr +% 1
+        mask_ptr += 1
+
+    if string_ptr == string_end:
+        # Allow ending '*' to contain nothing.
+        while mask_ptr != mask_end and mask_bytes[mask_ptr] == '*':
+            string_utils_matches_record_span(match_spans, string_ptr, 0)
+            mask_ptr += 1
+
+    return string_ptr == string_end and mask_ptr == mask_end
+
+## Ported from AK/StringUtils.cpp:87 AK::StringUtils::equals_ignoring_ascii_case.
+pub func string_utils_equals_ignoring_ascii_case(a: StringView, b: StringView) -> bool:
+    if string_view_length(&a) != string_view_length(&b):
+        return false
+    let a_characters = string_view_bytes(&a)
+    let b_characters = string_view_bytes(&b)
+    for i in 0..<string_view_length(&a):
+        if to_ascii_lowercase(a_characters[i]) != to_ascii_lowercase(b_characters[i]):
+            return false
+    return true
+
+## Ported from AK/StringUtils.cpp:98 AK::StringUtils::ends_with.
+pub func string_utils_ends_with(str_: StringView, end: StringView, case_sensitivity: CaseSensitivity) -> bool:
+    if string_view_is_empty(&end):
+        return true
+    if string_view_is_empty(&str_):
+        return false
+    if string_view_length(&end) > string_view_length(&str_):
+        return false
+
+    let str_chars = string_view_bytes(&str_)
+    let end_chars = string_view_bytes(&end)
+
+    if case_sensitivity == CaseSensitivity.case_sensitive:
+        return compare_bytes(str_chars[(str_chars.length - end_chars.length)..], end_chars) == 0
+
+    var si = str_chars.length - end_chars.length
+    for ei in 0..<end_chars.length:
+        if to_ascii_lowercase(str_chars[si]) != to_ascii_lowercase(end_chars[ei]):
+            return false
+        si += 1
+    return true
+
+## Ported from AK/StringUtils.cpp:121 AK::StringUtils::starts_with.
+pub func string_utils_starts_with(str_: StringView, start: StringView, case_sensitivity: CaseSensitivity) -> bool:
+    if string_view_is_empty(&start):
+        return true
+    if string_view_is_empty(&str_):
+        return false
+    if string_view_length(&start) > string_view_length(&str_):
+        return false
+    if string_view_characters_without_null_termination(&str_) == string_view_characters_without_null_termination(&start):
+        return true
+
+    let str_chars = string_view_bytes(&str_)
+    let start_chars = string_view_bytes(&start)
+
+    if case_sensitivity == CaseSensitivity.case_sensitive:
+        return compare_bytes(str_chars, start_chars) == 0
+
+    for starti in 0..<start_chars.length:
+        if to_ascii_lowercase(str_chars[starti]) != to_ascii_lowercase(start_chars[starti]):
+            return false
+    return true
+
+## Ported from AK/StringUtils.cpp:146 AK::StringUtils::contains.
+pub func string_utils_contains(str_: StringView, needle: StringView, case_sensitivity: CaseSensitivity) -> bool:
+    if string_view_is_empty(&str_) or string_view_length(&needle) > string_view_length(&str_):
+        return false
+    if string_view_is_empty(&needle):
+        return true
+    let str_chars = string_view_bytes(&str_)
+    let needle_chars = string_view_bytes(&needle)
+    if case_sensitivity == CaseSensitivity.case_sensitive:
+        return memmem_optional(str_chars, needle_chars) != none
+
+    let needle_first = to_ascii_lowercase(needle_chars[0])
+    var si: usize = 0
+    while si < str_chars.length:
+        if to_ascii_lowercase(str_chars[si]) != needle_first:
+            si += 1
+            continue
+        var ni: usize = 0
+        while si + ni < str_chars.length:
+            if to_ascii_lowercase(str_chars[si + ni]) != to_ascii_lowercase(needle_chars[ni]):
+                if ni > 0:
+                    si += ni - 1
+                break
+            if ni + 1 == needle_chars.length:
+                return true
+            ni += 1
+        si += 1
+    return false
+
+## Ported from AK/StringUtils.cpp:174 AK::StringUtils::is_whitespace.
+pub func string_utils_is_whitespace(str_: StringView) -> bool:
+    for ch in string_view_bytes(&str_):
+        if not is_ascii_space(ch):
+            return false
+    return true
+
+## Ported from AK/StringUtils.cpp:179 AK::StringUtils::trim.
+pub func string_utils_trim(str_: StringView, characters: StringView, mode: TrimMode) -> StringView:
+    var substring_start: usize = 0
+    var substring_length = string_view_length(&str_)
+    let str_chars = string_view_bytes(&str_)
+
+    if mode == TrimMode.left or mode == TrimMode.both:
+        for i in 0..<str_chars.length:
+            if substring_length == 0:
+                return sv("")
+            if not string_view_contains_u8(&characters, str_chars[i]):
+                break
+            substring_start += 1
+            substring_length -= 1
+
+    if mode == TrimMode.right or mode == TrimMode.both:
+        var i = str_chars.length
+        while i > 0:
+            if substring_length == 0:
+                return sv("")
+            if not string_view_contains_u8(&characters, str_chars[i - 1]):
+                break
+            substring_length -= 1
+            i -= 1
+
+    return string_view_substring_view_usize(&str_, substring_start, substring_length)
+
+## Ported from AK/StringUtils.cpp:208 AK::StringUtils::trim_whitespace.
+pub func string_utils_trim_whitespace(str_: StringView, mode: TrimMode) -> StringView:
+    return string_utils_trim(str_, sv(" \n\t\u{b}\u{c}\r"), mode)
+
+# mark: Searching ===============================================================================
+
+## Ported from AK/StringUtils.cpp:213 AK::StringUtils::find(StringView, char, size_t).
+pub func string_utils_find_u8(haystack: StringView, needle: u8, start_offset: usize = 0) -> usize?:
+    if start_offset >= string_view_length(&haystack):
+        return none
+
+    let result = simdutf_find(string_view_bytes(&haystack)[start_offset..], needle) else return none
+    return result + start_offset
+
+## Ported from AK/StringUtils.cpp:228 AK::StringUtils::find(StringView, StringView, size_t).
+pub func string_utils_find_string_view(haystack: StringView, needle: StringView, start: usize = 0) -> usize?:
+    if start > string_view_length(&haystack):
+        return none
+    let index = memmem_optional(string_view_bytes(&haystack)[start..], string_view_bytes(&needle)) else return none
+    return index + start
+
+## Ported from AK/StringUtils.cpp:238 AK::StringUtils::find_last(StringView, char).
+pub func string_utils_find_last_u8(haystack: StringView, needle: u8) -> usize?:
+    let characters = string_view_bytes(&haystack)
+    var i = characters.length
+    while i > 0:
+        if characters[i - 1] == needle:
+            return i - 1
+        i -= 1
+    return none
+
+## Ported from AK/StringUtils.cpp:247 AK::StringUtils::find_last(StringView, StringView).
+pub func string_utils_find_last_string_view(haystack: StringView, needle: StringView) -> usize?:
+    if string_view_length(&needle) > string_view_length(&haystack):
+        return none
+
+    var i = string_view_length(&haystack) - string_view_length(&needle)
+    while true:
+        let candidate = string_view_substring_view_usize(&haystack, i, string_view_length(&needle))
+        if string_view_eq_string_view(&candidate, needle):
+            return i
+
+        if i == 0:
+            break
+        i -= 1
+
+    return none
+
+## Ported from AK/StringUtils.cpp:263 AK::StringUtils::find_last_not.
+pub func string_utils_find_last_not(haystack: StringView, needle: u8) -> usize?:
+    let characters = string_view_bytes(&haystack)
+    var i = characters.length
+    while i > 0:
+        if characters[i - 1] != needle:
+            return i - 1
+        i -= 1
+    return none
+
+## Ported from AK/StringUtils.cpp:272 AK::StringUtils::find_all.
+pub func string_utils_find_all(haystack: StringView, needle: StringView) -> Vector[usize]:
+    var positions: Vector[usize]
+    var current_position: usize = 0
+    while current_position <= string_view_length(&haystack):
+        let maybe_position = memmem_optional(string_view_bytes(&haystack)[current_position..], string_view_bytes(&needle)) else break
+        vector_append_t(&positions, current_position + maybe_position)
+        current_position += maybe_position + 1
+    return positions
+
+## Ported from AK/StringUtils.cpp:288 AK::StringUtils::find_any_of.
+pub func string_utils_find_any_of(haystack: StringView, needles: StringView, direction: SearchDirection) -> usize?:
+    if string_view_is_empty(&haystack) or string_view_is_empty(&needles):
+        return none
+    let characters = string_view_bytes(&haystack)
+    if direction == SearchDirection.forward:
+        for i in 0..<characters.length:
+            if string_view_contains_u8(&needles, characters[i]):
+                return i
+    elif direction == SearchDirection.backward:
+        var i = characters.length
+        while i > 0:
+            if string_view_contains_u8(&needles, characters[i - 1]):
+                return i - 1
+            i -= 1
+    return none
+
+# mark: Case conversion =========================================================================
+
+## The `should_insert_underscore` lambda of StringUtils::to_snakecase.
+func string_utils_to_snakecase_should_insert_underscore(str_: const StringView*, i: usize, current_char: u8) -> bool:
+    if i == 0:
+        return false
+    let previous_ch = string_view_at(str_, i - 1)
+    if is_ascii_lower_alpha(previous_ch) and is_ascii_upper_alpha(current_char):
+        return true
+    if i >= string_view_length(str_) - 1:
+        return false
+    let next_ch = string_view_at(str_, i + 1)
+    if is_ascii_upper_alpha(current_char) and is_ascii_lower_alpha(next_ch):
+        return true
+    return false
+
+## Ported from AK/StringUtils.cpp:306 AK::StringUtils::to_snakecase.
+pub func string_utils_to_snakecase(str_: StringView) -> ByteString:
+    var builder = string_builder_new()
+    for i in 0..<string_view_length(&str_):
+        let ch = string_view_at(&str_, i)
+        if string_utils_to_snakecase_should_insert_underscore(&str_, i, ch):
+            string_builder_append_u8(&builder, '_')
+        string_builder_append_as_lowercase(&builder, ch)
+    return string_builder_to_byte_string(&builder)
+
+## Ported from AK/StringUtils.cpp:332 AK::StringUtils::to_titlecase.
+pub func string_utils_to_titlecase(str_: StringView) -> String:
+    var builder = string_builder_new()
+    var next_is_upper = true
+
+    for ch in string_view_bytes(&str_):
+        if next_is_upper:
+            string_builder_append_u8(&builder, (u8)to_ascii_uppercase(ch))
+        else:
+            string_builder_append_u8(&builder, (u8)to_ascii_lowercase(ch))
+        next_is_upper = ch == ' '
+
+    return string_builder_to_string(&builder) else trap("MUST: to_titlecase")
+
+# mark: Replacing and counting ==================================================================
+
+## Ported from AK/StringUtils.cpp:351 AK::StringUtils::replace_into_builder. Finishes the
+## replacing algorithm once it is known that at least one replacement is going to be done.
+## Otherwise the caller may want to follow a different route to construct its output.
+func string_utils_replace_into_builder(str_: StringView, needle: StringView, replacement: StringView, replace_mode: ReplaceMode, first_replacement_position: usize) -> StringBuilder:
+    var replaced_string = string_builder_new()
+
+    string_builder_append_string_view(&replaced_string, string_view_substring_view_usize(&str_, 0, first_replacement_position))
+    string_builder_append_string_view(&replaced_string, replacement)
+
+    var remaining = string_view_substring_view(&str_, first_replacement_position + string_view_length(&needle))
+
+    # ReplaceMode::FirstOnly: we already made the first replacement.
+    if replace_mode == ReplaceMode.all:
+        while not string_view_is_empty(&remaining):
+            let maybe_pos = string_view_find_string_view(&remaining, needle) else break
+            string_builder_append_string_view(&replaced_string, string_view_substring_view_usize(&remaining, 0, maybe_pos))
+            string_builder_append_string_view(&replaced_string, replacement)
+            remaining = string_view_substring_view(&remaining, maybe_pos + string_view_length(&needle))
+
+    # The remaining bits either don't contain the needle or are ignored due to `replace_mode`
+    # being `ReplaceMode::FirstOnly`.
+    string_builder_append_string_view(&replaced_string, remaining)
+
+    return replaced_string
+
+## Ported from AK/StringUtils.cpp:383 AK::StringUtils::replace(StringView, ...).
+pub func string_utils_replace_string_view(str_: StringView, needle: StringView, replacement: StringView, replace_mode: ReplaceMode) -> ByteString:
+    if string_view_is_empty(&str_):
+        return byte_string_from_string_view(str_)
+
+    let maybe_first = string_view_find_string_view(&str_, needle) else return byte_string_from_string_view(str_)
+
+    var resulting_builder = string_utils_replace_into_builder(str_, needle, replacement, replace_mode, maybe_first)
+    return string_builder_to_byte_string(&resulting_builder)
+
+## Ported from AK/StringUtils.cpp:397 AK::StringUtils::replace(String const&, ...).
+pub func string_utils_replace_string(haystack: const String*, needle: StringView, replacement: StringView, replace_mode: ReplaceMode) -> String!:
+    if string_is_empty(haystack):
+        return *haystack
+
+    let source_bytes = string_bytes_as_string_view(haystack)
+
+    let maybe_first = string_view_find_string_view(&source_bytes, needle) else return *haystack
+
+    var resulting_builder = string_utils_replace_into_builder(source_bytes, needle, replacement, replace_mode, maybe_first)
+    return try string_builder_to_string(&resulting_builder)
+
+## Ported from AK/StringUtils.cpp:413 AK::StringUtils::count(StringView, StringView).
+pub func string_utils_count_string_view(str_: StringView, needle: StringView) -> usize:
+    if string_view_is_empty(&needle):
+        return string_view_length(&str_)
+
+    var count: usize = 0
+    var i: usize = 0
+    while i < string_view_length(&str_) -% string_view_length(&needle) +% 1:
+        let rest = string_view_substring_view(&str_, i)
+        if string_view_starts_with_string_view(&rest, needle):
+            count += 1
+        i += 1
+    return count
+
+## Ported from AK/StringUtils.cpp:426 AK::StringUtils::count(StringView, char).
+pub func string_utils_count_u8(str_: StringView, needle: u8) -> usize:
+    var count: usize = 0
+    for ch in string_view_bytes(&str_):
+        if ch == needle:
+            count += 1
+    return count

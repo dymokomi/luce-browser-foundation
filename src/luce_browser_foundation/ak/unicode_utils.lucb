@@ -1,0 +1,163 @@
+#==============================================================================================
+#
+#   unicode_utils - UTF-8 and UTF-16 encoding of single code points
+#
+#   DESCRIPTION:
+#       Port of AK/UnicodeUtils.h (lines 1-212). The callback templates take a pointer to a
+#       struct conforming to the callback interfaces of text_support.
+#
+#==============================================================================================
+
+# mark: UTF-8 ===================================================================================
+
+## Ported from AK/UnicodeUtils.h:14 AK::UnicodeUtils::bytes_to_store_code_point_in_utf8.
+pub func unicode_utils_bytes_to_store_code_point_in_utf8(code_point: u32) -> i32:
+    if code_point <= 0x7f:
+        return 1
+    if code_point <= 0x7ff:
+        return 2
+    if code_point <= 0xffff:
+        return 3
+    if code_point <= 0x10ffff:
+        return 4
+    return 0
+
+## Ported from AK/UnicodeUtils.h:28 AK::UnicodeUtils::code_point_to_utf8.
+pub func unicode_utils_code_point_to_utf8[TCallback: Utf8ByteCallback](code_point: u32, callback: TCallback*) -> i32:
+    if code_point <= 0x7f:
+        callback.call((u8)code_point)
+        return 1
+    elif code_point <= 0x07ff:
+        callback.call((u8)(((code_point >> 6) & 0x1f) | 0xc0))
+        callback.call((u8)(((code_point >> 0) & 0x3f) | 0x80))
+        return 2
+    elif code_point <= 0xffff:
+        callback.call((u8)(((code_point >> 12) & 0x0f) | 0xe0))
+        callback.call((u8)(((code_point >> 6) & 0x3f) | 0x80))
+        callback.call((u8)(((code_point >> 0) & 0x3f) | 0x80))
+        return 3
+    elif code_point <= 0x10ffff:
+        callback.call((u8)(((code_point >> 18) & 0x07) | 0xf0))
+        callback.call((u8)(((code_point >> 12) & 0x3f) | 0x80))
+        callback.call((u8)(((code_point >> 6) & 0x3f) | 0x80))
+        callback.call((u8)(((code_point >> 0) & 0x3f) | 0x80))
+        return 4
+    return -1
+
+## Ported from AK/UnicodeUtils.h:52 AK::UnicodeUtils::try_code_point_to_utf8.
+pub func unicode_utils_try_code_point_to_utf8[TCallback: FallibleUtf8ByteCallback](code_point: u32, callback: TCallback*) -> i32!:
+    if code_point <= 0x7f:
+        try callback.call((u8)code_point)
+        return 1
+    if code_point <= 0x07ff:
+        try callback.call((u8)(((code_point >> 6) & 0x1f) | 0xc0))
+        try callback.call((u8)(((code_point >> 0) & 0x3f) | 0x80))
+        return 2
+    if code_point <= 0xffff:
+        try callback.call((u8)(((code_point >> 12) & 0x0f) | 0xe0))
+        try callback.call((u8)(((code_point >> 6) & 0x3f) | 0x80))
+        try callback.call((u8)(((code_point >> 0) & 0x3f) | 0x80))
+        return 3
+    if code_point <= 0x10ffff:
+        try callback.call((u8)(((code_point >> 18) & 0x07) | 0xf0))
+        try callback.call((u8)(((code_point >> 12) & 0x3f) | 0x80))
+        try callback.call((u8)(((code_point >> 6) & 0x3f) | 0x80))
+        try callback.call((u8)(((code_point >> 0) & 0x3f) | 0x80))
+        return 4
+    return -1
+
+## A code_point_to_utf8 callback that writes the bytes into a four-byte array (the C++'s
+## `Array<u8, 4> code_point_as_utf8; code_point_to_utf8(cp, [&](auto byte) { ... })`).
+pub struct CodePointAsUtf8: Utf8ByteCallback:
+    pub var bytes: u8[4]
+    pub var length: usize
+
+    pub mutating func call(byte: u8):
+        self.bytes[self.length] = byte
+        self.length += 1
+
+# mark: UTF-16 ==================================================================================
+
+## Ported from AK/UnicodeUtils.h:93 AK::UnicodeUtils::code_unit_length_for_code_point.
+pub func unicode_utils_code_unit_length_for_code_point(code_point: u32) -> usize:
+    return 1 if code_point < unicode_utils_first_supplementary_plane_code_point else 2
+
+## Ported from AK/UnicodeUtils.h:98 AK::UnicodeUtils::is_utf16_high_surrogate.
+pub func unicode_utils_is_utf16_high_surrogate(code_unit: u16) -> bool:
+    return (code_unit >= unicode_utils_high_surrogate_min) and (code_unit <= unicode_utils_high_surrogate_max)
+
+## Ported from AK/UnicodeUtils.h:103 AK::UnicodeUtils::is_utf16_low_surrogate.
+pub func unicode_utils_is_utf16_low_surrogate(code_unit: u16) -> bool:
+    return (code_unit >= unicode_utils_low_surrogate_min) and (code_unit <= unicode_utils_low_surrogate_max)
+
+## Ported from AK/UnicodeUtils.h:108 AK::UnicodeUtils::decode_utf16_surrogate_pair.
+pub func unicode_utils_decode_utf16_surrogate_pair(high_surrogate: u16, low_surrogate: u16) -> u32:
+    assert(unicode_utils_is_utf16_high_surrogate(high_surrogate))
+    assert(unicode_utils_is_utf16_low_surrogate(low_surrogate))
+
+    return (((u32)high_surrogate - unicode_utils_high_surrogate_min) << 10) + ((u32)low_surrogate - unicode_utils_low_surrogate_min) + unicode_utils_first_supplementary_plane_code_point
+
+## Ported from AK/UnicodeUtils.h:117 AK::UnicodeUtils::code_point_to_utf16.
+pub func unicode_utils_code_point_to_utf16[TCallback: Utf16CodeUnitCallback](code_point: u32, callback: TCallback*) -> usize:
+    if code_point < unicode_utils_first_supplementary_plane_code_point:
+        callback.call((u16)code_point)
+        return 1
+
+    if code_point <= 0x10ffff:
+        let supplementary = code_point - unicode_utils_first_supplementary_plane_code_point
+
+        var code_unit = (u16)((u32)unicode_utils_high_surrogate_min | (supplementary >> 10))
+        callback.call(code_unit)
+
+        code_unit = (u16)((u32)unicode_utils_low_surrogate_min | (supplementary & 0x3ff))
+        callback.call(code_unit)
+
+        return 2
+
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from AK/UnicodeUtils.h:139 AK::UnicodeUtils::try_code_point_to_utf16.
+pub func unicode_utils_try_code_point_to_utf16[TCallback: FallibleUtf16CodeUnitCallback](code_point: u32, callback: TCallback*) -> usize!:
+    if code_point < unicode_utils_first_supplementary_plane_code_point:
+        try callback.call((u16)code_point)
+        return 1
+
+    if code_point <= 0x10ffff:
+        let supplementary = code_point - unicode_utils_first_supplementary_plane_code_point
+
+        var code_unit = (u16)((u32)unicode_utils_high_surrogate_min | (supplementary >> 10))
+        try callback.call(code_unit)
+
+        code_unit = (u16)((u32)unicode_utils_low_surrogate_min | (supplementary & 0x3ff))
+        try callback.call(code_unit)
+
+        return 2
+
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from AK/UnicodeUtils.h:165 AK::UnicodeUtils::maximum_utf8_length_from_utf16.
+## Computes the maximum number of UTF-8 bytes needed to store a given UTF-16 string, accounting
+## for unmatched UTF-16 surrogates. This overcounts by at most 33%; 2 bytes for every valid
+## UTF-16 code point between U+100000 and U+10FFFF.
+func unicode_utils_maximum_utf8_length_from_utf16(code_units: const u16[]) -> usize:
+    # # UTF-16 code unit -> actual length added.
+    # 0x0000 - 0x007f = 1
+    # 0x0080 - 0x07ff = 2
+    # 0x0800 - 0xd7ff = 3
+    # 0xd800 - 0xdbff = 3
+    #   ^ If the next code unit is 0xdc00 - 0xdfff, they will combined sum to 6, which is greater
+    #   than the 4 required. Otherwise, 3 bytes are needed to encode U+D800 - U+DBFF.
+    # 0xdc00 - 0xdfff = 3
+    #   ^ If the previous code unit was, 0xd800 - 0xdbff, this will ensure that the combined sum
+    #   is greater than 4. Otherwise, 3 bytes are needed to encode U+DC00 - U+DFFF.
+    # 0xe000 - 0xffff = 3
+    var maximum_utf8_length: usize = 0
+
+    for code_unit in code_units:
+        maximum_utf8_length += 1
+        if code_unit > 0x007f:
+            maximum_utf8_length += 1
+        if code_unit > 0x07ff:
+            maximum_utf8_length += 1
+
+    return maximum_utf8_length

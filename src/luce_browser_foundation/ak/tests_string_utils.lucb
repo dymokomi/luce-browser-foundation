@@ -1,0 +1,234 @@
+#==============================================================================================
+#
+#   tests_string_utils - the StringUtils tests
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestStringUtils.cpp. hash_compatible (static_asserts on the C++
+#       HashCompatible concept) has no luce-base counterpart.
+#
+#==============================================================================================
+
+## Whether `spans` holds exactly the (start, length) pairs of `expected`.
+func mask_spans_equal(spans: const Vector[MaskSpan]*, expected: const MaskSpan[]) -> bool:
+    if test_vector_size(spans) != expected.length:
+        return false
+    for i in 0..<expected.length:
+        let span = test_vector_at(spans, i)
+        if not mask_span_eq(&span, expected[i]):
+            return false
+    return true
+
+test "matches_empty":
+    assert(string_utils_matches(sv(""), sv("")))
+
+    assert(string_utils_matches(sv(""), sv("*")))
+    assert(not string_utils_matches(sv(""), sv("?")))
+    assert(not string_utils_matches(sv(""), sv("a")))
+
+    assert(not string_utils_matches(sv("a"), sv("")))
+
+test "matches_case_sensitive":
+    assert(string_utils_matches(sv("a"), sv("a"), CaseSensitivity.case_sensitive))
+    assert(not string_utils_matches(sv("a"), sv("A"), CaseSensitivity.case_sensitive))
+    assert(not string_utils_matches(sv("A"), sv("a"), CaseSensitivity.case_sensitive))
+
+test "matches_case_insensitive":
+    assert(not string_utils_matches(sv("aa"), sv("a")))
+    assert(string_utils_matches(sv("aa"), sv("*")))
+    assert(not string_utils_matches(sv("cb"), sv("?a")))
+    assert(string_utils_matches(sv("adceb"), sv("a*b")))
+    assert(not string_utils_matches(sv("acdcb"), sv("a*c?b")))
+
+test "matches_with_positions":
+    if not ak_core_is_ported:
+        return
+    var spans: Vector[MaskSpan]
+    assert(string_utils_matches(sv("abbb"), sv("a*"), CaseSensitivity.case_sensitive, &spans))
+    assert(mask_spans_equal(&spans, [MaskSpan(start = 1, length = 3)]))
+
+    spans = Vector[MaskSpan]()
+    assert(string_utils_matches(sv("abbb"), sv("?*"), CaseSensitivity.case_sensitive, &spans))
+    assert(mask_spans_equal(&spans, [MaskSpan(start = 0, length = 1), MaskSpan(start = 1, length = 3)]))
+
+    spans = Vector[MaskSpan]()
+    assert(string_utils_matches(sv("acdcxb"), sv("a*c?b"), CaseSensitivity.case_sensitive, &spans))
+    assert(mask_spans_equal(&spans, [MaskSpan(start = 1, length = 2), MaskSpan(start = 4, length = 1)]))
+
+    spans = Vector[MaskSpan]()
+    assert(string_utils_matches(sv("aaaa"), sv("A*"), CaseSensitivity.case_insensitive, &spans))
+    assert(mask_spans_equal(&spans, [MaskSpan(start = 1, length = 3)]))
+
+# #4607
+test "matches_trailing":
+    assert(string_utils_matches(sv("ab"), sv("ab*")))
+    assert(string_utils_matches(sv("ab"), sv("ab****")))
+    assert(string_utils_matches(sv("ab"), sv("*ab****")))
+
+test "match_backslash_escape":
+    assert(string_utils_matches(sv("ab*"), sv("ab\\*")))
+    assert(not string_utils_matches(sv("abc"), sv("ab\\*")))
+    assert(not string_utils_matches(sv("abcd"), sv("ab\\*")))
+    assert(string_utils_matches(sv("ab?"), sv("ab\\?")))
+    assert(not string_utils_matches(sv("abc"), sv("ab\\?")))
+
+test "match_trailing_backslash":
+    assert(string_utils_matches(sv("x\\"), sv("x\\")))
+    assert(string_utils_matches(sv("x\\"), sv("x\\\\")))
+
+test "ends_with":
+    let test_string = byte_string_from_str("ABCDEF")
+    let view = byte_string_view(&test_string)
+    assert(string_utils_ends_with(view, sv("DEF"), CaseSensitivity.case_sensitive))
+    assert(string_utils_ends_with(view, sv("ABCDEF"), CaseSensitivity.case_sensitive))
+    assert(not string_utils_ends_with(view, sv("ABCDE"), CaseSensitivity.case_sensitive))
+    assert(not string_utils_ends_with(view, sv("ABCDEFG"), CaseSensitivity.case_sensitive))
+    assert(string_utils_ends_with(view, sv("def"), CaseSensitivity.case_insensitive))
+    assert(not string_utils_ends_with(view, sv("def"), CaseSensitivity.case_sensitive))
+
+test "starts_with":
+    let test_string = byte_string_from_str("ABCDEF")
+    let view = byte_string_view(&test_string)
+    assert(string_utils_starts_with(view, sv("ABC"), CaseSensitivity.case_sensitive))
+    assert(string_utils_starts_with(view, sv("ABCDEF"), CaseSensitivity.case_sensitive))
+    assert(not string_utils_starts_with(view, sv("BCDEF"), CaseSensitivity.case_sensitive))
+    assert(not string_utils_starts_with(view, sv("ABCDEFG"), CaseSensitivity.case_sensitive))
+    assert(string_utils_starts_with(view, sv("abc"), CaseSensitivity.case_insensitive))
+    assert(not string_utils_starts_with(view, sv("abc"), CaseSensitivity.case_sensitive))
+
+test "contains":
+    let test_string = byte_string_from_str("ABCDEFABCXYZ")
+    let view = byte_string_view(&test_string)
+    assert(string_utils_contains(view, sv("ABC"), CaseSensitivity.case_sensitive))
+    assert(string_utils_contains(view, sv("ABC"), CaseSensitivity.case_insensitive))
+    assert(string_utils_contains(view, sv("AbC"), CaseSensitivity.case_insensitive))
+    assert(string_utils_contains(view, sv("BCX"), CaseSensitivity.case_sensitive))
+    assert(string_utils_contains(view, sv("BCX"), CaseSensitivity.case_insensitive))
+    assert(string_utils_contains(view, sv("BcX"), CaseSensitivity.case_insensitive))
+    assert(not string_utils_contains(view, sv("xyz"), CaseSensitivity.case_sensitive))
+    assert(string_utils_contains(view, sv("xyz"), CaseSensitivity.case_insensitive))
+    assert(not string_utils_contains(view, sv("EFG"), CaseSensitivity.case_sensitive))
+    assert(not string_utils_contains(view, sv("EfG"), CaseSensitivity.case_insensitive))
+    assert(string_utils_contains(view, sv(""), CaseSensitivity.case_sensitive))
+    assert(string_utils_contains(view, sv(""), CaseSensitivity.case_insensitive))
+    assert(not string_utils_contains(sv(""), view, CaseSensitivity.case_sensitive))
+    assert(not string_utils_contains(sv(""), view, CaseSensitivity.case_insensitive))
+    assert(not string_utils_contains(view, sv("L"), CaseSensitivity.case_sensitive))
+    assert(not string_utils_contains(view, sv("L"), CaseSensitivity.case_insensitive))
+
+    let command_palette_bug_string = byte_string_from_str("Go Go Back")
+    let bug_view = byte_string_view(&command_palette_bug_string)
+    assert(string_utils_contains(bug_view, sv("Go Back"), CaseSensitivity.case_sensitive))
+    assert(string_utils_contains(bug_view, sv("gO bAcK"), CaseSensitivity.case_insensitive))
+
+test "is_whitespace":
+    assert(string_utils_is_whitespace(sv("")))
+    assert(string_utils_is_whitespace(sv("   ")))
+    assert(string_utils_is_whitespace(sv("  \t")))
+    assert(string_utils_is_whitespace(sv("  \t\n")))
+    assert(string_utils_is_whitespace(sv("  \t\n\r\u{b}")))
+    assert(not string_utils_is_whitespace(sv("  a ")))
+    assert(not string_utils_is_whitespace(sv("a\t")))
+
+## `EXPECT_EQ(StringUtils::trim(text, characters, mode), expected)`.
+func string_utils_trim_is(text: str, characters: str, mode: TrimMode, expected: str) -> bool:
+    let trimmed = string_utils_trim(sv(text), sv(characters), mode)
+    return string_view_equals(&trimmed, expected)
+
+test "trim":
+    assert(string_utils_trim_is("aaa.a.", ".", TrimMode.right, "aaa.a"))
+    assert(string_utils_trim_is("...aaa", ".", TrimMode.left, "aaa"))
+    assert(string_utils_trim_is("...aaa.a...", ".", TrimMode.both, "aaa.a"))
+    assert(string_utils_trim_is(".", ".", TrimMode.right, ""))
+    assert(string_utils_trim_is(".", ".", TrimMode.left, ""))
+    assert(string_utils_trim_is(".", ".", TrimMode.both, ""))
+    assert(string_utils_trim_is("...", ".", TrimMode.both, ""))
+
+test "find":
+    let test_string = byte_string_from_str("1234567")
+    let view = byte_string_view(&test_string)
+    assert((string_utils_find_string_view(view, sv("1")) else 1) == 0)
+    assert((string_utils_find_string_view(view, sv("2")) else 2) == 1)
+    assert((string_utils_find_string_view(view, sv("3")) else 3) == 2)
+    assert((string_utils_find_string_view(view, sv("4")) else 4) == 3)
+    assert((string_utils_find_string_view(view, sv("5")) else 5) == 4)
+    assert((string_utils_find_string_view(view, sv("34")) else 3) == 2)
+    assert(string_utils_find_string_view(view, sv("78")) == none)
+
+test "find_last":
+    let test_string = sv("abcdabc")
+
+    assert(string_utils_find_last_string_view(test_string, sv("")) == 7)
+    assert(string_utils_find_last_string_view(test_string, sv("a")) == 4)
+    assert(string_utils_find_last_string_view(test_string, sv("b")) == 5)
+    assert(string_utils_find_last_string_view(test_string, sv("c")) == 6)
+    assert(string_utils_find_last_string_view(test_string, sv("ab")) == 4)
+    assert(string_utils_find_last_string_view(test_string, sv("bc")) == 5)
+    assert(string_utils_find_last_string_view(test_string, sv("abc")) == 4)
+    assert(string_utils_find_last_string_view(test_string, sv("abcd")) == 0)
+    assert(string_utils_find_last_string_view(test_string, test_string) == 0)
+
+    assert(string_utils_find_last_string_view(test_string, sv("1")) == none)
+    assert(string_utils_find_last_string_view(test_string, sv("e")) == none)
+    assert(string_utils_find_last_string_view(test_string, sv("abd")) == none)
+
+## The `replace_like_in_jakt` lambda of replace_all_overlapping.
+func replace_like_in_jakt(source: StringView) -> ByteString:
+    var replaced = string_utils_replace_string_view(source, sv("\\\""), sv("\""), ReplaceMode.all)
+    replaced = string_utils_replace_string_view(byte_string_view(&replaced), sv("\\\\"), sv("\\"), ReplaceMode.all)
+    return replaced
+
+test "replace_all_overlapping":
+    # Replace only should take into account non-overlapping instances of the needle, since it
+    # is looking to replace them.
+
+    # These samples were grabbed from ADKaster's sample code in
+    # https://github.com/SerenityOS/jakt/issues/1159. This is the equivalent C++ code that
+    # triggered the same bug from Jakt's code generator.
+    if not ak_core_is_ported:
+        return
+    var replaced = replace_like_in_jakt(sv("\\\\\\\\\\\\\\\\"))
+    assert(byte_string_eq_string_view(&replaced, sv("\\\\\\\\")))
+    replaced = replace_like_in_jakt(sv(" auto str4 = \"\\\";"))
+    assert(byte_string_eq_string_view(&replaced, sv(" auto str4 = \"\";")))
+    replaced = replace_like_in_jakt(sv(" auto str5 = \"\\\\\";"))
+    assert(byte_string_eq_string_view(&replaced, sv(" auto str5 = \"\\\";")))
+
+## `EXPECT_EQ(StringUtils::to_snakecase(text), expected)`.
+func string_utils_to_snakecase_is(text: str, expected: str) -> bool:
+    let result = string_utils_to_snakecase(sv(text))
+    return byte_string_eq_string_view(&result, sv(expected))
+
+test "to_snakecase":
+    if not ak_core_is_ported:
+        return
+    assert(string_utils_to_snakecase_is("foobar", "foobar"))
+    assert(string_utils_to_snakecase_is("Foobar", "foobar"))
+    assert(string_utils_to_snakecase_is("FOOBAR", "foobar"))
+    assert(string_utils_to_snakecase_is("fooBar", "foo_bar"))
+    assert(string_utils_to_snakecase_is("FooBar", "foo_bar"))
+    assert(string_utils_to_snakecase_is("fooBAR", "foo_bar"))
+    assert(string_utils_to_snakecase_is("FOOBar", "foo_bar"))
+    assert(string_utils_to_snakecase_is("foo_bar", "foo_bar"))
+    assert(string_utils_to_snakecase_is("FBar", "f_bar"))
+    assert(string_utils_to_snakecase_is("FooB", "foo_b"))
+
+## `EXPECT_EQ(StringUtils::to_titlecase(text), expected)`.
+func string_utils_to_titlecase_is(text: str, expected: str) -> bool:
+    let result = string_utils_to_titlecase(sv(text))
+    return string_eq_string_view(&result, sv(expected))
+
+test "to_titlecase":
+    if not ak_core_is_ported:
+        return
+    assert(string_utils_to_titlecase_is("", ""))
+    assert(string_utils_to_titlecase_is("f", "F"))
+    assert(string_utils_to_titlecase_is("foobar", "Foobar"))
+    assert(string_utils_to_titlecase_is("Foobar", "Foobar"))
+    assert(string_utils_to_titlecase_is("FOOBAR", "Foobar"))
+    assert(string_utils_to_titlecase_is("foo bar", "Foo Bar"))
+    assert(string_utils_to_titlecase_is("foo bAR", "Foo Bar"))
+    assert(string_utils_to_titlecase_is("foo  bar", "Foo  Bar"))
+    assert(string_utils_to_titlecase_is("foo   bar", "Foo   Bar"))
+    assert(string_utils_to_titlecase_is("   foo   bar   ", "   Foo   Bar   "))
+    assert(string_utils_to_titlecase_is("\u{e7}", "\u{e7}"))  # U+00E7 LATIN SMALL LETTER C WITH CEDILLA
+    assert(string_utils_to_titlecase_is("\u{1000}", "\u{1000}"))  # U+1000 MYANMAR LETTER KA

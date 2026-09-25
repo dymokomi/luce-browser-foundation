@@ -16,9 +16,9 @@
 pub struct Utf16FlyStringTableHashTraits: Traits[const Utf16StringData*?]:
     pub var empty_: u8
 
-    func hash_of(key: const (const Utf16StringData*?)*) -> u32: trap("unported: AK::Utf16FlyStringTableHashTraits::hash")
+    func hash_of(key: const (const Utf16StringData*?)*) -> u32: return utf16_fly_string_table_hash_traits_hash(*key)
 
-    func equals(a: const (const Utf16StringData*?)*, b: const (const Utf16StringData*?)*) -> bool: trap("unported: AK::Utf16FlyStringTableHashTraits::equals")
+    func equals(a: const (const Utf16StringData*?)*, b: const (const Utf16StringData*?)*) -> bool: return utf16_fly_string_table_hash_traits_equals(*a, *b)
 
 # mark: Utf16FlyString ==========================================================================
 

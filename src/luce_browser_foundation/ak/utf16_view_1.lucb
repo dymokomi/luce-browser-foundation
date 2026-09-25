@@ -1,0 +1,601 @@
+#==============================================================================================
+#
+#   utf16_view_1 - Utf16View: code point iteration, construction, conversion and comparison
+#
+#   DESCRIPTION:
+#       Port of AK/Utf16View.h (lines 1-395) and AK/Utf16View.cpp (lines 1-209).
+#
+#       A Utf16View is a pointer to either ASCII bytes or UTF-16 code units, with the storage
+#       kind in the top bit (UTF16_FLAG) of m_length_in_code_units; its code point iterator
+#       does the same with m_remaining_code_units. The storage pointer is read through the
+#       union's bits (`raw`), since reading one optional-pointer member after writing the other
+#       is undefined in luce-base. m_length_in_code_points is `mutable` in the C++; views are
+#       values here, so a view carries a code point count it was given (or NumericLimits max for
+#       unknown) and computes it otherwise, without storing it.
+#
+#==============================================================================================
+
+# mark: Validation ==============================================================================
+
+## Ported from AK/Utf16View.cpp:17 AK::validate_utf16_le.
+pub func validate_utf16_le(bytes: const u8[]) -> bool:
+    return simdutf_validate_utf16_bytes(bytes, false)
+
+## Ported from AK/Utf16View.cpp:22 AK::validate_utf16_be.
+pub func validate_utf16_be(bytes: const u8[]) -> bool:
+    return simdutf_validate_utf16_bytes(bytes, true)
+
+# mark: Utf16CodePointIterator ==================================================================
+
+## The iterator's storage pointer as a word (the union's bits).
+func utf16_code_point_iterator_raw(this: const Utf16CodePointIterator*) -> usize:
+    return memory.read[usize](&this.m_iterator)
+
+## The iterator's position as ASCII bytes.
+func utf16_code_point_iterator_ascii(this: const Utf16CodePointIterator*) -> const u8*:
+    return (const u8*?)utf16_code_point_iterator_raw(this) else trap("VERIFY: iterator without storage")
+
+## The iterator's position as UTF-16 code units.
+func utf16_code_point_iterator_utf16(this: const Utf16CodePointIterator*) -> const u16*:
+    return (const u16*?)utf16_code_point_iterator_raw(this) else trap("VERIFY: iterator without storage")
+
+## Ported from AK/Utf16View.h:44 AK::Utf16CodePointIterator::operator++.
+pub func utf16_code_point_iterator_inc(this: Utf16CodePointIterator*) -> Utf16CodePointIterator*:
+    let remaining_code_units = utf16_code_point_iterator_remaining_code_units(this)
+    assert(remaining_code_units > 0)
+
+    if utf16_code_point_iterator_has_ascii_storage(this):
+        this.m_iterator.ascii = utf16_code_point_iterator_ascii(this) + 1
+        this.m_remaining_code_units -= 1
+    else:
+        let code_units = utf16_code_point_iterator_length_in_code_units(this)
+        let length = code_units if code_units < remaining_code_units else remaining_code_units
+
+        this.m_iterator.utf16 = utf16_code_point_iterator_utf16(this) + length
+        this.m_remaining_code_units -= length
+
+    return this
+
+## Ported from AK/Utf16View.h:62 AK::Utf16CodePointIterator::operator*.
+pub func utf16_code_point_iterator_deref(this: const Utf16CodePointIterator*) -> u32:
+    let remaining_code_units = utf16_code_point_iterator_remaining_code_units(this)
+    assert(remaining_code_units > 0)
+
+    if utf16_code_point_iterator_has_ascii_storage(this):
+        return utf16_code_point_iterator_ascii(this)[0]
+
+    let code_units = utf16_code_point_iterator_utf16(this)
+    let code_unit = code_units[0]
+
+    if unicode_utils_is_utf16_high_surrogate(code_unit):
+        if remaining_code_units > 1:
+            let next_code_unit = code_units[1]
+
+            if unicode_utils_is_utf16_low_surrogate(next_code_unit):
+                return unicode_utils_decode_utf16_surrogate_pair(code_unit, next_code_unit)
+
+    return (u32)code_unit
+
+## Ported from AK/Utf16View.h:84 AK::Utf16CodePointIterator::peek: the code point
+## `code_point_offset` code points ahead, or none past the end.
+pub func utf16_code_point_iterator_peek(this: const Utf16CodePointIterator*, code_point_offset: usize) -> u32?:
+    if code_point_offset == 0:
+        if utf16_code_point_iterator_remaining_code_units(this) == 0:
+            return none
+        return utf16_code_point_iterator_deref(this)
+
+    var it = *this
+
+    for _index in 0..<code_point_offset:
+        discard(utf16_code_point_iterator_inc(&it))
+        if utf16_code_point_iterator_remaining_code_units(&it) == 0:
+            return none
+
+    return utf16_code_point_iterator_deref(&it)
+
+## Ported from AK/Utf16View.h:103 AK::Utf16CodePointIterator::operator==.
+pub func utf16_code_point_iterator_eq(this: const Utf16CodePointIterator*, other: const Utf16CodePointIterator*) -> bool:
+    # Note that this also protects against iterators with different underlying storage.
+    if this.m_remaining_code_units != other.m_remaining_code_units:
+        return false
+
+    return utf16_code_point_iterator_raw(this) == utf16_code_point_iterator_raw(other)
+
+## Ported from AK/Utf16View.h:114 AK::Utf16CodePointIterator::length_in_code_units: the code
+## units of the current code point.
+pub func utf16_code_point_iterator_length_in_code_units(this: const Utf16CodePointIterator*) -> usize:
+    if utf16_code_point_iterator_has_ascii_storage(this):
+        return 1
+    return unicode_utils_code_unit_length_for_code_point(utf16_code_point_iterator_deref(this))
+
+## Whether the iterator is at the end (`it == view.end()` for an iterator of that view).
+pub func utf16_code_point_iterator_done(this: const Utf16CodePointIterator*) -> bool:
+    return utf16_code_point_iterator_remaining_code_units(this) == 0
+
+## Ported from AK/Utf16View.h:124 AK::Utf16CodePointIterator::Utf16CodePointIterator(char const*, size_t).
+pub func utf16_code_point_iterator_construct_u8(this: Utf16CodePointIterator*, iterator: const u8*?, length: usize):
+    this.m_iterator.ascii = iterator
+    this.m_remaining_code_units = length
+
+## Ported from AK/Utf16View.h:130 AK::Utf16CodePointIterator::Utf16CodePointIterator(char16_t const*, size_t).
+pub func utf16_code_point_iterator_construct_u16(this: Utf16CodePointIterator*, iterator: const u16*?, length: usize):
+    this.m_iterator.utf16 = iterator
+    this.m_remaining_code_units = length
+    this.m_remaining_code_units |= (usize)1 << utf16_flag
+
+## Ported from AK/Utf16View.h:137 AK::Utf16CodePointIterator::has_ascii_storage.
+pub func utf16_code_point_iterator_has_ascii_storage(this: const Utf16CodePointIterator*) -> bool:
+    return this.m_remaining_code_units >> utf16_flag == 0
+
+## Ported from AK/Utf16View.h:138 AK::Utf16CodePointIterator::remaining_code_units.
+pub func utf16_code_point_iterator_remaining_code_units(this: const Utf16CodePointIterator*) -> usize:
+    return this.m_remaining_code_units & ~((usize)1 << utf16_flag)
+
+# mark: Utf16View construction ==================================================================
+
+## The view's storage pointer as a word (the union's bits).
+func utf16_view_raw(this: const Utf16View*) -> usize:
+    return memory.read[usize](&this.m_string)
+
+## The view's storage as an ASCII pointer (none for a zero-initialized view).
+func utf16_view_ascii_pointer(this: const Utf16View*) -> const u8*?:
+    return (const u8*?)utf16_view_raw(this)
+
+## The view's storage as a UTF-16 pointer.
+func utf16_view_utf16_pointer(this: const Utf16View*) -> const u16*?:
+    return (const u16*?)utf16_view_raw(this)
+
+## Ported from AK/Utf16View.h:154 AK::Utf16View::Utf16View(): the empty view.
+pub func utf16_view_construct(this: Utf16View*):
+    this.m_string.ascii = "".bytes.data
+    this.m_length_in_code_units = 0
+    this.m_length_in_code_points = usize_max_code_points
+
+## Ported from AK/Utf16View.h:160 AK::Utf16View::Utf16View(char16_t const*, size_t).
+pub func utf16_view_construct_u16(this: Utf16View*, string: const u16*?, length_in_code_units: usize):
+    this.m_string.utf16 = string
+    this.m_length_in_code_units = length_in_code_units
+    this.m_length_in_code_points = usize_max_code_points
+    assert(string != none)
+    this.m_length_in_code_units |= (usize)1 << utf16_flag
+
+## Ported from AK/Utf16View.h:168 AK::Utf16View::Utf16View(StringView) (consteval): a view of
+## ASCII text.
+pub func utf16_view_construct_string_view(this: Utf16View*, string: StringView):
+    this.m_string.ascii = string_view_characters_without_null_termination(&string) else "".bytes.data
+    this.m_length_in_code_units = string_view_length(&string)
+    this.m_length_in_code_points = usize_max_code_points
+    assert(string_view_is_ascii(&string))
+
+## Ported from AK/Utf16View.h:666 AK::Utf16View::Utf16View(char const*, size_t) (private): a
+## view of ASCII storage.
+pub func utf16_view_construct_u8(this: Utf16View*, string: const u8*?, length_in_code_units: usize):
+    this.m_string.ascii = string
+    this.m_length_in_code_units = length_in_code_units
+    this.m_length_in_code_points = usize_max_code_points
+
+## `NumericLimits<size_t>::max()`: an unknown code point count.
+pub let usize_max_code_points: usize = 0xffffffffffffffff
+
+## `Utf16View {}`: the empty view.
+pub func utf16_view_new() -> Utf16View:
+    var view: Utf16View
+    utf16_view_construct(&view)
+    return view
+
+## `Utf16View { data, length }` over UTF-16 code units.
+pub func utf16_view_from_utf16(code_units: const u16[]) -> Utf16View:
+    var view: Utf16View
+    utf16_view_construct_u16(&view, code_units.data, code_units.length)
+    return view
+
+## `Utf16View { data, length }` over ASCII bytes (the private constructor; also the ASCII
+## StringView constructor, without its check).
+pub func utf16_view_from_ascii(bytes: const u8[]) -> Utf16View:
+    var view: Utf16View
+    utf16_view_construct_u8(&view, bytes.data, bytes.length)
+    return view
+
+## `"text"sv` for UTF-16 views of ASCII: `Utf16View { "text"sv }`.
+pub func utf16_sv(text: str) -> Utf16View:
+    var view: Utf16View
+    utf16_view_construct_string_view(&view, sv(text))
+    return view
+
+# mark: Conversion ==============================================================================
+
+## The lambda of Utf16View::to_utf8: transcodes the valid UTF-16 into the new string.
+struct Utf16ViewToUtf8Transcode: BytesCallback:
+    var code_units: const u16[]
+
+    mutating func call(buffer: u8[]) -> !:
+        let result = simdutf_convert_utf16_to_utf8(self.code_units, buffer)
+        assert(result == buffer.length)
+
+## Ported from AK/Utf16View.cpp:27 AK::Utf16View::to_utf8: the text as UTF-8; lonely surrogates
+## are encoded (WTF-8) unless `allow_lonely_surrogates` is no, which fails on them.
+pub func utf16_view_to_utf8(this: const Utf16View*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> String!:
+    if utf16_view_is_empty(this):
+        return string_new()
+    if utf16_view_has_ascii_storage(this):
+        return string_from_utf8_without_validation(utf16_view_bytes(this))
+
+    if allow_lonely_surrogates == AllowLonelySurrogates.no:
+        if not utf16_view_validate(this):
+            error(ak_error, "Input was not valid UTF-16")
+
+        var result = string_new()
+        let code_units = utf16_view_utf16_span(this)
+        let utf8_length = simdutf_utf8_length_from_utf16(code_units)
+
+        var transcode = Utf16ViewToUtf8Transcode(code_units = code_units)
+        try string_base_replace_with_new_string_utf16_view(&result.string_base, utf8_length, &transcode)
+
+        return result
+
+    var builder = string_builder_new()
+    string_builder_append_utf16_view(&builder, *this)
+    return try string_builder_to_string(&builder)
+
+## Ported from AK/Utf16View.cpp:55 AK::Utf16View::to_byte_string.
+pub func utf16_view_to_byte_string(this: const Utf16View*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> ByteString!:
+    let utf8 = try utf16_view_to_utf8(this, allow_lonely_surrogates)
+    return string_to_byte_string(&utf8)
+
+## Ported from AK/Utf16View.h:178 AK::Utf16View::to_utf8_but_should_be_ported_to_utf16.
+pub func utf16_view_to_utf8_but_should_be_ported_to_utf16(this: const Utf16View*, allow_lonely_surrogates: AllowLonelySurrogates = AllowLonelySurrogates.yes) -> String:
+    return utf16_view_to_utf8(this, allow_lonely_surrogates) else trap("MUST: to_utf8")
+
+## Ported from AK/Utf16View.cpp:60 AK::Utf16View::to_ascii_lowercase.
+pub func utf16_view_to_ascii_lowercase(this: const Utf16View*) -> Utf16String:
+    var builder = string_builder_new_mode_usize(StringBuilderMode.utf16, utf16_view_length_in_code_units(this))
+
+    for i in 0..<utf16_view_length_in_code_units(this):
+        string_builder_append_code_unit(&builder, (u16)to_ascii_lowercase(utf16_view_code_unit_at(this, i)))
+
+    return string_builder_to_utf16_string(&builder)
+
+## Ported from AK/Utf16View.cpp:70 AK::Utf16View::to_ascii_uppercase.
+pub func utf16_view_to_ascii_uppercase(this: const Utf16View*) -> Utf16String:
+    var builder = string_builder_new_mode_usize(StringBuilderMode.utf16, utf16_view_length_in_code_units(this))
+
+    for i in 0..<utf16_view_length_in_code_units(this):
+        string_builder_append_code_unit(&builder, (u16)to_ascii_uppercase(utf16_view_code_unit_at(this, i)))
+
+    return string_builder_to_utf16_string(&builder)
+
+## Ported from AK/Utf16View.cpp:80 AK::Utf16View::to_ascii_titlecase.
+pub func utf16_view_to_ascii_titlecase(this: const Utf16View*) -> Utf16String:
+    var builder = string_builder_new_mode_usize(StringBuilderMode.utf16, utf16_view_length_in_code_units(this))
+    var next_is_upper = true
+
+    for i in 0..<utf16_view_length_in_code_units(this):
+        let code_unit = utf16_view_code_unit_at(this, i)
+
+        if next_is_upper:
+            string_builder_append_code_unit(&builder, (u16)to_ascii_uppercase(code_unit))
+        else:
+            string_builder_append_code_unit(&builder, (u16)to_ascii_lowercase(code_unit))
+
+        next_is_upper = code_unit == (u16)' '
+
+    return string_builder_to_utf16_string(&builder)
+
+# mark: Storage =================================================================================
+
+## Ported from AK/Utf16View.h:187 AK::Utf16View::has_ascii_storage.
+pub func utf16_view_has_ascii_storage(this: const Utf16View*) -> bool:
+    return this.m_length_in_code_units >> utf16_flag == 0
+
+## Ported from AK/Utf16View.h:189 AK::Utf16View::bytes: the ASCII storage.
+pub func utf16_view_bytes(this: const Utf16View*) -> const u8[]:
+    assert(utf16_view_has_ascii_storage(this))
+    let ascii = utf16_view_ascii_pointer(this) else return b""
+    return u8[]((u8*)ascii, utf16_view_length_in_code_units(this))
+
+## Ported from AK/Utf16View.h:195 AK::Utf16View::ascii_span.
+pub func utf16_view_ascii_span(this: const Utf16View*) -> const u8[]:
+    return utf16_view_bytes(this)
+
+## Ported from AK/Utf16View.h:201 AK::Utf16View::utf16_span: the UTF-16 storage.
+pub func utf16_view_utf16_span(this: const Utf16View*) -> const u16[]:
+    assert(not utf16_view_has_ascii_storage(this))
+    let utf16 = utf16_view_utf16_pointer(this) else trap("VERIFY: UTF-16 view without storage")
+    return u16[]((u16*)utf16, utf16_view_length_in_code_units(this))
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<i8>.
+pub func utf16_view_to_number_i8(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_i8(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_i8(*this, trim_whitespace, base_)
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<i16>.
+pub func utf16_view_to_number_i16(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_i16(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_i16(*this, trim_whitespace, base_)
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<i32>.
+pub func utf16_view_to_number_i32(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_i32(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_i32(*this, trim_whitespace, base_)
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<i64>.
+pub func utf16_view_to_number_i64(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_i64(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_i64(*this, trim_whitespace, base_)
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<u8>.
+pub func utf16_view_to_number_u8(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_u8(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_u8(*this, trim_whitespace, base_)
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<u16>.
+pub func utf16_view_to_number_u16(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_u16(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_u16(*this, trim_whitespace, base_)
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<u32>.
+pub func utf16_view_to_number_u32(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_u32(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_u32(*this, trim_whitespace, base_)
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<u64>.
+pub func utf16_view_to_number_u64(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_u64(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_u64(*this, trim_whitespace, base_)
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<f32>.
+pub func utf16_view_to_number_f32(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_f32(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_f32(*this, trim_whitespace, base_)
+
+## Ported from AK/Utf16View.h:208 AK::Utf16View::to_number<f64>.
+pub func utf16_view_to_number_f64(this: const Utf16View*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    if utf16_view_has_ascii_storage(this):
+        return parse_number_string_view_f64(string_view_from_bytes(utf16_view_bytes(this)), trim_whitespace, base_)
+    return parse_number_utf16_view_f64(*this, trim_whitespace, base_)
+
+# mark: Comparison ==============================================================================
+
+## Ported from AK/Utf16View.h:215 AK::Utf16View::operator==(Utf16View const&).
+pub func utf16_view_eq_utf16_view(this: const Utf16View*, other: const Utf16View*) -> bool:
+    if utf16_view_length_in_code_units(this) != utf16_view_length_in_code_units(other):
+        return false
+
+    if utf16_view_has_ascii_storage(this) and utf16_view_has_ascii_storage(other):
+        return compare_bytes(utf16_view_bytes(this), utf16_view_bytes(other)) == 0
+    if not utf16_view_has_ascii_storage(this) and not utf16_view_has_ascii_storage(other):
+        let a = utf16_view_utf16_span(this)
+        let b = utf16_view_utf16_span(other)
+        for i in 0..<a.length:
+            if a[i] != b[i]:
+                return false
+        return true
+
+    for i in 0..<utf16_view_length_in_code_units(this):
+        if utf16_view_code_unit_at(this, i) != utf16_view_code_unit_at(other, i):
+            return false
+
+    return true
+
+## Ported from AK/Utf16View.h:233 AK::Utf16View::operator==(StringView): compares code points
+## with UTF-8 text.
+pub func utf16_view_eq_string_view(this: const Utf16View*, other: StringView) -> bool:
+    if utf16_view_has_ascii_storage(this):
+        let ascii = string_view_from_bytes(utf16_view_bytes(this))
+        return string_view_eq_string_view(&ascii, other)
+
+    if string_view_is_ascii(&other):
+        let other_view = utf16_view_from_ascii(string_view_bytes(&other))
+        return utf16_view_eq_utf16_view(this, &other_view)
+
+    let other_utf8 = Utf8View(m_string = other)
+
+    var this_it = utf16_view_begin(this)
+    var other_it = utf8_view_begin(&other_utf8)
+
+    while not utf16_code_point_iterator_done(&this_it) and not utf8_code_point_iterator_done(&other_it):
+        if utf16_code_point_iterator_deref(&this_it) != utf8_code_point_iterator_deref(&other_it):
+            return false
+        discard(utf16_code_point_iterator_inc(&this_it))
+        discard(utf8_code_point_iterator_inc(&other_it))
+
+    return utf16_code_point_iterator_done(&this_it) and utf8_code_point_iterator_done(&other_it)
+
+## Ported from AK/Utf16View.h:254 AK::Utf16View::operator<=>: orders by code units.
+pub func utf16_view_cmp(this: const Utf16View*, other: const Utf16View*) -> i32:
+    if utf16_view_is_empty(this) and utf16_view_is_empty(other):
+        return 0
+
+    let this_length = utf16_view_length_in_code_units(this)
+    let other_length = utf16_view_length_in_code_units(other)
+    let length = this_length if this_length < other_length else other_length
+    var result: i32 = 0
+
+    if utf16_view_has_ascii_storage(this) and utf16_view_has_ascii_storage(other):
+        result = compare_bytes(utf16_view_bytes(this)[..<length], utf16_view_bytes(other)[..<length])
+    else:
+        for i in 0..<length:
+            let this_code_unit = utf16_view_code_unit_at(this, i)
+            let other_code_unit = utf16_view_code_unit_at(other, i)
+
+            if this_code_unit < other_code_unit:
+                result = -1
+                break
+            if this_code_unit > other_code_unit:
+                result = 1
+                break
+
+    if result == 0:
+        if this_length == other_length:
+            return 0
+        if this_length < other_length:
+            return -1
+        return 1
+
+    return result
+
+## Ported from AK/Utf16View.h:291 AK::Utf16View::equals_ignoring_case.
+pub func utf16_view_equals_ignoring_case(this: const Utf16View*, other: const Utf16View*) -> bool:
+    # FIXME: Handle non-ASCII case insensitive comparisons.
+    return utf16_view_equals_ignoring_ascii_case(this, other)
+
+## Ported from AK/Utf16View.h:297 AK::Utf16View::equals_ignoring_ascii_case.
+pub func utf16_view_equals_ignoring_ascii_case(this: const Utf16View*, other: const Utf16View*) -> bool:
+    if utf16_view_length_in_code_units(this) != utf16_view_length_in_code_units(other):
+        return false
+
+    for i in 0..<utf16_view_length_in_code_units(this):
+        if to_ascii_lowercase(utf16_view_code_unit_at(this, i)) != to_ascii_lowercase(utf16_view_code_unit_at(other, i)):
+            return false
+
+    return true
+
+## Ported from AK/Utf16View.h:322 AK::Utf16View::hash.
+pub func utf16_view_hash(this: const Utf16View*) -> u32:
+    if utf16_view_is_empty(this):
+        return 0
+    if utf16_view_has_ascii_storage(this):
+        let bytes = utf16_view_bytes(this)
+        return string_hash(bytes.data, bytes.length)
+    let code_units = utf16_view_utf16_span(this)
+    return string_hash_u16(code_units.data, code_units.length)
+
+## Ported from AK/Utf16View.h:331 AK::Utf16View::is_empty.
+pub func utf16_view_is_empty(this: const Utf16View*) -> bool:
+    return utf16_view_length_in_code_units(this) == 0
+
+## Ported from AK/Utf16View.cpp:148 AK::Utf16View::is_ascii.
+pub func utf16_view_is_ascii(this: const Utf16View*) -> bool:
+    if utf16_view_has_ascii_storage(this):
+        return true
+    return simdutf_validate_utf16_as_ascii(utf16_view_utf16_span(this))
+
+## Ported from AK/Utf16View.h:335 AK::Utf16View::is_ascii_whitespace.
+pub func utf16_view_is_ascii_whitespace(this: const Utf16View*) -> bool:
+    if utf16_view_has_ascii_storage(this):
+        for byte in utf16_view_ascii_span(this):
+            if not is_ascii_space(byte):
+                return false
+        return true
+    for code_unit in utf16_view_utf16_span(this):
+        if not is_ascii_space(code_unit):
+            return false
+    return true
+
+## Ported from AK/Utf16View.cpp:155 AK::Utf16View::validate. Note that this does not allow lonely
+## surrogates. The string may be assumed to always be valid WTF-16.
+pub func utf16_view_validate(this: const Utf16View*) -> bool:
+    if utf16_view_has_ascii_storage(this):
+        return true
+    return simdutf_validate_utf16(utf16_view_utf16_span(this))
+
+## Ported from AK/Utf16View.cpp:162 AK::Utf16View::validate(size_t&).
+pub func utf16_view_validate_usize(this: const Utf16View*, valid_code_units: usize*) -> bool:
+    if utf16_view_has_ascii_storage(this):
+        *valid_code_units = utf16_view_length_in_code_units(this)
+        return true
+
+    let result = simdutf_validate_utf16_with_errors(utf16_view_utf16_span(this))
+    *valid_code_units = result.count
+
+    return result.error == SimdutfErrorCode.success
+
+## Ported from AK/Utf16View.h:346 AK::Utf16View::length_in_code_units.
+pub func utf16_view_length_in_code_units(this: const Utf16View*) -> usize:
+    return this.m_length_in_code_units & ~((usize)1 << utf16_flag)
+
+## Ported from AK/Utf16View.h:348 AK::Utf16View::length_in_code_points.
+pub func utf16_view_length_in_code_points(this: const Utf16View*) -> usize:
+    if utf16_view_has_ascii_storage(this):
+        return this.m_length_in_code_units
+
+    if this.m_length_in_code_points == usize_max_code_points:
+        return utf16_view_calculate_length_in_code_points(this)
+    return this.m_length_in_code_points
+
+## Ported from AK/Utf16View.h:358 AK::Utf16View::code_unit_at.
+pub func utf16_view_code_unit_at(this: const Utf16View*, index: usize) -> u16:
+    assert(index < utf16_view_length_in_code_units(this))
+
+    if utf16_view_has_ascii_storage(this):
+        return utf16_view_bytes(this)[index]
+    return utf16_view_utf16_span(this)[index]
+
+## Ported from AK/Utf16View.h:367 AK::Utf16View::code_point_at: the code point starting at code
+## unit `index` (a lonely surrogate is its own code point).
+pub func utf16_view_code_point_at(this: const Utf16View*, index: usize) -> u32:
+    assert(index < utf16_view_length_in_code_units(this))
+    let code_point = (u32)utf16_view_code_unit_at(this, index)
+
+    if not unicode_utils_is_utf16_high_surrogate((u16)code_point) and not unicode_utils_is_utf16_low_surrogate((u16)code_point):
+        return code_point
+    if unicode_utils_is_utf16_low_surrogate((u16)code_point) or (index + 1 == utf16_view_length_in_code_units(this)):
+        return code_point
+
+    let second = utf16_view_code_unit_at(this, index + 1)
+    if not unicode_utils_is_utf16_low_surrogate(second):
+        return code_point
+
+    return unicode_utils_decode_utf16_surrogate_pair((u16)code_point, second)
+
+## Ported from AK/Utf16View.h:384 AK::Utf16View::previous_code_point_at: moves `index` back one
+## code point and answers it.
+pub func utf16_view_previous_code_point_at(this: const Utf16View*, index: usize*) -> u32:
+    assert(*index > 0)
+    assert(*index <= utf16_view_length_in_code_units(this))
+    *index -= 1
+    if *index > 0 and unicode_utils_is_utf16_low_surrogate(utf16_view_code_unit_at(this, *index)) and unicode_utils_is_utf16_high_surrogate(utf16_view_code_unit_at(this, *index - 1)):
+        *index -= 1
+    return utf16_view_code_point_at(this, *index)
+
+## Ported from AK/Utf16View.cpp:175 AK::Utf16View::code_unit_offset_of.
+pub func utf16_view_code_unit_offset_of(this: const Utf16View*, code_point_offset: usize) -> usize:
+    assert(code_point_offset <= utf16_view_length_in_code_points(this))
+
+    if utf16_view_length_in_code_points(this) == utf16_view_length_in_code_units(this):
+        # Fast path: all code points are one code unit.
+        return code_point_offset
+
+    var remaining = code_point_offset
+    var code_unit_offset: usize = 0
+
+    var it = utf16_view_begin(this)
+    while not utf16_code_point_iterator_done(&it):
+        if remaining == 0:
+            return code_unit_offset
+
+        code_unit_offset += utf16_code_point_iterator_length_in_code_units(&it)
+        remaining -= 1
+        discard(utf16_code_point_iterator_inc(&it))
+
+    return code_unit_offset
+
+## Ported from AK/Utf16View.cpp:195 AK::Utf16View::code_point_offset_of.
+pub func utf16_view_code_point_offset_of(this: const Utf16View*, code_unit_offset: usize) -> usize:
+    assert(code_unit_offset <= utf16_view_length_in_code_units(this))
+
+    if utf16_view_length_in_code_points(this) == utf16_view_length_in_code_units(this):
+        # Fast path: all code points are one code unit.
+        return code_unit_offset
+
+    var code_point_offset: usize = 0
+
+    # We know the view is using UTF-16 storage because ASCII storage would have returned early above.
+    let start = (usize)(utf16_view_utf16_pointer(this) else trap("VERIFY: UTF-16 view without storage"))
+    var it = utf16_view_begin(this)
+    while not utf16_code_point_iterator_done(&it):
+        discard(utf16_code_point_iterator_inc(&it))
+        if utf16_code_point_iterator_raw(&it) > start + code_unit_offset * sizeof(u16):
+            break
+        code_point_offset += 1
+
+    return code_point_offset

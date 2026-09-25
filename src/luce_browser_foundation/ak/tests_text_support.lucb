@@ -1,0 +1,338 @@
+#==============================================================================================
+#
+#   tests_text_support - tests of the region's code that has no donor tests
+#
+#   DESCRIPTION:
+#       Focused tests pinned to the C++ behaviour for simdutf (results checked against the
+#       donor build's libsimdutf 7.4.0), MemMem, UnicodeUtils, StringBuilder, StringNumber and
+#       Utf32View.
+#
+#==============================================================================================
+
+# mark: simdutf =================================================================================
+
+## validate_utf8_with_errors, count_utf8 and utf16_length_from_utf8 of `bytes`.
+func tc_check_utf8(bytes: const u8[], expected_error: SimdutfErrorCode, count: usize, count_utf8: usize, utf16_length: usize):
+    let result = simdutf_validate_utf8_with_errors(bytes)
+    assert(result.error == expected_error)
+    assert(result.count == count)
+    assert(simdutf_count_utf8(bytes) == count_utf8)
+    assert(simdutf_utf16_length_from_utf8(bytes) == utf16_length)
+
+test "simdutf: UTF-8 validation errors and lengths":
+    tc_check_utf8(b"hello", SimdutfErrorCode.success, 5, 5, 5)
+    tc_check_utf8(b"h\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80", SimdutfErrorCode.success, 10, 4, 5)
+    tc_check_utf8(b"ab\xff", SimdutfErrorCode.header_bits, 2, 3, 4)
+    tc_check_utf8(b"ab\x80", SimdutfErrorCode.too_long, 2, 2, 2)
+    tc_check_utf8(b"ab\xe2\x82", SimdutfErrorCode.too_short, 2, 3, 3)
+    tc_check_utf8(b"a\xc0\xaf", SimdutfErrorCode.overlong, 1, 2, 2)
+    tc_check_utf8(b"a\xed\xa0\x80z", SimdutfErrorCode.surrogate, 1, 3, 3)
+    tc_check_utf8(b"a\xf4\x90\x80\x80", SimdutfErrorCode.too_large, 1, 2, 3)
+    assert(simdutf_validate_ascii(b"plain"))
+    assert(not simdutf_validate_ascii(b"caf\xc3\xa9"))
+
+test "simdutf: UTF-8 to UTF-16":
+    var output: u16[8]
+    let written = simdutf_convert_utf8_to_utf16(b"h\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80", output)
+    assert(written == 5)
+    let expected: u16[5] = [0x0068, 0x00e9, 0x20ac, 0xd83d, 0xde00]
+    for i in 0..<expected.length:
+        assert(output[i] == expected[i])
+    assert(simdutf_convert_utf8_to_utf16(b"a\xff", output) == 0)
+
+test "simdutf: UTF-16 validation, lengths and well-formed copies":
+    let units: u16[7] = [0x41, 0xd83d, 0xde00, 0xe9, 0xdc00, 0x42, 0xd800]
+    let result = simdutf_validate_utf16_with_errors(units)
+    assert(result.error == SimdutfErrorCode.surrogate)
+    assert(result.count == 4)
+    assert(not simdutf_validate_utf16(units))
+    assert(simdutf_validate_utf16(units[..<4]))
+    assert(simdutf_count_utf16(units[..<4]) == 3)
+    assert(simdutf_utf8_length_from_utf16(units) == 12)
+    assert(simdutf_validate_utf16_as_ascii(units[..<1]))
+    assert(not simdutf_validate_utf16_as_ascii(units))
+
+    var well_formed: u16[7]
+    simdutf_to_well_formed_utf16(units, well_formed)
+    let expected: u16[7] = [0x0041, 0xd83d, 0xde00, 0x00e9, 0xfffd, 0x0042, 0xfffd]
+    for i in 0..<expected.length:
+        assert(well_formed[i] == expected[i])
+
+test "simdutf: UTF-16 to UTF-8":
+    let units: u16[7] = [0x41, 0xd83d, 0xde00, 0xe9, 0xdc00, 0x42, 0xd800]
+    var output: u8[32]
+    let written = simdutf_convert_utf16_to_utf8(units[..<4], output)
+    assert(written == 7)
+    assert(tc_bytes_equal(output[..<written], b"\x41\xf0\x9f\x98\x80\xc3\xa9"))
+
+    let (result, partial) = simdutf_convert_utf16_to_utf8_with_errors(units, output)
+    assert(result.error == SimdutfErrorCode.surrogate)
+    assert(result.count == 4)
+    assert(partial == 7)
+    assert(simdutf_convert_utf16_to_utf8(units, output) == 0)
+
+test "simdutf: UTF-16 bytes in either order":
+    let big_endian = b"\x00\x41\xd8\x3d\xde\x00\xd8\x00"
+    assert(simdutf_validate_utf16_bytes(big_endian[..<6], true))
+    assert(not simdutf_validate_utf16_bytes(big_endian, true))
+    assert(simdutf_validate_utf16_bytes(big_endian[..<6], false))
+    assert(simdutf_utf8_length_from_utf16_bytes(big_endian[..<6], true) == 5)
+    let well_formed = simdutf_to_well_formed_utf16_bytes(big_endian, true)
+    assert(well_formed.length == 4)
+    assert(well_formed[0] == 0x41 and well_formed[1] == 0xd83d and well_formed[2] == 0xde00 and well_formed[3] == 0xfffd)
+    var output: u8[16]
+    assert(simdutf_convert_utf16_bytes_to_utf8(big_endian[..<6], true, output) == 5)
+    assert(tc_bytes_equal(output[..<5], b"\x41\xf0\x9f\x98\x80"))
+
+test "simdutf: UTF-32":
+    let code_points: u32[4] = [0x41, 0xe9, 0x20ac, 0x1f600]
+    assert(simdutf_validate_utf32(code_points))
+    assert(simdutf_utf16_length_from_utf32(code_points) == 5)
+    var utf8: u8[16]
+    let utf8_written = simdutf_convert_utf32_to_utf8(code_points, utf8)
+    assert(utf8_written == 10)
+    assert(tc_bytes_equal(utf8[..<utf8_written], b"\x41\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80"))
+    var utf16: u16[8]
+    assert(simdutf_convert_utf32_to_utf16(code_points, utf16) == 5)
+    assert(utf16[3] == 0xd83d and utf16[4] == 0xde00)
+
+    let surrogate: u32[2] = [0x41, 0xd800]
+    assert(not simdutf_validate_utf32(surrogate))
+    assert(simdutf_convert_utf32_to_utf8(surrogate, utf8) == 0)
+    let too_large: u32[1] = [0x110000]
+    assert(not simdutf_validate_utf32(too_large))
+    assert(simdutf_convert_utf32_to_utf8(too_large, utf8) == 0)
+
+test "simdutf: find":
+    assert(simdutf_find(b"abcabc", 'c') == 2)
+    assert(simdutf_find(b"abcabc", 'x') == none)
+    let units: u16[3] = [1, 2, 2]
+    assert(simdutf_find_u16(units, 2) == 1)
+    assert(simdutf_find_u16(units, 3) == none)
+
+# mark: MemMem ==================================================================================
+
+test "memmem: short needles (bitap)":
+    assert(memmem_optional(b"hello", b"") == 0)
+    assert(memmem_optional(b"he", b"hello") == none)
+    assert(memmem_optional(b"hello", b"hello") == 0)
+    assert(memmem_optional(b"hello", b"hellx") == none)
+    assert(memmem_optional(b"hello world", b"o") == 4)
+    assert(memmem_optional(b"hello world", b"world") == 6)
+    assert(memmem_optional(b"hello world", b"worlds") == none)
+    assert(memmem_optional(b"aaaab", b"aab") == 2)
+
+test "memmem: long needles (KMP)":
+    let needle = b"abcdefghijklmnopqrstuvwxyz0123456789"
+    assert(memmem_optional(b"--abcdefghijklmnopqrstuvwxyz0123456789--", needle) == 2)
+    assert(memmem_optional(b"--abcdefghijklmnopqrstuvwxyz012345678--", needle) == none)
+    # A needle with a repeated prefix exercises the KMP table's fallbacks.
+    let repeated = b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab"
+    assert(repeated.length == 33)
+    assert(memmem_optional(b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab", repeated) == 12)
+    assert(memmem_optional(b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", repeated) == none)
+
+# mark: UnicodeUtils ============================================================================
+
+## A UTF-16 callback that records the code units.
+struct TcCodeUnits: Utf16CodeUnitCallback:
+    var units: u16[2]
+    var count: usize
+
+    mutating func call(code_unit: u16):
+        self.units[self.count] = code_unit
+        self.count += 1
+
+test "unicode utils: UTF-8 encoding":
+    assert(unicode_utils_bytes_to_store_code_point_in_utf8(0x7f) == 1)
+    assert(unicode_utils_bytes_to_store_code_point_in_utf8(0x80) == 2)
+    assert(unicode_utils_bytes_to_store_code_point_in_utf8(0x7ff) == 2)
+    assert(unicode_utils_bytes_to_store_code_point_in_utf8(0x800) == 3)
+    assert(unicode_utils_bytes_to_store_code_point_in_utf8(0xffff) == 3)
+    assert(unicode_utils_bytes_to_store_code_point_in_utf8(0x10000) == 4)
+    assert(unicode_utils_bytes_to_store_code_point_in_utf8(0x10ffff) == 4)
+    assert(unicode_utils_bytes_to_store_code_point_in_utf8(0x110000) == 0)
+
+    var utf8 = CodePointAsUtf8()
+    assert(unicode_utils_code_point_to_utf8(0x20ac, &utf8) == 3)
+    assert(tc_bytes_equal(utf8.bytes[..<utf8.length], b"\xe2\x82\xac"))
+    var too_large = CodePointAsUtf8()
+    assert(unicode_utils_code_point_to_utf8(0x110000, &too_large) == -1)
+    assert(too_large.length == 0)
+
+test "unicode utils: UTF-16 encoding":
+    assert(unicode_utils_code_unit_length_for_code_point(0xffff) == 1)
+    assert(unicode_utils_code_unit_length_for_code_point(0x10000) == 2)
+    assert(unicode_utils_is_utf16_high_surrogate(0xd800) and unicode_utils_is_utf16_high_surrogate(0xdbff))
+    assert(not unicode_utils_is_utf16_high_surrogate(0xdc00))
+    assert(unicode_utils_is_utf16_low_surrogate(0xdc00) and unicode_utils_is_utf16_low_surrogate(0xdfff))
+    assert(not unicode_utils_is_utf16_low_surrogate(0xdbff))
+    assert(unicode_utils_decode_utf16_surrogate_pair(0xd83d, 0xde00) == 0x1f600)
+
+    var units = TcCodeUnits()
+    assert(unicode_utils_code_point_to_utf16(0x1f600, &units) == 2)
+    assert(units.units[0] == 0xd83d and units.units[1] == 0xde00)
+    var single = TcCodeUnits()
+    assert(unicode_utils_code_point_to_utf16(0xe9, &single) == 1)
+    assert(single.units[0] == 0xe9)
+
+    let mixed: u16[5] = [0x41, 0x7ff, 0x800, 0xd83d, 0xde00]
+    assert(unicode_utils_maximum_utf8_length_from_utf16(mixed) == 1 + 2 + 3 + 3 + 3)
+
+# mark: StringBuilder ===========================================================================
+
+## Whether a UTF-16 view holds exactly `expected`.
+func tc_utf16_is(view: const Utf16View*, expected: const u16[]) -> bool:
+    if utf16_view_length_in_code_units(view) != expected.length:
+        return false
+    for i in 0..<expected.length:
+        if utf16_view_code_unit_at(view, i) != expected[i]:
+            return false
+    return true
+
+test "string builder: UTF-8 code points":
+    if not ak_core_is_ported:
+        return
+    var builder = string_builder_new()
+    string_builder_append_code_point(&builder, (u32)'a')
+    string_builder_append_code_point(&builder, 0xe9)
+    string_builder_append_code_point(&builder, 0x20ac)
+    string_builder_append_code_point(&builder, 0x1f600)
+    string_builder_append_code_point(&builder, 0x110000)
+    let view = string_builder_string_view(&builder)
+    assert(tc_bytes_equal(string_view_bytes(&view), b"a\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80\xef\xbf\xbd"))
+    assert(string_builder_length(&builder) == 13)
+
+    try string_builder_try_append_code_point(&builder, 0x42)
+    string_builder_trim(&builder, 4)
+    let trimmed = string_builder_string_view(&builder)
+    assert(tc_bytes_equal(string_view_bytes(&trimmed), b"a\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80"))
+
+    string_builder_clear(&builder)
+    assert(string_builder_is_empty(&builder))
+
+test "string builder: UTF-16 mode switches from ASCII storage":
+    if not ak_core_is_ported:
+        return
+    var builder = string_builder_new_mode(StringBuilderMode.utf16)
+    string_builder_append(&builder, "abc")
+    let ascii_view = string_builder_utf16_string_view(&builder)
+    assert(utf16_view_has_ascii_storage(&ascii_view))
+    assert(utf16_view_length_in_code_units(&ascii_view) == 3)
+
+    string_builder_append_code_point(&builder, 0xe9)
+    string_builder_append_code_point(&builder, 0x1f600)
+    string_builder_append_u8(&builder, 'z')
+    let utf16_view = string_builder_utf16_string_view(&builder)
+    assert(not utf16_view_has_ascii_storage(&utf16_view))
+    let expected: u16[7] = [0x61, 0x62, 0x63, 0xe9, 0xd83d, 0xde00, 0x7a]
+    assert(tc_utf16_is(&utf16_view, expected))
+    assert(string_builder_length(&builder) == 14)
+
+    string_builder_trim(&builder, 1)
+    let trimmed = string_builder_utf16_string_view(&builder)
+    assert(tc_utf16_is(&trimmed, expected[..<6]))
+
+    let string = string_builder_to_utf16_string(&builder)
+    assert(utf16_string_base_has_long_utf16_storage(&string.utf16_string_base))
+    assert(utf16_string_base_length_in_code_units(&string.utf16_string_base) == 6)
+    assert(utf16_string_base_length_in_code_points(&string.utf16_string_base) == 5)
+
+test "string builder: UTF-16 views appended in UTF-8 mode":
+    if not ak_core_is_ported:
+        return
+    var builder = string_builder_new()
+    let units: u16[5] = [0x41, 0xd83d, 0xde00, 0xdc00, 0x42]
+    string_builder_append_utf16_view(&builder, utf16_view_from_utf16(units))
+    let view = string_builder_string_view(&builder)
+    # The lonely low surrogate is encoded as three bytes (WTF-8).
+    assert(tc_bytes_equal(string_view_bytes(&view), b"\x41\xf0\x9f\x98\x80\xed\xb0\x80\x42"))
+
+test "string builder: append_escaped_for_json":
+    if not ak_core_is_ported:
+        return
+    var builder = string_builder_new()
+    string_builder_append_escaped_for_json(&builder, string_view_from_bytes(b"\"\\\x08\n\t\x01\x1fx"))
+    let view = string_builder_string_view(&builder)
+    assert(tc_view_is(view, "\\\"\\\\\\b\\n\\t\\u0001\\u001fx"))
+
+test "string builder: append_repeated and append_as_lowercase":
+    if not ak_core_is_ported:
+        return
+    var builder = string_builder_new()
+    string_builder_append_repeated_u8(&builder, '-', 3)
+    string_builder_append_repeated_string_view(&builder, sv("ab"), 2)
+    string_builder_append_as_lowercase(&builder, 'Q')
+    string_builder_append_as_lowercase(&builder, '1')
+    let view = string_builder_string_view(&builder)
+    assert(tc_view_is(view, "---ababq1"))
+    let string = string_builder_to_string(&builder) else trap("MUST")
+    assert(string_eq_string_view(&string, sv("---ababq1")))
+
+# mark: StringNumber ============================================================================
+
+test "string number: extremes":
+    let minimum = string_number_i64(-9223372036854775808)
+    assert(string_eq_string_view(&minimum, sv("-9223372036854775808")))
+    let maximum = string_number_i64(9223372036854775807)
+    assert(string_eq_string_view(&maximum, sv("9223372036854775807")))
+    let zero = string_number_i64(0)
+    assert(string_eq_string_view(&zero, sv("0")))
+    let negative = string_number_i64(-42)
+    assert(string_eq_string_view(&negative, sv("-42")))
+    let unsigned_maximum = string_number_u64(18446744073709551615)
+    assert(string_eq_string_view(&unsigned_maximum, sv("18446744073709551615")))
+
+    let utf16 = utf16_string_number_i64(-123456789)
+    assert(utf16_string_base_eq_string_view(&utf16.utf16_string_base, sv("-123456789")))
+    let utf16_unsigned = utf16_string_number_u64(7)
+    assert(utf16_string_base_eq_string_view(&utf16_unsigned.utf16_string_base, sv("7")))
+
+    let byte_string = byte_string_number_i64(-5)
+    assert(tc_bs_is(&byte_string, "-5"))
+    let byte_string_unsigned = byte_string_number_u64(18446744073709551615)
+    assert(tc_bs_is(&byte_string_unsigned, "18446744073709551615"))
+
+# mark: Utf32View ===============================================================================
+
+test "utf32 view":
+    let code_points: u32[4] = [0x41, 0xe9, 0x20ac, 0x1f600]
+    let view = utf32_view_from_span(code_points)
+    assert(utf32_view_length(&view) == 4)
+    assert(not utf32_view_is_empty(&view))
+    assert(not utf32_view_is_null(&view))
+    assert(not utf32_view_is_ascii(&view))
+    assert(utf32_view_at_const(&view, 3) == 0x1f600)
+
+    let tail = utf32_view_substring_view(&view, 2)
+    assert(utf32_view_length(&tail) == 2)
+    assert(utf32_view_at_const_2(&tail, 0) == 0x20ac)
+    let head = utf32_view_substring_view_usize(&view, 0, 1)
+    assert(utf32_view_is_ascii(&head))
+
+    let same = utf32_view_from_span(code_points)
+    assert(utf32_view_eq(&view, &same))
+    assert(not utf32_view_eq(&view, &tail))
+
+    var it = utf32_view_begin(&view)
+    assert(utf32_code_point_iterator_peek(&it, 3) == 0x1f600)
+    assert(utf32_code_point_iterator_peek(&it, 4) == none)
+    discard(utf32_code_point_iterator_inc(&it))
+    assert(utf32_view_iterator_offset(&view, &it) == 1)
+    assert(utf32_code_point_iterator_deref(&it) == 0xe9)
+    let begin = utf32_view_begin(&view)
+    assert(utf32_code_point_iterator_sub(&it, &begin) == 1)
+    assert(utf32_code_point_iterator_code_point_length_in_bytes(&it) == 4)
+
+    var count: usize = 0
+    var walker = utf32_view_begin(&view)
+    let end = utf32_view_end(&view)
+    while not utf32_code_point_iterator_eq(&walker, &end):
+        count += 1
+        discard(utf32_code_point_iterator_inc(&walker))
+    assert(count == 4)
+    assert(utf32_code_point_iterator_done(&walker))
+
+    let empty = Utf32View()
+    assert(utf32_view_is_null(&empty))
+    assert(utf32_view_is_empty(&empty))

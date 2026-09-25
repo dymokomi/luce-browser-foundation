@@ -1,0 +1,167 @@
+#==============================================================================================
+#
+#   tests_fly_string - FlyString tests
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestFlyString.cpp (lines 1-144).
+#
+#       The donor counts table entries absolutely and relies on dead strings leaving the table;
+#       in managed memory nothing dies and the table persists across tests, so the port checks
+#       how much the count grows, with strings no other test interns, and drops the checks that
+#       a dead string left the table and that a moved-from FlyString is empty (moves are copies).
+#       Interned strings and the table live in `memory.heap`, not the per-test buffer, because
+#       the table outlives the test.
+#
+#==============================================================================================
+
+## `FlyString { "text"_string }`.
+func tc_fly(text: str) -> FlyString:
+    return fly_string_from_string(string_from_str(text))
+
+## `fly == "text"sv`.
+func tc_fly_is(fly: const FlyString*, text: str) -> bool:
+    return fly_string_eq_string_view(fly, sv(text))
+
+test "empty_string":
+    let fly = fly_string_new()
+    assert(fly_string_is_empty(&fly))
+    assert(tc_fly_is(&fly, ""))
+
+    # Short strings do not get stored in the fly string table.
+    if ak_core_is_ported:
+        let before = fly_string_number_of_fly_strings()
+        discard(tc_fly(""))
+        assert(fly_string_number_of_fly_strings() == before)
+
+test "short_ascii_literal_is_constexpr":
+    # The _fly_string UDL folds short ASCII literals to a constant.
+    let fly = fly_string_from_str("foo")
+    assert(tc_fly_is(&fly, "foo"))
+    let view = fly_string_bytes_as_string_view(&fly)
+    assert(string_view_length(&view) == 3)
+
+test "short_string":
+    var before: usize = 0
+    if ak_core_is_ported:
+        before = fly_string_number_of_fly_strings()
+
+    let fly1 = tc_fly("foo")
+    assert(tc_fly_is(&fly1, "foo"))
+
+    let fly2 = tc_fly("foo")
+    assert(tc_fly_is(&fly2, "foo"))
+
+    let fly3 = tc_fly("bar")
+    assert(tc_fly_is(&fly3, "bar"))
+
+    assert(fly_string_eq_fly_string(&fly1, &fly2))
+    assert(not fly_string_eq_fly_string(&fly1, &fly3))
+    assert(not fly_string_eq_fly_string(&fly2, &fly3))
+
+    let string1 = fly_string_to_string_const_2(&fly1)
+    let string2 = fly_string_to_string_const_2(&fly2)
+    let string3 = fly_string_to_string_const_2(&fly3)
+    assert(string_base_is_short_string(&string1.string_base))
+    assert(string_base_is_short_string(&string2.string_base))
+    assert(string_base_is_short_string(&string3.string_base))
+
+    # Short strings do not get stored in the fly string table.
+    if ak_core_is_ported:
+        assert(fly_string_number_of_fly_strings() == before)
+
+test "long_string":
+    if not ak_core_is_ported:
+        return
+    with memory.heap:
+        let before = fly_string_number_of_fly_strings()
+
+        let fly1 = tc_fly("long_string: thisisdefinitelymorethan7bytes")
+        assert(tc_fly_is(&fly1, "long_string: thisisdefinitelymorethan7bytes"))
+        assert(fly_string_number_of_fly_strings() == before + 1)
+
+        let fly2 = tc_fly("long_string: thisisdefinitelymorethan7bytes")
+        assert(tc_fly_is(&fly2, "long_string: thisisdefinitelymorethan7bytes"))
+        assert(fly_string_number_of_fly_strings() == before + 1)
+
+        let fly3 = tc_fly("long_string: thisisalsoforsuremorethan7bytes")
+        assert(tc_fly_is(&fly3, "long_string: thisisalsoforsuremorethan7bytes"))
+        assert(fly_string_number_of_fly_strings() == before + 2)
+
+        assert(fly_string_eq_fly_string(&fly1, &fly2))
+        assert(not fly_string_eq_fly_string(&fly1, &fly3))
+        assert(not fly_string_eq_fly_string(&fly2, &fly3))
+
+        let string1 = fly_string_to_string_const_2(&fly1)
+        let string2 = fly_string_to_string_const_2(&fly2)
+        let string3 = fly_string_to_string_const_2(&fly3)
+        assert(not string_base_is_short_string(&string1.string_base))
+        assert(not string_base_is_short_string(&string2.string_base))
+        assert(not string_base_is_short_string(&string3.string_base))
+
+test "from_string_view":
+    if not ak_core_is_ported:
+        return
+    with memory.heap:
+        let before = fly_string_number_of_fly_strings()
+
+        let fly1 = fly_string_from_str("from_string_view: thisisdefinitelymorethan7bytes")
+        assert(tc_fly_is(&fly1, "from_string_view: thisisdefinitelymorethan7bytes"))
+        assert(fly_string_number_of_fly_strings() == before + 1)
+
+        let fly2 = fly_string_from_str("from_string_view: thisisdefinitelymorethan7bytes")
+        assert(tc_fly_is(&fly2, "from_string_view: thisisdefinitelymorethan7bytes"))
+        assert(fly_string_number_of_fly_strings() == before + 1)
+
+        let fly3 = fly_string_from_str("foo")
+        assert(tc_fly_is(&fly3, "foo"))
+        assert(fly_string_number_of_fly_strings() == before + 1)
+
+        assert(fly_string_eq_fly_string(&fly1, &fly2))
+        assert(not fly_string_eq_fly_string(&fly1, &fly3))
+        assert(not fly_string_eq_fly_string(&fly2, &fly3))
+
+test "fly_string_keep_string_data_alive":
+    if not ak_core_is_ported:
+        return
+    with memory.heap:
+        let before = fly_string_number_of_fly_strings()
+        var fly = fly_string_new()
+        if true:
+            let string = string_from_str("keep_alive: thisisdefinitelymorethan7bytes")
+            fly = fly_string_from_string(string)
+            assert(fly_string_number_of_fly_strings() == before + 1)
+
+        assert(tc_fly_is(&fly, "keep_alive: thisisdefinitelymorethan7bytes"))
+        assert(fly_string_number_of_fly_strings() == before + 1)
+
+test "moved_fly_string_becomes_empty":
+    if not ak_core_is_ported:
+        return
+    with memory.heap:
+        var fly1 = fly_string_new()
+        assert(fly_string_is_empty(&fly1))
+
+        let before = fly_string_number_of_fly_strings()
+        let fly2 = tc_fly("moved: thisisdefinitelymorethan7bytes")
+        assert(tc_fly_is(&fly2, "moved: thisisdefinitelymorethan7bytes"))
+        assert(fly_string_number_of_fly_strings() == before + 1)
+
+        fly1 = fly2
+
+        assert(tc_fly_is(&fly1, "moved: thisisdefinitelymorethan7bytes"))
+        assert(fly_string_number_of_fly_strings() == before + 1)
+
+test "is_one_of":
+    let foo = fly_string_from_utf8(sv("foo")) else trap("MUST")
+    let bar = fly_string_from_utf8(sv("bar")) else trap("MUST")
+
+    # is_one_of(Ts...) is a fold of operator==.
+    assert(fly_string_eq_fly_string(&foo, &foo))
+    assert(fly_string_eq_fly_string(&foo, &foo) or fly_string_eq_fly_string(&foo, &bar))
+    assert(fly_string_eq_fly_string(&foo, &bar) or fly_string_eq_fly_string(&foo, &foo))
+    assert(not fly_string_eq_fly_string(&foo, &bar))
+
+    assert(not fly_string_eq_string_view(&bar, sv("foo")))
+    assert(fly_string_eq_string_view(&bar, sv("foo")) or fly_string_eq_string_view(&bar, sv("bar")))
+    assert(fly_string_eq_string_view(&bar, sv("bar")) or fly_string_eq_string_view(&bar, sv("foo")))
+    assert(fly_string_eq_string_view(&bar, sv("bar")))

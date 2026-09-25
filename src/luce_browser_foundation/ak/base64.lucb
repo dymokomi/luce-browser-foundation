@@ -1,0 +1,112 @@
+#==============================================================================================
+#
+#   base64 - Base64 and base64url encoding and forgiving decoding
+#
+#   DESCRIPTION:
+#       Port of AK/Base64.h (lines 1-52) and AK/Base64.cpp (lines 1-139), in the .cpp's
+#       order. The simdutf calls go to simdutf_base64; simdutf's option enums replace the
+#       opaque CNSimdutf* structs of the generated signatures. `ErrorOr<size_t,
+#       InvalidBase64>` is the payload enum DecodeBase64IntoResult.
+#
+#==============================================================================================
+
+## Ported from AK/Base64.cpp:14 AK::size_required_to_decode_base64: an upper bound of the bytes
+## `input` decodes to.
+pub func size_required_to_decode_base64(input: StringView) -> usize:
+    return simdutf_maximal_binary_length_from_base64(string_view_bytes(&input))
+
+## Ported from AK/Base64.cpp:19 AK::to_simdutf_last_chunk_handling.
+func to_simdutf_last_chunk_handling(last_chunk_handling: LastChunkHandling) -> SimdutfLastChunkHandling:
+    match last_chunk_handling:
+        .loose: return SimdutfLastChunkHandling.loose
+        .strict: return SimdutfLastChunkHandling.strict
+        .stop_before_partial: return SimdutfLastChunkHandling.stop_before_partial
+        _: trap("VERIFY_NOT_REACHED")
+
+## An AK::Error::from_string_literal.
+func base64_error_from_string_literal(literal: str) -> AkError:
+    return AkError(m_string_literal = sv(literal), m_code = 0, m_kind = AkErrorKind.string_literal)
+
+## Ported from AK/Base64.cpp:33 AK::decode_base64_into_impl: decodes into `output`, resized to
+## the bytes written.
+func decode_base64_into_impl(input: StringView, output: ByteBuffer*, last_chunk_handling: LastChunkHandling, options: SimdutfBase64Options) -> DecodeBase64IntoResult:
+    let decode_up_to_bad_character = true
+    var output_length = byte_buffer_size(output)
+
+    var destination: u8[] = u8[]((u8*)"".bytes.data, 0)
+    if let data = byte_buffer_data(output):
+        destination = u8[](data, output_length)
+
+    let result = simdutf_base64_to_binary_safe(string_view_bytes(&input), destination, &output_length, options, to_simdutf_last_chunk_handling(last_chunk_handling), decode_up_to_bad_character)
+
+    if result.error != SimdutfErrorCode.success and result.error != SimdutfErrorCode.output_buffer_too_small:
+        byte_buffer_resize(output, (result.count // 4) * 3)
+
+        let invalid_error = match result.error:
+            .base64_extra_bits => base64_error_from_string_literal("Extra bits found at end of chunk")
+            .base64_input_remainder => base64_error_from_string_literal("Invalid trailing data")
+            .invalid_base64_character => base64_error_from_string_literal("Invalid base64 character")
+            _ => base64_error_from_string_literal("Invalid base64-encoded data")
+
+        return DecodeBase64IntoResult.invalid(invalid_base64 = InvalidBase64(error = invalid_error, valid_input_bytes = result.count))
+
+    assert(output_length <= byte_buffer_size(output))
+    byte_buffer_resize(output, output_length)
+
+    return DecodeBase64IntoResult.decoded(count = result.count)
+
+## Ported from AK/Base64.cpp:72 AK::decode_base64_impl.
+func decode_base64_impl(input: StringView, last_chunk_handling: LastChunkHandling, options: SimdutfBase64Options) -> ByteBuffer!:
+    var output: ByteBuffer
+    try byte_buffer_try_resize(&output, size_required_to_decode_base64(input))
+
+    match decode_base64_into_impl(input, &output, last_chunk_handling, options):
+        .invalid(invalid):
+            error(ak_error, (str)string_view_bytes(&invalid.error.m_string_literal))
+        .decoded(_):
+            return output
+
+## Ported from AK/Base64.cpp:83 AK::encode_base64_impl.
+func encode_base64_impl(input: const u8[], options: SimdutfBase64Options) -> String!:
+    if input.length == 0:
+        return string_new()
+
+    var buffer: u8*? = none
+    let length = simdutf_base64_length_from_binary(input.length, options)
+    let output = try string_data_create_uninitialized(length, &buffer)
+
+    discard(simdutf_binary_to_base64(input, u8[](buffer else trap("VERIFY: buffer"), length), options))
+
+    var result = String(string_base = StringBase())
+    string_base_construct_string_data(&result.string_base, output)
+    return result
+
+## Ported from AK/Base64.cpp:101 AK::decode_base64: forgiving-base64 decoding of `input`.
+pub func decode_base64(input: StringView, last_chunk_handling: LastChunkHandling = LastChunkHandling.loose) -> ByteBuffer!:
+    return try decode_base64_impl(input, last_chunk_handling, SimdutfBase64Options.base64_default)
+
+## Ported from AK/Base64.cpp:106 AK::decode_base64url.
+pub func decode_base64url(input: StringView, last_chunk_handling: LastChunkHandling = LastChunkHandling.loose) -> ByteBuffer!:
+    return try decode_base64_impl(input, last_chunk_handling, SimdutfBase64Options.base64_url)
+
+## Ported from AK/Base64.cpp:111 AK::decode_base64_into: decodes into `output`'s current size.
+## On success the count is the input bytes decoded, which might be less than the string length
+## if the output buffer was not large enough.
+pub func decode_base64_into(input: StringView, output: ByteBuffer*, last_chunk_handling: LastChunkHandling = LastChunkHandling.loose) -> DecodeBase64IntoResult:
+    return decode_base64_into_impl(input, output, last_chunk_handling, SimdutfBase64Options.base64_default)
+
+## Ported from AK/Base64.cpp:116 AK::decode_base64url_into.
+pub func decode_base64url_into(input: StringView, output: ByteBuffer*, last_chunk_handling: LastChunkHandling = LastChunkHandling.loose) -> DecodeBase64IntoResult:
+    return decode_base64_into_impl(input, output, last_chunk_handling, SimdutfBase64Options.base64_url)
+
+## Ported from AK/Base64.cpp:121 AK::encode_base64.
+pub func encode_base64(input: const u8[], omit_padding: OmitPadding = OmitPadding.no) -> String!:
+    let options = SimdutfBase64Options.base64_default_no_padding if omit_padding == OmitPadding.yes else SimdutfBase64Options.base64_default
+
+    return try encode_base64_impl(input, options)
+
+## Ported from AK/Base64.cpp:130 AK::encode_base64url.
+pub func encode_base64url(input: const u8[], omit_padding: OmitPadding = OmitPadding.no) -> String!:
+    let options = SimdutfBase64Options.base64_url if omit_padding == OmitPadding.yes else SimdutfBase64Options.base64_url_with_padding
+
+    return try encode_base64_impl(input, options)

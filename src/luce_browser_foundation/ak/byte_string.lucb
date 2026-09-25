@@ -1,0 +1,555 @@
+#==============================================================================================
+#
+#   byte_string - ByteString: an immutable NUL-terminated byte string
+#
+#   DESCRIPTION:
+#       Port of AK/ByteString.h (lines 1-332) and AK/ByteString.cpp (lines 1-298), in the
+#       header's order with the .cpp bodies in place of their declarations.
+#
+#       A ByteString points at a ByteStringImpl (never null: the empty string is the static
+#       empty impl). Copies share the impl. Unlike String, a ByteString's bytes always live in
+#       the impl, so views of a ByteString value stay valid while the impl is reachable.
+#
+#==============================================================================================
+
+# mark: Construction ============================================================================
+
+## Ported from AK/ByteString.h:43 AK::ByteString::ByteString(): the empty string.
+pub func byte_string_construct(this: ByteString*):
+    this.m_impl = byte_string_impl_the_empty_stringimpl()
+
+## Ported from AK/ByteString.h:48 AK::ByteString::ByteString(StringView).
+pub func byte_string_construct_string_view(this: ByteString*, view: StringView):
+    this.m_impl = byte_string_impl_create_u8_usize(string_view_characters_without_null_termination(&view) else "".bytes.data, string_view_length(&view))
+
+## Ported from AK/ByteString.h:64 AK::ByteString::ByteString(char const*, ShouldChomp).
+pub func byte_string_construct_u8_should_chomp(this: ByteString*, cstring: const u8*?, should_chomp: ShouldChomp = ShouldChomp.no_chomp):
+    this.m_impl = byte_string_impl_create_u8_should_chomp(cstring, should_chomp)
+
+## Ported from AK/ByteString.h:69 AK::ByteString::ByteString(char const*, size_t, ShouldChomp).
+pub func byte_string_construct_u8_usize(this: ByteString*, cstring: const u8*?, length: usize, should_chomp: ShouldChomp = ShouldChomp.no_chomp):
+    this.m_impl = byte_string_impl_create_u8_usize(cstring, length, should_chomp)
+
+## Ported from AK/ByteString.h:74 AK::ByteString::ByteString(ReadonlyBytes, ShouldChomp).
+pub func byte_string_construct_span_u8(this: ByteString*, bytes: const u8[], should_chomp: ShouldChomp = ShouldChomp.no_chomp):
+    this.m_impl = byte_string_impl_create_span_u8(bytes, should_chomp)
+
+## Ported from AK/ByteString.h:79 AK::ByteString::ByteString(ByteStringImpl const&).
+pub func byte_string_construct_byte_string_impl(this: ByteString*, impl: const ByteStringImpl*):
+    this.m_impl = impl
+
+## Ported from AK/ByteString.h:84 AK::ByteString::ByteString(NonnullRefPtr<ByteStringImpl const>&&).
+pub func byte_string_construct_byte_string_impl_2(this: ByteString*, impl: const ByteStringImpl*):
+    this.m_impl = impl
+
+## Ported from AK/ByteString.cpp:240 AK::ByteString::ByteString(FlyString const&).
+pub func byte_string_construct_fly_string(this: ByteString*, string: const FlyString*):
+    this.m_impl = byte_string_impl_create_span_u8(fly_string_bytes(string))
+
+## `ByteString(view)`: a ByteString of a view's bytes (the value form of the StringView
+## constructor).
+pub func byte_string_from_string_view(view: StringView) -> ByteString:
+    var result = ByteString(m_impl = byte_string_impl_the_empty_stringimpl())
+    byte_string_construct_string_view(&result, view)
+    return result
+
+## `ByteString("text")`: a ByteString of a literal or any other `str`.
+pub func byte_string_from_str(text: str) -> ByteString:
+    return byte_string_from_string_view(sv(text))
+
+## `ByteString(impl)`: the value form of the ByteStringImpl constructors.
+pub func byte_string_from_impl(impl: const ByteStringImpl*) -> ByteString:
+    return ByteString(m_impl = impl)
+
+## Ported from AK/ByteString.cpp:167 AK::ByteString::repeated(char, size_t).
+pub func byte_string_repeated_u8(ch: u8, count: usize) -> ByteString:
+    if count == 0:
+        return byte_string_empty()
+    var buffer: u8*? = none
+    let impl = byte_string_impl_create_uninitialized(count, &buffer)
+    memory.set(u8[](buffer else trap("VERIFY: buffer"), count), ch)
+    return byte_string_from_impl(impl)
+
+## Ported from AK/ByteString.cpp:177 AK::ByteString::repeated(StringView, size_t).
+pub func byte_string_repeated_string_view(string: StringView, count: usize) -> ByteString:
+    if count == 0 or string_view_is_empty(&string):
+        return byte_string_empty()
+    var buffer: u8*? = none
+    let length = string_view_length(&string)
+    let impl = byte_string_impl_create_uninitialized(count * length, &buffer)
+    let destination = u8[](buffer else trap("VERIFY: buffer"), count * length)
+    for i in 0..<count:
+        copy_bytes(destination[(i * length)..], string_view_bytes(&string))
+    return byte_string_from_impl(impl)
+
+## Ported from AK/ByteString.h:112 AK::ByteString::join over StringViews with the default "{}"
+## format.
+pub func byte_string_join_string_view(separator: StringView, collection: const StringView[]) -> ByteString:
+    var builder = string_builder_new()
+    string_builder_join_string_view(&builder, separator, collection)
+    return string_builder_to_byte_string(&builder)
+
+## Ported from AK/ByteString.cpp:193 AK::ByteString::matches(StringView, CaseSensitivity).
+pub func byte_string_matches_case_sensitivity(this: const ByteString*, mask: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_insensitive) -> bool:
+    return string_utils_matches(byte_string_view(this), mask, case_sensitivity)
+
+## Ported from AK/ByteString.cpp:188 AK::ByteString::matches(StringView, Vector<MaskSpan>&, CaseSensitivity).
+pub func byte_string_matches_vector(this: const ByteString*, mask: StringView, mask_spans: Vector[MaskSpan]*, case_sensitivity: CaseSensitivity = CaseSensitivity.case_insensitive) -> bool:
+    return string_utils_matches(byte_string_view(this), mask, case_sensitivity, mask_spans)
+
+## Ported from AK/ByteString.h:123 AK::ByteString::number for signed integral T (formatted "{}").
+pub func byte_string_number_i64(value: i64) -> ByteString:
+    var buffer: u8[26]
+    let (unsigned_value, is_negative) = create_string_from_number_split(value)
+    return byte_string_from_string_view(string_view_from_bytes(create_string_from_number_digits(buffer, unsigned_value, is_negative)))
+
+## Ported from AK/ByteString.h:123 AK::ByteString::number for unsigned integral T (formatted "{}").
+pub func byte_string_number_u64(value: u64) -> ByteString:
+    var buffer: u8[26]
+    return byte_string_from_string_view(string_view_from_bytes(create_string_from_number_digits(buffer, value, false)))
+
+## Ported from AK/ByteString.h:123 AK::ByteString::number for floating-point T: formatted("{}", value).
+pub func byte_string_number_f64(value: f64) -> ByteString:
+    var parameter: TypeErasedParameter
+    var params = type_erased_format_params_for_f64(&parameter, value)
+    return byte_string_vformatted(sv("{}"), &params)
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<i8>.
+pub func byte_string_to_number_i8(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i8?:
+    return parse_number_string_view_i8(byte_string_view(this), trim_whitespace, base_)
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<i16>.
+pub func byte_string_to_number_i16(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i16?:
+    return parse_number_string_view_i16(byte_string_view(this), trim_whitespace, base_)
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<i32>.
+pub func byte_string_to_number_i32(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i32?:
+    return parse_number_string_view_i32(byte_string_view(this), trim_whitespace, base_)
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<i64>.
+pub func byte_string_to_number_i64(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> i64?:
+    return parse_number_string_view_i64(byte_string_view(this), trim_whitespace, base_)
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<u8>.
+pub func byte_string_to_number_u8(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u8?:
+    return parse_number_string_view_u8(byte_string_view(this), trim_whitespace, base_)
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<u16>.
+pub func byte_string_to_number_u16(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u16?:
+    return parse_number_string_view_u16(byte_string_view(this), trim_whitespace, base_)
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<u32>.
+pub func byte_string_to_number_u32(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u32?:
+    return parse_number_string_view_u32(byte_string_view(this), trim_whitespace, base_)
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<u64>.
+pub func byte_string_to_number_u64(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> u64?:
+    return parse_number_string_view_u64(byte_string_view(this), trim_whitespace, base_)
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<f32>.
+pub func byte_string_to_number_f32(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f32?:
+    return parse_number_string_view_f32(byte_string_view(this), trim_whitespace, base_)
+
+## Ported from AK/ByteString.h:129 AK::ByteString::to_number<f64>.
+pub func byte_string_to_number_f64(this: const ByteString*, trim_whitespace: TrimWhitespace = TrimWhitespace.yes, base_: i32 = 10) -> f64?:
+    return parse_number_string_view_f64(byte_string_view(this), trim_whitespace, base_)
+
+# mark: Case and trimming =======================================================================
+
+## Ported from AK/ByteString.cpp:245 AK::ByteString::to_lowercase.
+pub func byte_string_to_lowercase(this: const ByteString*) -> ByteString:
+    var has_upper = false
+    for byte in byte_string_bytes(this):
+        if is_ascii_upper_alpha(byte):
+            has_upper = true
+            break
+    if not has_upper:
+        return *this
+
+    var buffer: u8*? = none
+    let impl = byte_string_impl_create_uninitialized(byte_string_length(this), &buffer)
+    let destination = buffer else trap("VERIFY: buffer")
+
+    let characters = byte_string_bytes(this)
+    for i in 0..<characters.length:
+        destination[i] = (u8)to_ascii_lowercase(characters[i])
+
+    return byte_string_from_impl(impl)
+
+## Ported from AK/ByteString.cpp:259 AK::ByteString::to_uppercase.
+pub func byte_string_to_uppercase(this: const ByteString*) -> ByteString:
+    var has_lower = false
+    for byte in byte_string_bytes(this):
+        if is_ascii_lower_alpha(byte):
+            has_lower = true
+            break
+    if not has_lower:
+        return *this
+
+    var buffer: u8*? = none
+    let impl = byte_string_impl_create_uninitialized(byte_string_length(this), &buffer)
+    let destination = buffer else trap("VERIFY: buffer")
+
+    let characters = byte_string_bytes(this)
+    for i in 0..<characters.length:
+        destination[i] = (u8)to_ascii_uppercase(characters[i])
+
+    return byte_string_from_impl(impl)
+
+## Ported from AK/ByteString.cpp:273 AK::ByteString::to_snakecase.
+pub func byte_string_to_snakecase(this: const ByteString*) -> ByteString:
+    return string_utils_to_snakecase(byte_string_view(this))
+
+## Ported from AK/ByteString.h:138 AK::ByteString::is_whitespace.
+pub func byte_string_is_whitespace(this: const ByteString*) -> bool:
+    return string_utils_is_whitespace(byte_string_view(this))
+
+## Ported from AK/ByteString.h:140 AK::ByteString::trim.
+pub func byte_string_trim(this: const ByteString*, characters: StringView, mode: TrimMode = TrimMode.both) -> ByteString:
+    let view = byte_string_view(this)
+    let trimmed_view = string_utils_trim(view, characters, mode)
+    if string_view_eq_string_view(&view, trimmed_view):
+        return *this
+    return byte_string_from_string_view(trimmed_view)
+
+## Ported from AK/ByteString.h:148 AK::ByteString::trim_whitespace.
+pub func byte_string_trim_whitespace(this: const ByteString*, mode: TrimMode = TrimMode.both) -> ByteString:
+    let view = byte_string_view(this)
+    let trimmed_view = string_utils_trim_whitespace(view, mode)
+    if string_view_eq_string_view(&view, trimmed_view):
+        return *this
+    return byte_string_from_string_view(trimmed_view)
+
+## Ported from AK/ByteString.cpp:208 AK::ByteString::equals_ignoring_ascii_case.
+pub func byte_string_equals_ignoring_ascii_case(this: const ByteString*, other: StringView) -> bool:
+    return string_utils_equals_ignoring_ascii_case(byte_string_view(this), other)
+
+## Ported from AK/ByteString.cpp:198 AK::ByteString::contains(StringView, CaseSensitivity).
+pub func byte_string_contains_string_view(this: const ByteString*, needle: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    return string_utils_contains(byte_string_view(this), needle, case_sensitivity)
+
+## Ported from AK/ByteString.cpp:203 AK::ByteString::contains(char, CaseSensitivity).
+pub func byte_string_contains_u8(this: const ByteString*, needle: u8, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    var needle_bytes: u8[1] = [needle]
+    return string_utils_contains(byte_string_view(this), string_view_from_bytes(needle_bytes), case_sensitivity)
+
+# mark: Splitting and searching =================================================================
+
+## Ported from AK/ByteString.cpp:84 AK::ByteString::split_limit.
+pub func byte_string_split_limit(this: const ByteString*, separator: u8, limit: usize, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[ByteString]:
+    var v: Vector[ByteString]
+    if byte_string_is_empty(this):
+        return v
+
+    var substart: usize = 0
+    let keep_empty = has_flag(split_behavior, SplitBehavior.keep_empty)
+    let keep_separator = has_flag(split_behavior, SplitBehavior.keep_trailing_separator)
+    let characters = byte_string_bytes(this)
+    var i: usize = 0
+    while i < characters.length and (vector_size(&v) + 1) != limit:
+        let ch = characters[i]
+        if ch == separator:
+            let sublen = i - substart
+            if sublen != 0 or keep_empty:
+                vector_append_t(&v, byte_string_substring_usize(this, substart, sublen + 1 if keep_separator else sublen))
+            substart = i + 1
+        i += 1
+    let taillen = byte_string_length(this) - substart
+    if taillen != 0 or keep_empty:
+        vector_append_t(&v, byte_string_substring_usize(this, substart, taillen))
+    return v
+
+## Ported from AK/ByteString.cpp:79 AK::ByteString::split.
+pub func byte_string_split(this: const ByteString*, separator: u8, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[ByteString]:
+    return byte_string_split_limit(this, separator, 0, split_behavior)
+
+## The `[separator](char ch) { return ch == separator; }` predicate of ByteString::split_view(char).
+struct ByteStringSplitViewIsSeparator: CharPredicate:
+    var separator: u8
+
+    func matches(ch: u8) -> bool:
+        return ch == self.separator
+
+## Ported from AK/ByteString.cpp:132 AK::ByteString::split_view(char, SplitBehavior).
+pub func byte_string_split_view_u8(this: const ByteString*, separator: u8, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[StringView]:
+    let is_separator = ByteStringSplitViewIsSeparator(separator = separator)
+    return byte_string_split_view_if(this, &is_separator, split_behavior)
+
+## Ported from AK/ByteString.cpp:108 AK::ByteString::split_view(Function<bool(char)>, SplitBehavior).
+## The predicate is a CharPredicate.
+pub func byte_string_split_view_if[P: CharPredicate](this: const ByteString*, separator: const P*, split_behavior: SplitBehavior = SplitBehavior.nothing) -> Vector[StringView]:
+    var v: Vector[StringView]
+    if byte_string_is_empty(this):
+        return v
+
+    var substart: usize = 0
+    let keep_empty = has_flag(split_behavior, SplitBehavior.keep_empty)
+    let keep_separator = has_flag(split_behavior, SplitBehavior.keep_trailing_separator)
+    let characters = byte_string_bytes(this)
+    for i in 0..<characters.length:
+        let ch = characters[i]
+        if separator.matches(ch):
+            let sublen = i - substart
+            if sublen != 0 or keep_empty:
+                vector_append_t(&v, byte_string_substring_view_usize(this, substart, sublen + 1 if keep_separator else sublen))
+            substart = i + 1
+    let taillen = byte_string_length(this) - substart
+    if taillen != 0 or keep_empty:
+        vector_append_t(&v, byte_string_substring_view_usize(this, substart, taillen))
+    return v
+
+## Ported from AK/ByteString.h:170 AK::ByteString::find(char, size_t).
+pub func byte_string_find_u8(this: const ByteString*, needle: u8, start: usize = 0) -> usize?:
+    return string_utils_find_u8(byte_string_view(this), needle, start)
+
+## Ported from AK/ByteString.h:171 AK::ByteString::find(StringView, size_t).
+pub func byte_string_find_string_view(this: const ByteString*, needle: StringView, start: usize = 0) -> usize?:
+    return string_utils_find_string_view(byte_string_view(this), needle, start)
+
+## Ported from AK/ByteString.h:172 AK::ByteString::find_last(char).
+pub func byte_string_find_last_u8(this: const ByteString*, needle: u8) -> usize?:
+    return string_utils_find_last_u8(byte_string_view(this), needle)
+
+## Ported from AK/ByteString.h:173 AK::ByteString::find_last(StringView).
+pub func byte_string_find_last_string_view(this: const ByteString*, needle: StringView) -> usize?:
+    return string_utils_find_last_string_view(byte_string_view(this), needle)
+
+## Ported from AK/ByteString.cpp:293 AK::ByteString::find_all.
+pub func byte_string_find_all(this: const ByteString*, needle: StringView) -> Vector[usize]:
+    return string_utils_find_all(byte_string_view(this), needle)
+
+## Ported from AK/ByteString.h:176 AK::ByteString::find_any_of.
+pub func byte_string_find_any_of(this: const ByteString*, needles: StringView, direction: SearchDirection = SearchDirection.forward) -> usize?:
+    return string_utils_find_any_of(byte_string_view(this), needles, direction)
+
+## Ported from AK/ByteString.h:178 AK::ByteString::find_last_split_view.
+pub func byte_string_find_last_split_view(this: const ByteString*, separator: u8) -> StringView:
+    let view = byte_string_view(this)
+    return string_view_find_last_split_view(&view, separator)
+
+## Ported from AK/ByteString.cpp:51 AK::ByteString::substring(size_t, size_t).
+pub func byte_string_substring_usize(this: const ByteString*, start: usize, length: usize) -> ByteString:
+    if length == 0:
+        return byte_string_empty()
+    let end = start +? length else trap("VERIFY: substring overflow")
+    assert(end <= byte_string_impl_length(this.m_impl))
+    return byte_string_from_string_view(string_view_from_bytes(byte_string_bytes(this)[start..<end]))
+
+## Ported from AK/ByteString.cpp:60 AK::ByteString::substring(size_t).
+pub func byte_string_substring(this: const ByteString*, start: usize) -> ByteString:
+    assert(start <= byte_string_length(this))
+    return byte_string_from_string_view(string_view_from_bytes(byte_string_bytes(this)[start..]))
+
+## Ported from AK/ByteString.cpp:66 AK::ByteString::substring_view(size_t, size_t).
+pub func byte_string_substring_view_usize(this: const ByteString*, start: usize, length: usize) -> StringView:
+    let end = start +? length else trap("VERIFY: substring_view overflow")
+    assert(end <= byte_string_impl_length(this.m_impl))
+    return StringView(m_characters = byte_string_characters(this) + start, m_length = length)
+
+## Ported from AK/ByteString.cpp:73 AK::ByteString::substring_view(size_t).
+pub func byte_string_substring_view(this: const ByteString*, start: usize) -> StringView:
+    assert(start <= byte_string_length(this))
+    return StringView(m_characters = byte_string_characters(this) + start, m_length = byte_string_length(this) - start)
+
+# mark: Accessors ===============================================================================
+
+## Ported from AK/ByteString.h:190 AK::ByteString::is_empty.
+pub func byte_string_is_empty(this: const ByteString*) -> bool:
+    return byte_string_length(this) == 0
+
+## Ported from AK/ByteString.h:191 AK::ByteString::length.
+pub func byte_string_length(this: const ByteString*) -> usize:
+    return byte_string_impl_length(this.m_impl)
+
+## Ported from AK/ByteString.h:193 AK::ByteString::characters: includes the NUL terminator.
+pub func byte_string_characters(this: const ByteString*) -> const u8*:
+    return byte_string_impl_characters(this.m_impl)
+
+## Ported from AK/ByteString.cpp:39 AK::ByteString::copy_characters_to_buffer: copies as much as
+## fits and a NUL; answers whether everything fit.
+pub func byte_string_copy_characters_to_buffer(this: const ByteString*, buffer: u8[]) -> bool:
+    # We must fit at least the NUL-terminator.
+    assert(buffer.length > 0)
+
+    let length = byte_string_length(this)
+    let characters_to_copy = length if length < buffer.length - 1 else buffer.length - 1
+    copy_bytes(buffer, byte_string_bytes(this)[..<characters_to_copy])
+    buffer[characters_to_copy] = 0
+
+    return characters_to_copy == length
+
+## Ported from AK/ByteString.h:197 AK::ByteString::bytes.
+pub func byte_string_bytes(this: const ByteString*) -> const u8[]:
+    return byte_string_impl_bytes(this.m_impl)
+
+## Ported from AK/ByteString.h:200 AK::ByteString::operator[].
+pub func byte_string_at(this: const ByteString*, i: usize) -> u8:
+    return byte_string_impl_at(this.m_impl, i)
+
+## Ported from AK/ByteString.h:205 AK::ByteString::byte_at.
+pub func byte_string_byte_at(this: const ByteString*, i: usize) -> u8:
+    return byte_string_impl_at(this.m_impl, i)
+
+## Ported from AK/ByteString.h:212 AK::ByteString::begin.
+pub func byte_string_begin(this: const ByteString*) -> SimpleIterator[ByteString, u8]:
+    return SimpleIterator[ByteString, u8](m_container = (ByteString*)this, m_index = 0)
+
+## Ported from AK/ByteString.h:213 AK::ByteString::end.
+pub func byte_string_end(this: const ByteString*) -> SimpleIterator[ByteString, u8]:
+    return SimpleIterator[ByteString, u8](m_container = (ByteString*)this, m_index = byte_string_length(this))
+
+## Ported from AK/ByteString.cpp:143 AK::ByteString::starts_with(StringView, CaseSensitivity).
+pub func byte_string_starts_with_string_view(this: const ByteString*, str_: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    return string_utils_starts_with(byte_string_view(this), str_, case_sensitivity)
+
+## Ported from AK/ByteString.cpp:155 AK::ByteString::ends_with(StringView, CaseSensitivity).
+pub func byte_string_ends_with_string_view(this: const ByteString*, str_: StringView, case_sensitivity: CaseSensitivity = CaseSensitivity.case_sensitive) -> bool:
+    return string_utils_ends_with(byte_string_view(this), str_, case_sensitivity)
+
+## Ported from AK/ByteString.cpp:148 AK::ByteString::starts_with(char).
+pub func byte_string_starts_with_u8(this: const ByteString*, ch: u8) -> bool:
+    if byte_string_is_empty(this):
+        return false
+    return byte_string_characters(this)[0] == ch
+
+## Ported from AK/ByteString.cpp:160 AK::ByteString::ends_with(char).
+pub func byte_string_ends_with_u8(this: const ByteString*, ch: u8) -> bool:
+    if byte_string_is_empty(this):
+        return false
+    return byte_string_characters(this)[byte_string_length(this) - 1] == ch
+
+# mark: Comparison ==============================================================================
+
+## Ported from AK/ByteString.cpp:19 AK::ByteString::operator==(ByteString const&).
+pub func byte_string_eq_byte_string(this: const ByteString*, other: const ByteString*) -> bool:
+    if this.m_impl == byte_string_impl(other):
+        return true
+    let view = byte_string_view(this)
+    return string_view_eq_string_view(&view, byte_string_view(other))
+
+## Ported from AK/ByteString.cpp:24 AK::ByteString::operator==(StringView).
+pub func byte_string_eq_string_view(this: const ByteString*, other: StringView) -> bool:
+    let view = byte_string_view(this)
+    return string_view_eq_string_view(&view, other)
+
+## Ported from AK/ByteString.cpp:29 AK::ByteString::operator<.
+pub func byte_string_lt(this: const ByteString*, other: const ByteString*) -> bool:
+    let view = byte_string_view(this)
+    return string_view_lt(&view, byte_string_view(other))
+
+## Ported from AK/ByteString.h:225 AK::ByteString::operator>=(ByteString const&).
+pub func byte_string_ge_byte_string(this: const ByteString*, other: const ByteString*) -> bool:
+    return not byte_string_lt(this, other)
+
+## Ported from AK/ByteString.h:226 AK::ByteString::operator>=(char const*): `!(*this < other)`,
+## with `other` converted to a ByteString.
+pub func byte_string_ge_u8(this: const ByteString*, other: const u8*?) -> bool:
+    var other_string = byte_string_empty()
+    byte_string_construct_u8_should_chomp(&other_string, other)
+    return not byte_string_lt(this, &other_string)
+
+## Ported from AK/ByteString.cpp:34 AK::ByteString::operator>.
+pub func byte_string_gt(this: const ByteString*, other: const ByteString*) -> bool:
+    let view = byte_string_view(this)
+    return string_view_gt(&view, byte_string_view(other))
+
+## Ported from AK/ByteString.h:229 AK::ByteString::operator<=(ByteString const&).
+pub func byte_string_le_byte_string(this: const ByteString*, other: const ByteString*) -> bool:
+    return not byte_string_gt(this, other)
+
+## Ported from AK/ByteString.h:230 AK::ByteString::operator<=(char const*).
+pub func byte_string_le_u8(this: const ByteString*, other: const u8*?) -> bool:
+    var other_string = byte_string_empty()
+    byte_string_construct_u8_should_chomp(&other_string, other)
+    return not byte_string_gt(this, &other_string)
+
+## Ported from AK/ByteString.cpp:278 AK::ByteString::operator==(char const*).
+pub func byte_string_eq_u8(this: const ByteString*, cstring: const u8*?) -> bool:
+    if cstring == none:
+        return byte_string_is_empty(this)
+
+    let view = byte_string_view(this)
+    return string_view_eq_u8_const(&view, cstring)
+
+## Ported from AK/ByteString.h:234 AK::ByteString::empty.
+pub func byte_string_empty() -> ByteString:
+    return byte_string_from_impl(byte_string_impl_the_empty_stringimpl())
+
+## Ported from AK/ByteString.h:239 AK::ByteString::impl.
+pub func byte_string_impl(this: const ByteString*) -> const ByteStringImpl*:
+    return this.m_impl
+
+## Ported from AK/ByteString.h:262 AK::ByteString::hash.
+pub func byte_string_hash(this: const ByteString*) -> u32:
+    return byte_string_impl_hash(this.m_impl)
+
+## Ported from AK/ByteString.cpp:137 AK::ByteString::to_byte_buffer.
+pub func byte_string_to_byte_buffer(this: const ByteString*) -> ByteBuffer:
+    # FIXME: Handle OOM failure.
+    return byte_buffer_copy_span_u8(byte_string_bytes(this)) else trap("FIXME: should propagate errors")
+
+## Ported from AK/ByteString.h:270 AK::ByteString::copy: a ByteString of a buffer's bytes.
+pub func byte_string_copy(buffer: const u8[], should_chomp: ShouldChomp = ShouldChomp.no_chomp) -> ByteString:
+    if buffer.length == 0:
+        return byte_string_empty()
+    var result = byte_string_empty()
+    byte_string_construct_u8_usize(&result, buffer.data, buffer.length, should_chomp)
+    return result
+
+## Ported from AK/ByteString.cpp:286 AK::ByteString::vformatted.
+pub func byte_string_vformatted(fmtstr: StringView, params: TypeErasedFormatParams*) -> ByteString:
+    var builder = string_builder_new()
+    vformat(&builder, fmtstr, params) else trap("MUST: ByteString::vformatted")
+    return string_builder_to_byte_string(&builder)
+
+## Ported from AK/ByteString.h:286 AK::ByteString::view.
+pub func byte_string_view(this: const ByteString*) -> StringView:
+    return StringView(m_characters = byte_string_characters(this), m_length = byte_string_length(this))
+
+## Ported from AK/ByteString.h:289 AK::ByteString::replace.
+pub func byte_string_replace(this: const ByteString*, needle: StringView, replacement: StringView, replace_mode: ReplaceMode = ReplaceMode.all) -> ByteString:
+    return string_utils_replace_string_view(byte_string_view(this), needle, replacement, replace_mode)
+
+## Ported from AK/ByteString.h:290 AK::ByteString::count.
+pub func byte_string_count(this: const ByteString*, needle: StringView) -> usize:
+    return string_utils_count_string_view(byte_string_view(this), needle)
+
+## Ported from AK/ByteString.cpp:213 AK::ByteString::reverse.
+pub func byte_string_reverse(this: const ByteString*) -> ByteString:
+    var reversed_string = string_builder_new_usize(byte_string_length(this))
+    let characters = byte_string_bytes(this)
+    var i = characters.length
+    while i > 0:
+        i -= 1
+        string_builder_append_u8(&reversed_string, characters[i])
+    return string_builder_to_byte_string(&reversed_string)
+
+# mark: Traits and helpers ======================================================================
+
+## `Traits<ByteString>::hash`: the impl's hash.
+pub func byte_string_traits_hash(s: const ByteString*) -> u32:
+    return byte_string_impl_hash(byte_string_impl(s))
+
+## Ported from AK/ByteString.h:321 AK::CaseInsensitiveASCIIStringTraits::hash.
+pub func case_insensitive_ascii_string_traits_hash(s: const ByteString*) -> u32:
+    return byte_string_impl_case_insensitive_hash(byte_string_impl(s))
+
+## Ported from AK/ByteString.h:322 AK::CaseInsensitiveASCIIStringTraits::equals.
+pub func case_insensitive_ascii_string_traits_equals(a: const ByteString*, b: const ByteString*) -> bool:
+    return byte_string_equals_ignoring_ascii_case(a, byte_string_view(b))
+
+## Ported from AK/ByteString.cpp:222 AK::escape_html_entities.
+pub func escape_html_entities(html: StringView) -> ByteString:
+    var builder = string_builder_new()
+    for ch in string_view_bytes(&html):
+        if ch == '<':
+            string_builder_append(&builder, "&lt;")
+        elif ch == '>':
+            string_builder_append(&builder, "&gt;")
+        elif ch == '&':
+            string_builder_append(&builder, "&amp;")
+        elif ch == '"':
+            string_builder_append(&builder, "&quot;")
+        else:
+            string_builder_append_u8(&builder, ch)
+    return string_builder_to_byte_string(&builder)

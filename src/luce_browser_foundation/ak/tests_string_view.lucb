@@ -1,0 +1,246 @@
+#==============================================================================================
+#
+#   tests_string_view - the StringView tests
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestStringView.cpp. conforms_to_iterator_protocol (a static_assert on
+#       std::random_access_iterator) has no luce-base counterpart; constexpr_stuff runs its
+#       static_asserts at run time, with `is_one_of` spelled as the comparisons it folds.
+#
+#==============================================================================================
+
+## Whether a vector of views holds exactly the `expected` texts, in order.
+func string_view_vector_equals(views: const Vector[StringView]*, expected: const str[]) -> bool:
+    if test_vector_size(views) != expected.length:
+        return false
+    for i in 0..<expected.length:
+        let view = test_vector_at(views, i)
+        if not string_view_equals(&view, expected[i]):
+            return false
+    return true
+
+test "construct_empty":
+    let empty = StringView()
+    assert(string_view_is_empty(&empty))
+    assert(string_view_eq_string_view(&empty, sv("")))
+    assert(string_view_length(&empty) == 0)
+
+test "view_literal":
+    let truth = "cats rule dogs drool"
+    let view = literalsv_u8(truth.bytes.data, truth.length)
+    assert(string_view_characters_without_null_termination(&view) == truth.bytes.data)
+    assert(string_view_eq_string_view(&view, view))
+    assert(string_view_eq_u8_const(&view, truth.bytes.data))
+
+test "optional_string_view":
+    var missing: StringView? = none
+    assert(missing == none)
+
+    let empty: StringView? = sv("")
+    let empty_value = empty else trap("empty has a value")
+    assert(string_view_is_empty(&empty_value))
+    assert(string_view_equals(&empty_value, ""))
+
+    var value: StringView? = sv("foo")
+    let foo = value else trap("value has a value")
+    assert(string_view_equals(&foo, "foo"))
+
+    value = none
+    assert(value == none)
+    missing = sv("x")
+    assert(missing != none)
+
+test "compare_views":
+    let foo1 = byte_string_from_str("foo")
+    let foo2 = byte_string_from_str("foo")
+    let view1 = byte_string_view(&foo1)
+    let view2 = byte_string_view(&foo2)
+
+    assert(string_view_eq_string_view(&view1, view2))
+    assert(string_view_eq_byte_string(&view1, foo1))
+    assert(string_view_eq_byte_string(&view1, foo2))
+    assert(string_view_eq_u8_const(&view1, "foo".bytes.data))
+
+    let empty = byte_string_from_str("")
+    let empty_view = string_view_substring_view_usize(&view1, 0, 0)
+    let default_view = StringView()
+    let empty_string_view = byte_string_view(&empty)
+    assert(string_view_equals(&empty_string_view, ""))
+    assert(string_view_equals(&empty_view, ""))
+    assert(string_view_equals(&default_view, ""))
+
+test "string_view_literal_operator":
+    let literal_view = sv("foo")
+    let test_string = byte_string_from_str("foo")
+
+    assert(string_view_length(&literal_view) == byte_string_length(&test_string))
+    assert(string_view_eq_byte_string(&literal_view, test_string))
+
+test "starts_with":
+    let test_string = byte_string_from_str("ABCDEF")
+    let test_string_view = byte_string_view(&test_string)
+    assert(string_view_starts_with_u8(&test_string_view, 'A'))
+    assert(not string_view_starts_with_u8(&test_string_view, 'B'))
+    assert(string_view_starts_with_string_view(&test_string_view, sv("AB")))
+    assert(string_view_starts_with_string_view(&test_string_view, sv("ABCDEF")))
+    assert(not string_view_starts_with_string_view(&test_string_view, sv("DEF")))
+    assert(string_view_starts_with_string_view(&test_string_view, sv("abc"), CaseSensitivity.case_insensitive))
+    assert(not string_view_starts_with_string_view(&test_string_view, sv("abc"), CaseSensitivity.case_sensitive))
+
+test "ends_with":
+    let test_string = byte_string_from_str("ABCDEF")
+    let test_string_view = byte_string_view(&test_string)
+    assert(string_view_ends_with_string_view(&test_string_view, sv("DEF")))
+    assert(string_view_ends_with_u8(&test_string_view, 'F'))
+    assert(not string_view_ends_with_u8(&test_string_view, 'E'))
+    assert(string_view_ends_with_string_view(&test_string_view, sv("ABCDEF")))
+    assert(not string_view_ends_with_string_view(&test_string_view, sv("ABCDE")))
+    assert(not string_view_ends_with_string_view(&test_string_view, sv("ABCDEFG")))
+    assert(string_view_ends_with_string_view(&test_string_view, sv("def"), CaseSensitivity.case_insensitive))
+    assert(not string_view_ends_with_string_view(&test_string_view, sv("def"), CaseSensitivity.case_sensitive))
+
+test "lines":
+    if not ak_core_is_ported:
+        return
+    var test_string = byte_string_from_str("a\rb\nc\r\nd")
+    var test_string_view = byte_string_view(&test_string)
+    var test_string_vector = string_view_lines(&test_string_view)
+    assert(test_vector_size(&test_string_vector) == 4)
+    assert(string_view_vector_equals(&test_string_vector, ["a", "b", "c", "d"]))
+
+    test_string = byte_string_from_str("```\nHello there\r\nHello there\n```")
+    test_string_view = byte_string_view(&test_string)
+    test_string_vector = string_view_lines(&test_string_view)
+    assert(test_vector_size(&test_string_vector) == 4)
+    assert(string_view_vector_equals(&test_string_vector, ["```", "Hello there", "Hello there", "```"]))
+
+    test_string = byte_string_from_str("\n\n\n")
+    test_string_view = byte_string_view(&test_string)
+    test_string_vector = string_view_lines(&test_string_view)
+    assert(test_vector_size(&test_string_vector) == 3)
+    for i in 0..<3:
+        let line = test_vector_at(&test_string_vector, (usize)i)
+        assert(string_view_is_empty(&line) == true)
+
+## `"text"sv.count_lines(consider_carriage_return)`.
+func string_view_count_lines_of(text: str, consider_carriage_return: StringViewConsiderCarriageReturn = StringViewConsiderCarriageReturn.yes) -> usize:
+    let view = sv(text)
+    return string_view_count_lines(&view, consider_carriage_return)
+
+test "count_lines":
+    assert(string_view_count_lines_of("") == 1)
+    assert(string_view_count_lines_of("foo") == 1)
+
+    assert(string_view_count_lines_of("foo\nbar") == 2)
+    assert(string_view_count_lines_of("foo\rbar") == 2)
+    assert(string_view_count_lines_of("foo\rbar", StringViewConsiderCarriageReturn.no) == 1)
+    assert(string_view_count_lines_of("foo\r\nbar") == 2)
+    assert(string_view_count_lines_of("foo\r\nbar", StringViewConsiderCarriageReturn.no) == 2)
+
+    assert(string_view_count_lines_of("foo\nbar\nbax") == 3)
+    assert(string_view_count_lines_of("foo\rbar\rbaz") == 3)
+    assert(string_view_count_lines_of("foo\rbar\rbaz", StringViewConsiderCarriageReturn.no) == 1)
+    assert(string_view_count_lines_of("foo\r\nbar\r\nbaz") == 3)
+    assert(string_view_count_lines_of("foo\r\nbar\r\nbaz", StringViewConsiderCarriageReturn.no) == 3)
+
+test "find":
+    let test_string_view = sv("aabbcc_xy_ccbbaa")
+    assert(string_view_find_u8(&test_string_view, 'b') == 2)
+    assert(string_view_find_u8(&test_string_view, '_') == 6)
+    assert(string_view_find_u8(&test_string_view, 'n') == none)
+
+test "find_last":
+    var test_string_view = sv("aabbcc_xy_ccbbaa")
+    assert(string_view_find_last_u8(&test_string_view, 'b') == 13)
+    assert(string_view_find_last_u8(&test_string_view, '_') == 9)
+    assert(string_view_find_last_u8(&test_string_view, '3') == none)
+
+    test_string_view = sv("/")
+    assert(string_view_find_last_u8(&test_string_view, '/') == 0)
+
+test "find_any_of":
+    var test_string_view = sv("aabbcc_xy_ccbbaa")
+    assert(string_view_find_any_of(&test_string_view, sv("bc"), SearchDirection.forward) == 2)
+    assert(string_view_find_any_of(&test_string_view, sv("yx"), SearchDirection.forward) == 7)
+    assert(string_view_find_any_of(&test_string_view, sv("defg"), SearchDirection.forward) == none)
+    assert(string_view_find_any_of(&test_string_view, sv("bc"), SearchDirection.backward) == 13)
+    assert(string_view_find_any_of(&test_string_view, sv("yx"), SearchDirection.backward) == 8)
+    assert(string_view_find_any_of(&test_string_view, sv("fghi"), SearchDirection.backward) == none)
+
+    test_string_view = sv("/")
+    assert(string_view_find_any_of(&test_string_view, sv("/"), SearchDirection.forward) == 0)
+    assert(string_view_find_any_of(&test_string_view, sv("/"), SearchDirection.backward) == 0)
+
+## The `[](char ch) { return ch == 'x' || ch == '_'; }` predicate of split_view.
+struct StringViewSplitViewTestPredicate: CharPredicate:
+    var unused: u8
+
+    func matches(ch: u8) -> bool:
+        return ch == 'x' or ch == '_'
+
+test "split_view":
+    if not ak_core_is_ported:
+        return
+    var test_string_view = sv("axxbxcxd")
+    var parts = string_view_split_view_u8(&test_string_view, 'x')
+    assert(string_view_vector_equals(&parts, ["a", "b", "c", "d"]))
+    parts = string_view_split_view_u8(&test_string_view, 'x', SplitBehavior.keep_empty)
+    assert(string_view_vector_equals(&parts, ["a", "", "b", "c", "d"]))
+    parts = string_view_split_view_string_view(&test_string_view, sv("x"))
+    assert(string_view_vector_equals(&parts, ["a", "b", "c", "d"]))
+    parts = string_view_split_view_string_view(&test_string_view, sv("x"), SplitBehavior.keep_empty)
+    assert(string_view_vector_equals(&parts, ["a", "", "b", "c", "d"]))
+
+    test_string_view = sv("axxbx")
+    parts = string_view_split_view_u8(&test_string_view, 'x')
+    assert(string_view_vector_equals(&parts, ["a", "b"]))
+    parts = string_view_split_view_u8(&test_string_view, 'x', SplitBehavior.keep_empty)
+    assert(string_view_vector_equals(&parts, ["a", "", "b", ""]))
+    parts = string_view_split_view_string_view(&test_string_view, sv("x"))
+    assert(string_view_vector_equals(&parts, ["a", "b"]))
+    parts = string_view_split_view_string_view(&test_string_view, sv("x"), SplitBehavior.keep_empty)
+    assert(string_view_vector_equals(&parts, ["a", "", "b", ""]))
+
+    test_string_view = sv("axxbcxxdxx")
+    parts = string_view_split_view_string_view(&test_string_view, sv("xx"))
+    assert(string_view_vector_equals(&parts, ["a", "bc", "d"]))
+    parts = string_view_split_view_string_view(&test_string_view, sv("xx"), SplitBehavior.keep_empty)
+    assert(string_view_vector_equals(&parts, ["a", "bc", "d", ""]))
+
+    test_string_view = sv("ax_b_cxd")
+    let predicate = StringViewSplitViewTestPredicate(unused = 0)
+    parts = string_view_split_view_if(&test_string_view, &predicate)
+    assert(string_view_vector_equals(&parts, ["a", "b", "c", "d"]))
+    parts = string_view_split_view_if(&test_string_view, &predicate, SplitBehavior.keep_empty)
+    assert(string_view_vector_equals(&parts, ["a", "", "b", "c", "d"]))
+
+    test_string_view = sv("a,,,b")
+    parts = string_view_split_view_string_view(&test_string_view, sv(","), SplitBehavior.keep_empty)
+    assert(string_view_vector_equals(&parts, ["a", "", "", "b"]))
+    parts = string_view_split_view_string_view(&test_string_view, sv(","), SplitBehavior.keep_trailing_separator)
+    assert(string_view_vector_equals(&parts, ["a,", "b"]))
+    parts = string_view_split_view_string_view(&test_string_view, sv(","), SplitBehavior.keep_trailing_separator | SplitBehavior.keep_empty)
+    assert(string_view_vector_equals(&parts, ["a,", ",", ",", "b"]))
+
+test "constexpr_stuff":
+    # Can initialize from ""sv.
+    let test_constexpr = sv("foo")
+    assert(string_view_length(&test_constexpr) == 3)
+    assert(not string_view_is_empty(&test_constexpr))
+    assert(string_view_equals(&test_constexpr, "foo") or string_view_equals(&test_constexpr, "bar") or string_view_equals(&test_constexpr, "baz"))
+    assert(string_view_ne(&test_constexpr, sv("fob")))
+    assert(not string_view_eq_u8_const(&test_constexpr, "fob".bytes.data))
+    let tail = string_view_substring_view(&test_constexpr, 1)
+    assert(string_view_equals(&tail, "oo"))
+
+test "case_insensitive_hash":
+    if not ak_core_is_ported:
+        return
+    let string1 = sv("abcdef")
+    let string2 = sv("ABCDEF")
+    let string3 = sv("aBcDeF")
+    let string4 = sv("foo")
+
+    assert(case_insensitive_ascii_string_view_traits_hash(string1) == case_insensitive_ascii_string_view_traits_hash(string2))
+    assert(case_insensitive_ascii_string_view_traits_hash(string1) == case_insensitive_ascii_string_view_traits_hash(string3))
+    assert(case_insensitive_ascii_string_view_traits_hash(string1) != case_insensitive_ascii_string_view_traits_hash(string4))

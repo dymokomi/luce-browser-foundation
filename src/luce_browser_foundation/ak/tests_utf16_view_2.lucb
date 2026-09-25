@@ -1,0 +1,371 @@
+#==============================================================================================
+#
+#   tests_utf16_view_2 - Utf16View tests (offsets, replacing, trimming, searching, splitting)
+#
+#   DESCRIPTION:
+#       Port of Tests/AK/TestUtf16View.cpp (lines 542-932).
+#
+#==============================================================================================
+
+test "equals_ignoring_case":
+    var string1 = utf16_string_from_utf8_string_view(sv("foobar"))
+    var string2 = utf16_string_from_utf8_string_view(sv("FooBar"))
+    var view1 = t16s_view(&string1)
+    var view2 = t16s_view(&string2)
+    assert(utf16_view_equals_ignoring_case(&view1, &view2))
+
+    string1 = utf16_string_from_utf8_string_view(sv(""))
+    string2 = utf16_string_from_utf8_string_view(sv(""))
+    view1 = t16s_view(&string1)
+    view2 = t16s_view(&string2)
+    assert(utf16_view_equals_ignoring_case(&view1, &view2))
+
+    string1 = utf16_string_from_utf8_string_view(sv(""))
+    string2 = utf16_string_from_utf8_string_view(sv("FooBar"))
+    view1 = t16s_view(&string1)
+    view2 = t16s_view(&string2)
+    assert(not utf16_view_equals_ignoring_case(&view1, &view2))
+
+test "code_unit_offset_of":
+    let view = t16("😂 foo 😀 bar")
+    let expected: usize[12] = [0, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13]
+    for code_point_offset in 0..<expected.length:
+        assert(utf16_view_code_unit_offset_of(&view, code_point_offset) == expected[code_point_offset])
+
+test "code_point_offset_of":
+    let view = t16("😂 foo 😀 bar")
+    let expected: usize[14] = [0, 0, 1, 2, 3, 4, 5, 6, 6, 7, 8, 9, 10, 11]
+    for code_unit_offset in 0..<expected.length:
+        assert(utf16_view_code_point_offset_of(&view, code_unit_offset) == expected[code_unit_offset])
+
+test "iterator_offset":
+    let view = t16("😂 foo 😀 bar")
+    var expected_offset: usize = 0
+
+    var it = utf16_view_begin(&view)
+    while not utf16_code_point_iterator_done(&it):
+        assert(utf16_view_iterator_offset(&view, &it) == expected_offset)
+        expected_offset += utf16_code_point_iterator_length_in_code_units(&it)
+        discard(utf16_code_point_iterator_inc(&it))
+
+    let end = utf16_view_end(&view)
+    assert(utf16_view_iterator_offset(&view, &end) == utf16_view_length_in_code_units(&view))
+
+test "iterator_at_code_unit_offset":
+    let view = t16("😂 foo 😀 bar")
+
+    for i in 0..<utf16_view_length_in_code_units(&view):
+        let it = utf16_view_iterator_at_code_unit_offset(&view, i)
+        assert(utf16_code_point_iterator_deref(&it) == utf16_view_code_point_at(&view, i))
+
+    let at_end = utf16_view_iterator_at_code_unit_offset(&view, utf16_view_length_in_code_units(&view))
+    let end = utf16_view_end(&view)
+    assert(utf16_code_point_iterator_eq(&at_end, &end))
+
+## `EXPECT_EQ(u"input"sv.replace(u"needle"sv, u"replacement"sv, mode), u"expected"sv)`.
+func t16_replace_is(input: Utf16View, needle: Utf16View, replacement: Utf16View, mode: ReplaceMode, expected: Utf16View) -> bool:
+    let result = utf16_view_replace_utf16_view(&input, needle, replacement, mode)
+    return t16s_eq(&result, expected)
+
+test "replace":
+    if not ak_core_is_ported:
+        return
+    assert(t16_replace_is(t16(""), utf16_view_new(), utf16_view_new(), ReplaceMode.first_only, t16("")))
+    assert(t16_replace_is(t16(""), t16("foo"), t16("bar"), ReplaceMode.first_only, t16("")))
+    assert(t16_replace_is(t16("foo"), t16("bar"), t16("baz"), ReplaceMode.first_only, t16("foo")))
+    assert(t16_replace_is(t16("foo"), t16("foo"), t16("bar"), ReplaceMode.first_only, t16("bar")))
+    assert(t16_replace_is(t16("foo"), t16("o"), t16("e"), ReplaceMode.first_only, t16("feo")))
+    assert(t16_replace_is(t16("foo"), t16("o"), t16("e"), ReplaceMode.all, t16("fee")))
+    assert(t16_replace_is(t16("foo boo"), t16("o"), t16("e"), ReplaceMode.first_only, t16("feo boo")))
+    assert(t16_replace_is(t16("foo boo"), t16("o"), t16("e"), ReplaceMode.all, t16("fee bee")))
+    assert(t16_replace_is(t16("foo 😀 boo 😀"), t16("o"), t16("e"), ReplaceMode.all, t16("fee 😀 bee 😀")))
+    assert(t16_replace_is(t16("foo 😀 boo 😀"), t16("😀"), t16("🙃"), ReplaceMode.first_only, t16("foo 🙃 boo 😀")))
+    assert(t16_replace_is(t16("foo 😀 boo 😀"), t16("😀"), t16("🙃"), ReplaceMode.all, t16("foo 🙃 boo 🙃")))
+    assert(t16_replace_is(t16("foo 😀 boo 😀"), t16("😀 "), t16("🙃 "), ReplaceMode.all, t16("foo 🙃 boo 😀")))
+
+test "substring_view":
+    if not ak_core_is_ported:
+        return
+    let string = utf16_string_from_utf8_string_view(sv("Привет 😀"))
+
+    let whole = t16s_view(&string)
+    let emoji = utf16_view_substring_view_usize(&whole, 7, 2)
+    assert(utf16_view_length_in_code_units(&emoji) == 2)
+    assert(t16_to_utf8_is(emoji, AllowLonelySurrogates.yes, "😀".bytes))
+
+    let half = utf16_view_substring_view_usize(&whole, 7, 1)
+    assert(utf16_view_length_in_code_units(&half) == 1)
+    assert(t16_to_utf8_is(half, AllowLonelySurrogates.yes, b"\xed\xa0\xbd"))
+    assert(t16_to_utf8_fails(half, AllowLonelySurrogates.no))
+
+## Checks the three trim modes of `view` against `both`, `left` and `right`.
+func t16_trim_is(view: Utf16View, code_units: Utf16View, both: Utf16View, left: Utf16View, right: Utf16View):
+    assert(t16_eq(utf16_view_trim(&view, code_units, TrimMode.both), both))
+    assert(t16_eq(utf16_view_trim(&view, code_units, TrimMode.left), left))
+    assert(t16_eq(utf16_view_trim(&view, code_units, TrimMode.right), right))
+
+test "trim":
+    let whitespace = t16(" ")
+    t16_trim_is(t16("word"), whitespace, t16("word"), t16("word"), t16("word"))
+    t16_trim_is(t16("   word"), whitespace, t16("word"), t16("word"), t16("   word"))
+    t16_trim_is(t16("word   "), whitespace, t16("word"), t16("word   "), t16("word"))
+    t16_trim_is(t16("   word   "), whitespace, t16("word"), t16("word   "), t16("   word"))
+    t16_trim_is(t16("   \u{180e}   "), whitespace, t16("\u{180e}"), t16("\u{180e}   "), t16("   \u{180e}"))
+    t16_trim_is(t16("😀wfh😀"), t16("😀"), t16("wfh"), t16("wfh😀"), t16("😀wfh"))
+
+# mark: Searching ===============================================================================
+
+## `view.contains(code_unit)`.
+func t16_contains_unit(view: Utf16View, code_unit: u16) -> bool:
+    return utf16_view_contains_u16(&view, code_unit)
+
+## `view.contains(needle)`.
+func t16_contains(view: Utf16View, needle: Utf16View) -> bool:
+    return utf16_view_contains_utf16_view(&view, needle)
+
+test "contains":
+    assert(not t16_contains_unit(t16(""), 0x61))
+    assert(t16_contains_unit(t16("a"), 0x61))
+    assert(not t16_contains_unit(t16("b"), 0x61))
+    assert(t16_contains_unit(t16("ab"), 0x61))
+    assert(t16_contains_unit(t16("😀"), 0xd83d))
+    assert(t16_contains_unit(t16("😀"), 0xde00))
+
+    assert(not t16_contains_unit(utf16_sv(""), 0x61))
+    assert(t16_contains_unit(utf16_sv("a"), 0x61))
+    assert(not t16_contains_unit(utf16_sv("b"), 0x61))
+    assert(not t16_contains_unit(utf16_sv("b"), 0xd83d))
+    assert(not t16_contains_unit(utf16_sv("b"), 0xde00))
+
+    assert(t16_contains(t16(""), t16("")))
+    assert(not t16_contains(t16(""), t16("a")))
+    assert(t16_contains(t16("a"), t16("a")))
+    assert(not t16_contains(t16("b"), t16("a")))
+    assert(t16_contains(t16("ab"), t16("a")))
+    assert(t16_contains(t16("😀"), t16u([0xd83d])))
+    assert(t16_contains(t16("😀"), t16u([0xde00])))
+    assert(t16_contains(t16("😀"), t16("😀")))
+    assert(t16_contains(t16("ab😀"), t16("😀")))
+
+## `view.contains_any_of(needles)`.
+func t16_contains_any_of(view: Utf16View, needles: const u32[]) -> bool:
+    return utf16_view_contains_any_of(&view, needles)
+
+test "contains_any_of":
+    let no_needles: u32[1] = [0]
+    assert(not t16_contains_any_of(t16(""), no_needles[..<0]))
+    assert(not t16_contains_any_of(t16("a"), no_needles[..<0]))
+
+    assert(t16_contains_any_of(t16("a"), [0x61]))
+    assert(t16_contains_any_of(t16("a"), [0x61, 0x62]))
+    assert(t16_contains_any_of(t16("b"), [0x61, 0x62]))
+    assert(not t16_contains_any_of(t16("a"), [0x62]))
+    assert(not t16_contains_any_of(t16("b"), [0x61]))
+
+    assert(t16_contains_any_of(t16("ab"), [0x61]))
+    assert(t16_contains_any_of(t16("ab"), [0x62]))
+    assert(t16_contains_any_of(t16("ab"), [0x61, 0x62]))
+    assert(not t16_contains_any_of(t16("ab"), [0x63]))
+
+    assert(not t16_contains_any_of(t16("😀"), [0xd83d]))
+    assert(not t16_contains_any_of(t16("😀"), [0xde00]))
+    assert(t16_contains_any_of(t16("😀"), [0x1f600]))
+    assert(t16_contains_any_of(t16("ab😀"), [0x1f600]))
+
+## `view.count(needle)`.
+func t16_count(view: Utf16View, needle: Utf16View) -> usize:
+    return utf16_view_count(&view, needle)
+
+test "count":
+    assert(t16_count(t16(""), utf16_view_new()) == 0)
+    assert(t16_count(t16("abc"), utf16_view_new()) == 3)
+
+    assert(t16_count(t16(""), t16("a")) == 0)
+    assert(t16_count(t16("abc"), t16("a")) == 1)
+    assert(t16_count(t16("abc"), t16("b")) == 1)
+    assert(t16_count(t16("abc"), t16("c")) == 1)
+    assert(t16_count(t16("abc"), t16("ab")) == 1)
+    assert(t16_count(t16("abc"), t16("bc")) == 1)
+    assert(t16_count(t16("abc"), t16("abc")) == 1)
+    assert(t16_count(t16("abc"), t16("d")) == 0)
+
+    assert(t16_count(t16("aaaa"), t16("aa")) == 3)
+
+    assert(t16_count(t16("😀"), utf16_view_new()) == 2)
+    assert(t16_count(t16("😀"), t16u([0xd83d])) == 1)
+    assert(t16_count(t16("😀"), t16u([0xde00])) == 1)
+    assert(t16_count(t16("😀"), t16("😀")) == 1)
+    assert(t16_count(t16("😀😀😀"), t16("😀")) == 3)
+    assert(t16_count(t16("😀😀😀"), t16("😀😀")) == 2)
+
+## `view.starts_with(needle)`.
+func t16_starts_with(view: Utf16View, needle: Utf16View) -> bool:
+    return utf16_view_starts_with_utf16_view(&view, needle)
+
+## `view.ends_with(needle)`.
+func t16_ends_with(view: Utf16View, needle: Utf16View) -> bool:
+    return utf16_view_ends_with_utf16_view(&view, needle)
+
+test "starts_with":
+    assert(t16_starts_with(utf16_view_new(), t16("")))
+    assert(not t16_starts_with(utf16_view_new(), t16(" ")))
+
+    assert(t16_starts_with(t16("a"), t16("")))
+    assert(t16_starts_with(t16("a"), t16("a")))
+    assert(not t16_starts_with(t16("a"), t16("b")))
+    assert(not t16_starts_with(t16("a"), t16("ab")))
+
+    assert(t16_starts_with(t16("abc"), t16("")))
+    assert(t16_starts_with(t16("abc"), t16("a")))
+    assert(t16_starts_with(t16("abc"), t16("ab")))
+    assert(t16_starts_with(t16("abc"), t16("abc")))
+    assert(not t16_starts_with(t16("abc"), t16("b")))
+    assert(not t16_starts_with(t16("abc"), t16("bc")))
+
+    let emoji = t16("😀🙃")
+
+    assert(t16_starts_with(emoji, t16("")))
+    assert(t16_starts_with(emoji, t16("😀")))
+    assert(t16_starts_with(emoji, t16("😀🙃")))
+    assert(not t16_starts_with(emoji, t16("a")))
+    assert(not t16_starts_with(emoji, t16("🙃")))
+
+test "ends_with":
+    assert(t16_ends_with(utf16_view_new(), t16("")))
+    assert(not t16_ends_with(utf16_view_new(), t16(" ")))
+
+    assert(t16_ends_with(t16("a"), t16("")))
+    assert(t16_ends_with(t16("a"), t16("a")))
+    assert(not t16_ends_with(t16("a"), t16("b")))
+    assert(not t16_ends_with(t16("a"), t16("ab")))
+
+    assert(t16_ends_with(t16("abc"), t16("")))
+    assert(t16_ends_with(t16("abc"), t16("c")))
+    assert(t16_ends_with(t16("abc"), t16("bc")))
+    assert(t16_ends_with(t16("abc"), t16("abc")))
+    assert(not t16_ends_with(t16("abc"), t16("b")))
+    assert(not t16_ends_with(t16("abc"), t16("ab")))
+
+    let emoji = t16("😀🙃")
+
+    assert(t16_ends_with(emoji, t16("")))
+    assert(t16_ends_with(emoji, t16("🙃")))
+    assert(t16_ends_with(emoji, t16("😀🙃")))
+    assert(not t16_ends_with(emoji, t16("a")))
+    assert(not t16_ends_with(emoji, t16("😀")))
+
+# mark: Splitting ===============================================================================
+
+## `EXPECT_EQ(parts, Vector({ u"..."sv, ... }))`.
+func t16_parts_are(parts: const Vector[Utf16View]*, expected: const str[]) -> bool:
+    if test_vector_size(parts) != expected.length:
+        return false
+    for i in 0..<expected.length:
+        if not t16_eq(test_vector_at(parts, i), t16(expected[i])):
+            return false
+    return true
+
+## `view.split_view(code_unit, behavior)`.
+func t16_split_unit(view: Utf16View, separator: u16, behavior: SplitBehavior) -> Vector[Utf16View]:
+    return utf16_view_split_view_u16(&view, separator, behavior)
+
+## `view.split_view(separator, behavior)`.
+func t16_split(view: Utf16View, separator: Utf16View, behavior: SplitBehavior) -> Vector[Utf16View]:
+    return utf16_view_split_view_utf16_view(&view, separator, behavior)
+
+test "split_view":
+    if not ak_core_is_ported:
+        return
+    let test1 = t16("axxbxcxd")
+    var parts = t16_split_unit(test1, 0x78, SplitBehavior.nothing)
+    assert(t16_parts_are(&parts, ["a", "b", "c", "d"]))
+    parts = t16_split(test1, utf16_sv("x"), SplitBehavior.nothing)
+    assert(t16_parts_are(&parts, ["a", "b", "c", "d"]))
+    parts = t16_split_unit(test1, 0x78, SplitBehavior.keep_empty)
+    assert(t16_parts_are(&parts, ["a", "", "b", "c", "d"]))
+    parts = t16_split(test1, utf16_sv("x"), SplitBehavior.keep_empty)
+    assert(t16_parts_are(&parts, ["a", "", "b", "c", "d"]))
+
+    let test2 = t16("axxbx")
+    parts = t16_split_unit(test2, 0x78, SplitBehavior.nothing)
+    assert(t16_parts_are(&parts, ["a", "b"]))
+    parts = t16_split(test2, utf16_sv("x"), SplitBehavior.nothing)
+    assert(t16_parts_are(&parts, ["a", "b"]))
+    parts = t16_split_unit(test2, 0x78, SplitBehavior.keep_empty)
+    assert(t16_parts_are(&parts, ["a", "", "b", ""]))
+    parts = t16_split(test2, utf16_sv("x"), SplitBehavior.keep_empty)
+    assert(t16_parts_are(&parts, ["a", "", "b", ""]))
+
+    let test3 = t16("axxbcxxdxx")
+    parts = t16_split(test3, t16("xx"), SplitBehavior.nothing)
+    assert(t16_parts_are(&parts, ["a", "bc", "d"]))
+    parts = t16_split(test3, t16("xx"), SplitBehavior.keep_empty)
+    assert(t16_parts_are(&parts, ["a", "bc", "d", ""]))
+
+    let test4 = t16("a,,,b")
+    parts = t16_split(test4, t16(","), SplitBehavior.keep_empty)
+    assert(t16_parts_are(&parts, ["a", "", "", "b"]))
+    parts = t16_split(test4, t16(","), SplitBehavior.keep_trailing_separator)
+    assert(t16_parts_are(&parts, ["a,", "b"]))
+    parts = t16_split(test4, t16(","), SplitBehavior.keep_trailing_separator | SplitBehavior.keep_empty)
+    assert(t16_parts_are(&parts, ["a,", ",", ",", "b"]))
+
+    let test5 = t16("foo bar baz")
+    parts = t16_split(test5, t16(" "), SplitBehavior.nothing)
+    assert(t16_parts_are(&parts, ["foo", "bar", "baz"]))
+
+    let test6 = t16("ωΣ2ωΣω")
+    parts = t16_split_unit(test6, 0x03a3, SplitBehavior.nothing)
+    assert(t16_parts_are(&parts, ["ω", "2ω", "ω"]))
+
+test "find_code_unit_offset":
+    let conversion_result = utf16_string_from_utf8_string_view(sv("😀foo😀bar"))
+    let view = t16s_view(&conversion_result)
+
+    assert(utf16_view_find_code_unit_offset_utf16_view(&view, t16("")) == 0)
+    assert(utf16_view_find_code_unit_offset_utf16_view(&view, t16(""), 4) == 4)
+    assert(utf16_view_find_code_unit_offset_utf16_view(&view, t16(""), 16) == none)
+
+    assert(utf16_view_find_code_unit_offset_utf16_view(&view, t16("😀")) == 0)
+    assert(utf16_view_find_code_unit_offset_utf16_view(&view, t16("😀"), 1) == 5)
+    assert(utf16_view_find_code_unit_offset_utf16_view(&view, t16("foo")) == 2)
+    assert(utf16_view_find_code_unit_offset_utf16_view(&view, t16("bar")) == 7)
+
+    assert(utf16_view_find_code_unit_offset_utf16_view(&view, t16("baz")) == none)
+
+test "find_code_unit_offset_ignoring_case":
+    let conversion_result = utf16_string_from_utf8_string_view(sv("😀Foo😀Bar"))
+    let view = t16s_view(&conversion_result)
+
+    assert(utf16_view_find_code_unit_offset_ignoring_case(&view, t16("")) == 0)
+    assert(utf16_view_find_code_unit_offset_ignoring_case(&view, t16(""), 4) == 4)
+    assert(utf16_view_find_code_unit_offset_ignoring_case(&view, t16(""), 16) == none)
+
+    assert(utf16_view_find_code_unit_offset_ignoring_case(&view, t16("😀")) == 0)
+    assert(utf16_view_find_code_unit_offset_ignoring_case(&view, t16("😀"), 1) == 5)
+    assert(utf16_view_find_code_unit_offset_ignoring_case(&view, t16("foO")) == 2)
+    assert(utf16_view_find_code_unit_offset_ignoring_case(&view, t16("baR")) == 7)
+    assert(utf16_view_find_code_unit_offset_ignoring_case(&view, t16("baz")) == none)
+
+## Steps `previous_code_point_at` from `start` and checks each code point and index.
+func t16_previous_code_points_are(view: Utf16View, start: usize, expected: const u32[], indices: const usize[]):
+    var index = start
+    for i in 0..<expected.length:
+        assert(utf16_view_previous_code_point_at(&view, &index) == expected[i])
+        assert(index == indices[i])
+
+test "previous_code_point_at":
+    # ASCII text.
+    t16_previous_code_points_are(t16("abc"), 3, [0x63, 0x62, 0x61], [2, 1, 0])
+
+    # Surrogate pair (emoji).
+    t16_previous_code_points_are(t16("a😀b"), 4, [0x62, 0x1f600, 0x61], [3, 1, 0])
+
+    # Unpaired low surrogate.
+    t16_previous_code_points_are(t16u([0x61, 0xdc00, 0x67]), 3, [0x67, 0xdc00, 0x61], [2, 1, 0])
+
+    # Unpaired high surrogate.
+    t16_previous_code_points_are(t16u([0x61, 0xd800, 0x67]), 3, [0x67, 0xd800, 0x61], [2, 1, 0])
+
+    # Two consecutive unpaired low surrogates.
+    t16_previous_code_points_are(t16u([0xdc00, 0xdc00]), 2, [0xdc00, 0xdc00], [1, 0])
