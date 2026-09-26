@@ -5,6 +5,13 @@
 set -e
 cd "$(dirname "$0")"
 
+# Every hand-written fragment is laid out as the pinned compiler's formatter lays it out
+# (generated fragments are compared with their generator's output instead).
+echo "== luce-base fmt --check"
+for file in $(git ls-files '*.lucb' | grep -v -e '/generated_' -e '_tables\.lucb$'); do
+    luce-base fmt "$file" --check > /dev/null || { echo "$file is not formatted (luce-base fmt $file --write)"; exit 1; }
+done
+
 check() {
     echo "== luce-base check $1 -W"
     # -W reports warnings without failing, so any output at all fails the run.
