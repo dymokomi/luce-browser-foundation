@@ -16,17 +16,25 @@
 # mark: Objective-C blocks ======================================================================
 
 # The Blocks runtime (libclosure on macOS, libBlocksRuntime elsewhere). luce-base code never
-# makes a block; these exist for a Function built around one by foreign code.
+# makes a block; these exist for a Function built around one by foreign code. Only macOS
+# links a Blocks runtime by default, so elsewhere they trap (a test build keeps every
+# function, so the externs must not be referenced there: COMPILER-REQUESTS item 10).
 extern func c_block_copy as "_Block_copy"(block: const void*?) -> void*?
 extern func c_block_release as "_Block_release"(block: const void*?)
 
 ## Ported from AK/Function.h:42 _Block_copy.
 pub func block_copy(arg0: const void*?) -> void*?:
-    return c_block_copy(arg0)
+    if os.macos:
+        return c_block_copy(arg0)
+    else:
+        trap("no Blocks runtime on this platform")
 
 ## Ported from AK/Function.h:43 _Block_release.
 pub func block_release(arg0: const void*?):
-    c_block_release(arg0)
+    if os.macos:
+        c_block_release(arg0)
+    else:
+        trap("no Blocks runtime on this platform")
 
 ## Ported from AK/Function.h:44 Block_size.
 # Block_size reads the block descriptor: a block's layout starts with its isa, flags and
