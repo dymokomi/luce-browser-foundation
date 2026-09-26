@@ -20,8 +20,9 @@ pub func nan_boxed_value_extract_pointer_bits(encoded: u64) -> usize:
         # For x86_64 and riscv64 the top 16 bits should be sign extending the "real" top bit (47th).
         # So first shift the top 16 bits away then using the right shift it sign extends the top 16 bits.
         return (usize)(((i64)(encoded << 16)) >> 16)
-    # For AArch64 the top 16 bits of the pointer should be zero.
-    return (usize)(encoded & 0xffff_ffff_ffff)
+    else:
+        # For AArch64 the top 16 bits of the pointer should be zero.
+        return (usize)(encoded & 0xffff_ffff_ffff)
 
 ## Ported from Libraries/LibGC/NanBoxedValue.h:84 GC::NanBoxedValue::extract_pointer.
 pub func nan_boxed_value_extract_pointer[TPointerType](this: const NanBoxedValue*) -> TPointerType*:
