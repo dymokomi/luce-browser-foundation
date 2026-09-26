@@ -28,10 +28,9 @@ test "empty_string":
     assert(tc_fly_is(&fly, ""))
 
     # Short strings do not get stored in the fly string table.
-    if ak_core_is_ported:
-        let before = fly_string_number_of_fly_strings()
-        discard(tc_fly(""))
-        assert(fly_string_number_of_fly_strings() == before)
+    let before = fly_string_number_of_fly_strings()
+    discard(tc_fly(""))
+    assert(fly_string_number_of_fly_strings() == before)
 
 test "short_ascii_literal_is_constexpr":
     # The _fly_string UDL folds short ASCII literals to a constant.
@@ -42,8 +41,7 @@ test "short_ascii_literal_is_constexpr":
 
 test "short_string":
     var before: usize = 0
-    if ak_core_is_ported:
-        before = fly_string_number_of_fly_strings()
+    before = fly_string_number_of_fly_strings()
 
     let fly1 = tc_fly("foo")
     assert(tc_fly_is(&fly1, "foo"))
@@ -66,12 +64,9 @@ test "short_string":
     assert(string_base_is_short_string(&string3.string_base))
 
     # Short strings do not get stored in the fly string table.
-    if ak_core_is_ported:
-        assert(fly_string_number_of_fly_strings() == before)
+    assert(fly_string_number_of_fly_strings() == before)
 
 test "long_string":
-    if not ak_core_is_ported:
-        return
     with memory.heap:
         let before = fly_string_number_of_fly_strings()
 
@@ -99,8 +94,6 @@ test "long_string":
         assert(not string_base_is_short_string(&string3.string_base))
 
 test "from_string_view":
-    if not ak_core_is_ported:
-        return
     with memory.heap:
         let before = fly_string_number_of_fly_strings()
 
@@ -121,8 +114,6 @@ test "from_string_view":
         assert(not fly_string_eq_fly_string(&fly2, &fly3))
 
 test "fly_string_keep_string_data_alive":
-    if not ak_core_is_ported:
-        return
     with memory.heap:
         let before = fly_string_number_of_fly_strings()
         var fly = fly_string_new()
@@ -135,8 +126,6 @@ test "fly_string_keep_string_data_alive":
         assert(fly_string_number_of_fly_strings() == before + 1)
 
 test "moved_fly_string_becomes_empty":
-    if not ak_core_is_ported:
-        return
     with memory.heap:
         var fly1 = fly_string_new()
         assert(fly_string_is_empty(&fly1))

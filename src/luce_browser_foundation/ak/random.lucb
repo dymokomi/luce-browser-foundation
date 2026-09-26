@@ -92,14 +92,14 @@ pub func generate_random_uuid() -> String:
 
 # String::formatted("{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}...", bytes...).
 func format_uuid(bytes: const u8[], text: u8[]):
-    var out: usize = 0
+    var position: usize = 0
     for i in 0..<16usize:
         if i == 4 or i == 6 or i == 8 or i == 10:
-            text[out] = '-'
-            out += 1
-        text[out] = random_hex_digits[bytes[i] >> 4]
-        text[out + 1] = random_hex_digits[bytes[i] & 0xf]
-        out += 2
+            text[position] = '-'
+            position += 1
+        text[position] = random_hex_digits[bytes[i] >> 4]
+        text[position + 1] = random_hex_digits[bytes[i] & 0xf]
+        position += 2
 
 ## Ported from AK/Random.h:50 AK::shuffle, over a span.
 pub func shuffle[T](collection: T[]):

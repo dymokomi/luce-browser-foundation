@@ -40,8 +40,6 @@ test "matches_case_insensitive":
     assert(not string_utils_matches(sv("acdcb"), sv("a*c?b")))
 
 test "matches_with_positions":
-    if not ak_core_is_ported:
-        return
     var spans: Vector[MaskSpan]
     assert(string_utils_matches(sv("abbb"), sv("a*"), CaseSensitivity.case_sensitive, &spans))
     assert(mask_spans_equal(&spans, [MaskSpan(start = 1, length = 3)]))
@@ -184,8 +182,6 @@ test "replace_all_overlapping":
     # These samples were grabbed from ADKaster's sample code in
     # https://github.com/SerenityOS/jakt/issues/1159. This is the equivalent C++ code that
     # triggered the same bug from Jakt's code generator.
-    if not ak_core_is_ported:
-        return
     var replaced = replace_like_in_jakt(sv("\\\\\\\\\\\\\\\\"))
     assert(byte_string_eq_string_view(&replaced, sv("\\\\\\\\")))
     replaced = replace_like_in_jakt(sv(" auto str4 = \"\\\";"))
@@ -199,8 +195,6 @@ func string_utils_to_snakecase_is(text: str, expected: str) -> bool:
     return byte_string_eq_string_view(&result, sv(expected))
 
 test "to_snakecase":
-    if not ak_core_is_ported:
-        return
     assert(string_utils_to_snakecase_is("foobar", "foobar"))
     assert(string_utils_to_snakecase_is("Foobar", "foobar"))
     assert(string_utils_to_snakecase_is("FOOBAR", "foobar"))
@@ -218,8 +212,6 @@ func string_utils_to_titlecase_is(text: str, expected: str) -> bool:
     return string_eq_string_view(&result, sv(expected))
 
 test "to_titlecase":
-    if not ak_core_is_ported:
-        return
     assert(string_utils_to_titlecase_is("", ""))
     assert(string_utils_to_titlecase_is("f", "F"))
     assert(string_utils_to_titlecase_is("foobar", "Foobar"))

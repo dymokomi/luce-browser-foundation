@@ -100,8 +100,6 @@ test "decode_utf8":
     t16_expect_code_points(view, [1055, 1088, 1080, 1074, 1077, 1090, 44, 32, 1084, 1080, 1088, 33, 32, 128512, 32, 947, 949, 953, 940, 32, 963, 959, 965, 32, 954, 972, 963, 956, 959, 962, 32, 12371, 12435, 12395, 12385, 12399, 19990, 30028])
 
 test "encode_utf8":
-    if not ak_core_is_ported:
-        return
     let utf8_string = string_from_str("Привет, мир! 😀 γειά σου κόσμος こんにちは世界")
     let string = utf16_string_from_utf8_string(&utf8_string)
     let view = t16s_view(&string)
@@ -314,8 +312,6 @@ func t16_titlecase_is(input: str, expected: str) -> bool:
     return t16s_eq(&result, t16(expected))
 
 test "to_ascii_lowercase":
-    if not ak_core_is_ported:
-        return
     assert(t16_lowercase_is("", ""))
     assert(t16_lowercase_is("foobar", "foobar"))
     assert(t16_lowercase_is("FooBar", "foobar"))
@@ -323,8 +319,6 @@ test "to_ascii_lowercase":
     assert(t16_lowercase_is("FOO 😀 BAR", "foo 😀 bar"))
 
 test "to_ascii_uppercase":
-    if not ak_core_is_ported:
-        return
     assert(t16_uppercase_is("", ""))
     assert(t16_uppercase_is("foobar", "FOOBAR"))
     assert(t16_uppercase_is("FooBar", "FOOBAR"))
@@ -332,8 +326,6 @@ test "to_ascii_uppercase":
     assert(t16_uppercase_is("foo 😀 bar", "FOO 😀 BAR"))
 
 test "to_ascii_titlecase":
-    if not ak_core_is_ported:
-        return
     assert(t16_titlecase_is("", ""))
     assert(t16_titlecase_is("foobar", "Foobar"))
     assert(t16_titlecase_is("FooBar", "Foobar"))

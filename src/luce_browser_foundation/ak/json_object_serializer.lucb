@@ -1,0 +1,121 @@
+#==============================================================================================
+#
+#   json_object_serializer - JsonObjectSerializer: writes a JSON object member by member
+#
+#   DESCRIPTION:
+#       Port of AK/JsonObjectSerializer.h (lines 1-258), for the one Builder LibWeb uses,
+#       StringBuilder (a "legacy builder", so every write is the try_append form), with
+#       JsonArraySerializer::add_object, which the header defines.
+#
+#==============================================================================================
+
+## Ported from AK/JsonObjectSerializer.h:20 AK::JsonObjectSerializer::try_create: writes `{`.
+pub func json_object_serializer_try_create(builder: StringBuilder*) -> JsonObjectSerializer[StringBuilder]!:
+    try string_builder_try_append_u8(builder, '{')
+    var serializer: JsonObjectSerializer[StringBuilder] = ---
+    json_object_serializer_construct(&serializer, builder)
+    return serializer
+
+## Ported from AK/JsonObjectSerializer.h:38 AK::JsonObjectSerializer::add(StringView, JsonValue const&).
+pub func json_object_serializer_add_json_value2(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: const JsonValue2*) -> !:
+    try json_object_serializer_begin_item(this, key)
+    json_value2_serialize(value, this.m_builder)
+
+## Ported from AK/JsonObjectSerializer.h:45 AK::JsonObjectSerializer::add(StringView, StringView).
+pub func json_object_serializer_add_string_view(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: StringView) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try json_serializer_append_string(this.m_builder, value)
+
+## Ported from AK/JsonObjectSerializer.h:60 AK::JsonObjectSerializer::add(StringView, String const&).
+pub func json_object_serializer_add_string(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: String) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try json_serializer_append_string(this.m_builder, string_bytes_as_string_view(&value))
+
+## Ported from AK/JsonObjectSerializer.h:75 AK::JsonObjectSerializer::add(StringView, char const*).
+pub func json_object_serializer_add_u8(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: const u8*) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try json_serializer_append_string(this.m_builder, c_string_view((libc.str)value))
+
+## Ported from AK/JsonObjectSerializer.h:90 AK::JsonObjectSerializer::add(StringView, bool).
+pub func json_object_serializer_add_bool(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: bool) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try string_builder_try_append_string_view(this.m_builder, sv("true") if value else sv("false"))
+
+## Ported from AK/JsonObjectSerializer.h:100 AK::JsonObjectSerializer::add(StringView, int).
+pub func json_object_serializer_add_i32(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: i32) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_i64((i64)value)])
+
+## Ported from AK/JsonObjectSerializer.h:110 AK::JsonObjectSerializer::add(StringView, unsigned).
+pub func json_object_serializer_add_u32(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: u32) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_u64((u64)value)])
+
+## Ported from AK/JsonObjectSerializer.h:120 AK::JsonObjectSerializer::add(StringView, long).
+pub func json_object_serializer_add_i64(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: i64) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_i64(value)])
+
+## Ported from AK/JsonObjectSerializer.h:130 AK::JsonObjectSerializer::add(StringView, long unsigned).
+pub func json_object_serializer_add_u64(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: u64) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_u64(value)])
+
+## Ported from AK/JsonObjectSerializer.h:140 AK::JsonObjectSerializer::add(StringView, long long).
+pub func json_object_serializer_add_i64_2(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: i64) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_i64(value)])
+
+## Ported from AK/JsonObjectSerializer.h:150 AK::JsonObjectSerializer::add(StringView, long long unsigned).
+pub func json_object_serializer_add_u64_2(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: u64) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_u64(value)])
+
+## Ported from AK/JsonObjectSerializer.h:160 AK::JsonObjectSerializer::add(StringView, float).
+pub func json_object_serializer_add_f32(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: f32) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_f32(value)])
+
+## Ported from AK/JsonObjectSerializer.h:170 AK::JsonObjectSerializer::add(StringView, double).
+pub func json_object_serializer_add_f64(this: JsonObjectSerializer[StringBuilder]*, key: StringView, value: f64) -> !:
+    try json_object_serializer_begin_item(this, key)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_f64(value)])
+
+## Ported from AK/JsonObjectSerializer.h:248 AK::JsonArraySerializer::add_object: a nested object.
+pub func json_array_serializer_add_object(this: JsonArraySerializer[StringBuilder]*) -> JsonObjectSerializer[StringBuilder]!:
+    try json_array_serializer_begin_item(this)
+    return try json_object_serializer_try_create(this.m_builder)
+
+## Ported from AK/JsonObjectSerializer.h:180 AK::JsonObjectSerializer::add_array: a nested array.
+pub func json_object_serializer_add_array(this: JsonObjectSerializer[StringBuilder]*, key: StringView) -> JsonArraySerializer[StringBuilder]!:
+    try json_object_serializer_begin_item(this, key)
+    return try json_array_serializer_try_create(this.m_builder)
+
+## Ported from AK/JsonObjectSerializer.h:186 AK::JsonObjectSerializer::add_object: a nested object.
+pub func json_object_serializer_add_object(this: JsonObjectSerializer[StringBuilder]*, key: StringView) -> JsonObjectSerializer[StringBuilder]!:
+    try json_object_serializer_begin_item(this, key)
+    return try json_object_serializer_try_create(this.m_builder)
+
+## Ported from AK/JsonObjectSerializer.h:192 AK::JsonObjectSerializer::finish: writes `}`.
+pub func json_object_serializer_finish(this: JsonObjectSerializer[StringBuilder]*) -> !:
+    assert(not this.m_finished)
+    this.m_finished = true
+    try string_builder_try_append_u8(this.m_builder, '}')
+
+## Ported from AK/JsonObjectSerializer.h:204 AK::JsonObjectSerializer::JsonObjectSerializer<type-parameter-0-0>.
+pub func json_object_serializer_construct(this: JsonObjectSerializer[StringBuilder]*, builder: StringBuilder*):
+    this.m_builder = builder
+    this.m_empty = true
+    this.m_finished = false
+
+## Ported from AK/JsonObjectSerializer.h:209 AK::JsonObjectSerializer::begin_item: a comma after the
+## first member, then `"<key>":`.
+func json_object_serializer_begin_item(this: JsonObjectSerializer[StringBuilder]*, key: StringView) -> !:
+    assert(not this.m_finished)
+    if not this.m_empty:
+        try string_builder_try_append_u8(this.m_builder, ',')
+    this.m_empty = false
+
+    try string_builder_try_append_u8(this.m_builder, '"')
+    try string_builder_try_append_escaped_for_json(this.m_builder, key)
+    try string_builder_try_append_string_view(this.m_builder, sv("\":"))

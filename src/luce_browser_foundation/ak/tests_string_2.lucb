@@ -30,8 +30,6 @@ test "is_one_of":
     assert(string_2_is(&bar, "bar"))
 
 test "split":
-    if not ak_core_is_ported:
-        return
     let test1 = string_from_str("foo bar baz")
     let parts1 = string_split(&test1, (u32)' ') else trap("MUST")
     assert(test_vector_size(&parts1) == 3)
@@ -151,8 +149,6 @@ test "repeated":
     assert(string_2_is(&string103, "𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀"))
 
 test "join":
-    if not ak_core_is_ported:
-        return
     let empty_views: StringView[1] = [sv("")]
     let string1 = string_join_string_view(sv(","), empty_views[..<0]) else trap("MUST")
     assert(string_is_empty(&string1))
@@ -437,8 +433,6 @@ test "roman_numerals":
     let four_thousand = string_roman_number_from(4000, StringCase.upper)
     assert(string_2_is(&four_thousand, "4000"))
 
-    if not ak_core_is_ported:
-        return
     let zero = string_roman_number_from(0, StringCase.upper)
     assert(string_2_is(&zero, ""))
 

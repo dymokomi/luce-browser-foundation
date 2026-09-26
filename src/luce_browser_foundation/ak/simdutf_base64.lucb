@@ -343,36 +343,36 @@ pub func simdutf_base64_length_from_binary(length: usize, options: SimdutfBase64
 pub func simdutf_binary_to_base64(src: const u8[], dst: u8[], options: SimdutfBase64Options) -> usize:
     let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".bytes if simdutf_base64_is_url(options) else "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".bytes
     let use_padding = simdutf_base64_use_padding(options)
-    var out: usize = 0
+    var position: usize = 0
     var i: usize = 0
     while i + 2 < src.length:
         let t1 = src[i]
         let t2 = src[i + 1]
         let t3 = src[i + 2]
-        dst[out] = alphabet[t1 >> 2]
-        dst[out + 1] = alphabet[((t1 & 0x03) << 4) | ((t2 >> 4) & 0x0f)]
-        dst[out + 2] = alphabet[((t2 & 0x0f) << 2) | ((t3 >> 6) & 0x03)]
-        dst[out + 3] = alphabet[t3 & 0x3f]
-        out += 4
+        dst[position] = alphabet[t1 >> 2]
+        dst[position + 1] = alphabet[((t1 & 0x03) << 4) | ((t2 >> 4) & 0x0f)]
+        dst[position + 2] = alphabet[((t2 & 0x0f) << 2) | ((t3 >> 6) & 0x03)]
+        dst[position + 3] = alphabet[t3 & 0x3f]
+        position += 4
         i += 3
     let rest = src.length - i
     if rest == 1:
         let t1 = src[i]
-        dst[out] = alphabet[t1 >> 2]
-        dst[out + 1] = alphabet[(t1 & 0x03) << 4]
-        out += 2
+        dst[position] = alphabet[t1 >> 2]
+        dst[position + 1] = alphabet[(t1 & 0x03) << 4]
+        position += 2
         if use_padding:
-            dst[out] = '='
-            dst[out + 1] = '='
-            out += 2
+            dst[position] = '='
+            dst[position + 1] = '='
+            position += 2
     elif rest == 2:
         let t1 = src[i]
         let t2 = src[i + 1]
-        dst[out] = alphabet[t1 >> 2]
-        dst[out + 1] = alphabet[((t1 & 0x03) << 4) | ((t2 >> 4) & 0x0f)]
-        dst[out + 2] = alphabet[(t2 & 0x0f) << 2]
-        out += 3
+        dst[position] = alphabet[t1 >> 2]
+        dst[position + 1] = alphabet[((t1 & 0x03) << 4) | ((t2 >> 4) & 0x0f)]
+        dst[position + 2] = alphabet[(t2 & 0x0f) << 2]
+        position += 3
         if use_padding:
-            dst[out] = '='
-            out += 1
-    return out
+            dst[position] = '='
+            position += 1
+    return position

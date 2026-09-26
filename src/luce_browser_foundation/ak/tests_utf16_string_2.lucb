@@ -265,8 +265,6 @@ func t16s_test_equals_ignoring_ascii_case(string1_value: Utf16String, inequal_va
         assert(not t16s_equals_ignoring_ascii_case_view(inequal_string, t16s_view(&string2)))
 
 test "equals_ignoring_ascii_case":
-    if not ak_core_is_ported:
-        return
     # Short (empty) ASCII string comparison.
     t16s_test_equals_ignoring_ascii_case(utf16_string_new(), utf16_string_from_str("hello"))
 

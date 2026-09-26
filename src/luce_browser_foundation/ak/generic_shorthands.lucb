@@ -1,0 +1,83 @@
+#==============================================================================================
+#
+#   generic_shorthands - first_is_one_of and the other "first compared with the rest" folds
+#
+#   DESCRIPTION:
+#       Port of AK/GenericShorthands.h (lines 1-87). The C++ functions are variadic templates
+#       folding `||` or `&&` over the values after the first; luce-base has no variadic
+#       functions, so the values are a span (`first_is_one_of(3, [1, 2, 3])`) and the fold
+#       is a loop. An empty span folds as C++ folds an empty pack: `||` gives false, `&&`
+#       gives true. `==` needs Equatable, the orderings Comparable.
+#
+#==============================================================================================
+
+## Ported from AK/GenericShorthands.h:14 AK::first_is_one_of: whether `to_compare` equals any of
+## `valid_values`.
+pub func first_is_one_of[T: Equatable](to_compare: T, valid_values: const T[]) -> bool:
+    for value in valid_values:
+        if to_compare == value:
+            return true
+    return false
+
+## Ported from AK/GenericShorthands.h:20 AK::first_is_smaller_than_one_of.
+pub func first_is_smaller_than_one_of[T: Comparable](to_compare: T, valid_values: const T[]) -> bool:
+    for value in valid_values:
+        if to_compare.compare(value) < 0:
+            return true
+    return false
+
+## Ported from AK/GenericShorthands.h:26 AK::first_is_smaller_or_equal_than_one_of.
+pub func first_is_smaller_or_equal_than_one_of[T: Comparable](to_compare: T, valid_values: const T[]) -> bool:
+    for value in valid_values:
+        if to_compare.compare(value) <= 0:
+            return true
+    return false
+
+## Ported from AK/GenericShorthands.h:32 AK::first_is_larger_than_one_of.
+pub func first_is_larger_than_one_of[T: Comparable](to_compare: T, valid_values: const T[]) -> bool:
+    for value in valid_values:
+        if to_compare.compare(value) > 0:
+            return true
+    return false
+
+## Ported from AK/GenericShorthands.h:38 AK::first_is_larger_or_equal_than_one_of.
+pub func first_is_larger_or_equal_than_one_of[T: Comparable](to_compare: T, valid_values: const T[]) -> bool:
+    for value in valid_values:
+        if to_compare.compare(value) >= 0:
+            return true
+    return false
+
+## Ported from AK/GenericShorthands.h:44 AK::first_is_equal_to_all_of.
+pub func first_is_equal_to_all_of[T: Equatable](to_compare: T, valid_values: const T[]) -> bool:
+    for value in valid_values:
+        if not (to_compare == value):
+            return false
+    return true
+
+## Ported from AK/GenericShorthands.h:50 AK::first_is_smaller_than_all_of.
+pub func first_is_smaller_than_all_of[T: Comparable](to_compare: T, valid_values: const T[]) -> bool:
+    for value in valid_values:
+        if not (to_compare.compare(value) < 0):
+            return false
+    return true
+
+## Ported from AK/GenericShorthands.h:56 AK::first_is_smaller_or_equal_than_all_of.
+pub func first_is_smaller_or_equal_than_all_of[T: Comparable](to_compare: T, valid_values: const T[]) -> bool:
+    for value in valid_values:
+        if not (to_compare.compare(value) <= 0):
+            return false
+    return true
+
+## Ported from AK/GenericShorthands.h:62 AK::first_is_larger_than_all_of.
+pub func first_is_larger_than_all_of[T: Comparable](to_compare: T, valid_values: const T[]) -> bool:
+    for value in valid_values:
+        if not (to_compare.compare(value) > 0):
+            return false
+    return true
+
+## Ported from AK/GenericShorthands.h:68 AK::first_is_larger_or_equal_than_all_of.
+pub func first_is_larger_or_equal_than_all_of[T: Comparable](to_compare: T, valid_values: const T[]) -> bool:
+    for value in valid_values:
+        if not (to_compare.compare(value) >= 0):
+            return false
+    return true

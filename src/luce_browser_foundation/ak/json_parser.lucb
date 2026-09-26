@@ -1,0 +1,364 @@
+#==============================================================================================
+#
+#   json_parser - JsonParser: JSON text (ECMA-404) to a JsonValue
+#
+#   DESCRIPTION:
+#       Port of AK/JsonParser.cpp (lines 1-362) with AK/JsonParser.h (lines 1-45): a
+#       recursive-descent parser over a GenericLexer, with the nesting depth bounded so that
+#       untrusted JSON cannot exhaust the stack. Errors are failures with ak_error and the
+#       C++ message.
+#
+#       `ignore_while(is_space)` is written out as the loop it is; parse_number collects its
+#       digits in a StringBuilder (C++: a Vector<char, 32>).
+#
+#==============================================================================================
+
+## Ported from AK/JsonParser.cpp:17 AK::is_space: JSON's insignificant whitespace.
+pub func is_space(ch: i32) -> bool:
+    # ch == '\t' || ch == '\n' || ch == '\r' || ch == ' '
+    return ch == 0x09 or ch == 0x0a or ch == 0x0d or ch == 0x20
+
+## Ported from AK/JsonParser.cpp:24 AK::JsonParser::parse.
+pub func json_parser_parse(input: StringView) -> JsonValue2!:
+    var parser: JsonParser
+    json_parser_construct(&parser, input)
+    return try json_parser_parse_json(&parser)
+
+## Ported from AK/JsonParser.h:19 AK::JsonParser::JsonParser.
+pub func json_parser_construct(this: JsonParser*, input: StringView):
+    generic_lexer_construct(&this.generic_lexer, input)
+    this.m_current_nesting_depth = 0
+
+## GenericLexer::ignore_while(is_space).
+func json_parser_ignore_spaces(this: JsonParser*):
+    let lexer = &this.generic_lexer
+    while not generic_lexer_is_eof(lexer) and is_space((i32)generic_lexer_peek(lexer)):
+        generic_lexer_ignore(lexer)
+
+## The nesting-depth ScopeGuard of parse_object and parse_array.
+func json_parser_leave_nesting_level(this: JsonParser*):
+    this.m_current_nesting_depth -= 1
+
+# mark: Strings =================================================================================
+
+## Ported from AK/JsonParser.cpp:43 AK::JsonParser::consume_and_unescape_string.
+# ECMA-404 9 String
+# Boils down to
+# STRING = "\"" *("[^\"\\]" | "\\" ("[\"\\bfnrt]" | "u[0-9A-Za-z]{4}")) "\""
+#     │├── " ──╮───────────────────────────────────────────────╭── " ──┤│
+#              │                                               │
+#              │  ╭───────────────────<─────────────────────╮  │
+#              │  │                                         │  │
+#              ╰──╰──╮───────────── [^"\\] ──────────────╭──╯──╯
+#                    │                                   │
+#                    ╰── \ ───╮──── ["\\bfnrt] ───────╭──╯
+#                             │                       │
+#                             ╰─── u[0-9A-Za-z]{4}  ──╯
+#
+pub func json_parser_consume_and_unescape_string(this: JsonParser*) -> String!:
+    let lexer = &this.generic_lexer
+    if not generic_lexer_consume_specific_t_char_type(lexer, '"'):
+        error(ak_error, "JsonParser: Expected '\"'")
+    var final_sb: StringBuilder
+    string_builder_construct(&final_sb)
+
+    while true:
+        # OPTIMIZATION: We try to append as many literal characters as possible at a time
+        #               This also pre-checks some error conditions
+        # Note: All utf8 characters are either plain ascii,  or have their most signifiant bit set,
+        #       which puts the, above plain ascii in value, so they will always consist
+        #       of a set of "legal" non-special bytes,
+        #       hence we don't need to bother with a code-point iterator,
+        #       as a simple byte iterator suffices, which GenericLexer provides by default
+        var literal_characters: usize = 0
+        while true:
+            let ch = generic_lexer_peek(lexer, literal_characters)
+            # Note: We get a 0 byte when we hit EOF
+            if ch == 0:
+                error(ak_error, "JsonParser: EOF while parsing String")
+            # Spec: All code points may be placed within the quotation marks except
+            #       for the code points that must be escaped: quotation mark (U+0022),
+            #       reverse solidus (U+005C), and the control characters U+0000 to U+001F.
+            #       There are two-character escape sequence representations of some characters.
+            if is_ascii_c0_control((u32)ch):
+                error(ak_error, "JsonParser: ASCII control sequence encountered")
+            if ch == '"' or ch == '\\':
+                break
+            literal_characters += 1
+        string_builder_append_string_view(&final_sb, generic_lexer_consume_usize(lexer, literal_characters))
+
+        # We have checked all cases except end-of-string and escaped characters in the loop above,
+        # so we now only have to handle those two cases
+        let ch = generic_lexer_peek(lexer)
+
+        if ch == '"':
+            discard(generic_lexer_consume(lexer))
+            break
+
+        generic_lexer_ignore(lexer)  # '\'
+
+        match generic_lexer_peek(lexer):
+            0:
+                error(ak_error, "JsonParser: EOF while parsing String")
+            '"', '\\', '/':
+                string_builder_append_u8(&final_sb, generic_lexer_consume(lexer))
+            'b':
+                generic_lexer_ignore(lexer)
+                string_builder_append_u8(&final_sb, 0x08)
+            'f':
+                generic_lexer_ignore(lexer)
+                string_builder_append_u8(&final_sb, 0x0c)
+            'n':
+                generic_lexer_ignore(lexer)
+                string_builder_append_u8(&final_sb, '\n')
+            'r':
+                generic_lexer_ignore(lexer)
+                string_builder_append_u8(&final_sb, '\r')
+            't':
+                generic_lexer_ignore(lexer)
+                string_builder_append_u8(&final_sb, '\t')
+            'u':
+                generic_lexer_ignore(lexer)  # 'u'
+
+                # https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf
+                #
+                # To escape a code point that is not in the Basic Multilingual Plane, the character may be represented as a
+                # twelve-character sequence, encoding the UTF-16 surrogate pair corresponding to the code point. So for
+                # example, a string containing only the G clef character (U+1D11E) may be represented as "𝄞".
+                # However, whether a processor of JSON texts interprets such a surrogate pair as a single code point or as an
+                # explicit surrogate pair is a semantic decision that is determined by the specific processor.
+                let code_point = generic_lexer_decode_single_or_paired_surrogate(lexer)
+
+                match code_point:
+                    .failure(_):
+                        error(ak_error, "JsonParser: Error while parsing Unicode escape")
+                    .success(value):
+                        string_builder_append_code_point(&final_sb, value)
+            _:
+                let escaped = generic_lexer_peek(lexer)
+                var params = type_erased_format_params_create([arg_char(escaped), arg_char(escaped)])
+                vdbg(sv("JsonParser: Invalid escaped character '{}' ({:#x}) "), &params, true)
+                error(ak_error, "JsonParser: Invalid escaped character")
+
+    return try string_builder_to_string(&final_sb)
+
+# mark: Objects and arrays ======================================================================
+
+## Ported from AK/JsonParser.cpp:141 AK::JsonParser::parse_object.
+pub func json_parser_parse_object(this: JsonParser*) -> JsonValue2!:
+    let lexer = &this.generic_lexer
+    if this.m_current_nesting_depth >= json_parser_max_nesting_depth:
+        error(ak_error, exceeded_max_nesting_depth_error)
+    this.m_current_nesting_depth += 1
+    defer json_parser_leave_nesting_level(this)
+
+    var object: JsonObject
+    json_object_construct(&object)
+    if not generic_lexer_consume_specific_t_char_type(lexer, '{'):
+        error(ak_error, "JsonParser: Expected '{'")
+    while true:
+        json_parser_ignore_spaces(this)
+        if generic_lexer_peek(lexer) == '}':
+            break
+        json_parser_ignore_spaces(this)
+        let name = try json_parser_consume_and_unescape_string(this)
+        json_parser_ignore_spaces(this)
+        if not generic_lexer_consume_specific_t_char_type(lexer, ':'):
+            error(ak_error, "JsonParser: Expected ':'")
+        json_parser_ignore_spaces(this)
+        let value = try json_parser_parse_helper(this)
+        json_object_set_string(&object, name, value)
+        json_parser_ignore_spaces(this)
+        if generic_lexer_peek(lexer) == '}':
+            break
+        if not generic_lexer_consume_specific_t_char_type(lexer, ','):
+            error(ak_error, "JsonParser: Expected ','")
+        json_parser_ignore_spaces(this)
+        if generic_lexer_peek(lexer) == '}':
+            error(ak_error, "JsonParser: Unexpected '}'")
+    if not generic_lexer_consume_specific_t_char_type(lexer, '}'):
+        error(ak_error, "JsonParser: Expected '}'")
+    var result = json_value2_create()
+    json_value2_construct_json_object_2(&result, object)
+    return result
+
+## Ported from AK/JsonParser.cpp:177 AK::JsonParser::parse_array.
+pub func json_parser_parse_array(this: JsonParser*) -> JsonValue2!:
+    let lexer = &this.generic_lexer
+    if this.m_current_nesting_depth >= json_parser_max_nesting_depth:
+        error(ak_error, exceeded_max_nesting_depth_error)
+    this.m_current_nesting_depth += 1
+    defer json_parser_leave_nesting_level(this)
+
+    var array: JsonArray
+    if not generic_lexer_consume_specific_t_char_type(lexer, '['):
+        error(ak_error, "JsonParser: Expected '['")
+    while true:
+        json_parser_ignore_spaces(this)
+        if generic_lexer_peek(lexer) == ']':
+            break
+        let element = try json_parser_parse_helper(this)
+        try json_array_append(&array, element)
+        json_parser_ignore_spaces(this)
+        if generic_lexer_peek(lexer) == ']':
+            break
+        if not generic_lexer_consume_specific_t_char_type(lexer, ','):
+            error(ak_error, "JsonParser: Expected ','")
+        json_parser_ignore_spaces(this)
+        if generic_lexer_peek(lexer) == ']':
+            error(ak_error, "JsonParser: Unexpected ']'")
+    json_parser_ignore_spaces(this)
+    if not generic_lexer_consume_specific_t_char_type(lexer, ']'):
+        error(ak_error, "JsonParser: Expected ']'")
+    var result = json_value2_create()
+    json_value2_construct_json_array_2(&result, array)
+    return result
+
+## Ported from AK/JsonParser.cpp:208 AK::JsonParser::parse_string.
+pub func json_parser_parse_string(this: JsonParser*) -> JsonValue2!:
+    let string = try json_parser_consume_and_unescape_string(this)
+    var result = json_value2_create()
+    json_value2_construct_string(&result, string)
+    return result
+
+# mark: Numbers and keywords ====================================================================
+
+## parse_number's `fallback_to_double_parse` lambda (AK/JsonParser.cpp:230): parses the number
+## that starts at `start_index` as a double.
+func json_parser_fallback_to_double_parse(this: JsonParser*, start_index: usize) -> JsonValue2!:
+    # FIXME: Since we know all the characters so far are ascii digits (and one . or e) we could
+    #        use that in the floating point parser.
+
+    # The first part should be just ascii digits
+    let view = string_view_substring_view(&this.generic_lexer.m_input, start_index)
+
+    let parse_result = parse_first_number_string_view_f64(view, TrimWhitespace.no) else error(ak_error, "JsonParser: Invalid floating point")
+
+    this.generic_lexer.m_index = start_index + parse_result.characters_parsed
+    var result = json_value2_create()
+    json_value2_construct_f64(&result, parse_result.value)
+    return result
+
+## Ported from AK/JsonParser.cpp:214 AK::JsonParser::parse_number.
+pub func json_parser_parse_number(this: JsonParser*) -> JsonValue2!:
+    let lexer = &this.generic_lexer
+    var number_buffer: StringBuilder
+    string_builder_construct(&number_buffer)
+
+    let start_index = generic_lexer_tell(lexer)
+
+    var negative = false
+    if generic_lexer_peek(lexer) == '-':
+        string_builder_append_u8(&number_buffer, '-')
+        lexer.m_index += 1
+        negative = true
+
+        if not is_ascii_digit((u32)generic_lexer_peek(lexer)):
+            error(ak_error, "JsonParser: Unexpected '-' without further digits")
+
+    if generic_lexer_peek(lexer) == '0':
+        if is_ascii_digit((u32)generic_lexer_peek(lexer, 1)):
+            error(ak_error, "JsonParser: Cannot have leading zeros")
+
+    # Leading zeros are not allowed, however we can have a '.' or 'e' with
+    # valid digits after just a zero. These cases will be detected by having the next element
+    # start with a '.' or 'e'.
+
+    var all_zero = true
+    while true:
+        let ch = generic_lexer_peek(lexer)
+        if ch == '.':
+            if not is_ascii_digit((u32)generic_lexer_peek(lexer, 1)):
+                error(ak_error, "JsonParser: Must have digits after decimal point")
+
+            return try json_parser_fallback_to_double_parse(this, start_index)
+        if ch == 'e' or ch == 'E':
+            let next = generic_lexer_peek(lexer, 1)
+            if not is_ascii_digit((u32)next) and ((next != '+' and next != '-') or not is_ascii_digit((u32)generic_lexer_peek(lexer, 2))):
+                error(ak_error, "JsonParser: Must have digits after exponent with an optional sign inbetween")
+
+            return try json_parser_fallback_to_double_parse(this, start_index)
+
+        if is_ascii_digit((u32)ch):
+            if ch != '0':
+                all_zero = false
+
+            string_builder_append_u8(&number_buffer, ch)
+            lexer.m_index += 1
+            continue
+
+        break
+
+    # Negative zero is always a double
+    if negative and all_zero:
+        var negative_zero = json_value2_create()
+        json_value2_construct_f64(&negative_zero, -0.0)
+        return negative_zero
+
+    let number_string = string_builder_string_view(&number_buffer)
+
+    if let number = string_view_to_number_u64(&number_string):
+        var result = json_value2_create()
+        json_value2_construct_u64(&result, number)
+        return result
+    if let number = string_view_to_number_i64(&number_string):
+        var result = json_value2_create()
+        json_value2_construct_i64(&result, number)
+        return result
+
+    # It's possible the unsigned value is bigger than u64 max
+    return try json_parser_fallback_to_double_parse(this, start_index)
+
+## Ported from AK/JsonParser.cpp:298 AK::JsonParser::parse_true.
+pub func json_parser_parse_true(this: JsonParser*) -> JsonValue2!:
+    if not generic_lexer_consume_specific_string_view(&this.generic_lexer, sv("true")):
+        error(ak_error, "JsonParser: Expected 'true'")
+    var result = json_value2_create()
+    json_value2_json_value(&result, true)
+    return result
+
+## Ported from AK/JsonParser.cpp:305 AK::JsonParser::parse_false.
+pub func json_parser_parse_false(this: JsonParser*) -> JsonValue2!:
+    if not generic_lexer_consume_specific_string_view(&this.generic_lexer, sv("false")):
+        error(ak_error, "JsonParser: Expected 'false'")
+    var result = json_value2_create()
+    json_value2_json_value(&result, false)
+    return result
+
+## Ported from AK/JsonParser.cpp:312 AK::JsonParser::parse_null.
+pub func json_parser_parse_null(this: JsonParser*) -> JsonValue2!:
+    if not generic_lexer_consume_specific_string_view(&this.generic_lexer, sv("null")):
+        error(ak_error, "JsonParser: Expected 'null'")
+    return json_value2_create()
+
+# mark: Entry ===================================================================================
+
+## Ported from AK/JsonParser.cpp:319 AK::JsonParser::parse_helper: one value of any type.
+pub func json_parser_parse_helper(this: JsonParser*) -> JsonValue2!:
+    json_parser_ignore_spaces(this)
+    let type_hint = generic_lexer_peek(&this.generic_lexer)
+    match type_hint:
+        '{':
+            return try json_parser_parse_object(this)
+        '[':
+            return try json_parser_parse_array(this)
+        '"':
+            return try json_parser_parse_string(this)
+        '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+            return try json_parser_parse_number(this)
+        'f':
+            return try json_parser_parse_false(this)
+        't':
+            return try json_parser_parse_true(this)
+        'n':
+            return try json_parser_parse_null(this)
+        _:
+            error(ak_error, "JsonParser: Unexpected character")
+
+## Ported from AK/JsonParser.cpp:353 AK::JsonParser::parse_json: one value and nothing after it.
+pub func json_parser_parse_json(this: JsonParser*) -> JsonValue2!:
+    let result = try json_parser_parse_helper(this)
+    json_parser_ignore_spaces(this)
+    if not generic_lexer_is_eof(&this.generic_lexer):
+        error(ak_error, "JsonParser: Didn't consume all input")
+    return result

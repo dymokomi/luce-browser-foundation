@@ -4,8 +4,6 @@
 #
 #   DESCRIPTION:
 #       Port of Tests/AK/TestIPv4Address.cpp; the static_asserts are checked at run time.
-#       from_string splits into a Vector and to_byte_string builds with a StringBuilder
-#       (region r01), so those tests are gated on ak_core_is_ported.
 #
 #==============================================================================================
 
@@ -21,8 +19,6 @@ test "ipv4: should construct from c array":
     assert(not i_pv4_address_is_zero(&addr))
 
 test "ipv4: should construct from u32":
-    if not ak_core_is_ported:
-        return
     var a: BigEndian[u32]
     big_endian_construct(&a, 0x11_22_33_44)
     var addr = IPv4Address()
@@ -40,8 +36,6 @@ test "ipv4: should get octets by byte offset":
     assert(42 == i_pv4_address_at(&addr, 3))
 
 test "ipv4: should convert to string":
-    if not ak_core_is_ported:
-        return
     let addr = i_pv4_address_from_octets(1, 25, 39, 42)
 
     let text = i_pv4_address_to_byte_string(&addr)
@@ -60,33 +54,21 @@ func tests_ipv4_expect_octets(text: str, a: u8, b: u8, c_: u8, d: u8):
     assert(d == i_pv4_address_at(&addr, 3))
 
 test "ipv4: should make ipv4 address from string":
-    if not ak_core_is_ported:
-        return
     tests_ipv4_expect_octets("192.168.0.1", 192, 168, 0, 1)
 
 test "ipv4: should make empty optional from bad string":
-    if not ak_core_is_ported:
-        return
     assert(i_pv4_address_from_string(sv("bad string")) == none)
 
 test "ipv4: should make empty optional from out of range values":
-    if not ak_core_is_ported:
-        return
     assert(i_pv4_address_from_string(sv("192.168.0.500")) == none)
 
 test "ipv4: should fill d octet from 1 part":
-    if not ak_core_is_ported:
-        return
     tests_ipv4_expect_octets("1", 0, 0, 0, 1)
 
 test "ipv4: should fill a and d octets from 2 parts":
-    if not ak_core_is_ported:
-        return
     tests_ipv4_expect_octets("192.1", 192, 0, 0, 1)
 
 test "ipv4: should fill a b d octets from 3 parts":
-    if not ak_core_is_ported:
-        return
     tests_ipv4_expect_octets("192.168.1", 192, 168, 0, 1)
 
 test "ipv4: should convert to in addr t":

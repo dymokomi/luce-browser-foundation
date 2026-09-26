@@ -176,8 +176,6 @@ test "invalid_utf8":
     assert(message_ok)
 
 test "with_replacement_character":
-    if not ak_core_is_ported:
-        return
     let string1 = string_from_utf8_with_replacement_character(string_view_from_bytes(b"long string \xf4\x8f\xbf\xc0"), StringWithBomHandling.no)  # U+110000
     let string1_expected: u8[24] = [0x6c, 0x6f, 0x6e, 0x67, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x20, 0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd]
     assert(compare_bytes(string_base_bytes(&string1.string_base), string1_expected) == 0)
@@ -260,8 +258,6 @@ test "code_points":
     assert(code_points[1] == 0x1fa92)
 
 test "string_builder":
-    if not ak_core_is_ported:
-        return
     var builder = string_builder_new()
     string_builder_append_code_point(&builder, 0x1f9ac)
     string_builder_append_code_point(&builder, 0x1fa92)
@@ -271,8 +267,6 @@ test "string_builder":
     assert(string_base_bytes(&string.string_base).length == 8)
 
 test "ak_format":
-    if not ak_format_is_ported:
-        return
     # String::formatted("Hello {}", "friends"_string): the argument goes in as a string view.
     var parameter: TypeErasedParameter
     parameter.value.as_string_view = sv("friends")
@@ -282,8 +276,6 @@ test "ak_format":
     assert(string_is(&foo, "Hello friends"))
 
 test "replace":
-    if not ak_core_is_ported:
-        return
     let haystack = string_from_str("Hello enemies")
     let result1 = string_replace(&haystack, sv("enemies"), sv("friends"), ReplaceMode.all) else trap("MUST")
     assert(string_is(&result1, "Hello friends"))
@@ -300,8 +292,6 @@ func string_test_reverse(test_text: str, expected: str):
     assert(string_is(&result, expected))
 
 test "reverse":
-    if not ak_core_is_ported:
-        return
     string_test_reverse("", "")
     string_test_reverse("a", "a")
     string_test_reverse("ab", "ba")

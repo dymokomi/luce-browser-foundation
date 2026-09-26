@@ -1,0 +1,590 @@
+#==============================================================================================
+#
+#   json_value - JsonValue: null, a boolean, a number, a string, an array or an object
+#
+#   DESCRIPTION:
+#       Port of AK/JsonValue.cpp (lines 1-220) with the inline members of AK/JsonValue.h
+#       (lines 1-233). The storage is the JsonValueStorage payload enum (AK's Variant); an
+#       array or object is owned through a pointer, as the C++ NonnullOwnPtr is.
+#
+#       C++ copies a JsonValue deeply (its copy constructor clones the array or object); a
+#       luce-base struct copy shares them, so the C++ copies are json_value2_clone (DESIGN.md
+#       §3.3 rule 2). The member templates over an integer type (get_integer<T>, is_integer<T>,
+#       as_integer<T>) and over a float type (get_number_with_precision_loss<T>) are written
+#       out per type, as the instantiations C++ makes.
+#
+#==============================================================================================
+
+# mark: Construction and copies =================================================================
+
+## Ported from AK/JsonValue.cpp:17 AK::clone: a copy of the storage whose array or object is a
+## new copy too.
+func clone(other: JsonValueStorage) -> JsonValueStorage!:
+    match other:
+        .json_array(value):
+            let array = try new JsonArray(m_values = json_array_clone(value).m_values)
+            return JsonValueStorage.json_array(value = array)
+        .json_object(value):
+            let object = try new JsonObject(m_members = json_object_clone(value).m_members)
+            return JsonValueStorage.json_object(value = object)
+        _:
+            return other
+
+## Ported from AK/JsonValue.cpp:29 AK::JsonValue::JsonValue: null.
+pub func json_value2_construct(this: JsonValue2*):
+    this.m_value = JsonValueStorage.empty
+
+## AK::JsonValue::JsonValue(JsonValue const&) (AK/JsonValue.cpp:34): a deep copy.
+pub func json_value2_clone(this: const JsonValue2*) -> JsonValue2:
+    return JsonValue2(m_value = clone(this.m_value) else trap("MUST: JsonValue clone"))
+
+## A new JsonValue made by one of the json_value2_construct_* functions.
+pub func json_value2_create() -> JsonValue2:
+    var value: JsonValue2
+    json_value2_construct(&value)
+    return value
+
+## Ported from AK/JsonValue.cpp:126 AK::JsonValue::JsonValue(int).
+pub func json_value2_construct_i32(this: JsonValue2*, value: i32):
+    this.m_value = JsonValueStorage.i64_(value = (i64)value)
+
+## Ported from AK/JsonValue.cpp:131 AK::JsonValue::JsonValue(unsigned).
+pub func json_value2_construct_u32(this: JsonValue2*, value: u32):
+    this.m_value = JsonValueStorage.i64_(value = (i64)value)
+
+## Ported from AK/JsonValue.cpp:136 AK::JsonValue::JsonValue(long).
+pub func json_value2_construct_i64(this: JsonValue2*, value: i64):
+    this.m_value = JsonValueStorage.i64_(value = value)
+
+## Ported from AK/JsonValue.cpp:141 AK::JsonValue::JsonValue(unsigned long).
+pub func json_value2_construct_u64(this: JsonValue2*, value: u64):
+    this.m_value = JsonValueStorage.u64_(value = value)
+
+## Ported from AK/JsonValue.cpp:146 AK::JsonValue::JsonValue(long long).
+pub func json_value2_construct_i64_2(this: JsonValue2*, value: i64):
+    this.m_value = JsonValueStorage.i64_(value = value)
+
+## Ported from AK/JsonValue.cpp:151 AK::JsonValue::JsonValue(long long unsigned).
+pub func json_value2_construct_u64_2(this: JsonValue2*, value: u64):
+    this.m_value = JsonValueStorage.u64_(value = value)
+
+## Ported from AK/JsonValue.cpp:156 AK::JsonValue::JsonValue(double).
+pub func json_value2_construct_f64(this: JsonValue2*, value: f64):
+    this.m_value = JsonValueStorage.f64_(value = value)
+
+## Ported from AK/JsonValue.cpp:161 AK::JsonValue::JsonValue(String).
+pub func json_value2_construct_string(this: JsonValue2*, value: String):
+    this.m_value = JsonValueStorage.string(value = value)
+
+## Ported from AK/JsonValue.cpp:166 AK::JsonValue::JsonValue(StringView).
+pub func json_value2_construct_string_view(this: JsonValue2*, value: StringView):
+    this.m_value = JsonValueStorage.string(value = string_from_utf8(value) else trap("MUST: String::from_utf8"))
+
+## Ported from AK/JsonValue.h:63 AK::JsonValue::JsonValue(bool) (the template over T = bool).
+pub func json_value2_json_value(this: JsonValue2*, value: bool):
+    this.m_value = JsonValueStorage.bool_(value = value)
+
+## Ported from AK/JsonValue.cpp:176 AK::JsonValue::JsonValue(JsonArray const&): a copy of `value`.
+pub func json_value2_construct_json_array(this: JsonValue2*, value: JsonArray):
+    let array = new JsonArray(m_values = json_array_clone(&value).m_values) else trap("out of memory")
+    this.m_value = JsonValueStorage.json_array(value = array)
+
+## Ported from AK/JsonValue.cpp:171 AK::JsonValue::JsonValue(JsonObject const&): a copy of `value`.
+pub func json_value2_construct_json_object(this: JsonValue2*, value: JsonObject):
+    let object = new JsonObject(m_members = json_object_clone(&value).m_members) else trap("out of memory")
+    this.m_value = JsonValueStorage.json_object(value = object)
+
+## Ported from AK/JsonValue.cpp:186 AK::JsonValue::JsonValue(JsonArray&&): takes `value`'s elements.
+pub func json_value2_construct_json_array_2(this: JsonValue2*, value: JsonArray):
+    let array = new JsonArray(m_values = value.m_values) else trap("out of memory")
+    this.m_value = JsonValueStorage.json_array(value = array)
+
+## Ported from AK/JsonValue.cpp:181 AK::JsonValue::JsonValue(JsonObject&&): takes `value`'s members.
+pub func json_value2_construct_json_object_2(this: JsonValue2*, value: JsonObject):
+    let object = new JsonObject(m_members = value.m_members) else trap("out of memory")
+    this.m_value = JsonValueStorage.json_object(value = object)
+
+## Ported from AK/JsonValue.cpp:191 AK::JsonValue::from_string: parses JSON text.
+pub func json_value2_from_string(input: StringView) -> JsonValue2!:
+    return try json_parser_parse(input)
+
+# mark: Equality ================================================================================
+
+## JsonValue::equals's `normalize` lambda: the magnitude of a number, as an integer when it is
+## one, and whether it is negative.
+func json_value2_normalize(representation: U64OrI64OrF64, is_negative: bool*) -> U64OrF64:
+    match representation:
+        .u64_(value):
+            *is_negative = false
+            return U64OrF64.u64_(value = value)
+        .i64_(value):
+            *is_negative = value < 0
+            # static_cast<u64>(abs(value)): abs(INT64_MIN) wraps to itself.
+            return U64OrF64.u64_(value = (u64)value if value >= 0 else 0 -% (u64)value)
+        .f64_(value):
+            *is_negative = value < 0.0
+            let magnitude = -value if value < 0.0 else value
+            if (f64)((u64)magnitude) == magnitude:
+                return U64OrF64.u64_(value = (u64)magnitude)
+            return U64OrF64.f64_(value = magnitude)
+
+## Variant<u64, double>, the normalized number of JsonValue::equals.
+enum U64OrF64:
+    u64_(value: u64)
+    f64_(value: f64)
+
+## `as_string() == other.as_string()`.
+func json_value2_strings_equal(this: const JsonValue2*, other: const JsonValue2*) -> bool:
+    let string = json_value2_as_string(this)
+    let other_string = json_value2_as_string(other)
+    return string_base_eq(&string.string_base, &other_string.string_base)
+
+## Ported from AK/JsonValue.cpp:66 AK::JsonValue::equals.
+pub func json_value2_equals(this: const JsonValue2*, other: const JsonValue2*) -> bool:
+    if json_value2_is_null(this) and json_value2_is_null(other):
+        return true
+
+    if json_value2_is_bool(this) and json_value2_is_bool(other) and json_value2_as_bool(this) == json_value2_as_bool(other):
+        return true
+
+    if json_value2_is_string(this) and json_value2_is_string(other) and json_value2_strings_equal(this, other):
+        return true
+
+    if json_value2_is_number(this) and json_value2_is_number(other):
+        var is_this_negative = false
+        let normalized_this = json_value2_normalize(json_value2_as_number(this), &is_this_negative)
+        var is_that_negative = false
+        let normalized_that = json_value2_normalize(json_value2_as_number(other), &is_that_negative)
+        return is_this_negative == is_that_negative and normalized_this == normalized_that
+
+    if json_value2_is_array(this) and json_value2_is_array(other) and json_array_size(json_value2_as_array_const(this)) == json_array_size(json_value2_as_array_const(other)):
+        var result = true
+        for i in 0..<json_array_size(json_value2_as_array_const(this)):
+            result = json_value2_equals(json_array_at_const(json_value2_as_array_const(this), i), json_array_at_const(json_value2_as_array_const(other), i)) and result
+        return result
+
+    if json_value2_is_object(this) and json_value2_is_object(other) and json_object_size(json_value2_as_object_const(this)) == json_object_size(json_value2_as_object_const(other)):
+        var result = true
+        let this_object = json_value2_as_object_const(this)
+        let keys = ordered_hash_map_keys(&this_object.m_members)
+        for i in 0..<vector_size(&keys):
+            let key = vector_at_const(&keys, i)
+            let value = ordered_hash_map_get_k_const(&this_object.m_members, *key) else trap("VERIFY_NOT_REACHED")
+            if let other_value = json_object_get_const(json_value2_as_object_const(other), string_bytes_as_string_view(key)):
+                result = json_value2_equals(value, other_value) and result
+            else:
+                result = false
+        return result
+
+    return false
+
+# mark: Serialization ===========================================================================
+
+## Ported from AK/JsonValue.cpp:196 AK::JsonValue::serialized: the JSON text of this value.
+pub func json_value2_serialized(this: const JsonValue2*) -> String:
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    json_value2_serialize(this, &builder)
+
+    return string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")
+
+## Ported from AK/JsonValue.cpp:204 AK::JsonValue::serialize: appends the JSON text of this value.
+pub func json_value2_serialize(this: const JsonValue2*, builder: StringBuilder*):
+    match this.m_value:
+        .empty:
+            string_builder_append_string_view(builder, sv("null"))
+        .bool_(value):
+            string_builder_append_string_view(builder, sv("true") if value else sv("false"))
+        .i64_(value):
+            vformat_arguments(builder, sv("{}"), [arg_i64(value)]) else trap("MUST: appendff")
+        .u64_(value):
+            vformat_arguments(builder, sv("{}"), [arg_u64(value)]) else trap("MUST: appendff")
+        .f64_(value):
+            vformat_arguments(builder, sv("{}"), [arg_f64(value)]) else trap("MUST: appendff")
+        .string(value):
+            string_builder_append_u8(builder, '"')
+            string_builder_append_escaped_for_json(builder, string_bytes_as_string_view(&value))
+            string_builder_append_u8(builder, '"')
+        .json_array(value):
+            json_array_serialize(value, builder)
+        .json_object(value):
+            json_object_serialize(value, builder)
+
+## Ported from AK/JsonValue.h:222 AK::Formatter<JsonValue>::format: the serialized value, as a
+## string with this formatter's flags.
+pub func formatter_json_value_format(this: StandardFormatter*, builder: FormatBuilder*, value: const JsonValue2*) -> !:
+    let serialized = json_value2_serialized(value)
+    try formatter_string_view_format(this, builder, string_bytes_as_string_view(&serialized))
+
+## __format_value<JsonValue>: `value` points at a JsonValue.
+pub func format_value_json_value(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_json_value_format(&formatter, builder, (const JsonValue2*)format_value_target(value))
+
+# mark: Numbers =================================================================================
+
+## Ported from AK/JsonValue.h:83 AK::JsonValue::get_int.
+pub func json_value2_get_int(this: const JsonValue2*) -> i32?:
+    return json_value2_get_integer_i32(this)
+
+## Ported from AK/JsonValue.h:84 AK::JsonValue::get_i32.
+pub func json_value2_get_i32(this: const JsonValue2*) -> i32?:
+    return json_value2_get_integer_i32(this)
+
+## Ported from AK/JsonValue.h:85 AK::JsonValue::get_i64.
+pub func json_value2_get_i64(this: const JsonValue2*) -> i64?:
+    return json_value2_get_integer_i64(this)
+
+## Ported from AK/JsonValue.h:87 AK::JsonValue::get_uint.
+pub func json_value2_get_uint(this: const JsonValue2*) -> u32?:
+    return json_value2_get_integer_u32(this)
+
+## Ported from AK/JsonValue.h:88 AK::JsonValue::get_u32.
+pub func json_value2_get_u32(this: const JsonValue2*) -> u32?:
+    return json_value2_get_integer_u32(this)
+
+## Ported from AK/JsonValue.h:89 AK::JsonValue::get_u64.
+pub func json_value2_get_u64(this: const JsonValue2*) -> u64?:
+    return json_value2_get_integer_u64(this)
+
+## Ported from AK/JsonValue.h:90 AK::JsonValue::get_float_with_precision_loss.
+pub func json_value2_get_float_with_precision_loss(this: const JsonValue2*) -> f32?:
+    return json_value2_get_number_with_precision_loss_f32(this)
+
+## Ported from AK/JsonValue.h:91 AK::JsonValue::get_double_with_precision_loss.
+pub func json_value2_get_double_with_precision_loss(this: const JsonValue2*) -> f64?:
+    return json_value2_get_number_with_precision_loss_f64(this)
+
+## Ported from AK/JsonValue.h:93 AK::JsonValue::get_addr (FlatPtr is u64 on the 64-bit targets).
+pub func json_value2_get_addr(this: const JsonValue2*) -> u64?:
+    return json_value2_get_u64(this)
+
+## Ported from AK/JsonValue.h:108 AK::JsonValue::get_bool.
+pub func json_value2_get_bool(this: const JsonValue2*) -> bool?:
+    if not json_value2_is_bool(this):
+        return none
+    return json_value2_as_bool(this)
+
+# mark: Accessors ===============================================================================
+
+## Ported from AK/JsonValue.h:115 AK::JsonValue::as_bool.
+pub func json_value2_as_bool(this: const JsonValue2*) -> bool:
+    match this.m_value:
+        .bool_(value): return value
+        _: trap("VERIFY_NOT_REACHED: JsonValue is not a bool")
+
+## Ported from AK/JsonValue.h:120 AK::JsonValue::as_string (C++ returns `String const&`; a String
+## is an immutable value, so a copy reads the same).
+pub func json_value2_as_string(this: const JsonValue2*) -> String:
+    match this.m_value:
+        .string(value): return value
+        _: trap("VERIFY_NOT_REACHED: JsonValue is not a string")
+
+## Ported from AK/JsonValue.h:125 AK::JsonValue::as_object.
+pub func json_value2_as_object(this: JsonValue2*) -> JsonObject*:
+    match this.m_value:
+        .json_object(value): return value
+        _: trap("VERIFY_NOT_REACHED: JsonValue is not an object")
+
+## Ported from AK/JsonValue.h:130 AK::JsonValue::as_object.
+pub func json_value2_as_object_const(this: const JsonValue2*) -> const JsonObject*:
+    match this.m_value:
+        .json_object(value): return value
+        _: trap("VERIFY_NOT_REACHED: JsonValue is not an object")
+
+## Ported from AK/JsonValue.h:135 AK::JsonValue::as_array.
+pub func json_value2_as_array(this: JsonValue2*) -> JsonArray*:
+    match this.m_value:
+        .json_array(value): return value
+        _: trap("VERIFY_NOT_REACHED: JsonValue is not an array")
+
+## Ported from AK/JsonValue.h:140 AK::JsonValue::as_array.
+pub func json_value2_as_array_const(this: const JsonValue2*) -> const JsonArray*:
+    match this.m_value:
+        .json_array(value): return value
+        _: trap("VERIFY_NOT_REACHED: JsonValue is not an array")
+
+## Ported from AK/JsonValue.h:145 AK::JsonValue::as_number.
+pub func json_value2_as_number(this: const JsonValue2*) -> U64OrI64OrF64:
+    match this.m_value:
+        .u64_(value): return U64OrI64OrF64.u64_(value = value)
+        .i64_(value): return U64OrI64OrF64.i64_(value = value)
+        .f64_(value): return U64OrI64OrF64.f64_(value = value)
+        _: trap("VERIFY_NOT_REACHED: JsonValue is not a number")
+
+## Ported from AK/JsonValue.h:150 AK::JsonValue::type.
+pub func json_value2_type(this: const JsonValue2*) -> JsonValueType:
+    match this.m_value:
+        .empty: return JsonValueType.null
+        .bool_(_): return JsonValueType.bool_
+        .i64_(_), .u64_(_), .f64_(_): return JsonValueType.number
+        .string(_): return JsonValueType.string
+        .json_array(_): return JsonValueType.array
+        .json_object(_): return JsonValueType.object
+
+## Ported from AK/JsonValue.h:161 AK::JsonValue::is_null.
+pub func json_value2_is_null(this: const JsonValue2*) -> bool:
+    match this.m_value:
+        .empty: return true
+        _: return false
+
+## Ported from AK/JsonValue.h:162 AK::JsonValue::is_bool.
+pub func json_value2_is_bool(this: const JsonValue2*) -> bool:
+    match this.m_value:
+        .bool_(_): return true
+        _: return false
+
+## Ported from AK/JsonValue.h:163 AK::JsonValue::is_string.
+pub func json_value2_is_string(this: const JsonValue2*) -> bool:
+    match this.m_value:
+        .string(_): return true
+        _: return false
+
+## Ported from AK/JsonValue.h:164 AK::JsonValue::is_array.
+pub func json_value2_is_array(this: const JsonValue2*) -> bool:
+    match this.m_value:
+        .json_array(_): return true
+        _: return false
+
+## Ported from AK/JsonValue.h:165 AK::JsonValue::is_object.
+pub func json_value2_is_object(this: const JsonValue2*) -> bool:
+    match this.m_value:
+        .json_object(_): return true
+        _: return false
+
+## Ported from AK/JsonValue.h:166 AK::JsonValue::is_number.
+pub func json_value2_is_number(this: const JsonValue2*) -> bool:
+    match this.m_value:
+        .i64_(_), .u64_(_), .f64_(_): return true
+        _: return false
+
+## JsonValue::get_number_with_precision_loss<float> (AK/JsonValue.h:175).
+pub func json_value2_get_number_with_precision_loss_f32(this: const JsonValue2*) -> f32?:
+    match this.m_value:
+        .i64_(value): return (f32)value
+        .u64_(value): return (f32)value
+        .f64_(value): return (f32)value
+        _: return none
+
+## JsonValue::get_number_with_precision_loss<double> (AK/JsonValue.h:175).
+pub func json_value2_get_number_with_precision_loss_f64(this: const JsonValue2*) -> f64?:
+    match this.m_value:
+        .i64_(value): return (f64)value
+        .u64_(value): return (f64)value
+        .f64_(value): return value
+        _: return none
+
+# mark: get_integer<T>, is_integer<T>, as_integer<T> ============================================
+
+## JsonValue::get_integer<i8> (AK/JsonValue.h:196): the number as i8 when it has that exact value.
+pub func json_value2_get_integer_i8(this: const JsonValue2*) -> i8?:
+    match this.m_value:
+        .i64_(value):
+            if value < -128 or value > 127:  # !is_within_range<i8>(value)
+                return none
+            return (i8)value
+        .u64_(value):
+            if value > 127:  # !is_within_range<i8>(value)
+                return none
+            return (i8)value
+        .f64_(value):
+            # FIXME: Make is_within_range work with floating point numbers.
+            if (f64)((i8)value) != value:
+                return none
+            return (i8)value
+        _:
+            return none
+
+## JsonValue::is_integer<i8> (AK/JsonValue.h:184).
+pub func json_value2_is_integer_i8(this: const JsonValue2*) -> bool:
+    return json_value2_get_integer_i8(this) != none
+
+## JsonValue::as_integer<i8> (AK/JsonValue.h:190).
+pub func json_value2_as_integer_i8(this: const JsonValue2*) -> i8:
+    return json_value2_get_integer_i8(this) else trap("VERIFY_NOT_REACHED: not an integer of this type")
+
+## JsonValue::get_integer<u8> (AK/JsonValue.h:196): the number as u8 when it has that exact value.
+pub func json_value2_get_integer_u8(this: const JsonValue2*) -> u8?:
+    match this.m_value:
+        .i64_(value):
+            if value < 0 or value > 255:  # !is_within_range<u8>(value)
+                return none
+            return (u8)value
+        .u64_(value):
+            if value > 255:  # !is_within_range<u8>(value)
+                return none
+            return (u8)value
+        .f64_(value):
+            # FIXME: Make is_within_range work with floating point numbers.
+            if (f64)((u8)value) != value:
+                return none
+            return (u8)value
+        _:
+            return none
+
+## JsonValue::is_integer<u8> (AK/JsonValue.h:184).
+pub func json_value2_is_integer_u8(this: const JsonValue2*) -> bool:
+    return json_value2_get_integer_u8(this) != none
+
+## JsonValue::as_integer<u8> (AK/JsonValue.h:190).
+pub func json_value2_as_integer_u8(this: const JsonValue2*) -> u8:
+    return json_value2_get_integer_u8(this) else trap("VERIFY_NOT_REACHED: not an integer of this type")
+
+## JsonValue::get_integer<i16> (AK/JsonValue.h:196): the number as i16 when it has that exact value.
+pub func json_value2_get_integer_i16(this: const JsonValue2*) -> i16?:
+    match this.m_value:
+        .i64_(value):
+            if value < -32768 or value > 32767:  # !is_within_range<i16>(value)
+                return none
+            return (i16)value
+        .u64_(value):
+            if value > 32767:  # !is_within_range<i16>(value)
+                return none
+            return (i16)value
+        .f64_(value):
+            # FIXME: Make is_within_range work with floating point numbers.
+            if (f64)((i16)value) != value:
+                return none
+            return (i16)value
+        _:
+            return none
+
+## JsonValue::is_integer<i16> (AK/JsonValue.h:184).
+pub func json_value2_is_integer_i16(this: const JsonValue2*) -> bool:
+    return json_value2_get_integer_i16(this) != none
+
+## JsonValue::as_integer<i16> (AK/JsonValue.h:190).
+pub func json_value2_as_integer_i16(this: const JsonValue2*) -> i16:
+    return json_value2_get_integer_i16(this) else trap("VERIFY_NOT_REACHED: not an integer of this type")
+
+## JsonValue::get_integer<u16> (AK/JsonValue.h:196): the number as u16 when it has that exact value.
+pub func json_value2_get_integer_u16(this: const JsonValue2*) -> u16?:
+    match this.m_value:
+        .i64_(value):
+            if value < 0 or value > 65535:  # !is_within_range<u16>(value)
+                return none
+            return (u16)value
+        .u64_(value):
+            if value > 65535:  # !is_within_range<u16>(value)
+                return none
+            return (u16)value
+        .f64_(value):
+            # FIXME: Make is_within_range work with floating point numbers.
+            if (f64)((u16)value) != value:
+                return none
+            return (u16)value
+        _:
+            return none
+
+## JsonValue::is_integer<u16> (AK/JsonValue.h:184).
+pub func json_value2_is_integer_u16(this: const JsonValue2*) -> bool:
+    return json_value2_get_integer_u16(this) != none
+
+## JsonValue::as_integer<u16> (AK/JsonValue.h:190).
+pub func json_value2_as_integer_u16(this: const JsonValue2*) -> u16:
+    return json_value2_get_integer_u16(this) else trap("VERIFY_NOT_REACHED: not an integer of this type")
+
+## JsonValue::get_integer<i32> (AK/JsonValue.h:196): the number as i32 when it has that exact value.
+pub func json_value2_get_integer_i32(this: const JsonValue2*) -> i32?:
+    match this.m_value:
+        .i64_(value):
+            if value < -2147483648 or value > 2147483647:  # !is_within_range<i32>(value)
+                return none
+            return (i32)value
+        .u64_(value):
+            if value > 2147483647:  # !is_within_range<i32>(value)
+                return none
+            return (i32)value
+        .f64_(value):
+            # FIXME: Make is_within_range work with floating point numbers.
+            if (f64)((i32)value) != value:
+                return none
+            return (i32)value
+        _:
+            return none
+
+## JsonValue::is_integer<i32> (AK/JsonValue.h:184).
+pub func json_value2_is_integer_i32(this: const JsonValue2*) -> bool:
+    return json_value2_get_integer_i32(this) != none
+
+## JsonValue::as_integer<i32> (AK/JsonValue.h:190).
+pub func json_value2_as_integer_i32(this: const JsonValue2*) -> i32:
+    return json_value2_get_integer_i32(this) else trap("VERIFY_NOT_REACHED: not an integer of this type")
+
+## JsonValue::get_integer<u32> (AK/JsonValue.h:196): the number as u32 when it has that exact value.
+pub func json_value2_get_integer_u32(this: const JsonValue2*) -> u32?:
+    match this.m_value:
+        .i64_(value):
+            if value < 0 or value > 4294967295:  # !is_within_range<u32>(value)
+                return none
+            return (u32)value
+        .u64_(value):
+            if value > 4294967295:  # !is_within_range<u32>(value)
+                return none
+            return (u32)value
+        .f64_(value):
+            # FIXME: Make is_within_range work with floating point numbers.
+            if (f64)((u32)value) != value:
+                return none
+            return (u32)value
+        _:
+            return none
+
+## JsonValue::is_integer<u32> (AK/JsonValue.h:184).
+pub func json_value2_is_integer_u32(this: const JsonValue2*) -> bool:
+    return json_value2_get_integer_u32(this) != none
+
+## JsonValue::as_integer<u32> (AK/JsonValue.h:190).
+pub func json_value2_as_integer_u32(this: const JsonValue2*) -> u32:
+    return json_value2_get_integer_u32(this) else trap("VERIFY_NOT_REACHED: not an integer of this type")
+
+## JsonValue::get_integer<i64> (AK/JsonValue.h:196): the number as i64 when it has that exact value.
+pub func json_value2_get_integer_i64(this: const JsonValue2*) -> i64?:
+    match this.m_value:
+        .i64_(value):
+            return value
+        .u64_(value):
+            if value > 9223372036854775807:  # !is_within_range<i64>(value)
+                return none
+            return (i64)value
+        .f64_(value):
+            # FIXME: Make is_within_range work with floating point numbers.
+            if (f64)((i64)value) != value:
+                return none
+            return (i64)value
+        _:
+            return none
+
+## JsonValue::is_integer<i64> (AK/JsonValue.h:184).
+pub func json_value2_is_integer_i64(this: const JsonValue2*) -> bool:
+    return json_value2_get_integer_i64(this) != none
+
+## JsonValue::as_integer<i64> (AK/JsonValue.h:190).
+pub func json_value2_as_integer_i64(this: const JsonValue2*) -> i64:
+    return json_value2_get_integer_i64(this) else trap("VERIFY_NOT_REACHED: not an integer of this type")
+
+## JsonValue::get_integer<u64> (AK/JsonValue.h:196): the number as u64 when it has that exact value.
+pub func json_value2_get_integer_u64(this: const JsonValue2*) -> u64?:
+    match this.m_value:
+        .i64_(value):
+            if value < 0:  # !is_within_range<u64>(value)
+                return none
+            return (u64)value
+        .u64_(value):
+            return value
+        .f64_(value):
+            # FIXME: Make is_within_range work with floating point numbers.
+            if (f64)((u64)value) != value:
+                return none
+            return (u64)value
+        _:
+            return none
+
+## JsonValue::is_integer<u64> (AK/JsonValue.h:184).
+pub func json_value2_is_integer_u64(this: const JsonValue2*) -> bool:
+    return json_value2_get_integer_u64(this) != none
+
+## JsonValue::as_integer<u64> (AK/JsonValue.h:190).
+pub func json_value2_as_integer_u64(this: const JsonValue2*) -> u64:
+    return json_value2_get_integer_u64(this) else trap("VERIFY_NOT_REACHED: not an integer of this type")

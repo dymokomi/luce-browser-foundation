@@ -52,8 +52,7 @@ test "empty_string (Utf16FlyString)":
     assert(t16f_eq_str(&fly, ""))
 
     # Short strings do not get stored in the fly string table.
-    if ak_core_is_ported:
-        assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
 
 test "short_string (Utf16FlyString)":
     t16_reset_fly_strings()
@@ -79,12 +78,9 @@ test "short_string (Utf16FlyString)":
     assert(utf16_string_base_has_short_ascii_storage(&string3.utf16_string_base))
 
     # Short strings do not get stored in the fly string table.
-    if ak_core_is_ported:
-        assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
 
 test "long_string (Utf16FlyString)":
-    if not ak_core_is_ported:
-        return
     t16_reset_fly_strings()
     defer t16_reset_fly_strings()
     let fly1 = utf16_fly_string_from_utf16_string(utf16_string_from_str("thisisdefinitelymorethan7bytes"))
@@ -111,8 +107,6 @@ test "long_string (Utf16FlyString)":
     assert(utf16_string_base_has_long_ascii_storage(&string3.utf16_string_base))
 
 test "user_defined_literal (Utf16FlyString)":
-    if not ak_core_is_ported:
-        return
     t16_reset_fly_strings()
     defer t16_reset_fly_strings()
     let fly1 = t16f("thisisdefinitelymorethan7bytes")
@@ -141,8 +135,6 @@ test "user_defined_literal (Utf16FlyString)":
     assert(not t16f_eq(&fly3, &fly4))
 
 test "fly_string_keep_string_data_alive (Utf16FlyString)":
-    if not ak_core_is_ported:
-        return
     t16_reset_fly_strings()
     defer t16_reset_fly_strings()
     assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
@@ -155,8 +147,6 @@ test "fly_string_keep_string_data_alive (Utf16FlyString)":
     assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
 
 test "moved_fly_string_becomes_empty (Utf16FlyString)":
-    if not ak_core_is_ported:
-        return
     t16_reset_fly_strings()
     defer t16_reset_fly_strings()
     var fly1 = utf16_fly_string_new()
@@ -197,8 +187,6 @@ test "optional (Utf16FlyString)":
     assert(not utf16_fly_string_is_invalid(&string))
     assert(t16f_eq_str(&string, "ascii"))
 
-    if not ak_core_is_ported:
-        return
     string = t16f_lit("well 😀 hello")
     assert(not utf16_fly_string_is_invalid(&string))
     let expected = t16("well 😀 hello")

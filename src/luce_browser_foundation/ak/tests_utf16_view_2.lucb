@@ -68,8 +68,6 @@ func t16_replace_is(input: Utf16View, needle: Utf16View, replacement: Utf16View,
     return t16s_eq(&result, expected)
 
 test "replace":
-    if not ak_core_is_ported:
-        return
     assert(t16_replace_is(t16(""), utf16_view_new(), utf16_view_new(), ReplaceMode.first_only, t16("")))
     assert(t16_replace_is(t16(""), t16("foo"), t16("bar"), ReplaceMode.first_only, t16("")))
     assert(t16_replace_is(t16("foo"), t16("bar"), t16("baz"), ReplaceMode.first_only, t16("foo")))
@@ -84,8 +82,6 @@ test "replace":
     assert(t16_replace_is(t16("foo 😀 boo 😀"), t16("😀 "), t16("🙃 "), ReplaceMode.all, t16("foo 🙃 boo 😀")))
 
 test "substring_view":
-    if not ak_core_is_ported:
-        return
     let string = utf16_string_from_utf8_string_view(sv("Привет 😀"))
 
     let whole = t16s_view(&string)
@@ -274,8 +270,6 @@ func t16_split(view: Utf16View, separator: Utf16View, behavior: SplitBehavior) -
     return utf16_view_split_view_utf16_view(&view, separator, behavior)
 
 test "split_view":
-    if not ak_core_is_ported:
-        return
     let test1 = t16("axxbxcxd")
     var parts = t16_split_unit(test1, 0x78, SplitBehavior.nothing)
     assert(t16_parts_are(&parts, ["a", "b", "c", "d"]))

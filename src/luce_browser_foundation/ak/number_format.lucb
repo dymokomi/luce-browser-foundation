@@ -1,0 +1,180 @@
+#==============================================================================================
+#
+#   number_format - human-readable sizes, quantities and durations
+#
+#   DESCRIPTION:
+#       Port of AK/NumberFormat.cpp (lines 1-171) with AK/NumberFormat.h (lines 1-42):
+#       "123.0 KiB", "1h 1m 1s", "01:02:03". Each String::formatted and appendff is a
+#       vformat over type-erased arguments, MUST-ed as in C++.
+#
+#==============================================================================================
+
+# mark: Helpers =================================================================================
+
+## String::formatted(fmtstr, arguments...) with MUST.
+func number_format_formatted(fmtstr: str, arguments: const TypeErasedParameter[]) -> String:
+    var params = type_erased_format_params_create(arguments)
+    return string_vformatted(sv(fmtstr), &params) else trap("MUST: String::formatted")
+
+## builder.appendff(fmtstr, arguments...).
+func number_format_appendff(builder: StringBuilder*, fmtstr: str, arguments: const TypeErasedParameter[]):
+    vformat_arguments(builder, sv(fmtstr), arguments) else trap("MUST: appendff")
+
+# mark: Sizes and quantities ====================================================================
+
+## Ported from AK/NumberFormat.cpp:15 AK::number_string_with_one_decimal: `number` in `unit`s
+## with one (truncated) decimal, then `suffix`.
+# FIXME: Remove this hackery once printf() supports floats.
+func number_string_with_one_decimal(number: u64, unit_: u64, suffix: StringView, use_thousands_separator: UseThousandsSeparator) -> String:
+    let max_unit_size = ~(u64)0 // 10
+    assert(unit_ < max_unit_size)
+
+    let integer_part = number // unit_
+    let decimal_part = (number % unit_) * 10 // unit_
+    if use_thousands_separator == UseThousandsSeparator.yes:
+        return number_format_formatted("{:'d}.{} {}", [arg_u64(integer_part), arg_u64(decimal_part), arg_string_view(suffix)])
+
+    return number_format_formatted("{}.{} {}", [arg_u64(integer_part), arg_u64(decimal_part), arg_string_view(suffix)])
+
+let unit_prefixes: str[7] = ["", "K", "M", "G", "T", "P", "E"]
+
+## human_readable_quantity's `full_unit_suffix` lambda (AK/NumberFormat.cpp:33).
+func full_unit_suffix(index: usize, based_on: HumanReadableBasedOn, unit_: StringView) -> String:
+    let binary_infix = sv("i") if based_on == HumanReadableBasedOn.base2 and index != 0 else sv("")
+    return number_format_formatted("{}{}{}", [arg_str(unit_prefixes[index]), arg_string_view(binary_infix), arg_string_view(unit_)])
+
+## Ported from AK/NumberFormat.cpp:28 AK::human_readable_quantity: `quantity` in the largest unit
+## (K, M, G, T, P, E; powers of 1024 or 1000) it reaches, with one decimal.
+pub func human_readable_quantity(quantity: u64, based_on: HumanReadableBasedOn = HumanReadableBasedOn.base2, unit_: StringView, use_thousands_separator: UseThousandsSeparator = UseThousandsSeparator.no) -> String:
+    let size_of_unit: u64 = 1024 if based_on == HumanReadableBasedOn.base2 else 1000
+
+    var size_of_current_unit = size_of_unit
+
+    if quantity < size_of_unit:
+        let suffix = full_unit_suffix(0, based_on, unit_)
+        return number_format_formatted("{} {}", [arg_u64(quantity), arg_string_view(string_bytes_as_string_view(&suffix))])
+
+    for i in 1..<unit_prefixes.length - 1:
+        let suffix = full_unit_suffix(i, based_on, unit_)
+        if quantity < size_of_unit *% size_of_current_unit:
+            return number_string_with_one_decimal(quantity, size_of_current_unit, string_bytes_as_string_view(&suffix), use_thousands_separator)
+
+        size_of_current_unit = size_of_current_unit *% size_of_unit
+
+    let suffix = full_unit_suffix(unit_prefixes.length - 1, based_on, unit_)
+    return number_string_with_one_decimal(quantity, size_of_current_unit, string_bytes_as_string_view(&suffix), use_thousands_separator)
+
+## Ported from AK/NumberFormat.cpp:56 AK::human_readable_size: `size` bytes as "B", "KiB", ...
+pub func human_readable_size(size: u64, based_on: HumanReadableBasedOn = HumanReadableBasedOn.base2, use_thousands_separator: UseThousandsSeparator = UseThousandsSeparator.no) -> String:
+    return human_readable_quantity(size, based_on, sv("B"), use_thousands_separator)
+
+## Ported from AK/NumberFormat.cpp:61 AK::human_readable_size_long: the human-readable size and
+## the exact byte count.
+pub func human_readable_size_long(size: u64, use_thousands_separator: UseThousandsSeparator = UseThousandsSeparator.no) -> String:
+    if size < 1 * ki_b:
+        if use_thousands_separator == UseThousandsSeparator.yes:
+            return number_format_formatted("{:'d} bytes", [arg_u64(size)])
+        return number_format_formatted("{} bytes", [arg_u64(size)])
+
+    let human_readable_size_string = human_readable_size(size, HumanReadableBasedOn.base2, use_thousands_separator)
+    let size_string = string_bytes_as_string_view(&human_readable_size_string)
+    if use_thousands_separator == UseThousandsSeparator.yes:
+        return number_format_formatted("{} ({:'d} bytes)", [arg_string_view(size_string), arg_u64(size)])
+    return number_format_formatted("{} ({} bytes)", [arg_string_view(size_string), arg_u64(size)])
+
+# mark: Durations ===============================================================================
+
+## Ported from AK/NumberFormat.cpp:77 AK::human_readable_time: "1 day 2 hours 3 minutes 4.500 seconds".
+pub func human_readable_time(duration: Duration) -> String:
+    var milliseconds = duration_to_milliseconds(&duration)
+    let days = milliseconds // 86400000
+    milliseconds = milliseconds % 86400000
+
+    let hours = milliseconds // 3600000
+    milliseconds = milliseconds % 3600000
+
+    let minutes = milliseconds // 60000
+    milliseconds = milliseconds % 60000
+
+    let seconds = f64(milliseconds) / 1000.0
+
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+
+    if days > 0:
+        number_format_appendff(&builder, "{} day{} ", [arg_i64(days), arg_str("" if days == 1 else "s")])
+    if hours > 0:
+        number_format_appendff(&builder, "{} hour{} ", [arg_i64(hours), arg_str("" if hours == 1 else "s")])
+    if minutes > 0:
+        number_format_appendff(&builder, "{} minute{} ", [arg_i64(minutes), arg_str("" if minutes == 1 else "s")])
+
+    number_format_appendff(&builder, "{:.3} second{}", [arg_f64(seconds), arg_str("" if seconds == 1.0 else "s")])
+
+    return string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")
+
+## Ported from AK/NumberFormat.cpp:108 AK::human_readable_short_time: "999ns", "1.009µs",
+## "1d 1h 1m 1.001s".
+pub func human_readable_short_time(duration: Duration) -> String:
+    var nanoseconds = duration_to_nanoseconds(&duration)
+
+    if nanoseconds < 1_000:
+        return number_format_formatted("{}ns", [arg_i64(nanoseconds)])
+    if nanoseconds < 1_000_000:
+        return number_format_formatted("{:.3}µs", [arg_f64(f64(nanoseconds) / 1_000.0)])
+    if nanoseconds < 1_000_000_000:
+        return number_format_formatted("{:.3}ms", [arg_f64(f64(nanoseconds) / 1_000_000.0)])
+    if nanoseconds < 60_000_000_000:
+        return number_format_formatted("{:.3}s", [arg_f64(f64(nanoseconds) / 1_000_000_000.0)])
+
+    let days = nanoseconds // 86_400_000_000_000
+    nanoseconds = nanoseconds % 86_400_000_000_000
+
+    let hours = nanoseconds // 3_600_000_000_000
+    nanoseconds = nanoseconds % 3_600_000_000_000
+
+    let minutes = nanoseconds // 60_000_000_000
+    nanoseconds = nanoseconds % 60_000_000_000
+
+    let seconds = f64(nanoseconds) / 1_000_000_000.0
+
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+
+    if days > 0:
+        number_format_appendff(&builder, "{}d", [arg_i64(days)])
+
+    if hours > 0:
+        if not string_builder_is_empty(&builder):
+            string_builder_append_u8(&builder, ' ')
+        number_format_appendff(&builder, "{}h", [arg_i64(hours)])
+
+    if minutes > 0:
+        if not string_builder_is_empty(&builder):
+            string_builder_append_u8(&builder, ' ')
+        number_format_appendff(&builder, "{}m", [arg_i64(minutes)])
+
+    if seconds > 0.0:
+        if not string_builder_is_empty(&builder):
+            string_builder_append_u8(&builder, ' ')
+        number_format_appendff(&builder, "{:.3}s", [arg_f64(seconds)])
+
+    return string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")
+
+## Ported from AK/NumberFormat.cpp:153 AK::human_readable_digital_time: "[hh:]mm:ss".
+pub func human_readable_digital_time(time_in_seconds: i64) -> String:
+    var seconds = time_in_seconds
+    let hours = seconds // 3600
+    seconds = seconds % 3600
+
+    let minutes = seconds // 60
+    seconds = seconds % 60
+
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+
+    if hours > 0:
+        number_format_appendff(&builder, "{:02}:", [arg_i64(hours)])
+    number_format_appendff(&builder, "{:02}:", [arg_i64(minutes)])
+    number_format_appendff(&builder, "{:02}", [arg_i64(seconds)])
+
+    return string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")

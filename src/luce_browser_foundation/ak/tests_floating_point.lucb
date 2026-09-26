@@ -1,0 +1,53 @@
+#==============================================================================================
+#
+#   tests_floating_point - tests of floating_point (FloatExtractor)
+#
+#   DESCRIPTION:
+#       The donor has no test of AK/FloatingPoint.h; these pin the bit-field values the C++
+#       struct reads for a few floats (IEEE 754 binary32 and binary64).
+#
+#==============================================================================================
+
+test "float_extractor_f64_fields":
+    let one = float_extractor_f64_from_value(1.0)
+    assert(float_extractor_f64_sign(&one) == 0)
+    assert(float_extractor_f64_exponent(&one) == 1023)
+    assert(float_extractor_f64_mantissa(&one) == 0)
+
+    let negative = float_extractor_f64_from_value(-2.5)
+    assert(negative.bits == 0xc004000000000000)
+    assert(float_extractor_f64_sign(&negative) == 1)
+    assert(float_extractor_f64_exponent(&negative) == 1024)
+    assert(float_extractor_f64_mantissa(&negative) == 0x4000000000000)
+
+    # The exponent - exponent_bias is the power of two.
+    let eight = float_extractor_f64_from_value(8.0)
+    assert((i64)float_extractor_f64_exponent(&eight) - (i64)float_extractor_f64_exponent_bias == 3)
+
+test "float_extractor_f64_from_parts":
+    let minus_one = float_extractor_f64_from_parts(0, 1023, 1)
+    assert(minus_one.d == -1.0)
+
+    var extractor = float_extractor_f64_from_value(1.0)
+    float_extractor_f64_set_exponent(&extractor, (u64)float_extractor_f64_exponent_max)
+    float_extractor_f64_set_mantissa(&extractor, 1)
+    # All-ones exponent with a non-zero mantissa: a NaN.
+    assert(extractor.d != extractor.d)
+    # Assigning a bit-field keeps only its width.
+    float_extractor_f64_set_sign(&extractor, 3)
+    assert(float_extractor_f64_sign(&extractor) == 1)
+    float_extractor_f64_set_mantissa(&extractor, ~(u64)0)
+    assert(float_extractor_f64_mantissa(&extractor) == float_extractor_f64_mantissa_max)
+    assert(float_extractor_f64_exponent(&extractor) == 2047)
+
+test "float_extractor_f32":
+    let one_and_a_half = float_extractor_f32_from_value(1.5)
+    assert(one_and_a_half.bits == 0x3fc00000)
+    assert(float_extractor_f32_sign(&one_and_a_half) == 0)
+    assert(float_extractor_f32_exponent(&one_and_a_half) == 127)
+    assert(float_extractor_f32_mantissa(&one_and_a_half) == 0x400000)
+
+    let parts = float_extractor_f32_from_parts(0x400000, 128, 1)
+    assert(parts.d == -3.0)
+    assert(float_extractor_f32_mantissa_bits == 23)
+    assert(float_extractor_f32_exponent_bits == 8)

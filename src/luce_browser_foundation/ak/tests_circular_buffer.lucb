@@ -312,8 +312,8 @@ test "circular_buffer: copy_from_seekback and read_with_seekback":
     assert(circular_buffer_write(&circular_buffer, "ab".bytes) == 2)
     let copied = circular_buffer_copy_from_seekback(&circular_buffer, 2, 9) else trap("copy failed")
     assert(copied == 9)
-    var out: u8[11]
-    let read = circular_buffer_read(&circular_buffer, out)
+    var output: u8[11]
+    let read = circular_buffer_read(&circular_buffer, output)
     assert(bytes_equal(read, "abababababa".bytes))
     var seek: u8[3]
     let back = circular_buffer_read_with_seekback(&circular_buffer, seek, 4) else trap("seekback failed")

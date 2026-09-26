@@ -14,7 +14,8 @@ for module in ak gc web_unicode text_codec web_url web_infra; do
     fi
 done
 
-for module in ak; do
+# Unit tests (ported from Tests/AK, Tests/LibWeb and focused cases), module by module.
+for module in ak web_infra; do
     echo "== luce-base test src/luce_browser_foundation/$module"
     luce-base test "src/luce_browser_foundation/$module"
 done

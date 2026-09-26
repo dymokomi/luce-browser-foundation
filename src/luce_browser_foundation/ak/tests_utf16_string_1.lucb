@@ -85,10 +85,9 @@ test "from_utf8":
     assert(t16_eq(t16s_view(&string6), t16u([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xdc00, 0x21])))
 
 test "from_utf8_with_replacement_character":
-    if ak_core_is_ported:
-        # U+110000
-        let string1 = utf16_string_from_utf8_with_replacement_character(string_view_from_bytes(b"long string \xf4\x8f\xbf\xc0"), Utf16StringWithBomHandling.no)
-        assert(t16s_eq(&string1, t16("long string \u{fffd}\u{fffd}\u{fffd}\u{fffd}")))
+    # U+110000
+    let string1 = utf16_string_from_utf8_with_replacement_character(string_view_from_bytes(b"long string \xf4\x8f\xbf\xc0"), Utf16StringWithBomHandling.no)
+    assert(t16s_eq(&string1, t16("long string \u{fffd}\u{fffd}\u{fffd}\u{fffd}")))
 
     let string3 = utf16_string_from_utf8_with_replacement_character(sv("A valid string!"), Utf16StringWithBomHandling.no)
     assert(t16s_eq_str(&string3, "A valid string!"))
@@ -102,10 +101,9 @@ test "from_utf8_with_replacement_character":
     let string6 = utf16_string_from_utf8_with_replacement_character(string_view_from_bytes(b"\xef\xbb\xbfWHF!"), Utf16StringWithBomHandling.no)
     assert(t16s_eq(&string6, t16("\u{feff}WHF!")))
 
-    if ak_core_is_ported:
-        # U+D800
-        let string7 = utf16_string_from_utf8_with_replacement_character(string_view_from_bytes(b"\xed\xa0\x80WHF!"))
-        assert(t16s_eq(&string7, t16("\u{fffd}WHF!")))
+    # U+D800
+    let string7 = utf16_string_from_utf8_with_replacement_character(string_view_from_bytes(b"\xed\xa0\x80WHF!"))
+    assert(t16s_eq(&string7, t16("\u{fffd}WHF!")))
 
 test "from_utf16":
     let string1 = utf16_string_from_utf16(t16("hello!"))
@@ -200,8 +198,6 @@ test "formatted":
     t16s_expect(&string, true, false, true, 2, 2)
     assert(t16s_eq(&string, t16("42")))
 
-    if not ak_core_is_ported:
-        return
     let segments1: Utf16View[6] = [t16("abcdefghijklmnopqrstuvwxyz"), t16("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), t16("abcdefghijklmnopqrstuvwxyz"), t16("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), t16("abcdefghijklmnopqrstuvwxyz"), t16("ABCDEFGHIJKLMNOPQRSTUVWXYZ")]
     let joined1 = utf16_string_join_utf16_view(t16("--"), segments1)
     t16s_expect(&joined1, true, true, false, 166, 166)
@@ -221,8 +217,6 @@ test "repeated":
     let empty1 = utf16_string_repeated(0x61, 0)
     assert(utf16_string_base_is_empty(&empty1.utf16_string_base))
 
-    if not ak_core_is_ported:
-        return
     let empty2 = utf16_string_repeated(0x03c9, 0)
     assert(utf16_string_base_is_empty(&empty2.utf16_string_base))
     let empty3 = utf16_string_repeated(0x10300, 0)
@@ -241,8 +235,6 @@ test "repeated":
     assert(t16_repeated_is(0x10300, 10, 20, "𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀"))
 
 test "from_string_builder":
-    if not ak_core_is_ported:
-        return
     var builder = string_builder_new_mode(StringBuilderMode.utf16)
     string_builder_append_code_point(&builder, 0x61)
     string_builder_append_code_point(&builder, 0x62)
@@ -279,8 +271,6 @@ func t16_utf16_bytes(view: Utf16View) -> ByteBuffer:
 
 test "from_ipc_stream":
     # FixedMemoryStream belongs to region r01.
-    if not ak_core_is_ported:
-        return
     let string1 = t16_from_ipc_stream("abc".bytes, 3, true) else trap("from_ipc_stream")
     t16s_expect(&string1, true, false, true, 3, 3)
     assert(t16s_eq_str(&string1, "abc"))

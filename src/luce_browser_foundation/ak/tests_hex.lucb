@@ -4,8 +4,7 @@
 #
 #   DESCRIPTION:
 #       Port of Tests/AK/TestHex.cpp (should_constexpr_decode_hex_digit runs at run time),
-#       plus tests of decode_hex/encode_hex pinned to the donor's behaviour (they use
-#       ByteBuffer and StringBuilder, region r01, so they are gated on ak_core_is_ported).
+#       plus tests of decode_hex/encode_hex pinned to the donor's behaviour.
 #
 #==============================================================================================
 
@@ -36,8 +35,6 @@ test "hex: should decode hex digit":
     assert(255 == decode_hex_digit(' '))
 
 test "hex: decode and encode":
-    if not ak_core_is_ported:
-        return
     let decoded = decode_hex(sv("48656c6C6f00ff")) else trap("decode_hex")
     let bytes = byte_buffer_span_const(&decoded)
     assert(compare_bytes(bytes, b"Hello\x00\xff") == 0 and bytes.length == 7)

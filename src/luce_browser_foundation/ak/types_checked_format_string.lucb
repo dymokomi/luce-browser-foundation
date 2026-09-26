@@ -14,7 +14,8 @@
 
 ## AK::Format::Detail::Array (AK/CheckedFormatString.h:19): a generic struct.
 pub struct Array[T]:
-    pub var __data: T*?
+    # `T __data[Size]`: luce-base has no value parameters, so the storage is a span (r03).
+    pub var __data: T[]
 
 # mark: CheckedFormatString =====================================================================
 

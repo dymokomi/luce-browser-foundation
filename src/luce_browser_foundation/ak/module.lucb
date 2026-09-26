@@ -14,10 +14,12 @@
 #==============================================================================================
 
 # Module-wide imports (imports apply to every fragment of the module, language §16.1).
+import c as libc
 import io
 import memory
 from memory import Allocator
 import luce
+from luce import Comparable, Equatable
 import os
 import math
 import math32

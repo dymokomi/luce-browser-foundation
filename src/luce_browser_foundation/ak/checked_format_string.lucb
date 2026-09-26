@@ -1,0 +1,53 @@
+#==============================================================================================
+#
+#   checked_format_string - CheckedFormatString: a format string checked against its arguments
+#
+#   DESCRIPTION:
+#       Port of AK/CheckedFormatString.h (lines 1-219). In C++ the checking constructor is
+#       `consteval` and runs only under ENABLE_COMPILETIME_FORMAT_CHECK (count_fmt_params,
+#       check_format_parameter_consistency); luce-base has no compile-time evaluation, so a
+#       CheckedFormatString here only carries its view. The constexpr Array helper is kept,
+#       with its storage as a span.
+#
+#==============================================================================================
+
+# mark: Array ===================================================================================
+
+## Ported from AK/CheckedFormatString.h:20 AK::Format::Detail::Array::size.
+pub func array_size[T](this: const Array[T]*) -> usize:
+    return this.__data.length
+
+## Ported from AK/CheckedFormatString.h:21 AK::Format::Detail::Array::operator[].
+pub func array_at_const[T](this: const Array[T]*, index: usize) -> T:
+    return this.__data[index]
+
+## Ported from AK/CheckedFormatString.h:22 AK::Format::Detail::Array::operator[].
+pub func array_at[T](this: Array[T]*, index: usize) -> T*:
+    return &this.__data[index]
+
+## Ported from AK/CheckedFormatString.h:26 AK::Format::Detail::Array::begin.
+pub func array_begin_const[T](this: const Array[T]*) -> const T*:
+    return this.__data.data
+
+## Ported from AK/CheckedFormatString.h:27 AK::Format::Detail::Array::begin.
+pub func array_begin[T](this: Array[T]*) -> T*:
+    return this.__data.data
+
+## Ported from AK/CheckedFormatString.h:29 AK::Format::Detail::Array::end.
+pub func array_end_const[T](this: const Array[T]*) -> const T*:
+    return this.__data.data + this.__data.length
+
+## Ported from AK/CheckedFormatString.h:30 AK::Format::Detail::Array::end.
+pub func array_end[T](this: Array[T]*) -> T*:
+    return this.__data.data + this.__data.length
+
+# mark: CheckedFormatString =====================================================================
+
+## Ported from AK/CheckedFormatString.h:148 AK::Format::Detail::CheckedFormatString::CheckedFormatString<Args...>
+## (the unchecked constructor from anything a StringView is made from).
+pub func checked_format_string_checked_format_string_args[TArgs](this: CheckedFormatString[TArgs]*, unchecked_fmt: StringView):
+    this.m_string = unchecked_fmt
+
+## Ported from AK/CheckedFormatString.h:154 AK::Format::Detail::CheckedFormatString::view.
+pub func checked_format_string_view[TArgs](this: const CheckedFormatString[TArgs]*) -> StringView:
+    return this.m_string

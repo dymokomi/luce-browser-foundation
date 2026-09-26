@@ -191,8 +191,6 @@ func tc_utf16_is(view: const Utf16View*, expected: const u16[]) -> bool:
     return true
 
 test "string builder: UTF-8 code points":
-    if not ak_core_is_ported:
-        return
     var builder = string_builder_new()
     string_builder_append_code_point(&builder, (u32)'a')
     string_builder_append_code_point(&builder, 0xe9)
@@ -212,8 +210,6 @@ test "string builder: UTF-8 code points":
     assert(string_builder_is_empty(&builder))
 
 test "string builder: UTF-16 mode switches from ASCII storage":
-    if not ak_core_is_ported:
-        return
     var builder = string_builder_new_mode(StringBuilderMode.utf16)
     string_builder_append(&builder, "abc")
     let ascii_view = string_builder_utf16_string_view(&builder)
@@ -239,8 +235,6 @@ test "string builder: UTF-16 mode switches from ASCII storage":
     assert(utf16_string_base_length_in_code_points(&string.utf16_string_base) == 5)
 
 test "string builder: UTF-16 views appended in UTF-8 mode":
-    if not ak_core_is_ported:
-        return
     var builder = string_builder_new()
     let units: u16[5] = [0x41, 0xd83d, 0xde00, 0xdc00, 0x42]
     string_builder_append_utf16_view(&builder, utf16_view_from_utf16(units))
@@ -249,16 +243,12 @@ test "string builder: UTF-16 views appended in UTF-8 mode":
     assert(tc_bytes_equal(string_view_bytes(&view), b"\x41\xf0\x9f\x98\x80\xed\xb0\x80\x42"))
 
 test "string builder: append_escaped_for_json":
-    if not ak_core_is_ported:
-        return
     var builder = string_builder_new()
     string_builder_append_escaped_for_json(&builder, string_view_from_bytes(b"\"\\\x08\n\t\x01\x1fx"))
     let view = string_builder_string_view(&builder)
     assert(tc_view_is(view, "\\\"\\\\\\b\\n\\t\\u0001\\u001fx"))
 
 test "string builder: append_repeated and append_as_lowercase":
-    if not ak_core_is_ported:
-        return
     var builder = string_builder_new()
     string_builder_append_repeated_u8(&builder, '-', 3)
     string_builder_append_repeated_string_view(&builder, sv("ab"), 2)

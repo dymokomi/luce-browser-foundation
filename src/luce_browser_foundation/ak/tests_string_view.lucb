@@ -100,8 +100,6 @@ test "ends_with":
     assert(not string_view_ends_with_string_view(&test_string_view, sv("def"), CaseSensitivity.case_sensitive))
 
 test "lines":
-    if not ak_core_is_ported:
-        return
     var test_string = byte_string_from_str("a\rb\nc\r\nd")
     var test_string_view = byte_string_view(&test_string)
     var test_string_vector = string_view_lines(&test_string_view)
@@ -179,8 +177,6 @@ struct StringViewSplitViewTestPredicate: CharPredicate:
         return ch == 'x' or ch == '_'
 
 test "split_view":
-    if not ak_core_is_ported:
-        return
     var test_string_view = sv("axxbxcxd")
     var parts = string_view_split_view_u8(&test_string_view, 'x')
     assert(string_view_vector_equals(&parts, ["a", "b", "c", "d"]))
@@ -234,8 +230,6 @@ test "constexpr_stuff":
     assert(string_view_equals(&tail, "oo"))
 
 test "case_insensitive_hash":
-    if not ak_core_is_ported:
-        return
     let string1 = sv("abcdef")
     let string2 = sv("ABCDEF")
     let string3 = sv("aBcDeF")

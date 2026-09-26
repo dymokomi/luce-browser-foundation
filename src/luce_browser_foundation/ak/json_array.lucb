@@ -1,0 +1,221 @@
+#==============================================================================================
+#
+#   json_array - JsonArray and JsonArraySerializer
+#
+#   DESCRIPTION:
+#       Port of AK/JsonArray.h (lines 1-129), AK/JsonArray.cpp (lines 1-30) and
+#       AK/JsonArraySerializer.h (lines 1-223).
+#
+#       JsonArray's copy constructor copies each element (deeply: json_array_clone); its
+#       templated constructors from a container and its for_each callbacks take a span and a
+#       function with a context pointer (DESIGN.md §2.7). JsonArraySerializer is written for
+#       the one Builder LibWeb uses, StringBuilder, which is a "legacy builder" (it has
+#       try_append), so every write is the try_append form.
+#
+#==============================================================================================
+
+# mark: JsonArray ===============================================================================
+
+## Ported from AK/JsonArray.h:25 AK::JsonArray::JsonArray(size_t): `initial_size` nulls.
+pub func json_array_construct(this: JsonArray*, initial_size: usize):
+    json_array_resize(this, initial_size)
+
+## AK::JsonArray::JsonArray(JsonArray const&) (AK/JsonArray.h:30): a copy whose elements are
+## copies.
+pub func json_array_clone(this: const JsonArray*) -> JsonArray:
+    var copy: JsonArray
+    for i in 0..<json_array_size(this):
+        json_array_must_append(&copy, json_value2_clone(json_array_at_const(this, i)))
+    return copy
+
+## Ported from AK/JsonArray.h:41 AK::JsonArray::JsonArray(ContainerT&&): takes the values.
+pub func json_array_json_array(this: JsonArray*, source: const JsonValue2[]):
+    for value in source:
+        vector_append_t(&this.m_values, value)
+
+## Ported from AK/JsonArray.h:48 AK::JsonArray::JsonArray(ContainerT const&): copies the values.
+pub func json_array_json_array_2(this: JsonArray*, source: const JsonValue2[]):
+    for i in 0..<source.length:
+        vector_append_t(&this.m_values, json_value2_clone(&source[i]))
+
+## Ported from AK/JsonArray.h:68 AK::JsonArray::size.
+pub func json_array_size(this: const JsonArray*) -> usize:
+    return vector_size(&this.m_values)
+
+## Ported from AK/JsonArray.h:69 AK::JsonArray::is_empty.
+pub func json_array_is_empty(this: const JsonArray*) -> bool:
+    return vector_is_empty(&this.m_values)
+
+## Ported from AK/JsonArray.h:71 AK::JsonArray::at.
+pub func json_array_at_const(this: const JsonArray*, index: usize) -> const JsonValue2*:
+    return vector_at_const(&this.m_values, index)
+
+## Ported from AK/JsonArray.h:72 AK::JsonArray::operator[].
+pub func json_array_at_const_2(this: const JsonArray*, index: usize) -> const JsonValue2*:
+    return json_array_at_const(this, index)
+
+## Ported from AK/JsonArray.h:74 AK::JsonArray::take: removes and returns the value at `index`.
+pub func json_array_take(this: JsonArray*, index: usize) -> JsonValue2:
+    return vector_take(&this.m_values, index)
+
+## Ported from AK/JsonArray.h:76 AK::JsonArray::must_append.
+pub func json_array_must_append(this: JsonArray*, value: JsonValue2):
+    vector_append_t(&this.m_values, value)
+
+## Ported from AK/JsonArray.h:78 AK::JsonArray::clear.
+pub func json_array_clear(this: JsonArray*):
+    vector_clear(&this.m_values)
+
+## Ported from AK/JsonArray.h:79 AK::JsonArray::append.
+pub func json_array_append(this: JsonArray*, value: JsonValue2) -> !:
+    try vector_try_append_t(&this.m_values, value)
+
+## Ported from AK/JsonArray.h:80 AK::JsonArray::set.
+pub func json_array_set(this: JsonArray*, index: usize, value: JsonValue2):
+    *vector_at(&this.m_values, index) = value
+
+## Ported from AK/JsonArray.cpp:13 AK::JsonArray::serialized.
+pub func json_array_serialized(this: const JsonArray*) -> String:
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    json_array_serialize(this, &builder)
+
+    return string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")
+
+## Ported from AK/JsonArray.cpp:21 AK::JsonArray::serialize.
+pub func json_array_serialize(this: const JsonArray*, builder: StringBuilder*):
+    var serializer = json_array_serializer_try_create(builder) else trap("MUST: JsonArraySerializer::try_create")
+    for i in 0..<json_array_size(this):
+        json_array_serializer_add_json_value2(&serializer, json_array_at_const(this, i)) else trap("MUST: JsonArraySerializer::add")
+    json_array_serializer_finish(&serializer) else trap("MUST: JsonArraySerializer::finish")
+
+## Ported from AK/JsonArray.h:86 AK::JsonArray::for_each: calls `callback(context, value)` for
+## each value.
+pub func json_array_for_each(this: JsonArray*, callback: func(void*?, JsonValue2*) -> unit, context: void*?):
+    for i in 0..<json_array_size(this):
+        callback(context, vector_at(&this.m_values, i))
+
+## Ported from AK/JsonArray.h:93 AK::JsonArray::for_each const.
+pub func json_array_for_each_const(this: const JsonArray*, callback: func(void*?, const JsonValue2*) -> unit, context: void*?):
+    for i in 0..<json_array_size(this):
+        callback(context, json_array_at_const(this, i))
+
+## Ported from AK/JsonArray.h:100 AK::JsonArray::try_for_each: stops at the first failure.
+pub func json_array_try_for_each(this: JsonArray*, callback: func(void*?, JsonValue2*) -> unit!, context: void*?) -> !:
+    for i in 0..<json_array_size(this):
+        try callback(context, vector_at(&this.m_values, i))
+
+## Ported from AK/JsonArray.h:108 AK::JsonArray::try_for_each const.
+pub func json_array_try_for_each_const(this: const JsonArray*, callback: func(void*?, const JsonValue2*) -> unit!, context: void*?) -> !:
+    for i in 0..<json_array_size(this):
+        try callback(context, json_array_at_const(this, i))
+
+## Ported from AK/JsonArray.h:115 AK::JsonArray::values.
+pub func json_array_values(this: JsonArray*) -> Vector[JsonValue2]*:
+    return &this.m_values
+
+## Ported from AK/JsonArray.h:116 AK::JsonArray::values.
+pub func json_array_values_const(this: const JsonArray*) -> const Vector[JsonValue2]*:
+    return &this.m_values
+
+## Ported from AK/JsonArray.h:118 AK::JsonArray::ensure_capacity.
+pub func json_array_ensure_capacity(this: JsonArray*, capacity: usize):
+    vector_ensure_capacity(&this.m_values, capacity)
+
+## Ported from AK/JsonArray.h:119 AK::JsonArray::resize.
+pub func json_array_resize(this: JsonArray*, size: usize):
+    vector_resize(&this.m_values, size)
+
+# mark: JsonArraySerializer =====================================================================
+
+## Ported from AK/JsonArraySerializer.h:25 AK::JsonArraySerializer::try_create: writes `[`.
+pub func json_array_serializer_try_create(builder: StringBuilder*) -> JsonArraySerializer[StringBuilder]!:
+    try string_builder_try_append_u8(builder, '[')
+    var serializer: JsonArraySerializer[StringBuilder] = ---
+    json_array_serializer_construct(&serializer, builder)
+    return serializer
+
+## Appends `"<escaped value>"`, the body of the string-valued add overloads.
+func json_serializer_append_string(builder: StringBuilder*, value: StringView) -> !:
+    try string_builder_try_append_u8(builder, '"')
+    try string_builder_try_append_escaped_for_json(builder, value)
+    try string_builder_try_append_u8(builder, '"')
+
+## Ported from AK/JsonArraySerializer.h:43 AK::JsonArraySerializer::add(JsonValue const&).
+pub func json_array_serializer_add_json_value2(this: JsonArraySerializer[StringBuilder]*, value: const JsonValue2*) -> !:
+    try json_array_serializer_begin_item(this)
+    json_value2_serialize(value, this.m_builder)
+
+## Ported from AK/JsonArraySerializer.h:50 AK::JsonArraySerializer::add(StringView).
+pub func json_array_serializer_add_string_view(this: JsonArraySerializer[StringBuilder]*, value: StringView) -> !:
+    try json_array_serializer_begin_item(this)
+    try json_serializer_append_string(this.m_builder, value)
+
+## Ported from AK/JsonArraySerializer.h:65 AK::JsonArraySerializer::add(ByteString const&).
+pub func json_array_serializer_add_byte_string(this: JsonArraySerializer[StringBuilder]*, value: ByteString) -> !:
+    try json_array_serializer_begin_item(this)
+    try json_serializer_append_string(this.m_builder, byte_string_view(&value))
+
+## Ported from AK/JsonArraySerializer.h:80 AK::JsonArraySerializer::add(char const*).
+pub func json_array_serializer_add_u8(this: JsonArraySerializer[StringBuilder]*, value: const u8*) -> !:
+    try json_array_serializer_begin_item(this)
+    try json_serializer_append_string(this.m_builder, c_string_view((libc.str)value))
+
+## Ported from AK/JsonArraySerializer.h:95 AK::JsonArraySerializer::add(bool).
+pub func json_array_serializer_add_bool(this: JsonArraySerializer[StringBuilder]*, value: bool) -> !:
+    try json_array_serializer_begin_item(this)
+    try string_builder_try_append_string_view(this.m_builder, sv("true") if value else sv("false"))
+
+## Ported from AK/JsonArraySerializer.h:105 AK::JsonArraySerializer::add(int).
+pub func json_array_serializer_add_i32(this: JsonArraySerializer[StringBuilder]*, value: i32) -> !:
+    try json_array_serializer_begin_item(this)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_i64((i64)value)])
+
+## Ported from AK/JsonArraySerializer.h:115 AK::JsonArraySerializer::add(unsigned).
+pub func json_array_serializer_add_u32(this: JsonArraySerializer[StringBuilder]*, value: u32) -> !:
+    try json_array_serializer_begin_item(this)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_u64((u64)value)])
+
+## Ported from AK/JsonArraySerializer.h:125 AK::JsonArraySerializer::add(long).
+pub func json_array_serializer_add_i64(this: JsonArraySerializer[StringBuilder]*, value: i64) -> !:
+    try json_array_serializer_begin_item(this)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_i64(value)])
+
+## Ported from AK/JsonArraySerializer.h:135 AK::JsonArraySerializer::add(long unsigned).
+pub func json_array_serializer_add_u64(this: JsonArraySerializer[StringBuilder]*, value: u64) -> !:
+    try json_array_serializer_begin_item(this)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_u64(value)])
+
+## Ported from AK/JsonArraySerializer.h:145 AK::JsonArraySerializer::add(long long).
+pub func json_array_serializer_add_i64_2(this: JsonArraySerializer[StringBuilder]*, value: i64) -> !:
+    try json_array_serializer_begin_item(this)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_i64(value)])
+
+## Ported from AK/JsonArraySerializer.h:155 AK::JsonArraySerializer::add(long long unsigned).
+pub func json_array_serializer_add_u64_2(this: JsonArraySerializer[StringBuilder]*, value: u64) -> !:
+    try json_array_serializer_begin_item(this)
+    try vformat_arguments(this.m_builder, sv("{}"), [arg_u64(value)])
+
+## Ported from AK/JsonArraySerializer.h:165 AK::JsonArraySerializer::add_array: a nested array.
+pub func json_array_serializer_add_array(this: JsonArraySerializer[StringBuilder]*) -> JsonArraySerializer[StringBuilder]!:
+    try json_array_serializer_begin_item(this)
+    return try json_array_serializer_try_create(this.m_builder)
+
+## Ported from AK/JsonArraySerializer.h:174 AK::JsonArraySerializer::finish: writes `]`.
+pub func json_array_serializer_finish(this: JsonArraySerializer[StringBuilder]*) -> !:
+    assert(not this.m_finished)
+    this.m_finished = true
+    try string_builder_try_append_u8(this.m_builder, ']')
+
+## Ported from AK/JsonArraySerializer.h:186 AK::JsonArraySerializer::JsonArraySerializer<type-parameter-0-0>.
+pub func json_array_serializer_construct(this: JsonArraySerializer[StringBuilder]*, builder: StringBuilder*):
+    this.m_builder = builder
+    this.m_empty = true
+    this.m_finished = false
+
+## Ported from AK/JsonArraySerializer.h:191 AK::JsonArraySerializer::begin_item.
+func json_array_serializer_begin_item(this: JsonArraySerializer[StringBuilder]*) -> !:
+    assert(not this.m_finished)
+    if not this.m_empty:
+        try string_builder_try_append_u8(this.m_builder, ',')
+    this.m_empty = false

@@ -3,8 +3,7 @@
 #   tests_lexical_path - tests of LexicalPath
 #
 #   DESCRIPTION:
-#       Port of Tests/AK/TestLexicalPath.cpp. Every LexicalPath splits its string into a
-#       Vector (region r01), so all tests are gated on ak_core_is_ported.
+#       Port of Tests/AK/TestLexicalPath.cpp.
 #
 #==============================================================================================
 
@@ -30,8 +29,6 @@ func tests_lexical_path_part(path: const LexicalPath*, index: usize) -> StringVi
     return test_vector_at(lexical_path_parts_view(path), index)
 
 test "lexical path: relative path":
-    if not ak_core_is_ported:
-        return
     assert(tests_lexical_path_relative("/tmp/abc.txt", "/tmp", "abc.txt"))
     assert(tests_lexical_path_relative("/tmp/abc.txt", "/tmp/", "abc.txt"))
     assert(tests_lexical_path_relative("/tmp/abc.txt", "/", "tmp/abc.txt"))
@@ -43,8 +40,6 @@ test "lexical path: relative path":
     assert(tests_lexical_path_relative("/tmp/foo/bar/baz.txt", "/tmp/bar/foo/", "../../foo/bar/baz.txt"))
 
 test "lexical path: regular absolute path":
-    if not ak_core_is_ported:
-        return
     let path = tests_lexical_path("/home/anon/foo.txt")
     assert(tests_lexical_path_equals(lexical_path_string(&path), "/home/anon/foo.txt"))
     assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), "/home/anon"))
@@ -61,8 +56,6 @@ test "lexical path: regular absolute path":
     assert(tests_lexical_path_view_equals(lexical_path_basename_lexical_path_strip_extension(&path, .yes), "foo"))
 
 test "lexical path: regular relative path":
-    if not ak_core_is_ported:
-        return
     let path = tests_lexical_path("anon/foo.txt")
     assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), "anon"))
     assert(tests_lexical_path_view_equals(lexical_path_basename_lexical_path_strip_extension(&path), "foo.txt"))
@@ -71,8 +64,6 @@ test "lexical path: regular relative path":
     assert(tests_lexical_path_view_equals(tests_lexical_path_part(&path, 1), "foo.txt"))
 
 test "lexical path: single dot":
-    if not ak_core_is_ported:
-        return
     let first = tests_lexical_path("/home/./anon/foo.txt")
     assert(tests_lexical_path_equals(lexical_path_string(&first), "/home/anon/foo.txt"))
     let second = tests_lexical_path("./test.txt")
@@ -81,8 +72,6 @@ test "lexical path: single dot":
     assert(tests_lexical_path_equals(lexical_path_string(&third), "../test.txt"))
 
 test "lexical path: relative path with dotdot":
-    if not ak_core_is_ported:
-        return
     let path = tests_lexical_path("anon/../../foo.txt")
     assert(tests_lexical_path_equals(lexical_path_string(&path), "../foo.txt"))
     assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), ".."))
@@ -92,24 +81,18 @@ test "lexical path: relative path with dotdot":
     assert(tests_lexical_path_view_equals(tests_lexical_path_part(&path, 1), "foo.txt"))
 
 test "lexical path: absolute path with dotdot":
-    if not ak_core_is_ported:
-        return
     let first = tests_lexical_path("/test/../foo.txt")
     assert(tests_lexical_path_equals(lexical_path_string(&first), "/foo.txt"))
     let second = tests_lexical_path("/../../foo.txt")
     assert(tests_lexical_path_equals(lexical_path_string(&second), "/foo.txt"))
 
 test "lexical path: more dotdot paths":
-    if not ak_core_is_ported:
-        return
     assert(tests_lexical_path_equals(lexical_path_canonicalized_path(byte_string_from_str("/home/user/../../not/home")), "/not/home"))
     assert(tests_lexical_path_equals(lexical_path_canonicalized_path(byte_string_from_str("/../../../../")), "/"))
     assert(tests_lexical_path_equals(lexical_path_canonicalized_path(byte_string_from_str("./../../../../")), "../../../.."))
     assert(tests_lexical_path_equals(lexical_path_canonicalized_path(byte_string_from_str("../../../../../")), "../../../../.."))
 
 test "lexical path: the root path":
-    if not ak_core_is_ported:
-        return
     let path = tests_lexical_path("/")
     assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), "/"))
     assert(tests_lexical_path_view_equals(lexical_path_basename_lexical_path_strip_extension(&path), "/"))
@@ -118,8 +101,6 @@ test "lexical path: the root path":
     assert(lexical_path_is_root(&path))
 
 test "lexical path: the dot path":
-    if not ak_core_is_ported:
-        return
     let path = tests_lexical_path(".")
     assert(tests_lexical_path_equals(lexical_path_string(&path), "."))
     assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), "."))
@@ -127,14 +108,10 @@ test "lexical path: the dot path":
     assert(tests_lexical_path_view_equals(lexical_path_title(&path), "."))
 
 test "lexical path: double slash":
-    if not ak_core_is_ported:
-        return
     let path = tests_lexical_path("//home/anon/foo.txt")
     assert(tests_lexical_path_equals(lexical_path_string(&path), "/home/anon/foo.txt"))
 
 test "lexical path: trailing slash":
-    if not ak_core_is_ported:
-        return
     let path = tests_lexical_path("/home/anon/")
     assert(tests_lexical_path_equals(lexical_path_string(&path), "/home/anon"))
     assert(tests_lexical_path_view_equals(lexical_path_dirname(&path), "/home"))
@@ -146,8 +123,6 @@ func tests_lexical_path_absolute(dir_path: str, target: str, expected: str) -> b
     return tests_lexical_path_equals(lexical_path_absolute_path(byte_string_from_str(dir_path), byte_string_from_str(target)), expected)
 
 test "lexical path: resolve absolute path":
-    if not ak_core_is_ported:
-        return
     assert(tests_lexical_path_absolute("/home/anon", "foo.txt", "/home/anon/foo.txt"))
     assert(tests_lexical_path_absolute("/home/anon/", "foo.txt", "/home/anon/foo.txt"))
     assert(tests_lexical_path_absolute("/home/anon", "././foo.txt", "/home/anon/foo.txt"))
@@ -159,8 +134,6 @@ test "lexical path: resolve absolute path":
     assert(tests_lexical_path_absolute("quux/bar/", "../../test/foo.txt", "test/foo.txt"))
 
 test "lexical path: has extension":
-    if not ak_core_is_ported:
-        return
     let simple = tests_lexical_path("/tmp/simple.png")
     assert(lexical_path_has_extension(&simple, sv(".png")))
     assert(lexical_path_has_extension(&simple, sv(".pnG")))
@@ -178,8 +151,6 @@ test "lexical path: has extension":
     assert(not lexical_path_has_extension(&png, sv(".png")))
 
 test "lexical path: join":
-    if not ak_core_is_ported:
-        return
     var one: StringView[1] = [sv("foo.txt")]
     let first = lexical_path_join(sv("anon"), one)
     assert(tests_lexical_path_equals(lexical_path_string(&first), "anon/foo.txt"))
@@ -194,15 +165,11 @@ test "lexical path: join":
     assert(tests_lexical_path_equals(lexical_path_string(&fourth), "/home/anon/foo.txt"))
 
 test "lexical path: append":
-    if not ak_core_is_ported:
-        return
     let path = tests_lexical_path("/home/anon/")
     let new_path = lexical_path_append(&path, sv("foo.txt"))
     assert(tests_lexical_path_equals(lexical_path_string(&new_path), "/home/anon/foo.txt"))
 
 test "lexical path: parent":
-    if not ak_core_is_ported:
-        return
     let first = tests_lexical_path("/home/anon/foo.txt")
     let first_parent = lexical_path_parent(&first)
     assert(tests_lexical_path_equals(lexical_path_string(&first_parent), "/home/anon"))
@@ -228,8 +195,6 @@ func tests_lexical_path_is_child_of(child: str, parent: str) -> bool:
     return lexical_path_is_child_of(&child_path, &parent_path)
 
 test "lexical path: is child of":
-    if not ak_core_is_ported:
-        return
     let parent = tests_lexical_path("/a/parent/directory")
     let child = tests_lexical_path("/a/parent/directory/a/child")
     let mismatching = tests_lexical_path("/not/a/child/directory")

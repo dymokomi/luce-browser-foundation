@@ -64,13 +64,13 @@ pub func vector_try_insert_before_matching[T](this: Vector[T]*, value: T, predic
     while i < vector_size(this):
         if function1_call(&predicate, vector_at(this, i)):
             try vector_try_insert(this, i, value)
-            if let out = inserted_index:
-                *out = i
+            if let index_out = inserted_index:
+                *index_out = i
             return
         i += 1
     try vector_try_append_t(this, value)
-    if let out = inserted_index:
-        *out = vector_size(this) - 1
+    if let index_out = inserted_index:
+        *index_out = vector_size(this) - 1
 
 ## Ported from AK/Vector.h:732 AK::Vector::try_extend(Vector&&): `other` is emptied.
 pub func vector_try_extend[T](this: Vector[T]*, other: Vector[T]*) -> !:

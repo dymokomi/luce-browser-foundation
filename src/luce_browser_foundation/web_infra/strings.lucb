@@ -1,0 +1,182 @@
+#==============================================================================================
+#
+#   strings - Infra string operations: newlines, whitespace, code units, scalar values
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibWeb/Infra/Strings.cpp (lines 1-174) and Strings.h: normalize
+#       newlines, strip and collapse ASCII whitespace (UTF-8 and UTF-16), code-unit prefix and
+#       ordering, and conversion to a scalar value string.
+#
+#==============================================================================================
+
+# mark: Newlines ================================================================================
+
+## Ported from Libraries/LibWeb/Infra/Strings.cpp:24 Web::Infra::normalize_newlines.
+# https://infra.spec.whatwg.org/#normalize-newlines
+pub func normalize_newlines_string(string: ak.String) -> ak.String:
+    # To normalize newlines in a string, replace every U+000D CR U+000A LF code point pair with a single U+000A LF
+    # code point, and then replace every remaining U+000D CR code point with a U+000A LF code point.
+    if not ak.string_contains_u32(&string, 0x0d):  # '\r'
+        return string
+
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    var lexer: ak.GenericLexer[u8]
+    ak.generic_lexer_construct(&lexer, ak.string_bytes_as_string_view(&string))
+
+    while not ak.generic_lexer_is_eof(&lexer):
+        ak.string_builder_append_string_view(&builder, ak.generic_lexer_consume_until_t_char_type(&lexer, '\r'))
+
+        if ak.generic_lexer_peek(&lexer) == '\r':
+            ak.generic_lexer_ignore(&lexer, 1 + (1 if ak.generic_lexer_peek(&lexer, 1) == '\n' else 0))
+            ak.string_builder_append_u8(&builder, '\n')
+
+    return ak.string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")
+
+## Ported from Libraries/LibWeb/Infra/Strings.cpp:47 Web::Infra::normalize_newlines.
+# https://infra.spec.whatwg.org/#normalize-newlines
+pub func normalize_newlines_utf16_string(string: ak.Utf16String) -> ak.Utf16String:
+    # To normalize newlines in a string, replace every U+000D CR U+000A LF code point pair with a single U+000A LF
+    # code point, and then replace every remaining U+000D CR code point with a U+000A LF code point.
+    let base_ = &string.utf16_string_base
+    if not ak.utf16_string_base_contains_u16(base_, 0x0d):  # '\r'
+        return string
+
+    # FIXME: Implement a UTF-16 GenericLexer.
+    let length = ak.utf16_string_base_length_in_code_units(base_)
+    var builder: ak.StringBuilder
+    ak.string_builder_construct_string_builder_mode_usize(&builder, ak.StringBuilderMode.utf16, length)
+
+    var i: usize = 0
+    while i < length:
+        let code_unit = ak.utf16_string_base_code_unit_at(base_, i)
+        if code_unit == 0x0d:  # '\r'
+            if i + 1 < length and ak.utf16_string_base_code_unit_at(base_, i + 1) == 0x0a:  # '\n'
+                i += 1
+            ak.string_builder_append_u8(&builder, '\n')
+        else:
+            ak.string_builder_append_code_unit(&builder, code_unit)
+        i += 1
+
+    return ak.string_builder_to_utf16_string(&builder)
+
+# mark: Whitespace ==============================================================================
+
+## Ported from Libraries/LibWeb/Infra/Strings.cpp:71 Web::Infra::strip_and_collapse_whitespace.
+# https://infra.spec.whatwg.org/#strip-and-collapse-ascii-whitespace
+pub func strip_and_collapse_whitespace_string_view(string: ak.StringView) -> ak.String!:
+    # Replace any sequence of one or more consecutive code points that are ASCII whitespace in the string with a single U+0020 SPACE code point.
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    var view: ak.Utf8View = ---
+    ak.utf8_view_construct_string_view(&view, string)
+    var iterator = ak.utf8_view_begin(&view)
+    while not ak.utf8_code_point_iterator_done(&iterator):
+        let code_point = ak.utf8_code_point_iterator_deref(&iterator)
+        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        if is_ascii_whitespace(code_point):
+            let collapsed = ak.string_builder_string_view(&builder)
+            if not ak.string_view_ends_with_u8(&collapsed, ' '):
+                ak.string_builder_append_u8(&builder, ' ')
+            continue
+        try ak.string_builder_try_append_code_point(&builder, code_point)
+
+    # ...and then remove any leading and trailing ASCII whitespace from that string.
+    let collapsed = ak.string_builder_string_view(&builder)
+    return try ak.string_from_utf8(ak.string_view_trim(&collapsed, ascii_whitespace_view()))
+
+## Ported from Libraries/LibWeb/Infra/Strings.cpp:89 Web::Infra::strip_and_collapse_whitespace.
+# https://infra.spec.whatwg.org/#strip-and-collapse-ascii-whitespace
+pub func strip_and_collapse_whitespace_utf16_string(string: ak.Utf16String) -> ak.Utf16String:
+    # Replace any sequence of one or more consecutive code points that are ASCII whitespace in the string with a single U+0020 SPACE code point.
+    let base_ = &string.utf16_string_base
+    if not ak.utf16_string_base_contains_any_of(base_, ascii_whitespace_code_points):
+        return string
+
+    var builder: ak.StringBuilder
+    ak.string_builder_construct_string_builder_mode(&builder, ak.StringBuilderMode.utf16)
+
+    var iterator = ak.utf16_string_base_begin(base_)
+    let end = ak.utf16_string_base_end(base_)
+    while not ak.utf16_code_point_iterator_eq(&iterator, &end):
+        let code_point = ak.utf16_code_point_iterator_deref(&iterator)
+        discard(ak.utf16_code_point_iterator_inc(&iterator))
+        if is_ascii_whitespace(code_point):
+            let collapsed = ak.string_builder_utf16_string_view(&builder)
+            if not ak.utf16_view_ends_with_u16(&collapsed, 0x20):  # ' '
+                ak.string_builder_append_u8(&builder, ' ')
+            continue
+
+        ak.string_builder_append_code_point(&builder, code_point)
+
+    # ...and then remove any leading and trailing ASCII whitespace from that string.
+    var whitespace: ak.Utf16View
+    ak.utf16_view_construct_string_view(&whitespace, ascii_whitespace_view())
+    let collapsed = ak.string_builder_to_utf16_string(&builder)
+    return ak.utf16_string_trim(&collapsed, whitespace)
+
+# mark: Code units and scalar values ============================================================
+
+## Ported from Libraries/LibWeb/Infra/Strings.cpp:112 Web::Infra::is_code_unit_prefix.
+# https://infra.spec.whatwg.org/#code-unit-prefix
+pub func is_code_unit_prefix(potential_prefix_utf8: ak.StringView, input_utf8: ak.StringView) -> bool:
+    let potential_prefix = ak.utf16_string_from_utf8_string_view(potential_prefix_utf8)
+    let input = ak.utf16_string_from_utf8_string_view(input_utf8)
+
+    # 1. Let i be 0.
+    var i: usize = 0
+
+    # 2. While true:
+    while true:
+        # 1. If i is greater than or equal to potentialPrefix’s length, then return true.
+        if i >= ak.utf16_string_base_length_in_code_units(&potential_prefix.utf16_string_base):
+            return true
+
+        # 2. If i is greater than or equal to input’s length, then return false.
+        if i >= ak.utf16_string_base_length_in_code_units(&input.utf16_string_base):
+            return false
+
+        # 3. Let potentialPrefixCodeUnit be the ith code unit of potentialPrefix.
+        let potential_prefix_code_unit = ak.utf16_string_base_code_unit_at(&potential_prefix.utf16_string_base, i)
+
+        # 4. Let inputCodeUnit be the ith code unit of input.
+        let input_code_unit = ak.utf16_string_base_code_unit_at(&input.utf16_string_base, i)
+
+        # 5. Return false if potentialPrefixCodeUnit is not inputCodeUnit.
+        if potential_prefix_code_unit != input_code_unit:
+            return false
+
+        # 6. Set i to i + 1.
+        i += 1
+
+## Ported from Libraries/LibWeb/Infra/Strings.cpp:146 Web::Infra::convert_to_scalar_value_string.
+# https://infra.spec.whatwg.org/#scalar-value-string
+pub func convert_to_scalar_value_string(string: ak.StringView) -> ak.String!:
+    # To convert a string into a scalar value string, replace any surrogates with U+FFFD.
+    var scalar_value_builder: ak.StringBuilder
+    ak.string_builder_construct(&scalar_value_builder)
+    var utf8_view: ak.Utf8View = ---
+    ak.utf8_view_construct_string_view(&utf8_view, string)
+    var iterator = ak.utf8_view_begin(&utf8_view)
+    while not ak.utf8_code_point_iterator_done(&iterator):
+        var code_point = ak.utf8_code_point_iterator_deref(&iterator)
+        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        if ak.is_unicode_surrogate(code_point):
+            code_point = 0xFFFD
+        ak.string_builder_append_code_point(&scalar_value_builder, code_point)
+    return try ak.string_builder_to_string(&scalar_value_builder)
+
+## Ported from Libraries/LibWeb/Infra/Strings.cpp:160 Web::Infra::code_unit_less_than.
+# https://infra.spec.whatwg.org/#code-unit-less-than
+pub func code_unit_less_than(a: ak.StringView, b: ak.StringView) -> bool:
+    # FIXME: Perhaps there is a faster way to do this?
+
+    # Fastpath for ASCII-only strings.
+    if ak.string_view_is_ascii(&a) and ak.string_view_is_ascii(&b):
+        return ak.string_view_lt(&a, b)
+
+    let a_utf16 = ak.utf16_string_from_utf8_string_view(a)
+    let b_utf16 = ak.utf16_string_from_utf8_string_view(b)
+
+    let a_view = ak.utf16_string_base_utf16_view(&a_utf16.utf16_string_base)
+    return ak.utf16_view_is_code_unit_less_than(&a_view, ak.utf16_string_base_utf16_view(&b_utf16.utf16_string_base))

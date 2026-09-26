@@ -141,8 +141,6 @@ test "to_uppercase":
     assert(tc_bs_is(&uppercase, "ABC"))
 
 test "replace":
-    if not ak_core_is_ported:
-        return
     var test_string = tc_bs("Well, hello Friends!")
 
     test_string = byte_string_replace(&test_string, sv("Friends"), sv("Testers"), ReplaceMode.first_only)
@@ -193,8 +191,6 @@ test "substring":
     assert(tc_bs_is(&empty_end, ""))
 
 test "split":
-    if not ak_core_is_ported:
-        return
     var subject = tc_bs("foo bar baz")
     var parts = byte_string_split(&subject, ' ')
     assert(test_vector_size(&parts) == 3)
@@ -236,8 +232,6 @@ test "split":
     assert(test_vector_size(&split_view_x_empty) == 4)
 
 test "builder_zero_initial_capacity":
-    if not ak_core_is_ported:
-        return
     var builder = string_builder_new_usize(0)
     string_builder_append_string_view(&builder, sv(""))
     let built = string_builder_to_byte_string(&builder)
@@ -260,15 +254,13 @@ test "find":
 test "find_with_empty_needle":
     var string = tc_bs("")
     assert(byte_string_find_string_view(&string, sv("")) == 0)
-    if ak_core_is_ported:
-        let all_in_empty = byte_string_find_all(&string, sv(""))
-        assert(test_vector_size(&all_in_empty) == 1)
-        assert(test_vector_at(&all_in_empty, 0) == 0)
+    let all_in_empty = byte_string_find_all(&string, sv(""))
+    assert(test_vector_size(&all_in_empty) == 1)
+    assert(test_vector_at(&all_in_empty, 0) == 0)
 
     string = tc_bs("abc")
     assert(byte_string_find_string_view(&string, sv("")) == 0)
-    if ak_core_is_ported:
-        let all_in_abc = byte_string_find_all(&string, sv(""))
-        assert(test_vector_size(&all_in_abc) == 4)
-        for i: usize in 0..<4:
-            assert(test_vector_at(&all_in_abc, i) == i)
+    let all_in_abc = byte_string_find_all(&string, sv(""))
+    assert(test_vector_size(&all_in_abc) == 4)
+    for i: usize in 0..<4:
+        assert(test_vector_at(&all_in_abc, i) == i)

@@ -3,8 +3,7 @@
 #   tests_base64 - tests of Base64 (and its simdutf replacement)
 #
 #   DESCRIPTION:
-#       Port of Tests/AK/TestBase64.cpp. Decoding fills a ByteBuffer (region r01), so the
-#       decoding tests are gated on ak_core_is_ported; encoding needs nothing of r01.
+#       Port of Tests/AK/TestBase64.cpp.
 #
 #==============================================================================================
 
@@ -29,8 +28,6 @@ func tests_base64_decode_fails(input: const u8[], url: bool) -> bool:
     return failed
 
 test "base64: decode":
-    if not ak_core_is_ported:
-        return
     tests_base64_decode_equal("", "", false)
     tests_base64_decode_equal("Zg==", "f", false)
     tests_base64_decode_equal("Zm8=", "fo", false)
@@ -57,8 +54,6 @@ func tests_base64_decode_into_equal(input: str, expected: str, buffer_size: usiz
     assert(string_view_equals(&decoded, expected))
 
 test "base64: decode into":
-    if not ak_core_is_ported:
-        return
     tests_base64_decode_into_equal("", "", none)
 
     tests_base64_decode_into_equal("Zg==", "f", none)
@@ -81,8 +76,6 @@ test "base64: decode into":
     tests_base64_decode_into_equal("Zm9vYmFy", "foobar", 7)
 
 test "base64: decode invalid":
-    if not ak_core_is_ported:
-        return
     assert(tests_base64_decode_fails(b"asdf\xffqwe", false))
     assert(tests_base64_decode_fails(b"asdf\x80qwe", false))
     assert(tests_base64_decode_fails(b"asdf:qwe", false))
@@ -95,8 +88,6 @@ test "base64: decode invalid":
     assert(tests_base64_decode_fails(b"YQ=", false))
 
 test "base64: decode only padding":
-    if not ak_core_is_ported:
-        return
     # Only padding is not allowed
     assert(tests_base64_decode_fails(b"=", false))
     assert(tests_base64_decode_fails(b"==", false))
@@ -132,8 +123,6 @@ test "base64: encode omit padding":
     tests_base64_encode_equal("foobar", "Zm9vYmFy", false, .yes)
 
 test "base64: urldecode":
-    if not ak_core_is_ported:
-        return
     tests_base64_decode_equal("", "", true)
     tests_base64_decode_equal("Zg==", "f", true)
     tests_base64_decode_equal("Zm8=", "fo", true)
