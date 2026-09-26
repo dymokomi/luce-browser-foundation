@@ -1,0 +1,144 @@
+#==============================================================================================
+#
+#   icu_enums - ICU 78.2's numbering of the enumerated properties
+#
+#   DESCRIPTION:
+#       The value order of ICU's enumerations (unicode/uchar.h, unicode/uscript.h), by short
+#       value alias. ppucd.txt names the values; these lists give them ICU's numbers, which
+#       LibUnicode's API exposes and web_unicode keeps.
+#
+#==============================================================================================
+
+## UCharCategory, U_UNASSIGNED (0) through U_FINAL_PUNCTUATION (29).
+let icu_general_categories: str[30] = [
+    "Cn", "Lu", "Ll", "Lt", "Lm", "Lo", "Mn", "Me", "Mc", "Nd", "Nl", "No", "Zs", "Zl", "Zp",
+    "Cc", "Cf", "Co", "Cs", "Pd", "Ps", "Pe", "Pc", "Po", "Sm", "Sc", "Sk", "So", "Pi", "Pf",
+]
+
+## The general category groups LibUnicode numbers U_CHAR_CATEGORY_COUNT + 1 through + 8,
+## by short alias.
+let icu_general_category_groups: str[8] = ["LC", "L", "M", "N", "P", "S", "Z", "C"]
+
+## UCharDirection, U_LEFT_TO_RIGHT (0) through U_POP_DIRECTIONAL_ISOLATE (22).
+let icu_bidi_classes: str[23] = [
+    "L", "R", "EN", "ES", "ET", "AN", "CS", "B", "S", "WS", "ON", "LRE", "LRO", "AL", "RLE",
+    "RLO", "PDF", "NSM", "BN", "FSI", "LRI", "RLI", "PDI",
+]
+
+## ULineBreak, U_LB_UNKNOWN (0) through U_LB_UNAMBIGUOUS_HYPHEN (48).
+let icu_line_breaks: str[49] = [
+    "XX", "AI", "AL", "B2", "BA", "BB", "BK", "CB", "CL", "CM", "CR", "EX", "GL", "HY", "ID",
+    "IN", "IS", "LF", "NS", "NU", "OP", "PO", "PR", "QU", "SA", "SG", "SP", "SY", "ZW", "NL",
+    "WJ", "H2", "H3", "JL", "JT", "JV", "CP", "CJ", "HL", "RI", "EB", "EM", "ZWJ", "AK", "AP",
+    "AS", "VF", "VI", "HH",
+]
+
+## UEastAsianWidth.
+let icu_east_asian_widths: str[6] = ["N", "A", "H", "F", "Na", "W"]
+
+## UGraphemeClusterBreak.
+let icu_grapheme_cluster_breaks: str[18] = [
+    "XX", "CN", "CR", "EX", "L", "LF", "LV", "LVT", "T", "V", "SM", "PP", "RI", "EB", "EBG",
+    "EM", "GAZ", "ZWJ",
+]
+
+## UWordBreakValues.
+let icu_word_breaks: str[23] = [
+    "XX", "LE", "FO", "KA", "ML", "MN", "NU", "EX", "CR", "Extend", "LF", "MB", "NL", "RI",
+    "HL", "SQ", "DQ", "EB", "EBG", "EM", "GAZ", "ZWJ", "WSegSpace",
+]
+
+## USentenceBreak.
+let icu_sentence_breaks: str[15] = [
+    "XX", "AT", "CL", "FO", "LO", "NU", "LE", "SE", "SP", "ST", "UP", "CR", "EX", "LF", "SC",
+]
+
+## UIndicConjunctBreak.
+let icu_indic_conjunct_breaks: str[4] = ["None", "Consonant", "Extend", "Linker"]
+
+## UJoiningType.
+let icu_joining_types: str[6] = ["U", "C", "D", "L", "R", "T"]
+
+## UDecompositionType.
+let icu_decomposition_types: str[18] = [
+    "None", "Can", "Com", "Enc", "Fin", "Font", "Fra", "Init", "Iso", "Med", "Nar", "Nb", "Sml",
+    "Sqr", "Sub", "Sup", "Vert", "Wide",
+]
+
+## UNormalizationCheckResult: UNORM_NO (0), UNORM_YES (1), UNORM_MAYBE (2).
+let icu_quick_checks: str[3] = ["N", "Y", "M"]
+
+## UScriptCode, USCRIPT_COMMON (0) through USCRIPT_CODE_LIMIT - 1 (212), by ISO 15924 code.
+let icu_scripts: str[213] = [
+    "Zyyy", "Zinh", "Arab", "Armn", "Beng", "Bopo", "Cher", "Copt", "Cyrl", "Dsrt", "Deva",
+    "Ethi", "Geor", "Goth", "Grek", "Gujr", "Guru", "Hani", "Hang", "Hebr", "Hira", "Knda",
+    "Kana", "Khmr", "Laoo", "Latn", "Mlym", "Mong", "Mymr", "Ogam", "Ital", "Orya", "Runr",
+    "Sinh", "Syrc", "Taml", "Telu", "Thaa", "Thai", "Tibt", "Cans", "Yiii", "Tglg", "Hano",
+    "Buhd", "Tagb", "Brai", "Cprt", "Limb", "Linb", "Osma", "Shaw", "Tale", "Ugar", "Hrkt",
+    "Bugi", "Glag", "Khar", "Sylo", "Talu", "Tfng", "Xpeo", "Bali", "Batk", "Blis", "Brah",
+    "Cham", "Cirt", "Cyrs", "Egyd", "Egyh", "Egyp", "Geok", "Hans", "Hant", "Hmng", "Hung",
+    "Inds", "Java", "Kali", "Latf", "Latg", "Lepc", "Lina", "Mand", "Maya", "Mero", "Nkoo",
+    "Orkh", "Perm", "Phag", "Phnx", "Plrd", "Roro", "Sara", "Syre", "Syrj", "Syrn", "Teng",
+    "Vaii", "Visp", "Xsux", "Zxxx", "Zzzz", "Cari", "Jpan", "Lana", "Lyci", "Lydi", "Olck",
+    "Rjng", "Saur", "Sgnw", "Sund", "Moon", "Mtei", "Armi", "Avst", "Cakm", "Kore", "Kthi",
+    "Mani", "Phli", "Phlp", "Phlv", "Prti", "Samr", "Tavt", "Zmth", "Zsym", "Bamu", "Lisu",
+    "Nkgb", "Sarb", "Bass", "Dupl", "Elba", "Gran", "Kpel", "Loma", "Mend", "Merc", "Narb",
+    "Nbat", "Palm", "Sind", "Wara", "Afak", "Jurc", "Mroo", "Nshu", "Shrd", "Sora", "Takr",
+    "Tang", "Wole", "Hluw", "Khoj", "Tirh", "Aghb", "Mahj", "Ahom", "Hatr", "Modi", "Mult",
+    "Pauc", "Sidd", "Adlm", "Bhks", "Marc", "Newa", "Osge", "Hanb", "Jamo", "Zsye", "Gonm",
+    "Soyo", "Zanb", "Dogr", "Gong", "Maka", "Medf", "Rohg", "Sogd", "Sogo", "Elym", "Hmnp",
+    "Nand", "Wcho", "Chrs", "Diak", "Kits", "Yezi", "Cpmn", "Ougr", "Tnsa", "Toto", "Vith",
+    "Kawi", "Nagm", "Aran", "Gara", "Gukh", "Krai", "Onao", "Sunu", "Todr", "Tutg", "Berf",
+    "Sidt", "Tayo", "Tols", "Hntl",
+]
+
+## UProperty's binary properties, UCHAR_ALPHABETIC (0) through UCHAR_BINARY_LIMIT - 1 (75),
+## by long property alias.
+let icu_binary_properties: str[76] = [
+    "Alphabetic", "ASCII_Hex_Digit", "Bidi_Control", "Bidi_Mirrored", "Dash",
+    "Default_Ignorable_Code_Point", "Deprecated", "Diacritic", "Extender",
+    "Full_Composition_Exclusion", "Grapheme_Base", "Grapheme_Extend", "Grapheme_Link",
+    "Hex_Digit", "Hyphen", "ID_Continue", "ID_Start", "Ideographic", "IDS_Binary_Operator",
+    "IDS_Trinary_Operator", "Join_Control", "Logical_Order_Exception", "Lowercase", "Math",
+    "Noncharacter_Code_Point", "Quotation_Mark", "Radical", "Soft_Dotted",
+    "Terminal_Punctuation", "Unified_Ideograph", "Uppercase", "White_Space", "XID_Continue",
+    "XID_Start", "Case_Sensitive", "Sentence_Terminal", "Variation_Selector", "NFD_Inert",
+    "NFKD_Inert", "NFC_Inert", "NFKC_Inert", "Segment_Starter", "Pattern_Syntax",
+    "Pattern_White_Space", "alnum", "blank", "graph", "print", "xdigit", "Cased",
+    "Case_Ignorable", "Changes_When_Lowercased", "Changes_When_Uppercased",
+    "Changes_When_Titlecased", "Changes_When_Casefolded", "Changes_When_Casemapped",
+    "Changes_When_NFKC_Casefolded", "Emoji", "Emoji_Presentation", "Emoji_Modifier",
+    "Emoji_Modifier_Base", "Emoji_Component", "Regional_Indicator",
+    "Prepended_Concatenation_Mark", "Extended_Pictographic", "Basic_Emoji",
+    "Emoji_Keycap_Sequence", "RGI_Emoji_Modifier_Sequence", "RGI_Emoji_Flag_Sequence",
+    "RGI_Emoji_Tag_Sequence", "RGI_Emoji_ZWJ_Sequence", "RGI_Emoji", "IDS_Unary_Operator",
+    "ID_Compat_Math_Start", "ID_Compat_Math_Continue", "Modifier_Combining_Mark",
+]
+
+# The binary properties ICU computes rather than reads from ppucd.txt.
+let property_case_sensitive: usize = 34
+let property_nfd_inert: usize = 37
+let property_nfkd_inert: usize = 38
+let property_nfc_inert: usize = 39
+let property_nfkc_inert: usize = 40
+let property_segment_starter: usize = 41
+let property_posix_alnum: usize = 44
+let property_posix_blank: usize = 45
+let property_posix_graph: usize = 46
+let property_posix_print: usize = 47
+let property_posix_xdigit: usize = 48
+let property_alphabetic: usize = 0
+let property_basic_emoji: usize = 65
+let property_emoji_keycap_sequence: usize = 66
+let property_rgi_emoji_modifier_sequence: usize = 67
+let property_rgi_emoji_flag_sequence: usize = 68
+let property_rgi_emoji_tag_sequence: usize = 69
+let property_rgi_emoji_zwj_sequence: usize = 70
+let property_rgi_emoji: usize = 71
+
+## The index of `name` in `names`, or none.
+func index_of(names: const str[], name: str) -> usize?:
+    for index in 0..<names.length:
+        if names[index] == name:
+            return index
+    return none

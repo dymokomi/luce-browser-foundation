@@ -1,0 +1,263 @@
+#==============================================================================================
+#
+#   character_types_2 - Unicode::CharacterTypes: the extern "C" interface of LibRegex
+#
+#   DESCRIPTION:
+#       Port of LibUnicode/CharacterTypes.cpp (lines 761-946): ResolvedPropertyKind and the
+#       functions Ladybird's Rust LibRegex calls, over character_types.lucb.
+#
+#==============================================================================================
+
+# mark: The LibRegex interface ==================================================================
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:641 ResolvedPropertyKind (see types).
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:648 string_view_from_ffi.
+func string_view_from_ffi(string: const u8*?, length: usize) -> ak.StringView:
+    assert(string != none)
+    return ak.StringView(m_characters = string, m_length = length)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:654 optional_string_view_from_ffi.
+func optional_string_view_from_ffi(string: const u8*?, length: usize) -> ak.StringView?:
+    if string != none:
+        return string_view_from_ffi(string, length)
+    return none
+
+## name.is_one_of(a, b, c, d) for StringViews.
+func view_is_one_of(view: ak.StringView, names: const str[]) -> bool:
+    for name in names:
+        if view_equals(view, name):
+            return true
+    return false
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:661 has_property.
+func has_property(code_point: u32, name: ak.StringView, value: ak.StringView?) -> bool:
+    if let found_value = value:
+        if view_is_one_of(name, ["sc", "Script", "scx", "Script_Extensions"]):
+            if let script = script_from_string(found_value):
+                if view_is_one_of(name, ["sc", "Script"]):
+                    return code_point_has_script(code_point, script)
+                return code_point_has_script_extension(code_point, script)
+        elif view_is_one_of(name, ["gc", "General_Category"]):
+            if let category = general_category_from_string(found_value):
+                return code_point_has_general_category(code_point, category)
+
+        return false
+
+    if let property = property_from_string(name):
+        return code_point_has_property(code_point, property)
+
+    if let category = general_category_from_string(name):
+        return code_point_has_general_category(code_point, category)
+
+    if let script = script_from_string(name):
+        return code_point_has_script(code_point, script)
+
+    return false
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:690 resolve_property.
+func resolve_property(name: ak.StringView, value: ak.StringView?, out_kind: u8*, out_id: u32*) -> bool:
+    if let found_value = value:
+        if view_is_one_of(name, ["sc", "Script", "scx", "Script_Extensions"]):
+            if let script = script_from_string(found_value):
+                *out_kind = (u8)(ResolvedPropertyKind.script_extension if view_is_one_of(name, ["scx", "Script_Extensions"]) else ResolvedPropertyKind.script)
+                *out_id = script
+                return true
+        elif view_is_one_of(name, ["gc", "General_Category"]):
+            if let category = general_category_from_string(found_value):
+                *out_kind = (u8)ResolvedPropertyKind.general_category
+                *out_id = category
+                return true
+
+        return false
+
+    if let property = property_from_string(name):
+        *out_kind = (u8)ResolvedPropertyKind.binary_property
+        *out_id = property
+        return true
+
+    if let category = general_category_from_string(name):
+        *out_kind = (u8)ResolvedPropertyKind.general_category
+        *out_id = category
+        return true
+
+    if let script = script_from_string(name):
+        *out_kind = (u8)ResolvedPropertyKind.script
+        *out_id = script
+        return true
+
+    return false
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:757 unicode_property_matches.
+pub func unicode_property_matches(code_point: u32, name_ptr: const u8*?, name_len: usize, value_ptr: const u8*?, value_len: usize) -> bool:
+    let name = string_view_from_ffi(name_ptr, name_len)
+    let value = optional_string_view_from_ffi(value_ptr, value_len)
+
+    return has_property(code_point, name, value)
+
+## The capture of the lambdas of unicode_property_matches_case_insensitive and
+## unicode_property_all_case_equivalents_match.
+struct UnicodePropertyMatchesCaseInsensitiveMatch:
+    var name: ak.StringView
+    var value: ak.StringView?
+    var found: bool
+
+func unicode_property_matches_case_insensitive_find(context: void*?, cp: u32) -> ak.IterationDecision:
+    let captures = (UnicodePropertyMatchesCaseInsensitiveMatch*)(context else trap("no capture"))
+    if has_property(cp, captures.name, captures.value):
+        captures.found = true
+        return ak.IterationDecision.break_
+    return ak.IterationDecision.continue_
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:768 unicode_property_matches_case_insensitive.
+pub func unicode_property_matches_case_insensitive(code_point: u32, name_ptr: const u8*?, name_len: usize, value_ptr: const u8*?, value_len: usize) -> bool:
+    let name = string_view_from_ffi(name_ptr, name_len)
+    let value = optional_string_view_from_ffi(value_ptr, value_len)
+    var captures = UnicodePropertyMatchesCaseInsensitiveMatch(name = name, value = value, found = false)
+
+    for_each_case_folded_code_point(code_point, ak.Function1[u32, ak.IterationDecision](call = unicode_property_matches_case_insensitive_find, context = &captures))
+
+    return captures.found
+
+func unicode_property_all_case_equivalents_match_check(context: void*?, cp: u32) -> ak.IterationDecision:
+    let captures = (UnicodePropertyMatchesCaseInsensitiveMatch*)(context else trap("no capture"))
+    if not has_property(cp, captures.name, captures.value):
+        captures.found = false
+        return ak.IterationDecision.break_
+    return ak.IterationDecision.continue_
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:788 unicode_property_all_case_equivalents_match.
+pub func unicode_property_all_case_equivalents_match(code_point: u32, name_ptr: const u8*?, name_len: usize, value_ptr: const u8*?, value_len: usize) -> bool:
+    let name = string_view_from_ffi(name_ptr, name_len)
+    let value = optional_string_view_from_ffi(value_ptr, value_len)
+    # `found` is all_match here.
+    var captures = UnicodePropertyMatchesCaseInsensitiveMatch(name = name, value = value, found = true)
+
+    for_each_case_folded_code_point(code_point, ak.Function1[u32, ak.IterationDecision](call = unicode_property_all_case_equivalents_match_check, context = &captures))
+
+    return captures.found
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:808 unicode_resolve_property.
+pub func unicode_resolve_property(name_ptr: const u8*?, name_len: usize, value_ptr: const u8*?, value_len: usize, out_kind: u8*, out_id: u32*) -> bool:
+    let name = string_view_from_ffi(name_ptr, name_len)
+    let value = optional_string_view_from_ffi(value_ptr, value_len)
+
+    return resolve_property(name, value, out_kind, out_id)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:819 unicode_resolved_property_matches.
+pub func unicode_resolved_property_matches(code_point: u32, kind: u8, id: u32) -> bool:
+    match (ResolvedPropertyKind)kind:
+        .script: return code_point_has_script(code_point, id)
+        .script_extension: return code_point_has_script_extension(code_point, id)
+        .general_category: return code_point_has_general_category(code_point, id)
+        .binary_property: return code_point_has_property(code_point, id)
+        _: trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:834 unicode_code_point_has_space_separator_general_category.
+pub func unicode_code_point_has_space_separator_general_category(code_point: u32) -> bool:
+    return code_point_has_space_separator_general_category(code_point)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:839 unicode_code_point_has_identifier_start_property.
+pub func unicode_code_point_has_identifier_start_property(code_point: u32) -> bool:
+    return code_point_has_identifier_start_property(code_point)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:844 unicode_code_point_has_identifier_continue_property.
+pub func unicode_code_point_has_identifier_continue_property(code_point: u32) -> bool:
+    return code_point_has_identifier_continue_property(code_point)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:849 unicode_is_string_property.
+pub func unicode_is_string_property(name_ptr: const u8*?, name_len: usize) -> bool:
+    let name = string_view_from_ffi(name_ptr, name_len)
+
+    if let property = property_from_string(name):
+        return is_ecma262_string_property(property)
+
+    return false
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:859 unicode_is_valid_ecma262_property.
+pub func unicode_is_valid_ecma262_property(name_ptr: const u8*?, name_len: usize, value_ptr: const u8*?, value_len: usize) -> bool:
+    let name = string_view_from_ffi(name_ptr, name_len)
+    let value = optional_string_view_from_ffi(value_ptr, value_len)
+
+    if let found_value = value:
+        if view_is_one_of(name, ["sc", "Script", "scx", "Script_Extensions"]):
+            return script_from_string(found_value) != none
+        if view_is_one_of(name, ["gc", "General_Category"]):
+            return general_category_from_string(found_value) != none
+        return false
+
+    if let property = property_from_string(name):
+        return is_ecma262_property(property) or is_ecma262_string_property(property)
+
+    return general_category_from_string(name) != none
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:880 unicode_get_string_property_data.
+## The strings of the property with more than one code point, laid out for LibRegex.
+pub func unicode_get_string_property_data(name_ptr: const u8*?, name_len: usize, out: u32*?, capacity: u32) -> u32:
+    let name = string_view_from_ffi(name_ptr, name_len)
+    let property = property_from_string(name) else return 0
+    if not is_ecma262_string_property(property):
+        return 0
+
+    # get_property_strings(*property), keeping only the multi-code-point strings: the single
+    # code points of the property are not needed here, and the sequences are the table's.
+    var multi_code_point_strings = CodePointBuffer.create(64)
+    var string_count: u32 = 0
+    var offset: usize = 0
+    while offset < ucd_emoji_sequences.length:
+        let sequence_property = ucd_hex(ucd_emoji_sequences, offset, 2)
+        let length = (usize)ucd_hex(ucd_emoji_sequences, offset + 2, 2)
+        if sequence_property == property and length > 1:
+            multi_code_point_strings.append((u32)length)
+            for index in 0..<length:
+                multi_code_point_strings.append(ucd_hex(ucd_emoji_sequences, offset + 4 + index * 6, 6))
+            string_count += 1
+        offset += 4 + length * 6
+
+    # total_size = 1 + for each string (1 + its code points): the layout below.
+    let total_size = 1 + (u32)multi_code_point_strings.count
+
+    let buffer = out else return total_size
+    if capacity < total_size:
+        return total_size
+
+    var index: usize = 0
+    buffer[index] = string_count
+    index += 1
+
+    for value in multi_code_point_strings.view():
+        buffer[index] = value
+        index += 1
+
+    return total_size
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:920 unicode_simple_case_fold.
+pub func unicode_simple_case_fold(code_point: u32, unicode_mode: bool) -> u32:
+    return canonicalize(code_point, unicode_mode)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:925 unicode_code_point_matches_range_ignoring_case.
+pub func unicode_code_point_matches_range_ignoring_case(code_point: u32, from_: u32, to: u32, unicode_mode: bool) -> bool:
+    return code_point_matches_range_ignoring_case(code_point, from_, to, unicode_mode)
+
+## The capture of unicode_get_case_closure's lambda.
+struct UnicodeGetCaseClosureCollect:
+    var out_buffer: u32*?
+    var buffer_capacity: u32
+    var count: u32
+
+func unicode_get_case_closure_collect(context: void*?, cp: u32) -> ak.IterationDecision:
+    let captures = (UnicodeGetCaseClosureCollect*)(context else trap("no capture"))
+    if captures.count < captures.buffer_capacity:
+        let buffer = captures.out_buffer else trap("no buffer")
+        buffer[(usize)captures.count] = cp
+        captures.count += 1
+        return ak.IterationDecision.continue_
+    return ak.IterationDecision.break_
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:930 unicode_get_case_closure.
+pub func unicode_get_case_closure(code_point: u32, out_buffer: u32*?, buffer_capacity: u32) -> u32:
+    var captures = UnicodeGetCaseClosureCollect(out_buffer = out_buffer, buffer_capacity = buffer_capacity, count = 0)
+
+    for_each_case_folded_code_point(code_point, ak.Function1[u32, ak.IterationDecision](call = unicode_get_case_closure_collect, context = &captures))
+
+    return captures.count

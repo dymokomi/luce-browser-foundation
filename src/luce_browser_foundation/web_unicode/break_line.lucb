@@ -1,0 +1,384 @@
+#==============================================================================================
+#
+#   break_line - line break opportunities (UAX #14)
+#
+#   DESCRIPTION:
+#       Not a port: replaces ICU's line break iterator (ICU 78's line.txt: the UAX #14 rules
+#       of Unicode 17 with CJ resolved to NS, as CSS line-break: strict). ICU splits runs of
+#       complex-context scripts (Thai, Lao, Khmer, Myanmar) with dictionaries; this port has
+#       none and resolves them as LB1 says.
+#
+#       The rules after LB9 see the text as groups: a character with the combining marks and
+#       joiners attached to it by LB9. Each rule is checked at a group boundary in the order
+#       of UAX #14, looking at the groups before and after it.
+#
+#==============================================================================================
+
+# mark: Classes =================================================================================
+
+# ULineBreak values.
+let lb_xx: u32 = 0
+let lb_ai: u32 = 1
+let lb_al: u32 = 2
+let lb_b2: u32 = 3
+let lb_ba: u32 = 4
+let lb_bb: u32 = 5
+let lb_bk: u32 = 6
+let lb_cb: u32 = 7
+let lb_cl: u32 = 8
+let lb_cm: u32 = 9
+let lb_cr: u32 = 10
+let lb_ex: u32 = 11
+let lb_gl: u32 = 12
+let lb_hy: u32 = 13
+let lb_id: u32 = 14
+let lb_in: u32 = 15
+let lb_is: u32 = 16
+let lb_lf: u32 = 17
+let lb_ns: u32 = 18
+let lb_nu: u32 = 19
+let lb_op: u32 = 20
+let lb_po: u32 = 21
+let lb_pr: u32 = 22
+let lb_qu: u32 = 23
+let lb_sa: u32 = 24
+let lb_sg: u32 = 25
+let lb_sp: u32 = 26
+let lb_sy: u32 = 27
+let lb_zw: u32 = 28
+let lb_nl: u32 = 29
+let lb_wj: u32 = 30
+let lb_h2: u32 = 31
+let lb_h3: u32 = 32
+let lb_jl: u32 = 33
+let lb_jt: u32 = 34
+let lb_jv: u32 = 35
+let lb_cp: u32 = 36
+let lb_cj: u32 = 37
+let lb_hl: u32 = 38
+let lb_ri: u32 = 39
+let lb_eb: u32 = 40
+let lb_em: u32 = 41
+let lb_zwj: u32 = 42
+let lb_ak: u32 = 43
+let lb_ap: u32 = 44
+let lb_as: u32 = 45
+let lb_vf: u32 = 46
+let lb_vi: u32 = 47
+let lb_hh: u32 = 48
+
+# UEastAsianWidth values of LB19a's and LB30's $EastAsian: F, W and H.
+let ea_halfwidth: u32 = 2
+let ea_fullwidth: u32 = 3
+let ea_wide: u32 = 5
+
+# UCharCategory values of the quotation marks.
+let u_initial_punctuation: u32 = 28
+let u_final_punctuation: u32 = 29
+
+## A group of LB9: a character and the CM and ZWJ characters attached to it.
+struct LineGroup:
+    ## The index of the group's first code point.
+    var start: u32
+    ## The group's class after LB1 and LB10.
+    var class: u32
+    ## Whether the last code point of the group is a ZWJ (LB8a).
+    var ends_with_zwj: bool
+    ## Properties of the group's first code point.
+    var east_asian: bool
+    var initial_quote: bool
+    var final_quote: bool
+    var unassigned_pictographic: bool
+    var dotted_circle: bool
+
+## LB1: the resolved line break class of `code_point`.
+func line_break_class_resolved(code_point: u32) -> u32:
+    let record = ucd_record(code_point)
+    let lb = ucd_hex(ucd_records, record + ucd_field_line_break, 2)
+    if lb == lb_ai or lb == lb_sg or lb == lb_xx:
+        return lb_al
+    if lb == lb_sa:
+        let gc = ucd_hex(ucd_records, record + ucd_field_general_category, 2)
+        return lb_cm if gc == u_non_spacing_mark or gc == u_combining_spacing_mark else lb_al
+    if lb == lb_cj:
+        return lb_ns
+    return lb
+
+## Append the line break opportunities of `code_points` to `boundaries`.
+func line_boundaries(code_points: const u32[], boundaries: CodePointBuffer*):
+    boundaries.append(0)
+    let count = code_points.length
+    if count == 0:
+        return
+    # LB9 and LB10: build the groups.
+    var groups = new LineGroup[count] else trap("out of memory")
+    var group_count: usize = 0
+    for index in 0..<count:
+        let code_point = code_points[index]
+        let class = line_break_class_resolved(code_point)
+        if (class == lb_cm or class == lb_zwj) and group_count > 0:
+            let base_raw = line_break_class_resolved(code_points[(usize)groups[group_count - 1].start])
+            if base_raw != lb_bk and base_raw != lb_cr and base_raw != lb_lf and base_raw != lb_nl and base_raw != lb_sp and base_raw != lb_zw:
+                groups[group_count - 1].ends_with_zwj = class == lb_zwj
+                continue
+        let record = ucd_record(code_point)
+        let ea = ucd_hex(ucd_records, record + ucd_field_east_asian_width, 2)
+        let gc = ucd_hex(ucd_records, record + ucd_field_general_category, 2)
+        groups[group_count] = LineGroup(start = (u32)index,
+                                        class = lb_al if class == lb_cm or class == lb_zwj else class,
+                                        ends_with_zwj = class == lb_zwj,
+                                        east_asian = ea == ea_fullwidth or ea == ea_wide or ea == ea_halfwidth,
+                                        initial_quote = gc == u_initial_punctuation, final_quote = gc == u_final_punctuation,
+                                        unassigned_pictographic = gc == u_unassigned and ucd_has_binary_property(code_point, uchar_extended_pictographic),
+                                        dotted_circle = code_point == 0x25cc)
+        group_count += 1
+    let group = groups[..<group_count]
+    var regional_indicators: usize = 0
+    for k in 1..<group_count:
+        regional_indicators = regional_indicators + 1 if group[k - 1].class == lb_ri else 0
+        if line_break_before_group(group, k, regional_indicators):
+            boundaries.append(group[k].start)
+    boundaries.append((u32)count)
+
+## The class of group `index`, or none outside the text.
+func group_class(group: const LineGroup[], index: isize) -> u32?:
+    if index < 0 or index >= (isize)group.length:
+        return none
+    return group[(usize)index].class
+
+## The index of the first group before `index` that is not SP, or -1.
+func skip_spaces_back(group: const LineGroup[], index: isize) -> isize:
+    var position = index
+    while position >= 0 and group[(usize)position].class == lb_sp:
+        position -= 1
+    return position
+
+func is_ak_dotted_as(group: const LineGroup*) -> bool:
+    return group.class == lb_ak or group.class == lb_as or group.dotted_circle
+
+func is_ak_dotted(group: const LineGroup*) -> bool:
+    return group.class == lb_ak or group.dotted_circle
+
+## Whether there is a line break opportunity between groups k - 1 and k.
+func line_break_before_group(group: const LineGroup[], k: usize, regional_indicators: usize) -> bool:
+    let before = &group[k - 1]
+    let after = &group[k]
+    let b = before.class
+    let a = after.class
+    let next: u32? = group_class(group, (isize)k + 1)
+    let before_before: u32? = group_class(group, (isize)k - 2)
+    # LB4: BK !
+    if b == lb_bk:
+        return true
+    # LB5: CR × LF; CR !; LF !; NL !
+    if b == lb_cr and a == lb_lf:
+        return false
+    if b == lb_cr or b == lb_lf or b == lb_nl:
+        return true
+    # LB6: × (BK | CR | LF | NL)
+    if a == lb_bk or a == lb_cr or a == lb_lf or a == lb_nl:
+        return false
+    # LB7: × SP; × ZW
+    if a == lb_sp or a == lb_zw:
+        return false
+    # LB8: ZW SP* ÷
+    let before_spaces = skip_spaces_back(group, (isize)k - 1)
+    if before_spaces >= 0 and group[(usize)before_spaces].class == lb_zw:
+        return true
+    # LB8a: ZWJ ×
+    if before.ends_with_zwj:
+        return false
+    # LB11: × WJ; WJ ×
+    if a == lb_wj or b == lb_wj:
+        return false
+    # LB12: GL ×
+    if b == lb_gl:
+        return false
+    # LB12a: [^SP BA HY HH] × GL
+    if a == lb_gl and b != lb_sp and b != lb_ba and b != lb_hy and b != lb_hh:
+        return false
+    # LB13: × CL; × CP; × EX; × SY
+    if a == lb_cl or a == lb_cp or a == lb_ex or a == lb_sy:
+        return false
+    # LB14: OP SP* ×
+    if before_spaces >= 0 and group[(usize)before_spaces].class == lb_op:
+        return false
+    # LB15a: (sot | BK | CR | LF | NL | OP | QU | GL | SP | ZW) [\p{Pi}&QU] SP* ×
+    if before_spaces >= 0:
+        let quote = &group[(usize)before_spaces]
+        if quote.class == lb_qu and quote.initial_quote:
+            let preceding: u32? = group_class(group, before_spaces - 1)
+            if preceding == none:
+                return false
+            let value = preceding else return false
+            if value == lb_bk or value == lb_cr or value == lb_lf or value == lb_nl or value == lb_op or value == lb_qu or value == lb_gl or value == lb_sp or value == lb_zw:
+                return false
+    # LB15b: × [\p{Pf}&QU] (SP | GL | WJ | CL | QU | CP | EX | IS | SY | BK | CR | LF | NL | ZW | eot)
+    if a == lb_qu and after.final_quote:
+        let following = next else return false
+        if following == lb_sp or following == lb_gl or following == lb_wj or following == lb_cl or following == lb_qu or following == lb_cp or following == lb_ex or following == lb_is or following == lb_sy or following == lb_bk or following == lb_cr or following == lb_lf or following == lb_nl or following == lb_zw:
+            return false
+    # LB15c: SP ÷ IS NU
+    if b == lb_sp and a == lb_is and next == lb_nu:
+        return true
+    # LB15d: × IS
+    if a == lb_is:
+        return false
+    # LB16: (CL | CP) SP* × NS
+    if a == lb_ns and before_spaces >= 0 and (group[(usize)before_spaces].class == lb_cl or group[(usize)before_spaces].class == lb_cp):
+        return false
+    # LB17: B2 SP* × B2
+    if a == lb_b2 and before_spaces >= 0 and group[(usize)before_spaces].class == lb_b2:
+        return false
+    # LB18: SP ÷
+    if b == lb_sp:
+        return true
+    # LB19: × [QU - \p{Pi}]; [QU - \p{Pf}] ×
+    if a == lb_qu and not after.initial_quote:
+        return false
+    if b == lb_qu and not before.final_quote:
+        return false
+    # LB19a: [^$EastAsian] × QU; × QU ( [^$EastAsian] | eot ); QU × [^$EastAsian];
+    #        ( sot | [^$EastAsian] ) QU ×
+    if a == lb_qu:
+        if not before.east_asian:
+            return false
+        if k + 1 >= group.length or not group[k + 1].east_asian:
+            return false
+    if b == lb_qu:
+        if not after.east_asian:
+            return false
+        if k < 2 or not group[k - 2].east_asian:
+            return false
+    # LB20: ÷ CB; CB ÷
+    if a == lb_cb or b == lb_cb:
+        return true
+    # LB20a: ( sot | BK | CR | LF | NL | SP | ZW | CB | GL ) ( HY | HH ) × ( AL | HL )
+    if (b == lb_hy or b == lb_hh) and (a == lb_al or a == lb_hl):
+        let preceding = before_before else return false
+        if preceding == lb_bk or preceding == lb_cr or preceding == lb_lf or preceding == lb_nl or preceding == lb_sp or preceding == lb_zw or preceding == lb_cb or preceding == lb_gl:
+            return false
+    # LB21: × BA; × HH; × HY; × NS; BB ×
+    if a == lb_ba or a == lb_hh or a == lb_hy or a == lb_ns or b == lb_bb:
+        return false
+    # LB21a: HL (HY | HH) × [^HL]
+    if (b == lb_hy or b == lb_hh) and before_before == lb_hl and a != lb_hl:
+        return false
+    # LB21b: SY × HL
+    if b == lb_sy and a == lb_hl:
+        return false
+    # LB22: × IN
+    if a == lb_in:
+        return false
+    # LB23: (AL | HL) × NU; NU × (AL | HL)
+    if (b == lb_al or b == lb_hl) and a == lb_nu:
+        return false
+    if b == lb_nu and (a == lb_al or a == lb_hl):
+        return false
+    # LB23a: PR × (ID | EB | EM); (ID | EB | EM) × PO
+    if b == lb_pr and (a == lb_id or a == lb_eb or a == lb_em):
+        return false
+    if (b == lb_id or b == lb_eb or b == lb_em) and a == lb_po:
+        return false
+    # LB24: (PR | PO) × (AL | HL); (AL | HL) × (PR | PO)
+    if (b == lb_pr or b == lb_po) and (a == lb_al or a == lb_hl):
+        return false
+    if (b == lb_al or b == lb_hl) and (a == lb_pr or a == lb_po):
+        return false
+    # LB25: do not break numbers
+    if line_number_join(group, k):
+        return false
+    # LB26: JL × (JL | JV | H2 | H3); (JV | H2) × (JV | JT); (JT | H3) × JT
+    if b == lb_jl and (a == lb_jl or a == lb_jv or a == lb_h2 or a == lb_h3):
+        return false
+    if (b == lb_jv or b == lb_h2) and (a == lb_jv or a == lb_jt):
+        return false
+    if (b == lb_jt or b == lb_h3) and a == lb_jt:
+        return false
+    # LB27: (JL | JV | JT | H2 | H3) × PO; PR × (JL | JV | JT | H2 | H3)
+    let a_korean = a == lb_jl or a == lb_jv or a == lb_jt or a == lb_h2 or a == lb_h3
+    let b_korean = b == lb_jl or b == lb_jv or b == lb_jt or b == lb_h2 or b == lb_h3
+    if b_korean and a == lb_po:
+        return false
+    if b == lb_pr and a_korean:
+        return false
+    # LB28: (AL | HL) × (AL | HL)
+    if (b == lb_al or b == lb_hl) and (a == lb_al or a == lb_hl):
+        return false
+    # LB28a: AP × (AK | ◌ | AS); (AK | ◌ | AS) × (VF | VI); (AK | ◌ | AS) VI × (AK | ◌);
+    #        (AK | ◌ | AS) × (AK | ◌ | AS) VF
+    if b == lb_ap and is_ak_dotted_as(after):
+        return false
+    if is_ak_dotted_as(before) and (a == lb_vf or a == lb_vi):
+        return false
+    if b == lb_vi and k >= 2 and is_ak_dotted_as(&group[k - 2]) and is_ak_dotted(after):
+        return false
+    if is_ak_dotted_as(before) and is_ak_dotted_as(after) and next == lb_vf:
+        return false
+    # LB29: IS × (AL | HL)
+    if b == lb_is and (a == lb_al or a == lb_hl):
+        return false
+    # LB30: (AL | HL | NU) × [OP-$EastAsian]; [CP-$EastAsian] × (AL | HL | NU)
+    if (b == lb_al or b == lb_hl or b == lb_nu) and a == lb_op and not after.east_asian:
+        return false
+    if b == lb_cp and not before.east_asian and (a == lb_al or a == lb_hl or a == lb_nu):
+        return false
+    # LB30a: sot (RI RI)* RI × RI; [^RI] (RI RI)* RI × RI
+    if b == lb_ri and a == lb_ri and regional_indicators % 2 == 1:
+        return false
+    # LB30b: EB × EM; [\p{Extended_Pictographic}&\p{Cn}] × EM
+    if a == lb_em and (b == lb_eb or before.unassigned_pictographic):
+        return false
+    # LB31: ÷
+    return true
+
+## LB25: whether the groups k - 1 and k are inside one number of the form
+## ((PR | PO) (OP | HY)? IS? NU (NU | SY | IS)* (CL | CP)? (PR | PO)?), which UAX #14 states as
+##     (PR | PO) × ( OP | HY )? IS? NU
+##     ( OP | HY ) × IS? NU
+##     IS × NU
+##     NU (NU | SY | IS)* × (NU | SY | IS | CL | CP)
+##     NU (NU | SY | IS)* (CL | CP)? × (PO | PR)
+func line_number_join(group: const LineGroup[], k: usize) -> bool:
+    let b = group[k - 1].class
+    let a = group[k].class
+    let next: u32? = group_class(group, (isize)k + 1)
+    let after_next: u32? = group_class(group, (isize)k + 2)
+    # (PR | PO) × ( OP | HY )? IS? NU
+    if b == lb_pr or b == lb_po:
+        if a == lb_nu:
+            return true
+        if (a == lb_op or a == lb_hy) and (next == lb_nu or (next == lb_is and after_next == lb_nu)):
+            return true
+        if a == lb_is and next == lb_nu:
+            return true
+    # ( OP | HY ) × IS? NU
+    if b == lb_op or b == lb_hy:
+        if a == lb_nu or (a == lb_is and next == lb_nu):
+            return true
+    # IS × NU
+    if b == lb_is and a == lb_nu:
+        return true
+    # NU (NU | SY | IS)* × (NU | SY | IS | CL | CP)
+    if a == lb_nu or a == lb_sy or a == lb_is or a == lb_cl or a == lb_cp:
+        if number_run_ends_at(group, (isize)k - 1):
+            return true
+    # NU (NU | SY | IS)* (CL | CP)? × (PO | PR)
+    if a == lb_po or a == lb_pr:
+        if number_run_ends_at(group, (isize)k - 1):
+            return true
+        if (b == lb_cl or b == lb_cp) and number_run_ends_at(group, (isize)k - 2):
+            return true
+    return false
+
+## Whether the groups ending at `index` are NU (NU | SY | IS)*.
+func number_run_ends_at(group: const LineGroup[], index: isize) -> bool:
+    var position = index
+    while position >= 0:
+        let class = group[(usize)position].class
+        if class == lb_nu:
+            return true
+        if class != lb_sy and class != lb_is:
+            return false
+        position -= 1
+    return false

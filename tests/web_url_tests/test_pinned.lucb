@@ -102,7 +102,6 @@ func expect_tokens(input: str, policy: web_url.TokenizerPolicy, expected: const 
         expect_string(web_url.token_to_string(ak.vector_at_const(&tokens, index)), expected[index])
 
 test "tokenizer":
-    if not web_unicode_is_ported: return
     expect_tokens("/foo/:bar(\\d+)?/*{baz}+", web_url.TokenizerPolicy.strict, [
         "Char, index: 0, value: '/'",
         "Char, index: 1, value: 'f'",
@@ -157,7 +156,6 @@ func expect_component_error(input: str, options: web_url.Options, message: str):
     trap("expected Component::compile to fail")
 
 test "component_compile":
-    if not web_unicode_is_ported: return
     let no_names: str[1] = [""]
     expect_component("/foo/:bar/*", web_url.options_pathname(), "/foo/:bar/*", ["bar", "0"], false)
     expect_component("/books/:id(\\d+)?", web_url.options_pathname(), "/books/:id(\\d+)?", ["id"], true)
@@ -183,7 +181,6 @@ func group_string(groups: const ak.OrderedHashMap[ak.String, ak.StringOrEmpty, a
         .empty: trap("expected a String, got Empty")
 
 test "pattern_create_and_match":
-    if not web_unicode_is_ported: return
     let pattern = must_create_pattern("https://*.example.com/:path*")
     expect_string(web_url.pattern_protocol_component(&pattern).pattern_string, "https")
     expect_string(web_url.pattern_hostname_component(&pattern).pattern_string, "*.example.com")
@@ -230,7 +227,6 @@ func expect_create_error(text: str, base_url: ak.String?, message: str):
     trap("expected Pattern::create to fail")
 
 test "pattern_errors":
-    if not web_unicode_is_ported: return
     expect_create_error("/:a/:a", web_url.string_lit("https://x"), "Duplicate name 'a' provided in URL pattern")
     expect_create_error("foo", none, "Relative URLPattern constructor must provide one of baseURL or protocol")
     expect_create_error("https://x/([", none, "Error processing a token")

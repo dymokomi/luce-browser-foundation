@@ -1,4 +1,5 @@
 # C++ name	package	module	Luce name	file:line	kind
+(integration: Concepts::HashCompatible<String, StringView>, a String table looked up by a StringView.)	luce-browser-foundation	ak	StringStringViewTraits	-	addition
 (integration: __format_value<Duration>, the formatter arg_custom takes.)	luce-browser-foundation	ak	format_value_duration	-	addition
 (integration: __format_value<UnixDateTime>, the formatter arg_custom takes.)	luce-browser-foundation	ak	format_value_unix_date_time	-	addition
 (integration: a StringView as text for a debug message; non-UTF-8 bytes print as a marker.)	luce-browser-foundation	ak	string_view_text	-	addition
@@ -1902,10 +1903,10 @@ AK::String::ends_with	luce-browser-foundation	ak	string_ends_with	AK/String.cpp:
 AK::String::ends_with_bytes	luce-browser-foundation	ak	string_ends_with_bytes	AK/String.cpp:389	ported
 AK::String::equals_ignoring_ascii_case	luce-browser-foundation	ak	string_equals_ignoring_ascii_case_string	AK/String.cpp:441	ported
 AK::String::equals_ignoring_ascii_case	luce-browser-foundation	ak	string_equals_ignoring_ascii_case_string_view	AK/String.cpp:446	ported
-AK::String::equals_ignoring_case	luce-browser-foundation	ak	string_equals_ignoring_case	Libraries/LibUnicode/String.cpp:126	stub
+AK::String::equals_ignoring_case	luce-browser-foundation	web_unicode	string_equals_ignoring_case	Libraries/LibUnicode/String.cpp:126	stub
 AK::String::find_byte_offset	luce-browser-foundation	ak	string_find_byte_offset_string_view	AK/String.cpp:239	ported
 AK::String::find_byte_offset	luce-browser-foundation	ak	string_find_byte_offset_u32	AK/String.cpp:225	ported
-AK::String::find_byte_offset_ignoring_case	luce-browser-foundation	ak	string_find_byte_offset_ignoring_case	Libraries/LibUnicode/String.cpp:139	stub
+AK::String::find_byte_offset_ignoring_case	luce-browser-foundation	web_unicode	string_find_byte_offset_ignoring_case	Libraries/LibUnicode/String.cpp:139	stub
 AK::String::from_ascii_short_string_without_validation	luce-browser-foundation	ak	string_from_ascii_short_string_without_validation	AK/String.h:60	ported
 AK::String::from_ascii_without_validation	luce-browser-foundation	ak	string_from_ascii_without_validation	AK/String.cpp:57	ported
 AK::String::from_byte_string	luce-browser-foundation	ak	string_from_byte_string	AK/String.cpp:404	ported
@@ -1949,9 +1950,9 @@ AK::String::substring_from_byte_offset_with_shared_superstring	luce-browser-foun
 AK::String::to_ascii_lowercase	luce-browser-foundation	ak	string_to_ascii_lowercase	AK/String.cpp:409	ported
 AK::String::to_ascii_uppercase	luce-browser-foundation	ak	string_to_ascii_uppercase	AK/String.cpp:425	ported
 AK::String::to_byte_string	luce-browser-foundation	ak	string_to_byte_string	AK/String.cpp:399	ported
-AK::String::to_casefold	luce-browser-foundation	ak	string_to_casefold	Libraries/LibUnicode/String.cpp:118	stub
-AK::String::to_fullwidth	luce-browser-foundation	ak	string_to_fullwidth	Libraries/LibUnicode/String.cpp:90	stub
-AK::String::to_lowercase	luce-browser-foundation	ak	string_to_lowercase	Libraries/LibUnicode/String.cpp:38	stub
+AK::String::to_casefold	luce-browser-foundation	web_unicode	string_to_casefold	Libraries/LibUnicode/String.cpp:118	stub
+AK::String::to_fullwidth	luce-browser-foundation	web_unicode	string_to_fullwidth	Libraries/LibUnicode/String.cpp:90	stub
+AK::String::to_lowercase	luce-browser-foundation	web_unicode	string_to_lowercase	Libraries/LibUnicode/String.cpp:38	stub
 AK::String::to_number	luce-browser-foundation	ak	string_to_number	AK/String.h:199	dropped
 AK::String::to_number<f32>	luce-browser-foundation	ak	string_to_number_f32	AK/String.h:199	ported
 AK::String::to_number<f64>	luce-browser-foundation	ak	string_to_number_f64	AK/String.h:199	ported
@@ -1963,12 +1964,12 @@ AK::String::to_number<u16>	luce-browser-foundation	ak	string_to_number_u16	AK/St
 AK::String::to_number<u32>	luce-browser-foundation	ak	string_to_number_u32	AK/String.h:199	ported
 AK::String::to_number<u64>	luce-browser-foundation	ak	string_to_number_u64	AK/String.h:199	ported
 AK::String::to_number<u8>	luce-browser-foundation	ak	string_to_number_u8	AK/String.h:199	ported
-AK::String::to_titlecase	luce-browser-foundation	ak	string_to_titlecase	Libraries/LibUnicode/String.cpp:70	stub
-AK::String::to_uppercase	luce-browser-foundation	ak	string_to_uppercase	Libraries/LibUnicode/String.cpp:54	stub
+AK::String::to_titlecase	luce-browser-foundation	web_unicode	string_to_titlecase	Libraries/LibUnicode/String.cpp:70	stub
+AK::String::to_uppercase	luce-browser-foundation	web_unicode	string_to_uppercase	Libraries/LibUnicode/String.cpp:54	stub
 AK::String::trim	luce-browser-foundation	ak	string_trim_string_view	AK/String.cpp:338	ported
 AK::String::trim	luce-browser-foundation	ak	string_trim_utf8_view	AK/String.cpp:332	ported
 AK::String::trim_ascii_whitespace	luce-browser-foundation	ak	string_trim_ascii_whitespace	AK/String.cpp:343	ported
-AK::String::trim_whitespace	luce-browser-foundation	ak	string_trim_whitespace	Libraries/LibUnicode/String.cpp:159	stub
+AK::String::trim_whitespace	luce-browser-foundation	web_unicode	string_trim_whitespace	Libraries/LibUnicode/String.cpp:159	stub
 AK::String::vformatted	luce-browser-foundation	ak	string_vformatted	AK/String.cpp:188	ported
 AK::StringBuilder	luce-browser-foundation	ak	StringBuilder	AK/StringBuilder.h:17	struct
 AK::StringBuilder [default member initializers]	luce-browser-foundation	ak	string_builder_init_fields	AK/StringBuilder.h:17	init fields
@@ -2334,11 +2335,11 @@ AK::Utf16String::replace	luce-browser-foundation	ak	utf16_string_replace_utf16_v
 AK::Utf16String::to_ascii_lowercase	luce-browser-foundation	ak	utf16_string_to_ascii_lowercase	AK/Utf16String.h:156	ported
 AK::Utf16String::to_ascii_titlecase	luce-browser-foundation	ak	utf16_string_to_ascii_titlecase	AK/Utf16String.h:186	ported
 AK::Utf16String::to_ascii_uppercase	luce-browser-foundation	ak	utf16_string_to_ascii_uppercase	AK/Utf16String.h:171	ported
-AK::Utf16String::to_casefold	luce-browser-foundation	ak	utf16_string_to_casefold	Libraries/LibUnicode/Utf16String.cpp:66	stub
-AK::Utf16String::to_fullwidth	luce-browser-foundation	ak	utf16_string_to_fullwidth	Libraries/LibUnicode/Utf16String.cpp:74	stub
-AK::Utf16String::to_lowercase	luce-browser-foundation	ak	utf16_string_to_lowercase	Libraries/LibUnicode/Utf16String.cpp:18	stub
-AK::Utf16String::to_titlecase	luce-browser-foundation	ak	utf16_string_to_titlecase	Libraries/LibUnicode/Utf16String.cpp:48	stub
-AK::Utf16String::to_uppercase	luce-browser-foundation	ak	utf16_string_to_uppercase	Libraries/LibUnicode/Utf16String.cpp:33	stub
+AK::Utf16String::to_casefold	luce-browser-foundation	web_unicode	utf16_string_to_casefold	Libraries/LibUnicode/Utf16String.cpp:66	stub
+AK::Utf16String::to_fullwidth	luce-browser-foundation	web_unicode	utf16_string_to_fullwidth	Libraries/LibUnicode/Utf16String.cpp:74	stub
+AK::Utf16String::to_lowercase	luce-browser-foundation	web_unicode	utf16_string_to_lowercase	Libraries/LibUnicode/Utf16String.cpp:18	stub
+AK::Utf16String::to_titlecase	luce-browser-foundation	web_unicode	utf16_string_to_titlecase	Libraries/LibUnicode/Utf16String.cpp:48	stub
+AK::Utf16String::to_uppercase	luce-browser-foundation	web_unicode	utf16_string_to_uppercase	Libraries/LibUnicode/Utf16String.cpp:33	stub
 AK::Utf16String::to_well_formed	luce-browser-foundation	ak	utf16_string_to_well_formed	AK/Utf16String.cpp:164	ported
 AK::Utf16String::to_well_formed_utf8	luce-browser-foundation	ak	utf16_string_to_well_formed_utf8	AK/Utf16String.cpp:171	ported
 AK::Utf16String::trim	luce-browser-foundation	ak	utf16_string_trim	AK/Utf16String.h:209	ported
@@ -4016,7 +4017,6 @@ Unicode::style_to_string	luce-browser-foundation	web_unicode	style_to_string	Lib
 VERIFY_UTF16_LENGTH: due to internal optimizations,	luce-browser-foundation	ak	verify_utf16_length	AK/Utf16StringData.cpp:15	ported
 Variant<BlobUrlEntryBlob, BlobUrlEntryMediaSource>	luce-browser-foundation	web_url	BlobUrlEntryObject	generated	variant
 Variant<ByteBuffer, CoreResource>	luce-browser-foundation	ak	ByteBufferOrCoreResource	generated	variant
-Variant<Empty, String, Icu78UnicodeString>	luce-browser-foundation	ak	EmptyOrStringOrIcu78UnicodeString	generated	variant
 Variant<Empty, bool, i64, u64, f64, String, JsonArray, JsonObject>	luce-browser-foundation	ak	JsonValueStorage	generated	variant
 Variant<Empty, u16, u32, bool, String>	luce-browser-foundation	ak	JsonBaseValue	generated	variant
 Variant<IPv4Address, IPv6Address, String>	luce-browser-foundation	ak	HostVariantType	generated	variant
@@ -4073,7 +4073,6 @@ has_property	luce-browser-foundation	web_unicode	has_property	Libraries/LibUnico
 icu_78::BreakIterator	luce-browser-foundation	web_unicode	Icu78BreakIterator	Build/vcpkg_installed/arm64-osx-dynamic/include/unicode/brkiter.h:0	opaque
 icu_78::Locale	luce-browser-foundation	web_unicode	Icu78Locale	Build/vcpkg_installed/arm64-osx-dynamic/include/unicode/locid.h:0	opaque
 icu_78::UnicodeSet	luce-browser-foundation	web_unicode	Icu78UnicodeSet	Build/vcpkg_installed/arm64-osx-dynamic/include/unicode/uniset.h:0	opaque
-icu_78::UnicodeString	luce-browser-foundation	ak	Icu78UnicodeString	Build/vcpkg_installed/arm64-osx-dynamic/include/unicode/unistr.h:0	opaque
 kcalloc	luce-browser-foundation	ak	kcalloc	AK/kmalloc.h:28	stub
 kfree	luce-browser-foundation	ak	kfree	AK/kmalloc.h:33	stub
 kmalloc	luce-browser-foundation	ak	kmalloc	AK/kmalloc.h:38	stub

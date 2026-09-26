@@ -1,0 +1,215 @@
+#==============================================================================================
+#
+#   tests_segmenter - Tests/LibUnicode/TestSegmenter.cpp
+#
+#   DESCRIPTION:
+#       Ladybird's segmenter tests: the String cases go through for_each_boundary(String), the
+#       Utf16String cases through Utf16Views.
+#
+#==============================================================================================
+
+func collect_boundary(context: void*?, boundary: u64) -> ak.IterationDecision:
+    let collected = (CodePointBuffer*)(context else trap("no capture"))
+    collected.append((u32)boundary)
+    return ak.IterationDecision.continue_
+
+func unreachable_boundary(context: void*?, boundary: u64) -> ak.IterationDecision:
+    trap("VERIFY_NOT_REACHED")
+
+## segmenter->for_each_boundary(MUST(String::from_utf8(string)), ...) over the String's bytes.
+func segment_utf8(granularity: SegmenterGranularity, text: str) -> CodePointBuffer:
+    let segmenter = segmenter_create_segmenter_granularity(granularity)
+    let string = ak.string_from_utf8(view_of(text)) else trap("MUST: String::from_utf8")
+    var boundaries = CodePointBuffer.create(8)
+    segmenter_for_each_boundary_string(segmenter, string, ak.Function1[u64, ak.IterationDecision](call = collect_boundary, context = &boundaries))
+    return boundaries
+
+func expect_boundaries(granularity: SegmenterGranularity, text: str, expected: const u32[]):
+    let actual = segment_utf8(granularity, text)
+    var same = actual.count == expected.length
+    if same:
+        for index in 0..<expected.length:
+            if actual.items[index] != expected[index]:
+                same = false
+    if not same:
+        print(f"segmentation of {text} differs")
+        trap("segmentation")
+
+## An empty text calls no callback (for_each_boundary(String {}, ...)).
+func expect_no_boundaries(granularity: SegmenterGranularity):
+    let segmenter = segmenter_create_segmenter_granularity(granularity)
+    segmenter_for_each_boundary_utf16_view(segmenter, utf16_view_of_ascii(b""), ak.Function1[u64, ak.IterationDecision](call = unreachable_boundary, context = none))
+
+# Ported from TestSegmenter.cpp TEST_CASE(grapheme_segmentation).
+test "grapheme_segmentation":
+    expect_no_boundaries(SegmenterGranularity.grapheme)
+
+    expect_boundaries(SegmenterGranularity.grapheme, "a", [0, 1])
+    expect_boundaries(SegmenterGranularity.grapheme, "ab", [0, 1, 2])
+    expect_boundaries(SegmenterGranularity.grapheme, "abc", [0, 1, 2, 3])
+    expect_boundaries(SegmenterGranularity.grapheme, "a\nb", [0, 1, 2, 3])
+    expect_boundaries(SegmenterGranularity.grapheme, "a\n\rb", [0, 1, 2, 3, 4])
+    expect_boundaries(SegmenterGranularity.grapheme, "a\r\nb", [0, 1, 3, 4])
+    expect_boundaries(SegmenterGranularity.grapheme, "aᄀb", [0, 1, 4, 5])
+    expect_boundaries(SegmenterGranularity.grapheme, "aᄀᄀb", [0, 1, 7, 8])
+    expect_boundaries(SegmenterGranularity.grapheme, "aᄀᆢb", [0, 1, 7, 8])
+    expect_boundaries(SegmenterGranularity.grapheme, "aᄀ가b", [0, 1, 7, 8])
+    expect_boundaries(SegmenterGranularity.grapheme, "aᄀ각b", [0, 1, 7, 8])
+    expect_boundaries(SegmenterGranularity.grapheme, "a😀b", [0, 1, 5, 6])
+    expect_boundaries(SegmenterGranularity.grapheme, "a👨‍👩‍👧‍👦b", [0, 1, 26, 27])
+    expect_boundaries(SegmenterGranularity.grapheme, "a👩🏼‍❤️‍👨🏻b", [0, 1, 29, 30])
+
+# Ported from TestSegmenter.cpp TEST_CASE(grapheme_segmentation_indic_conjunct_break).
+test "grapheme_segmentation_indic_conjunct_break":
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}", [0, 3])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}a", [0, 3, 4])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}\u{0916}", [0, 3, 6])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}\u{094D}\u{0916}", [0, 9])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}\u{09BC}\u{09CD}\u{094D}\u{0916}", [0, 15])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}\u{094D}\u{09BC}\u{09CD}\u{0916}", [0, 15])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}\u{09BC}\u{09CD}\u{094D}\u{09BC}\u{09CD}\u{0916}", [0, 21])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}\u{09BC}\u{09CD}\u{09BC}\u{09CD}\u{094D}\u{0916}", [0, 21])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}\u{094D}\u{09BC}\u{09CD}\u{09BC}\u{09CD}\u{0916}", [0, 21])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}\u{09BC}\u{09CD}\u{09BC}\u{09CD}\u{094D}\u{09BC}\u{09CD}\u{0916}", [0, 27])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}\u{09BC}\u{09CD}\u{094D}\u{09BC}\u{09CD}\u{09BC}\u{09CD}\u{0916}", [0, 27])
+    expect_boundaries(SegmenterGranularity.grapheme, "\u{0915}\u{09BC}\u{09CD}\u{09BC}\u{09CD}\u{094D}\u{09BC}\u{09CD}\u{09BC}\u{09CD}\u{0916}", [0, 33])
+
+# Ported from TestSegmenter.cpp TEST_CASE(word_segmentation).
+test "word_segmentation":
+    expect_no_boundaries(SegmenterGranularity.word)
+
+    expect_boundaries(SegmenterGranularity.word, "a", [0, 1])
+    expect_boundaries(SegmenterGranularity.word, "ab", [0, 2])
+    expect_boundaries(SegmenterGranularity.word, "abc", [0, 3])
+    expect_boundaries(SegmenterGranularity.word, "ab cd", [0, 2, 3, 5])
+    expect_boundaries(SegmenterGranularity.word, "ab  cd", [0, 2, 4, 6])
+    expect_boundaries(SegmenterGranularity.word, "ab\tcd", [0, 2, 3, 5])
+    expect_boundaries(SegmenterGranularity.word, "ab\ncd", [0, 2, 3, 5])
+    expect_boundaries(SegmenterGranularity.word, "ab\n\rcd", [0, 2, 3, 4, 6])
+    expect_boundaries(SegmenterGranularity.word, "ab\r\ncd", [0, 2, 4, 6])
+    expect_boundaries(SegmenterGranularity.word, "a😀b", [0, 1, 5, 6])
+    expect_boundaries(SegmenterGranularity.word, "a👨‍👩‍👧‍👦b", [0, 1, 26, 27])
+    expect_boundaries(SegmenterGranularity.word, "a👩🏼‍❤️‍👨🏻b", [0, 1, 29, 30])
+    expect_boundaries(SegmenterGranularity.word, "ab 12 cd", [0, 2, 3, 5, 6, 8])
+    expect_boundaries(SegmenterGranularity.word, "ab 1.2 cd", [0, 2, 3, 6, 7, 9])
+    expect_boundaries(SegmenterGranularity.word, "ab 12.34 cd", [0, 2, 3, 8, 9, 11])
+    expect_boundaries(SegmenterGranularity.word, "ab example.com cd", [0, 2, 3, 14, 15, 17])
+    expect_boundaries(SegmenterGranularity.word, "ab can't cd", [0, 2, 3, 8, 9, 11])
+    expect_boundaries(SegmenterGranularity.word, "ab \"can't\" cd", [0, 2, 3, 4, 9, 10, 11, 13])
+
+    expect_boundaries(SegmenterGranularity.word, "The quick (“brown”) fox can’t jump 32.3 feet, right?", [0, 3, 4, 9, 10, 11, 14, 19, 22, 23, 24, 27, 28, 35, 36, 40, 41, 45, 46, 50, 51, 52, 57, 58])
+
+# Ported from TestSegmenter.cpp TEST_CASE(line_segmentation).
+test "line_segmentation":
+    expect_no_boundaries(SegmenterGranularity.line)
+
+    # Single characters.
+    expect_boundaries(SegmenterGranularity.line, "a", [0, 1])
+    # No break opportunities within a single word.
+    expect_boundaries(SegmenterGranularity.line, "abc", [0, 3])
+    # Break opportunity after whitespace.
+    expect_boundaries(SegmenterGranularity.line, "ab cd", [0, 3, 5])
+    expect_boundaries(SegmenterGranularity.line, "ab  cd", [0, 4, 6])
+    expect_boundaries(SegmenterGranularity.line, "ab\tcd", [0, 3, 5])
+    # Hard line breaks.
+    expect_boundaries(SegmenterGranularity.line, "ab\ncd", [0, 3, 5])
+    expect_boundaries(SegmenterGranularity.line, "ab\r\ncd", [0, 4, 6])
+    # CJK ideographs allow break between each character.
+    expect_boundaries(SegmenterGranularity.line, "你好", [0, 3, 6])
+    expect_boundaries(SegmenterGranularity.line, "你好世界", [0, 3, 6, 9, 12])
+    # Mixed ASCII and CJK.
+    expect_boundaries(SegmenterGranularity.line, "ab你好cd", [0, 2, 5, 8, 10])
+
+# Ported from TestSegmenter.cpp TEST_CASE(out_of_bounds).
+test "out_of_bounds":
+    # The String "foo" (its bytes, see segment_utf8).
+    let text = "foo"
+    let segmenter = segmenter_create_segmenter_granularity(SegmenterGranularity.word)
+    let impl = as_segmenter_impl(segmenter)
+    impl.m_segmented_text = SegmentedText.utf8(string = none, bytes = text.bytes)
+    break_iterator_set_text_utf8(impl.m_segmenter, text.bytes)
+
+    assert(segmenter_previous_boundary(segmenter, text.length + 1, SegmenterInclusive.no) != none)
+    assert(segmenter_next_boundary(segmenter, text.length + 1, SegmenterInclusive.no) == none)
+    assert(segmenter_previous_boundary(segmenter, text.length, SegmenterInclusive.no) != none)
+    assert(segmenter_next_boundary(segmenter, text.length, SegmenterInclusive.no) == none)
+    assert(segmenter_next_boundary(segmenter, 0, SegmenterInclusive.no) != none)
+    assert(segmenter_previous_boundary(segmenter, 0, SegmenterInclusive.no) == none)
+
+    # u"foo"_utf16
+    let utf16_segmenter = segmenter_create_segmenter_granularity(SegmenterGranularity.word)
+    let units: u16[3] = [0x66, 0x6f, 0x6f]
+    segmenter_set_segmented_text_utf16_view(utf16_segmenter, utf16_view_of_units(units))
+
+    assert(segmenter_previous_boundary(utf16_segmenter, 4, SegmenterInclusive.no) != none)
+    assert(segmenter_next_boundary(utf16_segmenter, 4, SegmenterInclusive.no) == none)
+    assert(segmenter_previous_boundary(utf16_segmenter, 3, SegmenterInclusive.no) != none)
+    assert(segmenter_next_boundary(utf16_segmenter, 3, SegmenterInclusive.no) == none)
+    assert(segmenter_next_boundary(utf16_segmenter, 0, SegmenterInclusive.no) != none)
+    assert(segmenter_previous_boundary(utf16_segmenter, 0, SegmenterInclusive.no) == none)
+
+func collect_utf16(segmenter: Segmenter*, units: const u16[]) -> CodePointBuffer:
+    var boundaries = CodePointBuffer.create(8)
+    segmenter_for_each_boundary_utf16_view(segmenter, utf16_view_of_units(units), ak.Function1[u64, ak.IterationDecision](call = collect_boundary, context = &boundaries))
+    return boundaries
+
+# Not in Ladybird's tests: the Segmenter API over UTF-16, UTF-32 and ASCII text, with
+# boundaries pinned to ICU 78.2's.
+test "segmenter over UTF-16 and UTF-32":
+    # "a😀b" in UTF-16: the emoji is a surrogate pair.
+    let units: u16[4] = [0x61, 0xd83d, 0xde00, 0x62]
+    let grapheme = segmenter_create_segmenter_granularity(SegmenterGranularity.grapheme)
+    let boundaries = collect_utf16(grapheme, units)
+    assert(boundaries.count == 4 and boundaries.items[1] == 1 and boundaries.items[2] == 3 and boundaries.items[3] == 4)
+    # Offsets inside a surrogate pair are aligned to its start.
+    assert(segmenter_next_boundary(grapheme, 2, SegmenterInclusive.yes) == 1)
+    assert(segmenter_next_boundary(grapheme, 2, SegmenterInclusive.no) == 3)
+    assert(segmenter_previous_boundary(grapheme, 2, SegmenterInclusive.yes) == 1)
+    assert(segmenter_current_boundary(grapheme) == 1)
+
+    let code_points: u32[3] = [0x61, 0x1f600, 0x62]
+    var collected = CodePointBuffer.create(4)
+    segmenter_for_each_boundary_utf32_view(grapheme, ak.Utf32View(m_code_points = &code_points[0], m_length = 3), ak.Function1[u64, ak.IterationDecision](call = collect_boundary, context = &collected))
+    assert(collected.count == 4 and collected.items[1] == 1 and collected.items[2] == 2 and collected.items[3] == 3)
+
+    # Word rule statuses.
+    let word = segmenter_create_segmenter_granularity(SegmenterGranularity.word)
+    let hello: u16[7] = [0x68, 0x69, 0x20, 0x31, 0x32, 0x2e, 0x5f]
+    segmenter_set_segmented_text_utf16_view(word, utf16_view_of_units(hello))
+    assert(segmenter_next_boundary(word, 0, SegmenterInclusive.no) == 2)
+    assert(segmenter_is_current_boundary_word_like(word))
+    assert(segmenter_next_boundary(word, 2, SegmenterInclusive.no) == 3)
+    assert(not segmenter_is_current_boundary_word_like(word))
+    assert(segmenter_next_boundary(word, 3, SegmenterInclusive.no) == 5)
+    assert(segmenter_is_current_boundary_word_like(word))
+
+    let clone = segmenter_clone(word)
+    assert(segmenter_segmenter_granularity(clone) == SegmenterGranularity.word)
+    assert(segmenter_next_boundary(clone, 5, SegmenterInclusive.no) == 6)
+
+    # The line segmenter keeps "(1)" together and breaks after spaces.
+    let line = segmenter_create_segmenter_granularity(SegmenterGranularity.line)
+    let text: u16[6] = [0x61, 0x20, 0x28, 0x31, 0x29, 0x62]
+    let line_boundaries_ = collect_utf16(line, text)
+    assert(line_boundaries_.count == 3 and line_boundaries_.items[1] == 2 and line_boundaries_.items[2] == 6)
+
+test "AsciiGraphemeSegmenter":
+    let segmenter = segmenter_create_for_ascii_grapheme(3)
+    assert(is_ascii_grapheme_segmenter(segmenter))
+    assert(segmenter_next_boundary(segmenter, 0, SegmenterInclusive.no) == 1)
+    assert(segmenter_next_boundary(segmenter, 3, SegmenterInclusive.no) == none)
+    assert(segmenter_next_boundary(segmenter, 3, SegmenterInclusive.yes) == 3)
+    assert(segmenter_previous_boundary(segmenter, 0, SegmenterInclusive.no) == none)
+    assert(segmenter_previous_boundary(segmenter, 2, SegmenterInclusive.no) == 1)
+    assert(not segmenter_is_current_boundary_word_like(segmenter))
+    var boundaries = CodePointBuffer.create(4)
+    segmenter_for_each_boundary_utf16_view(segmenter, utf16_view_of_ascii("ab".bytes), ak.Function1[u64, ak.IterationDecision](call = collect_boundary, context = &boundaries))
+    assert(boundaries.count == 3 and boundaries.items[2] == 2)
+    let clone = segmenter_clone(segmenter)
+    assert(segmenter_next_boundary(clone, 1, SegmenterInclusive.no) == 2)
+
+test "should_continue_beyond_word and granularity names":
+    assert(segmenter_should_continue_beyond_word(utf16_view_of_ascii(", .".bytes)))
+    assert(not segmenter_should_continue_beyond_word(utf16_view_of_ascii("a.".bytes)))
+    assert(segmenter_granularity_from_string(view_of("sentence")) == SegmenterGranularity.sentence)
+    assert(view_equals(segmenter_granularity_to_string(SegmenterGranularity.line), "line"))

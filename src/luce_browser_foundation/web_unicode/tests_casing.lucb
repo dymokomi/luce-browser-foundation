@@ -1,0 +1,61 @@
+#==============================================================================================
+#
+#   tests_casing - case mapping, titlecasing and the Halfwidth-Fullwidth mapping
+#
+#   DESCRIPTION:
+#       Ladybird has no tests of its own for the case functions of LibUnicode/String.cpp and
+#       Utf16String.cpp; these pin the cores (casing.lucb) to ICU 78.2's answers for the same
+#       texts: u_strToLower/Upper/Title/FoldCase in the root, Turkish, Lithuanian and Dutch
+#       locales, and the Halfwidth-Fullwidth transliterator.
+#
+#==============================================================================================
+
+## The text of code points, as a UTF-8 str for comparison.
+func text_of(code_points: const CodePointBuffer*) -> str:
+    let bytes = encode_utf8_all(code_points.view())
+    return (str)bytes.view()
+
+func expect_cased(actual: CodePointBuffer, expected: str):
+    let text = text_of(&actual)
+    if text != expected:
+        print(f"expected {expected}, got {text}")
+        trap("case mapping")
+
+test "root locale":
+    let text = code_points_of("Straße ΣΑΣ")
+    expect_cased(lowercase_code_points(text.view(), CaseLocale.root), "straße σας")
+    expect_cased(uppercase_code_points(text.view(), CaseLocale.root), "STRASSE ΣΑΣ")
+    expect_cased(titlecase_code_points(text.view(), CaseLocale.root, false), "Straße Σας")
+    expect_cased(titlecase_code_points(text.view(), CaseLocale.root, true), "Straße ΣΑΣ")
+    expect_cased(case_fold_code_points(text.view(), false), "strasse σασ")
+    let words = code_points_of("hello wORLD o'neil")
+    expect_cased(titlecase_code_points(words.view(), CaseLocale.root, false), "Hello World O'neil")
+    expect_cased(titlecase_code_points(words.view(), CaseLocale.root, true), "Hello WORLD O'neil")
+    let ligatures = code_points_of("ﬀ ǅ")
+    expect_cased(uppercase_code_points(ligatures.view(), CaseLocale.root), "FF Ǆ")
+    expect_cased(titlecase_code_points(ligatures.view(), CaseLocale.root, false), "Ff ǅ")
+    expect_cased(lowercase_code_points(ligatures.view(), CaseLocale.root), "ﬀ ǆ")
+
+test "Turkish, Lithuanian and Dutch":
+    let turkish = code_points_of("İstanbul Iı")
+    expect_cased(lowercase_code_points(turkish.view(), CaseLocale.root), "i\u{307}stanbul iı")
+    expect_cased(lowercase_code_points(turkish.view(), CaseLocale.turkish), "istanbul ıı")
+    let neil = code_points_of("hello wORLD o'neil")
+    expect_cased(uppercase_code_points(neil.view(), CaseLocale.turkish), "HELLO WORLD O'NEİL")
+    let accents = code_points_of("I\u{300} J\u{301}\u{303}")
+    expect_cased(lowercase_code_points(accents.view(), CaseLocale.lithuanian), "i\u{307}\u{300} j\u{307}\u{301}\u{303}")
+    expect_cased(lowercase_code_points(accents.view(), CaseLocale.turkish), "ı\u{300} j\u{301}\u{303}")
+    let dutch = code_points_of("ijsland IJMUIDEN")
+    expect_cased(titlecase_code_points(dutch.view(), CaseLocale.dutch, false), "IJsland IJmuiden")
+    expect_cased(titlecase_code_points(dutch.view(), CaseLocale.root, false), "Ijsland Ijmuiden")
+    assert(case_locale_of("tr-TR".bytes) == CaseLocale.turkish and case_locale_of("AZE".bytes) == CaseLocale.turkish)
+    assert(case_locale_of("lt".bytes) == CaseLocale.lithuanian and case_locale_of("nl_NL".bytes) == CaseLocale.dutch)
+    assert(case_locale_of("en-US".bytes) == CaseLocale.root)
+
+test "Halfwidth-Fullwidth":
+    let text = code_points_of("ﾊﾟﾝ ABC")
+    expect_cased(fullwidth_code_points(text.view()), "パン\u{3000}ＡＢＣ")
+    let hangul = code_points_of("\u{FFA1}\u{FFC2}")
+    expect_cased(fullwidth_code_points(hangul.view()), "\u{1100}\u{1161}")
+    let parenthesis = code_points_of("\u{2985}")
+    expect_cased(fullwidth_code_points(parenthesis.view()), "\u{2985}")

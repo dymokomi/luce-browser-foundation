@@ -1,0 +1,173 @@
+#==============================================================================================
+#
+#   string - the AK::String methods that require UCD data
+#
+#   DESCRIPTION:
+#       Port of LibUnicode/String.cpp (lines 1-191): "definitions of AK::String methods which
+#       require UCD data". C++ declares them in AK and defines them in LibUnicode; ak cannot
+#       import web_unicode, so they are functions of web_unicode, named as the namemap names
+#       them (string_to_lowercase, ...). ICU's CaseMap and the Halfwidth-Fullwidth
+#       transliterator are casing.lucb.
+#
+#==============================================================================================
+
+## The code points of a String's UTF-8 bytes.
+func code_points_of_bytes(bytes: const u8[]) -> CodePointBuffer:
+    var code_points = CodePointBuffer.create(bytes.length + 1)
+    decode_utf8(bytes, &code_points, none)
+    return code_points
+
+## builder.to_string_without_validation() of code points.
+func string_from_code_points(code_points: const u32[]) -> ak.String:
+    let bytes = encode_utf8_all(code_points)
+    return ak.string_from_utf8_without_validation(bytes.view())
+
+## Ported from Libraries/LibUnicode/String.cpp:26 AK::resolve_locale.
+func resolve_locale(locale: ak.StringView?) -> ResolvedLocale:
+    let found = locale else return ResolvedLocale()
+
+    var resolved_locale = ResolvedLocale()
+    resolved_locale.buffer = view_bytes(found)
+    resolved_locale.locale = resolved_locale.buffer
+
+    return resolved_locale
+
+## The case locale of a ResolvedLocale (ICU's ucase_getCaseLocale of its C string).
+func case_locale_of_resolved(resolved_locale: const ResolvedLocale*) -> CaseLocale:
+    let locale = resolved_locale.locale else return CaseLocale.root
+    return case_locale_of(locale)
+
+## Ported from Libraries/LibUnicode/String.cpp:38 AK::String::to_lowercase.
+pub func string_to_lowercase(this: const ak.String*, locale: ak.StringView? = none) -> ak.String!:
+    let resolved_locale = resolve_locale(locale)
+
+    # icu::CaseMap::utf8ToLower(resolved_locale.locale, 0, ...)
+    let code_points = code_points_of_bytes(ak.string_base_bytes(&this.string_base))
+    let lowercased = lowercase_code_points(code_points.view(), case_locale_of_resolved(&resolved_locale))
+
+    return string_from_code_points(lowercased.view())
+
+## Ported from Libraries/LibUnicode/String.cpp:54 AK::String::to_uppercase.
+pub func string_to_uppercase(this: const ak.String*, locale: ak.StringView? = none) -> ak.String!:
+    let resolved_locale = resolve_locale(locale)
+
+    # icu::CaseMap::utf8ToUpper(resolved_locale.locale, 0, ...)
+    let code_points = code_points_of_bytes(ak.string_base_bytes(&this.string_base))
+    let uppercased = uppercase_code_points(code_points.view(), case_locale_of_resolved(&resolved_locale))
+
+    return string_from_code_points(uppercased.view())
+
+## Ported from Libraries/LibUnicode/String.cpp:70 AK::String::to_titlecase.
+pub func string_to_titlecase(this: const ak.String*, locale: ak.StringView? = none, trailing_code_point_transformation: ak.TrailingCodePointTransformation = ak.TrailingCodePointTransformation.lowercase) -> ak.String!:
+    let resolved_locale = resolve_locale(locale)
+
+    # options |= U_TITLECASE_NO_LOWERCASE for PreserveExisting
+    let no_lowercase = trailing_code_point_transformation == ak.TrailingCodePointTransformation.preserve_existing
+
+    # icu::CaseMap::utf8ToTitle(resolved_locale.locale, options, nullptr, ...)
+    let code_points = code_points_of_bytes(ak.string_base_bytes(&this.string_base))
+    let titlecased = titlecase_code_points(code_points.view(), case_locale_of_resolved(&resolved_locale), no_lowercase)
+
+    return string_from_code_points(titlecased.view())
+
+## Ported from Libraries/LibUnicode/String.cpp:90 AK::String::to_fullwidth.
+pub func string_to_fullwidth(this: const ak.String*) -> ak.String!:
+    # icu::Transliterator::createInstance("Halfwidth-Fullwidth", UTRANS_FORWARD)
+    let code_points = code_points_of_bytes(ak.string_base_bytes(&this.string_base))
+    let fullwidth = fullwidth_code_points(code_points.view())
+
+    return string_from_code_points(fullwidth.view())
+
+## Ported from Libraries/LibUnicode/String.cpp:105 AK::build_casefold_string.
+func build_casefold_string(string: ak.StringView, builder: ByteBuffer*) -> !:
+    # icu::CaseMap::utf8Fold(0, ...)
+    let code_points = code_points_of_bytes(view_bytes(string))
+    let folded = case_fold_code_points(code_points.view(), false)
+    for code_point in folded.view():
+        encode_utf8(code_point, builder)
+
+## Ported from Libraries/LibUnicode/String.cpp:118 AK::String::to_casefold.
+pub func string_to_casefold(this: const ak.String*) -> ak.String!:
+    let bytes = ak.string_base_bytes(&this.string_base)
+    var builder = ByteBuffer.create(bytes.length + 1)
+    try build_casefold_string(view_of_bytes(bytes), &builder)
+
+    return ak.string_from_utf8_without_validation(builder.view())
+
+## Ported from Libraries/LibUnicode/String.cpp:126 AK::String::equals_ignoring_case.
+pub func string_equals_ignoring_case(this: const ak.String*, other: ak.String) -> bool:
+    let lhs = ak.string_base_bytes(&this.string_base)
+    var lhs_builder = ByteBuffer.create(lhs.length + 1)
+    build_casefold_string(view_of_bytes(lhs), &lhs_builder) else return false
+
+    let rhs = ak.string_base_bytes(&other.string_base)
+    var rhs_builder = ByteBuffer.create(rhs.length + 1)
+    build_casefold_string(view_of_bytes(rhs), &rhs_builder) else return false
+
+    return bytes_equal(lhs_builder.view(), rhs_builder.view())
+
+func bytes_equal(a: const u8[], b: const u8[]) -> bool:
+    if a.length != b.length:
+        return false
+    for index in 0..<a.length:
+        if a[index] != b[index]:
+            return false
+    return true
+
+## StringView::find: the first offset of `needle` in `haystack`.
+func find_bytes(haystack: const u8[], needle: const u8[]) -> usize?:
+    if needle.length > haystack.length:
+        return none
+    for start in 0..=(haystack.length - needle.length):
+        if bytes_equal(haystack[start..<start + needle.length], needle):
+            return start
+    return none
+
+## Ported from Libraries/LibUnicode/String.cpp:139 AK::String::find_byte_offset_ignoring_case.
+pub func string_find_byte_offset_ignoring_case(this: const ak.String*, needle: ak.StringView, from_byte_offset: usize = 0) -> u64?:
+    let haystack = ak.string_base_bytes(&this.string_base)[from_byte_offset..]
+    if haystack.length == 0:
+        return none
+
+    var lhs_builder = ByteBuffer.create(haystack.length + 1)
+    build_casefold_string(view_of_bytes(haystack), &lhs_builder) else return none
+
+    let needle_bytes = view_bytes(needle)
+    var rhs_builder = ByteBuffer.create(needle_bytes.length + 1)
+    # C++ returns `false` here, which converts to an Optional<size_t> holding 0.
+    build_casefold_string(needle, &rhs_builder) else return 0
+
+    if let index = find_bytes(lhs_builder.view(), rhs_builder.view()):
+        return (u64)(index + from_byte_offset)
+
+    return none
+
+## Ported from Libraries/LibUnicode/String.cpp:159 AK::String::trim_whitespace.
+pub func string_trim_whitespace(this: const ak.String*, mode: ak.TrimMode = ak.TrimMode.both) -> ak.String!:
+    let bytes = ak.string_base_bytes(&this.string_base)
+
+    var start: usize? = none
+    var length: usize = 0
+
+    var offset: usize = 0
+    while offset < bytes.length:
+        let (code_point, width) = decode_utf8_at(bytes, offset)
+        if not code_point_has_white_space_property(code_point):
+            if start == none:
+                start = offset
+
+            length = offset + width
+        offset += width
+
+    if mode == ak.TrimMode.right:
+        start = 0
+    if mode == ak.TrimMode.left:
+        length = bytes.length
+
+    let found = start else return ak.string_from_utf8_without_validation(b"")
+    if found == length:
+        return ak.string_from_utf8_without_validation(b"")
+    if found == 0 and length == bytes.length:
+        return *this
+
+    return try ak.string_substring_from_byte_offset_with_shared_superstring_usize(this, found, length - found)

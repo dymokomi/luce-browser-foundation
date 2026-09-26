@@ -1,0 +1,187 @@
+#==============================================================================================
+#
+#   derive - the binary properties ICU computes instead of reading them from ppucd.txt
+#
+#   DESCRIPTION:
+#       u_hasBinaryProperty answers some properties from other data: the POSIX-compatible
+#       classes (uchar.cpp), Case_Sensitive (ucase.cpp), the normalization inertness and
+#       Segment_Starter (normalizer2impl.cpp). They are computed here once, so that the
+#       run-time lookup of every binary property is one bit.
+#
+#==============================================================================================
+
+# UCharCategory numbers used below.
+let gc_unassigned: u8 = 0
+let gc_decimal_number: u8 = 9
+let gc_space_separator: u8 = 12
+let gc_line_separator: u8 = 13
+let gc_paragraph_separator: u8 = 14
+let gc_control: u8 = 15
+let gc_surrogate: u8 = 18
+
+# UNormalizationCheckResult's UNORM_YES.
+let quick_check_yes: u8 = 1
+let quick_check_maybe: u8 = 2
+
+func derive_binary_properties(database: Database*):
+    for code_point: u32 in 0..<(u32)code_point_count:
+        let gc = database.gc[(usize)code_point]
+        # uchar.cpp u_isalnumPOSIX: u_isUAlphabetic(c) || u_isdigit(c).
+        let alnum = database.has_bit(code_point, property_alphabetic) or gc == gc_decimal_number
+        database.set_bit(code_point, property_posix_alnum, alnum)
+        # u_isblank: TAB and SPACE in the C0/C1 range, else Zs.
+        let blank = (code_point == 9 or code_point == 0x20) if code_point <= 0x9f else gc == gc_space_separator
+        database.set_bit(code_point, property_posix_blank, blank)
+        # u_isgraphPOSIX: not Cc, Cs, Cn or Z*.
+        let graph = not (gc == gc_control or gc == gc_surrogate or gc == gc_unassigned or gc == gc_space_separator or gc == gc_line_separator or gc == gc_paragraph_separator)
+        database.set_bit(code_point, property_posix_graph, graph)
+        # u_isprintPOSIX: Zs or graph.
+        database.set_bit(code_point, property_posix_print, gc == gc_space_separator or graph)
+        # u_isxdigit: ASCII and fullwidth A-F/a-f, or Nd.
+        var xdigit = gc == gc_decimal_number
+        if code_point >= 0x41 and code_point <= 0x66 and (code_point <= 0x46 or code_point >= 0x61):
+            xdigit = true
+        if code_point >= 0xff21 and code_point <= 0xff46 and (code_point <= 0xff26 or code_point >= 0xff41):
+            xdigit = true
+        database.set_bit(code_point, property_posix_xdigit, xdigit)
+        # Normalizer2::isInert for the decomposing forms: NF*D_QC=Yes with ccc=0.
+        let ccc = database.ccc[(usize)code_point]
+        database.set_bit(code_point, property_nfd_inert, database.nfd_qc[(usize)code_point] == quick_check_yes and ccc == 0)
+        database.set_bit(code_point, property_nfkd_inert, database.nfkd_qc[(usize)code_point] == quick_check_yes and ccc == 0)
+    derive_composition_inertness(database)
+    derive_case_sensitive(database)
+
+## NFC_Inert, NFKC_Inert and Segment_Starter. A character is inert under composition when it
+## is NF*C_QC=Yes with ccc=0, does not combine with a following character, and its (full)
+## decomposition ends in a character that does not combine either. A segment starter has
+## ccc=0 and occurs in no non-initial position of a canonical decomposition (uchar.h).
+func derive_composition_inertness(database: Database*):
+    var combines_forward = new bool[code_point_count] else trap("out of memory")
+    defer free(combines_forward)
+    var non_initial = new bool[code_point_count] else trap("out of memory")
+    defer free(non_initial)
+    # The primary compositions, threaded per first code point from `first_pair`.
+    var first_pair = new u32[code_point_count] else trap("out of memory")
+    defer free(first_pair)
+    for code_point in 0..<code_point_count:
+        first_pair[code_point] = 0xffffffff
+    var pairs = try_u32_list()
+    # The first code point of a primary composite's canonical decomposition combines with
+    # what follows it; Hangul L jamos and LV syllables combine with V and T jamos.
+    for code_point: u32 in 0..<(u32)code_point_count:
+        if code_point >= 0x1100 and code_point <= 0x1112:
+            combines_forward[(usize)code_point] = true
+        if code_point >= 0xac00 and code_point <= 0xd7a3 and (code_point - 0xac00) % 28 == 0:
+            combines_forward[(usize)code_point] = true
+        if code_point >= 0x1161 and code_point <= 0x1175:
+            non_initial[(usize)code_point] = true
+        if code_point >= 0x11a8 and code_point <= 0x11c2:
+            non_initial[(usize)code_point] = true
+        if database.dt[(usize)code_point] != 1:
+            continue
+        let mapping = database.mapping(code_point, mapping_dm) else continue
+        if mapping.length == 2 and not database.has_bit(code_point, 9):
+            combines_forward[(usize)mapping[0]] = true
+            # pairs: second, composite, next pair of the same first
+            append_or_trap(&pairs, mapping[1])
+            append_or_trap(&pairs, code_point)
+            append_or_trap(&pairs, first_pair[(usize)mapping[0]])
+            first_pair[(usize)mapping[0]] = (u32)pairs.count - 3
+        mark_non_initial(database, mapping, non_initial)
+    for code_point: u32 in 0..<(u32)code_point_count:
+        let ccc = database.ccc[(usize)code_point]
+        let starts_inert = ccc == 0 and not combines_forward[(usize)code_point]
+        let last = last_of_decomposition(database, code_point, false)
+        let last_compatibility = last_of_decomposition(database, code_point, true)
+        let nfc = starts_inert and database.nfc_qc[(usize)code_point] == quick_check_yes and not (combines_forward[(usize)last] and database.nfc_qc[(usize)last] != quick_check_maybe) and not may_compose_after(database, code_point, false, first_pair, pairs.view())
+        let nfkc = starts_inert and database.nfkc_qc[(usize)code_point] == quick_check_yes and not (combines_forward[(usize)last_compatibility] and database.nfkc_qc[(usize)last_compatibility] != quick_check_maybe) and not may_compose_after(database, code_point, true, first_pair, pairs.view())
+        database.set_bit(code_point, property_nfc_inert, nfc)
+        database.set_bit(code_point, property_nfkc_inert, nfkc)
+        database.set_bit(code_point, property_segment_starter, ccc == 0 and not non_initial[(usize)code_point])
+
+func try_u32_list() -> U32List:
+    return U32List.create() else trap("out of memory")
+
+func append_or_trap(list: U32List*, value: u32):
+    list.append(value) else trap("out of memory")
+
+## Append the full decomposition of `code_point`.
+func append_decomposition(database: const Database*, code_point: u32, compatibility: bool, out: U32List*):
+    let dt = database.dt[(usize)code_point]
+    if dt != 0 and (dt == 1 or compatibility):
+        if let mapping = database.mapping(code_point, mapping_dm):
+            for part in mapping:
+                append_decomposition(database, part, compatibility, out)
+            return
+    append_or_trap(out, code_point)
+
+## Whether a mark following `code_point` can be reordered into its decomposition and compose
+## with the starter composed so far (Normalizer2's "comp boundary after" is then false).
+func may_compose_after(database: const Database*, code_point: u32, compatibility: bool, first_pair: const u32[], pairs: const u32[]) -> bool:
+    var decomposition = try_u32_list()
+    append_decomposition(database, code_point, compatibility, &decomposition)
+    let parts = decomposition.view()
+    if parts.length < 2 or database.ccc[(usize)parts[0]] != 0:
+        return false
+    var composed = parts[0]
+    var low: u32 = 0
+    for index in 1..<parts.length:
+        let high = (u32)database.ccc[(usize)parts[index]]
+        # A mark m with low < ccc(m) < high lands before parts[index] and meets `composed`.
+        var pair = first_pair[(usize)composed]
+        var next_composed: u32? = none
+        while pair != 0xffffffff:
+            let second = pairs[(usize)pair]
+            let mark_class = (u32)database.ccc[(usize)second]
+            if mark_class > low and mark_class < high:
+                return true
+            if second == parts[index]:
+                next_composed = pairs[(usize)pair + 1]
+            pair = pairs[(usize)pair + 2]
+        if let found = next_composed:
+            composed = found
+        else:
+            low = high
+    return false
+
+## Mark every code point after the first of the full canonical decomposition `mapping`.
+func mark_non_initial(database: const Database*, mapping: const u32[], non_initial: bool[]):
+    for index in 0..<mapping.length:
+        let part = mapping[index]
+        if index > 0:
+            non_initial[(usize)part] = true
+        if database.dt[(usize)part] == 1:
+            if let inner = database.mapping(part, mapping_dm):
+                # The inner decomposition's first code point keeps the outer position.
+                for inner_index in 0..<inner.length:
+                    if index > 0 or inner_index > 0:
+                        non_initial[(usize)inner[inner_index]] = true
+
+## The last code point of the full canonical (or compatibility) decomposition.
+func last_of_decomposition(database: const Database*, code_point: u32, compatibility: bool) -> u32:
+    var current = code_point
+    while true:
+        let dt = database.dt[(usize)current]
+        if dt == 0 or (dt != 1 and not compatibility):
+            return current
+        let mapping = database.mapping(current, mapping_dm) else return current
+        if mapping.length == 0:
+            return current
+        current = mapping[mapping.length - 1]
+
+## ucase.cpp's UCASE_SENSITIVE: the source or a code point of the result of any case mapping.
+func derive_case_sensitive(database: Database*):
+    var buffer: u32[1]
+    for code_point: u32 in 0..<(u32)code_point_count:
+        var changes = false
+        for kind in [mapping_slc, mapping_suc, mapping_stc, mapping_scf, mapping_lc, mapping_uc, mapping_tc, mapping_cf]:
+            if let mapped = database.mapping(code_point, kind):
+                if mapped.length != 1 or mapped[0] != code_point:
+                    changes = true
+        if not changes:
+            continue
+        database.set_bit(code_point, property_case_sensitive, true)
+        for kind in [mapping_slc, mapping_suc, mapping_stc, mapping_scf, mapping_lc, mapping_uc, mapping_tc, mapping_cf]:
+            let mapped = database.full_mapping(code_point, kind, kind, buffer)
+            for target in mapped:
+                database.set_bit(target, property_case_sensitive, true)

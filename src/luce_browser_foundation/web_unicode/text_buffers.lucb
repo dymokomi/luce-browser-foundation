@@ -1,0 +1,272 @@
+#==============================================================================================
+#
+#   text_buffers - code point buffers, UTF-8/UTF-16 coding and AK view access
+#
+#   DESCRIPTION:
+#       Not a port: the plumbing the ICU replacement needs where ICU works on its own
+#       UnicodeString and UText. Text is decoded into code points, processed, and encoded
+#       back. Buffers are allocated with the current allocator (the managed heap in the
+#       engine, DESIGN.md §3.3).
+#
+#       The AK views (StringView, Utf16View, Utf32View) are read through their fields, the
+#       representation AK/Utf16View.h documents (the UTF-16 flag in the top bit of the length).
+#
+#==============================================================================================
+
+# mark: Code point buffers ======================================================================
+
+## A growable array of code points (or of any u32 values).
+struct CodePointBuffer:
+    var items: u32[]
+    var count: usize
+
+    static func create(capacity: usize = 16) -> CodePointBuffer:
+        let items = new u32[capacity if capacity > 0 else 1] else trap("out of memory")
+        return CodePointBuffer(items = items, count = 0)
+
+    mutating func append(value: u32):
+        if self.count == self.items.length:
+            let grown = new u32[self.items.length * 2] else trap("out of memory")
+            for index in 0..<self.count:
+                grown[index] = self.items[index]
+            self.items = grown
+        self.items[self.count] = value
+        self.count += 1
+
+    mutating func append_all(values: const u32[]):
+        for value in values:
+            self.append(value)
+
+    func view() -> const u32[]:
+        return self.items[..<self.count]
+
+# mark: UTF-8 ===================================================================================
+
+## The code points of UTF-8 `bytes`, and the byte offset each starts at (the offsets have
+## one more entry: the length). Invalid sequences decode as U+FFFD, one byte at a time.
+func decode_utf8(bytes: const u8[], code_points: CodePointBuffer*, offsets: CodePointBuffer*?):
+    var offset: usize = 0
+    while offset < bytes.length:
+        let (code_point, width) = decode_utf8_at(bytes, offset)
+        code_points.append(code_point)
+        if let starts = offsets:
+            starts.append((u32)offset)
+        offset += width
+    if let starts = offsets:
+        starts.append((u32)bytes.length)
+
+## The code point at `offset` of UTF-8 `bytes` and its length in bytes.
+func decode_utf8_at(bytes: const u8[], offset: usize) -> (u32, usize):
+    let lead = bytes[offset]
+    if lead < 0x80:
+        return ((u32)lead, 1)
+    var width: usize = 0
+    var code_point: u32 = 0
+    if lead >= 0xc2 and lead <= 0xdf:
+        width = 2
+        code_point = (u32)(lead & 0x1f)
+    elif lead >= 0xe0 and lead <= 0xef:
+        width = 3
+        code_point = (u32)(lead & 0x0f)
+    elif lead >= 0xf0 and lead <= 0xf4:
+        width = 4
+        code_point = (u32)(lead & 0x07)
+    else:
+        return (0xfffd, 1)
+    if width > bytes.length - offset:
+        return (0xfffd, 1)
+    for index in 1..<width:
+        let byte = bytes[offset + index]
+        if (byte & 0xc0) != 0x80:
+            return (0xfffd, 1)
+        code_point = (code_point << 6) | (u32)(byte & 0x3f)
+    let minimum: u32 = 0x80 if width == 2 else (0x800 if width == 3 else 0x10000)
+    if code_point < minimum or code_point > 0x10ffff or (code_point >= 0xd800 and code_point <= 0xdfff):
+        return (0xfffd, 1)
+    return (code_point, width)
+
+## Append the UTF-8 encoding of `code_point` to `bytes` (a byte buffer kept as u32s).
+func encode_utf8(code_point: u32, bytes: ByteBuffer*):
+    let value = 0xfffd if (code_point >= 0xd800 and code_point <= 0xdfff) or code_point > 0x10ffff else code_point
+    if value < 0x80:
+        bytes.append((u8)value)
+    elif value < 0x800:
+        bytes.append(0xc0 | (u8)(value >> 6))
+        bytes.append(0x80 | (u8)(value & 0x3f))
+    elif value < 0x10000:
+        bytes.append(0xe0 | (u8)(value >> 12))
+        bytes.append(0x80 | (u8)((value >> 6) & 0x3f))
+        bytes.append(0x80 | (u8)(value & 0x3f))
+    else:
+        bytes.append(0xf0 | (u8)(value >> 18))
+        bytes.append(0x80 | (u8)((value >> 12) & 0x3f))
+        bytes.append(0x80 | (u8)((value >> 6) & 0x3f))
+        bytes.append(0x80 | (u8)(value & 0x3f))
+
+## A growable byte array.
+struct ByteBuffer:
+    var items: u8[]
+    var count: usize
+
+    static func create(capacity: usize = 16) -> ByteBuffer:
+        let items = new u8[capacity if capacity > 0 else 1] else trap("out of memory")
+        return ByteBuffer(items = items, count = 0)
+
+    mutating func append(value: u8):
+        if self.count == self.items.length:
+            let grown = new u8[self.items.length * 2] else trap("out of memory")
+            for index in 0..<self.count:
+                grown[index] = self.items[index]
+            self.items = grown
+        self.items[self.count] = value
+        self.count += 1
+
+    func view() -> const u8[]:
+        return self.items[..<self.count]
+
+## The UTF-8 encoding of `code_points`.
+func encode_utf8_all(code_points: const u32[]) -> ByteBuffer:
+    var bytes = ByteBuffer.create(code_points.length + 1)
+    for code_point in code_points:
+        encode_utf8(code_point, &bytes)
+    return bytes
+
+# mark: UTF-16 ==================================================================================
+
+## The code points of UTF-16 `units`, and the unit offset each starts at (plus the length).
+## A lone surrogate is a code point of its own, as ICU's UnicodeString iterates it.
+func decode_utf16(units: const u16[], code_points: CodePointBuffer*, offsets: CodePointBuffer*?):
+    var offset: usize = 0
+    while offset < units.length:
+        let (code_point, width) = decode_utf16_at(units, offset)
+        code_points.append(code_point)
+        if let starts = offsets:
+            starts.append((u32)offset)
+        offset += width
+    if let starts = offsets:
+        starts.append((u32)units.length)
+
+## The code point at `offset` of `units` and its length in code units.
+func decode_utf16_at(units: const u16[], offset: usize) -> (u32, usize):
+    let lead = (u32)units[offset]
+    if lead >= 0xd800 and lead <= 0xdbff and offset + 1 < units.length:
+        let trail = (u32)units[offset + 1]
+        if trail >= 0xdc00 and trail <= 0xdfff:
+            return (0x10000 + ((lead - 0xd800) << 10) + (trail - 0xdc00), 2)
+    return (lead, 1)
+
+## A growable array of UTF-16 code units.
+struct UnitBuffer:
+    var items: u16[]
+    var count: usize
+
+    static func create(capacity: usize = 16) -> UnitBuffer:
+        let items = new u16[capacity if capacity > 0 else 1] else trap("out of memory")
+        return UnitBuffer(items = items, count = 0)
+
+    mutating func append(value: u16):
+        if self.count == self.items.length:
+            let grown = new u16[self.items.length * 2] else trap("out of memory")
+            for index in 0..<self.count:
+                grown[index] = self.items[index]
+            self.items = grown
+        self.items[self.count] = value
+        self.count += 1
+
+    func view() -> const u16[]:
+        return self.items[..<self.count]
+
+## Append the UTF-16 encoding of `code_point`; a lone surrogate stays one unit.
+func encode_utf16(code_point: u32, units: UnitBuffer*):
+    if code_point >= 0x10000 and code_point <= 0x10ffff:
+        let value = code_point - 0x10000
+        units.append((u16)(0xd800 + (value >> 10)))
+        units.append((u16)(0xdc00 + (value & 0x3ff)))
+    else:
+        units.append((u16)code_point)
+
+## The UTF-16 encoding of `code_points`.
+func encode_utf16_all(code_points: const u32[]) -> UnitBuffer:
+    var units = UnitBuffer.create(code_points.length + 1)
+    for code_point in code_points:
+        encode_utf16(code_point, &units)
+    return units
+
+# mark: AK views ================================================================================
+
+## The bytes of an AK::StringView.
+func view_bytes(view: ak.StringView) -> const u8[]:
+    let characters = view.m_characters else return b""
+    return u8[]((u8*)characters, view.m_length)
+
+## An AK::StringView of `text` ("..."sv).
+func view_of(text: str) -> ak.StringView:
+    return ak.StringView(m_characters = text.bytes.data, m_length = text.length)
+
+## StringView == "..."sv.
+func view_equals(view: ak.StringView, text: str) -> bool:
+    let bytes = view_bytes(view)
+    if bytes.length != text.length:
+        return false
+    for index in 0..<bytes.length:
+        if bytes[index] != text.bytes[index]:
+            return false
+    return true
+
+# AK::Detail::UTF16_FLAG: the top bit of Utf16View::m_length_in_code_units marks UTF-16 storage.
+let utf16_storage_flag: usize = (usize)1 << 63
+
+## Utf16View::has_ascii_storage.
+func utf16_view_is_ascii(view: const ak.Utf16View*) -> bool:
+    return (view.m_length_in_code_units & utf16_storage_flag) == 0
+
+## Utf16View::length_in_code_units.
+func utf16_view_length(view: const ak.Utf16View*) -> usize:
+    return view.m_length_in_code_units & ~utf16_storage_flag
+
+## Utf16View::ascii_span (for ASCII storage).
+func utf16_view_ascii(view: const ak.Utf16View*) -> const u8[]:
+    let length = utf16_view_length(view)
+    if length == 0:
+        return b""
+    let characters = view.m_string.ascii else return b""
+    return u8[]((u8*)characters, length)
+
+## Utf16View::utf16_span (for UTF-16 storage).
+func utf16_view_units(view: const ak.Utf16View*) -> const u16[]:
+    let length = utf16_view_length(view)
+    var empty: const u16[]
+    if length == 0:
+        return empty
+    let units = view.m_string.utf16 else return empty
+    return u16[]((u16*)units, length)
+
+## An ASCII-storage Utf16View of `bytes`.
+func utf16_view_of_ascii(bytes: const u8[]) -> ak.Utf16View:
+    var storage: ak.Utf16ViewUnion
+    storage.ascii = bytes.data
+    return ak.Utf16View(m_string = storage, m_length_in_code_units = bytes.length, m_length_in_code_points = bytes.length)
+
+## A UTF-16-storage Utf16View of `units`.
+func utf16_view_of_units(units: const u16[]) -> ak.Utf16View:
+    var storage: ak.Utf16ViewUnion
+    storage.utf16 = units.data
+    return ak.Utf16View(m_string = storage, m_length_in_code_units = units.length | utf16_storage_flag, m_length_in_code_points = ~(usize)0)
+
+## The code points of a Utf32View.
+func utf32_view_code_points(view: const ak.Utf32View*) -> const u32[]:
+    var empty: const u32[]
+    if view.m_length == 0:
+        return empty
+    let code_points = view.m_code_points else return empty
+    return u32[]((u32*)code_points, view.m_length)
+
+## Call an AK::Function<IterationDecision(size_t)>.
+func call_boundary_callback(callback: ak.Function1[u64, ak.IterationDecision]*, index: usize) -> ak.IterationDecision:
+    let call = callback.call else trap("an empty AK::Function was called")
+    return call(callback.context, (u64)index)
+
+## Call an AK::Function<IterationDecision(u32)>.
+func call_code_point_callback(callback: ak.Function1[u32, ak.IterationDecision]*, code_point: u32) -> ak.IterationDecision:
+    let call = callback.call else trap("an empty AK::Function was called")
+    return call(callback.context, code_point)

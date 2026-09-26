@@ -30,7 +30,6 @@ types_fly_string.lucb
 types_format.lucb
 types_forward.lucb
 types_function.lucb
-types_generated_unistr.lucb
 types_generic_lexer.lucb
 types_hash_map.lucb
 types_hash_table.lucb
@@ -239,7 +238,6 @@ json_parser.lucb
 json_value.lucb
 number_format.lucb
 time_format.lucb
-stub_r07_web_unicode.lucb
 tests_integer_math.lucb
 tests_checked.lucb
 tests_vector.lucb

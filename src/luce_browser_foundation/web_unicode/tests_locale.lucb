@@ -1,0 +1,100 @@
+#==============================================================================================
+#
+#   tests_locale - Tests/LibUnicode/TestLocale.cpp
+#
+#   DESCRIPTION:
+#       The subtag and type identifier cases of Ladybird's locale tests; tests_locale_2 has
+#       the parsing and canonicalization cases.
+#
+#==============================================================================================
+
+# Ported from TestLocale.cpp TEST_CASE(is_unicode_language_subtag).
+test "is_unicode_language_subtag":
+    assert(is_unicode_language_subtag(view_of("aa")))
+    assert(is_unicode_language_subtag(view_of("aaa")))
+    assert(is_unicode_language_subtag(view_of("aaaaa")))
+    assert(is_unicode_language_subtag(view_of("aaaaaa")))
+    assert(is_unicode_language_subtag(view_of("aaaaaaa")))
+    assert(is_unicode_language_subtag(view_of("aaaaaaaa")))
+
+    assert(not is_unicode_language_subtag(view_of("")))
+    assert(not is_unicode_language_subtag(view_of("a")))
+    assert(not is_unicode_language_subtag(view_of("aaaa")))
+    assert(not is_unicode_language_subtag(view_of("aaaaaaaaa")))
+    assert(not is_unicode_language_subtag(view_of("123")))
+
+# Ported from TestLocale.cpp TEST_CASE(is_unicode_script_subtag).
+test "is_unicode_script_subtag":
+    assert(is_unicode_script_subtag(view_of("aaaa")))
+
+    assert(not is_unicode_script_subtag(view_of("")))
+    assert(not is_unicode_script_subtag(view_of("a")))
+    assert(not is_unicode_script_subtag(view_of("aa")))
+    assert(not is_unicode_script_subtag(view_of("aaa")))
+    assert(not is_unicode_script_subtag(view_of("aaaaa")))
+    assert(not is_unicode_script_subtag(view_of("1234")))
+
+# Ported from TestLocale.cpp TEST_CASE(is_unicode_region_subtag).
+test "is_unicode_region_subtag":
+    assert(is_unicode_region_subtag(view_of("aa")))
+    assert(is_unicode_region_subtag(view_of("123")))
+
+    assert(not is_unicode_region_subtag(view_of("")))
+    assert(not is_unicode_region_subtag(view_of("a")))
+    assert(not is_unicode_region_subtag(view_of("aaa")))
+    assert(not is_unicode_region_subtag(view_of("12")))
+    assert(not is_unicode_region_subtag(view_of("12a")))
+
+# Ported from TestLocale.cpp TEST_CASE(is_unicode_variant_subtag).
+test "is_unicode_variant_subtag":
+    assert(is_unicode_variant_subtag(view_of("aaaaa")))
+    assert(is_unicode_variant_subtag(view_of("aaaaaa")))
+    assert(is_unicode_variant_subtag(view_of("aaaaaaa")))
+    assert(is_unicode_variant_subtag(view_of("aaaaaaaa")))
+
+    assert(is_unicode_variant_subtag(view_of("1aaa")))
+    assert(is_unicode_variant_subtag(view_of("12aa")))
+    assert(is_unicode_variant_subtag(view_of("123a")))
+    assert(is_unicode_variant_subtag(view_of("1234")))
+
+    assert(not is_unicode_variant_subtag(view_of("")))
+    assert(not is_unicode_variant_subtag(view_of("a")))
+    assert(not is_unicode_variant_subtag(view_of("aa")))
+    assert(not is_unicode_variant_subtag(view_of("aaa")))
+    assert(not is_unicode_variant_subtag(view_of("aaaa")))
+    assert(not is_unicode_variant_subtag(view_of("aaaaaaaaa")))
+    assert(not is_unicode_variant_subtag(view_of("a234")))
+
+# Ported from TestLocale.cpp TEST_CASE(is_type_identifier).
+test "is_type_identifier":
+    assert(is_type_identifier(view_of("aaaa")))
+    assert(is_type_identifier(view_of("aaaa-bbbb")))
+    assert(is_type_identifier(view_of("aaaa-bbbb-cccc")))
+
+    assert(is_type_identifier(view_of("1aaa")))
+    assert(is_type_identifier(view_of("12aa")))
+    assert(is_type_identifier(view_of("123a")))
+    assert(is_type_identifier(view_of("1234")))
+
+    assert(not is_type_identifier(view_of("")))
+    assert(not is_type_identifier(view_of("a")))
+    assert(not is_type_identifier(view_of("aa")))
+    assert(not is_type_identifier(view_of("aaaaaaaaa")))
+    assert(not is_type_identifier(view_of("aaaa-")))
+
+# Not in Ladybird's tests: the locale functions that need no AK String.
+test "locale data":
+    assert(view_equals(default_locale(), "en"))
+    assert(style_from_string(view_of("narrow")) == Style.narrow)
+    assert(view_equals(style_to_string(Style.short), "short"))
+    let maximized = likely_subtags_lookup("zh-TW".bytes) else trap("zh-TW has likely subtags")
+    assert(view_equals(maximized, "zh-Hant-TW"))
+    assert(likely_subtags_lookup("xyz".bytes) == none)
+    var lexer = generic_lexer_over(view_of("en-US_x"))
+    let language = consume_next_segment(&lexer, false) else trap("a segment")
+    assert(view_equals(language, "en"))
+    let region = consume_next_segment(&lexer) else trap("a segment")
+    assert(view_equals(region, "US"))
+    let private_use = consume_next_segment(&lexer) else trap("a segment")
+    assert(view_equals(private_use, "x") and ak.generic_lexer_is_eof(&lexer))
+    assert(consume_next_segment(&lexer) == none)

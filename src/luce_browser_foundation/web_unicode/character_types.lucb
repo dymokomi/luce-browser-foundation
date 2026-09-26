@@ -1,0 +1,496 @@
+#==============================================================================================
+#
+#   character_types - Unicode::CharacterTypes: general categories, properties, scripts
+#
+#   DESCRIPTION:
+#       Port of LibUnicode/CharacterTypes.cpp (lines 1-760) and CharacterTypes.h (lines
+#       1-121). The C++ asks ICU (uchar.h, uscript.h, uniset.h); the port asks web_unicode's
+#       tables (ucd.lucb, casing.lucb), which keep ICU's numbering of categories, properties
+#       and scripts. The names ICU gives them are the generated ucd_*_names tables. The
+#       extern "C" functions at the end serve LibRegex in Ladybird; they are ported for
+#       completeness.
+#
+#==============================================================================================
+
+# mark: Property names ==========================================================================
+
+## AK::Traits<Unicode::PropertyName<PropertyType>>::equals: whether `property` is one of the
+## names of `candidate` (an absent name matches nothing).
+func property_name_equals(candidate: const UcdNames*, property: ak.StringView) -> bool:
+    if candidate.long_name.length > 0 and view_equals(property, candidate.long_name):
+        return true
+    if candidate.short_name.length > 0 and view_equals(property, candidate.short_name):
+        return true
+    return candidate.additional_name.length > 0 and view_equals(property, candidate.additional_name)
+
+# mark: General categories ======================================================================
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:59 Unicode::general_category_from_string.
+## The names are ICU's (u_getPropertyValueName of UCHAR_GENERAL_CATEGORY, and of
+## UCHAR_GENERAL_CATEGORY_MASK for the groups): ucd_general_category_names.
+pub func general_category_from_string(general_category: ak.StringView) -> u32?:
+    for index in 0..<ucd_general_category_names.length:
+        if property_name_equals(&ucd_general_category_names[index], general_category):
+            return (u32)index
+    return none
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:93 Unicode::get_icu_mask.
+func get_icu_mask(general_category: u32) -> u32:
+    if general_category == general_category_cased_letter:
+        return u_gc_lc_mask
+    if general_category == general_category_letter:
+        return u_gc_l_mask
+    if general_category == general_category_mark:
+        return u_gc_m_mask
+    if general_category == general_category_number:
+        return u_gc_n_mask
+    if general_category == general_category_punctuation:
+        return u_gc_p_mask
+    if general_category == general_category_symbol:
+        return u_gc_s_mask
+    if general_category == general_category_separator:
+        return u_gc_z_mask
+    if general_category == general_category_other:
+        return u_gc_c_mask
+
+    return u_mask(general_category)
+
+func has_general_category_mask(context: const void*, code_point: u32) -> bool:
+    let category_mask = *(const u32*)context
+    return (ucd_general_category_mask(code_point) & category_mask) != 0
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:115 Unicode::code_point_has_general_category.
+pub func code_point_has_general_category(code_point: u32, general_category: u32, case_sensitivity: ak.CaseSensitivity = ak.CaseSensitivity.case_sensitive) -> bool:
+    let icu_code_point = code_point
+    let category_mask = get_icu_mask(general_category)
+
+    if (ucd_general_category_mask(icu_code_point) & category_mask) != 0:
+        return true
+
+    if case_sensitivity == ak.CaseSensitivity.case_sensitive:
+        return false
+
+    # The C++ caches the category's set closed over case (s_category_sets_with_case_closure);
+    # a code point is in that set when a member of its case closure has the category.
+    return case_closure_any(icu_code_point, &category_mask, has_general_category_mask)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:138 Unicode::code_point_is_printable.
+pub func code_point_is_printable(code_point: u32) -> bool:
+    return ucd_is_print(code_point)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:143 Unicode::code_point_has_control_general_category.
+pub func code_point_has_control_general_category(code_point: u32) -> bool:
+    return code_point_has_general_category(code_point, u_control_char)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:148 Unicode::code_point_has_letter_general_category.
+pub func code_point_has_letter_general_category(code_point: u32) -> bool:
+    return code_point_has_general_category(code_point, general_category_letter)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:153 Unicode::code_point_has_mark_general_category.
+pub func code_point_has_mark_general_category(code_point: u32) -> bool:
+    return code_point_has_general_category(code_point, general_category_mark)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:158 Unicode::code_point_has_number_general_category.
+pub func code_point_has_number_general_category(code_point: u32) -> bool:
+    return code_point_has_general_category(code_point, general_category_number)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:163 Unicode::code_point_has_punctuation_general_category.
+pub func code_point_has_punctuation_general_category(code_point: u32) -> bool:
+    return code_point_has_general_category(code_point, general_category_punctuation)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:168 Unicode::code_point_has_separator_general_category.
+pub func code_point_has_separator_general_category(code_point: u32) -> bool:
+    return code_point_has_general_category(code_point, general_category_separator)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:173 Unicode::code_point_has_space_separator_general_category.
+pub func code_point_has_space_separator_general_category(code_point: u32) -> bool:
+    return code_point_has_general_category(code_point, u_space_separator)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:178 Unicode::code_point_has_symbol_general_category.
+pub func code_point_has_symbol_general_category(code_point: u32) -> bool:
+    return code_point_has_general_category(code_point, general_category_symbol)
+
+# mark: Properties ==============================================================================
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:188 Unicode::property_from_string.
+## The names are ICU's (u_getPropertyName): ucd_binary_property_names, then Any, ASCII and
+## Assigned.
+pub func property_from_string(property: ak.StringView) -> u32?:
+    for index in 0..<ucd_binary_property_names.length:
+        if property_name_equals(&ucd_binary_property_names[index], property):
+            return (u32)index
+
+    if view_equals(property, "Any"):
+        return property_any
+    if view_equals(property, "ASCII"):
+        return property_ascii
+    if view_equals(property, "Assigned"):
+        return property_assigned
+    return none
+
+func has_binary_property(context: const void*, code_point: u32) -> bool:
+    return ucd_has_binary_property(code_point, *(const u32*)context)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:216 Unicode::code_point_has_property.
+pub func code_point_has_property(code_point: u32, property: u32, case_sensitivity: ak.CaseSensitivity = ak.CaseSensitivity.case_sensitive) -> bool:
+    let icu_code_point = code_point
+
+    if property == property_any:
+        return code_point <= 0x10ffff
+    if property == property_ascii:
+        return code_point < 0x80
+    if property == property_assigned:
+        return ucd_is_defined(icu_code_point)
+
+    let icu_property = property
+    if ucd_has_binary_property(icu_code_point, icu_property):
+        return true
+
+    if case_sensitivity == ak.CaseSensitivity.case_sensitive:
+        return false
+
+    # s_property_sets_with_case_closure: see code_point_has_general_category.
+    return case_closure_any(icu_code_point, &icu_property, has_binary_property)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:246 Unicode::code_point_has_emoji_property.
+pub func code_point_has_emoji_property(code_point: u32) -> bool:
+    return code_point_has_property(code_point, uchar_emoji)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:251 Unicode::code_point_has_emoji_modifier_base_property.
+pub func code_point_has_emoji_modifier_base_property(code_point: u32) -> bool:
+    return code_point_has_property(code_point, uchar_emoji_modifier_base)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:256 Unicode::code_point_has_emoji_presentation_property.
+pub func code_point_has_emoji_presentation_property(code_point: u32) -> bool:
+    return code_point_has_property(code_point, uchar_emoji_presentation)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:261 Unicode::code_point_has_identifier_start_property.
+pub func code_point_has_identifier_start_property(code_point: u32) -> bool:
+    return ucd_is_id_start(code_point)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:266 Unicode::code_point_has_identifier_continue_property.
+pub func code_point_has_identifier_continue_property(code_point: u32) -> bool:
+    return ucd_is_id_part(code_point)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:271 Unicode::code_point_has_regional_indicator_property.
+pub func code_point_has_regional_indicator_property(code_point: u32) -> bool:
+    return code_point_has_property(code_point, uchar_regional_indicator)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:276 Unicode::code_point_has_variation_selector_property.
+pub func code_point_has_variation_selector_property(code_point: u32) -> bool:
+    return code_point_has_property(code_point, uchar_variation_selector)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:281 Unicode::code_point_has_white_space_property.
+pub func code_point_has_white_space_property(code_point: u32) -> bool:
+    return code_point_has_property(code_point, uchar_white_space)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:287 Unicode::is_ecma262_property.
+# https://tc39.es/ecma262/#table-binary-unicode-properties
+pub func is_ecma262_property(property: u32) -> bool:
+    if property == property_any or property == property_ascii or property == property_assigned:
+        return true
+
+    # 1 UCHAR_ASCII_HEX_DIGIT, 0 UCHAR_ALPHABETIC, 2 UCHAR_BIDI_CONTROL, 3 UCHAR_BIDI_MIRRORED,
+    # 50 UCHAR_CASE_IGNORABLE, 49 UCHAR_CASED, 54 UCHAR_CHANGES_WHEN_CASEFOLDED,
+    # 55 UCHAR_CHANGES_WHEN_CASEMAPPED, 51 UCHAR_CHANGES_WHEN_LOWERCASED,
+    # 56 UCHAR_CHANGES_WHEN_NFKC_CASEFOLDED, 53 UCHAR_CHANGES_WHEN_TITLECASED,
+    # 52 UCHAR_CHANGES_WHEN_UPPERCASED, 4 UCHAR_DASH, 5 UCHAR_DEFAULT_IGNORABLE_CODE_POINT,
+    # 6 UCHAR_DEPRECATED, 7 UCHAR_DIACRITIC, 57 UCHAR_EMOJI, 61 UCHAR_EMOJI_COMPONENT,
+    # 59 UCHAR_EMOJI_MODIFIER, 60 UCHAR_EMOJI_MODIFIER_BASE, 58 UCHAR_EMOJI_PRESENTATION,
+    # 64 UCHAR_EXTENDED_PICTOGRAPHIC, 8 UCHAR_EXTENDER, 10 UCHAR_GRAPHEME_BASE,
+    # 11 UCHAR_GRAPHEME_EXTEND, 13 UCHAR_HEX_DIGIT, 18 UCHAR_IDS_BINARY_OPERATOR,
+    # 19 UCHAR_IDS_TRINARY_OPERATOR, 15 UCHAR_ID_CONTINUE, 16 UCHAR_ID_START,
+    # 17 UCHAR_IDEOGRAPHIC, 20 UCHAR_JOIN_CONTROL, 21 UCHAR_LOGICAL_ORDER_EXCEPTION,
+    # 22 UCHAR_LOWERCASE, 23 UCHAR_MATH, 24 UCHAR_NONCHARACTER_CODE_POINT,
+    # 42 UCHAR_PATTERN_SYNTAX, 43 UCHAR_PATTERN_WHITE_SPACE, 25 UCHAR_QUOTATION_MARK,
+    # 26 UCHAR_RADICAL, 62 UCHAR_REGIONAL_INDICATOR, 35 UCHAR_S_TERM, 27 UCHAR_SOFT_DOTTED,
+    # 28 UCHAR_TERMINAL_PUNCTUATION, 29 UCHAR_UNIFIED_IDEOGRAPH, 30 UCHAR_UPPERCASE,
+    # 36 UCHAR_VARIATION_SELECTOR, 31 UCHAR_WHITE_SPACE, 32 UCHAR_XID_CONTINUE,
+    # 33 UCHAR_XID_START
+    match property:
+        1, 0, 2, 3, 50, 49, 54, 55, 51, 56, 53, 52, 4, 5, 6, 7, 57, 61, 59, 60, 58, 64, 8, 10, 11, 13, 18, 19, 15, 16, 17, 20, 21, 22, 23, 24, 42, 43, 25, 26, 62, 35, 27, 28, 29, 30, 36, 31, 32, 33:
+            return true
+        _:
+            return false
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:350 Unicode::is_ecma262_string_property.
+# https://tc39.es/ecma262/#table-binary-unicode-properties-of-strings
+pub func is_ecma262_string_property(property: u32) -> bool:
+    # 65 UCHAR_BASIC_EMOJI, 66 UCHAR_EMOJI_KEYCAP_SEQUENCE, 71 UCHAR_RGI_EMOJI,
+    # 68 UCHAR_RGI_EMOJI_FLAG_SEQUENCE, 69 UCHAR_RGI_EMOJI_TAG_SEQUENCE,
+    # 67 UCHAR_RGI_EMOJI_MODIFIER_SEQUENCE, 70 UCHAR_RGI_EMOJI_ZWJ_SEQUENCE
+    match property:
+        65, 66, 71, 68, 69, 67, 70:
+            return true
+        _:
+            return false
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:366 Unicode::get_property_strings.
+pub func get_property_strings(property: u32) -> ak.Vector[ak.String]:
+    var result: ak.Vector[ak.String]
+
+    if not is_ecma262_string_property(property):
+        return result
+
+    # u_getBinaryPropertySet: the code points of the property, as ranges, then its strings.
+    for code_point: u32 in 0..=0x10ffff:
+        if ucd_has_binary_property(code_point, property):
+            ak.vector_append_t(&result, ak.string_from_code_point(code_point))
+
+    var offset: usize = 0
+    while offset < ucd_emoji_sequences.length:
+        let sequence_property = ucd_hex(ucd_emoji_sequences, offset, 2)
+        let length = (usize)ucd_hex(ucd_emoji_sequences, offset + 2, 2)
+        if sequence_property == property:
+            var code_points = CodePointBuffer.create(length)
+            for index in 0..<length:
+                code_points.append(ucd_hex(ucd_emoji_sequences, offset + 4 + index * 6, 6))
+            let bytes = encode_utf8_all(code_points.view())
+            # icu_string_to_string
+            ak.vector_append_t(&result, ak.string_from_utf8_without_validation(bytes.view()))
+        offset += 4 + length * 6
+
+    return result
+
+# mark: Scripts =================================================================================
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:399 Unicode::script_from_string.
+## The names are ICU's (uscript_getName, uscript_getShortName and the additional
+## u_getPropertyValueName of UCHAR_SCRIPT): ucd_script_names.
+pub func script_from_string(script: ak.StringView) -> u32?:
+    for index in 0..<ucd_script_names.length:
+        if property_name_equals(&ucd_script_names[index], script):
+            return (u32)index
+    return none
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:423 Unicode::code_point_has_script.
+pub func code_point_has_script(code_point: u32, script: u32) -> bool:
+    return ucd_script(code_point) == script
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:435 Unicode::code_point_has_script_extension.
+pub func code_point_has_script_extension(code_point: u32, script: u32) -> bool:
+    return ucd_has_script_extension(code_point, script)
+
+# mark: Bidi and line break classes =============================================================
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:443 Unicode::char_direction_to_bidi_class.
+## `direction` is ICU's UCharDirection.
+func char_direction_to_bidi_class(direction: u32) -> BidiClass:
+    match direction:
+        5: return BidiClass.arabic_number  # U_ARABIC_NUMBER
+        7: return BidiClass.block_separator  # U_BLOCK_SEPARATOR
+        18: return BidiClass.boundary_neutral  # U_BOUNDARY_NEUTRAL
+        6: return BidiClass.common_number_separator  # U_COMMON_NUMBER_SEPARATOR
+        17: return BidiClass.dir_non_spacing_mark  # U_DIR_NON_SPACING_MARK
+        2: return BidiClass.european_number  # U_EUROPEAN_NUMBER
+        3: return BidiClass.european_number_separator  # U_EUROPEAN_NUMBER_SEPARATOR
+        4: return BidiClass.european_number_terminator  # U_EUROPEAN_NUMBER_TERMINATOR
+        19: return BidiClass.first_strong_isolate  # U_FIRST_STRONG_ISOLATE
+        0: return BidiClass.left_to_right  # U_LEFT_TO_RIGHT
+        11: return BidiClass.left_to_right_embedding  # U_LEFT_TO_RIGHT_EMBEDDING
+        20: return BidiClass.left_to_right_isolate  # U_LEFT_TO_RIGHT_ISOLATE
+        12: return BidiClass.left_to_right_override  # U_LEFT_TO_RIGHT_OVERRIDE
+        10: return BidiClass.other_neutral  # U_OTHER_NEUTRAL
+        16: return BidiClass.pop_directional_format  # U_POP_DIRECTIONAL_FORMAT
+        22: return BidiClass.pop_directional_isolate  # U_POP_DIRECTIONAL_ISOLATE
+        1: return BidiClass.right_to_left  # U_RIGHT_TO_LEFT
+        13: return BidiClass.right_to_left_arabic  # U_RIGHT_TO_LEFT_ARABIC
+        14: return BidiClass.right_to_left_embedding  # U_RIGHT_TO_LEFT_EMBEDDING
+        21: return BidiClass.right_to_left_isolate  # U_RIGHT_TO_LEFT_ISOLATE
+        15: return BidiClass.right_to_left_override  # U_RIGHT_TO_LEFT_OVERRIDE
+        8: return BidiClass.segment_separator  # U_SEGMENT_SEPARATOR
+        9: return BidiClass.white_space_neutral  # U_WHITE_SPACE_NEUTRAL
+        _: trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:498 Unicode::bidirectional_class.
+pub func bidirectional_class(code_point: u32) -> BidiClass:
+    let icu_code_point = code_point
+
+    let direction = ucd_bidi_class(icu_code_point)
+    return char_direction_to_bidi_class(direction)
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:506 Unicode::line_break_class.
+pub func line_break_class(code_point: u32) -> LineBreakClass:
+    let icu_code_point = code_point
+    let icu_line_break = ucd_line_break(icu_code_point)
+
+    if icu_line_break == lb_al or icu_line_break == lb_hl:
+        return LineBreakClass.alphabetic
+    if icu_line_break == lb_nu:
+        return LineBreakClass.numeric
+    if icu_line_break == lb_id or icu_line_break == lb_h2 or icu_line_break == lb_h3:
+        return LineBreakClass.ideographic
+    if icu_line_break == lb_ai:
+        return LineBreakClass.ambiguous
+    if icu_line_break == lb_sa:
+        return LineBreakClass.complex_context
+    if icu_line_break == lb_cm:
+        return LineBreakClass.combining_mark
+    return LineBreakClass.other
+
+# mark: Case-insensitive matching ===============================================================
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:533 Unicode::canonicalize.
+# 22.2.2.7.3 Canonicalize ( rer, ch ), https://tc39.es/ecma262/#sec-runtime-semantics-canonicalize-ch
+pub func canonicalize(code_point: u32, unicode_mode: bool) -> u32:
+    # 1. If HasEitherUnicodeFlag(rer) is true and rer.[[IgnoreCase]] is true, then
+    #    a. If the file CaseFolding.txt of the Unicode Character Database provides a simple or common case folding mapping for ch, return the result of applying that mapping to ch.
+    #    b. Return ch.
+    if unicode_mode:
+        return simple_case_folding(code_point)
+
+    # 2. If rer.[[IgnoreCase]] is false, return ch.
+    # NOTE: This is handled by the caller.
+
+    # 3. Assert: ch is a UTF-16 code unit.
+    # 4. Let cp be the code point whose numeric value is the numeric value of ch.
+    # NOTE: We already have a code point.
+
+    # 5. Let u be toUppercase(« cp »), according to the Unicode Default Case Conversion algorithm.
+    # 6. Let uStr be CodePointsToString(u).
+
+    # OPTIMIZATION: For ASCII characters, toUppercase is just to_ascii_uppercase.
+    #               Conditions in 7 & 9 are trivially satisfied (ASCII always maps to a single code point, and the result stays in the same range).
+    if code_point < 128:
+        return code_point - 32 if code_point >= 0x61 and code_point <= 0x7a else code_point
+
+    # String::from_code_point(code_point).to_uppercase(): the full uppercase mapping of the
+    # one code point in the root locale.
+    let single: u32[1] = [code_point]
+    let uppercased = uppercase_code_points(single, CaseLocale.root)
+    let code_points = uppercased.view()
+
+    # 7. If the length of uStr ≠ 1, return ch.
+    if code_points.length != 1:
+        return code_point
+
+    # 8. Let cu be uStr's single code unit element.
+    let uppercased_code_point = code_points[0]
+
+    # 9. If the numeric value of ch ≥ 128 and the numeric value of cu < 128, return ch.
+    if code_point >= 128 and uppercased_code_point < 128:
+        return code_point
+
+    # 10. Return cu.
+    return uppercased_code_point
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:579 Unicode::expand_range_case_insensitive.
+## icu::UnicodeSet(from, to).closeOver(USET_CASE_INSENSITIVE), as ranges.
+pub func expand_range_case_insensitive(from_: u32, to: u32) -> ak.Vector[CodePointRange]:
+    var result: ak.Vector[CodePointRange]
+    let ranges = case_insensitive_ranges(from_, to)
+    ak.vector_ensure_capacity(&result, ranges.count // 2)
+
+    var index: usize = 0
+    while index < ranges.count:
+        ak.vector_append_t(&result, CodePointRange(from_ = ranges.items[index], to = ranges.items[index + 1]))
+        index += 2
+
+    return result
+
+## The set [from, to] closed over case, as ascending (first, last) pairs.
+func case_insensitive_ranges(from_: u32, to: u32) -> CodePointBuffer:
+    # The code points the closure adds outside [from, to].
+    var added = CodePointBuffer.create(8)
+    var entry: usize = 0
+    while entry < ucd_case_closure.length:
+        let code_point = ucd_hex(ucd_case_closure, entry, 6)
+        if code_point >= from_ and code_point <= to:
+            var members = CodePointBuffer.create(4)
+            append_case_pool(ucd_hex(ucd_case_closure, entry + 6, 4), ucd_hex(ucd_case_closure, entry + 10, 2), &members)
+            for member in members.view():
+                if member < from_ or member > to:
+                    added.append(member)
+        entry += 12
+    sort_code_points(&added)
+    # Merge the range with the added code points.
+    var ranges = CodePointBuffer.create(8)
+    var pending_range = true
+    for code_point in added.view():
+        if pending_range and code_point > to:
+            append_range(&ranges, from_, to)
+            pending_range = false
+        append_range(&ranges, code_point, code_point)
+    if pending_range:
+        append_range(&ranges, from_, to)
+    return ranges
+
+## Append [first, last] to ascending ranges, merging with the last range when adjacent.
+func append_range(ranges: CodePointBuffer*, first: u32, last: u32):
+    if ranges.count >= 2:
+        let previous_last = ranges.items[ranges.count - 1]
+        if first <= previous_last +% 1 and first >= ranges.items[ranges.count - 2]:
+            if last > previous_last:
+                ranges.items[ranges.count - 1] = last
+            return
+    ranges.append(first)
+    ranges.append(last)
+
+## Sort code points ascending (insertion sort: the lists are short).
+func sort_code_points(buffer: CodePointBuffer*):
+    for index in 1..<buffer.count:
+        let value = buffer.items[index]
+        var position = index
+        while position > 0 and buffer.items[position - 1] > value:
+            buffer.items[position] = buffer.items[position - 1]
+            position -= 1
+        buffer.items[position] = value
+
+## The code points of the case closure of `code_point` (itself included), ascending.
+func case_closure_sorted(code_point: u32) -> CodePointBuffer:
+    var closure = CodePointBuffer.create(4)
+    closure.append(code_point)
+    append_case_closure(code_point, &closure)
+    sort_code_points(&closure)
+    return closure
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:594 Unicode::for_each_case_folded_code_point.
+pub func for_each_case_folded_code_point(code_point: u32, callback: ak.Function1[u32, ak.IterationDecision]):
+    let canonical = canonicalize(code_point, true)
+
+    # icu::UnicodeSet closure(canonical, canonical); closure.closeOver(USET_CASE_INSENSITIVE);
+    let closure = case_closure_sorted(canonical)
+
+    var callback_ = callback
+    for cp in closure.view():
+        if call_code_point_callback(&callback_, cp) == ak.IterationDecision.break_:
+            return
+
+## Ported from Libraries/LibUnicode/CharacterTypes.cpp:612 Unicode::code_point_matches_range_ignoring_case.
+pub func code_point_matches_range_ignoring_case(code_point: u32, from_: u32, to: u32, unicode_mode: bool) -> bool:
+    if code_point >= from_ and code_point <= to:
+        return true
+
+    # icu::UnicodeSet candidates(code_point, code_point); candidates.closeOver(...);
+    # candidates.retain(from, to);
+    let closure = case_closure_sorted(code_point)
+    var candidates = CodePointBuffer.create(4)
+    for candidate in closure.view():
+        if candidate >= from_ and candidate <= to:
+            candidates.append(candidate)
+
+    if candidates.count == 0:
+        return false
+
+    let canonical_ch = canonicalize(code_point, unicode_mode)
+    for candidate_cp in candidates.view():
+        if canonicalize(candidate_cp, unicode_mode) == canonical_ch:
+            return true
+
+    return false
+
+## Ported from Libraries/LibUnicode/CharacterTypes.h:106 Unicode::ranges_equal_ignoring_case.
+## The ranges are spans of code points.
+pub func ranges_equal_ignoring_case(range1: const u32[], range2: const u32[], unicode_mode: bool) -> bool:
+    var it1: usize = 0
+    var it2: usize = 0
+    let end1 = range1.length
+    let end2 = range2.length
+
+    while it1 != end1 and it2 != end2:
+        if canonicalize(range1[it1], unicode_mode) != canonicalize(range2[it2], unicode_mode):
+            return false
+        it1 += 1
+        it2 += 1
+
+    return it1 == end1 and it2 == end2

@@ -1,0 +1,445 @@
+#==============================================================================================
+#
+#   tests_locale_2 - Tests/LibUnicode/TestLocale.cpp: parsing and canonicalization
+#
+#   DESCRIPTION:
+#       The parse_unicode_locale_id and canonicalize_unicode_locale_id cases of Ladybird's
+#       locale tests, and supports_locale_aliases. Each `pass`/`fail`/`test` lambda is a
+#       helper; the expected extensions are written as the C++ aggregates' values.
+#
+#       Not ported: the canonicalize cases that need CLDR alias data (the ks/ms/tz/ca value
+#       aliases, t's m0 alias, and the language, territory, script, variant, subdivision and
+#       complex subtag aliases): web_unicode canonicalizes
+#       by syntax only (docs/regions/r07.md). Those cases stay in place as comments marked
+#       "CLDR alias, not ported".
+#
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
+#==============================================================================================
+
+# mark: Helpers =================================================================================
+
+## `lhs == rhs` for an Optional<String> and an Optional<StringView>.
+func optional_equals(actual: ak.String?, expected: str?) -> bool:
+    if let text = expected:
+        let string = actual else return false
+        return view_equals(ak.string_bytes_as_string_view(&string), text)
+    return actual == none
+
+## compare_vectors(Vector<String>, Vector<StringView>).
+func string_vector_equals(actual: const ak.Vector[ak.String]*, expected: const str[]) -> bool:
+    if ak.vector_size(actual) != expected.length:
+        return false
+    for i in 0..<expected.length:
+        let string = ak.vector_at_const(actual, i)
+        if not view_equals(ak.string_bytes_as_string_view(string), expected[i]):
+            return false
+    return true
+
+## The `fail` lambda: parse_unicode_locale_id rejects `locale`.
+func expect_locale_parse_fails(locale: str):
+    assert(parse_unicode_locale_id(view_of(locale)) == none)
+
+## VERIFY(locale_id.has_value()) and the one extension it has.
+func only_extension(locale: str) -> Extension:
+    let locale_id = parse_unicode_locale_id(view_of(locale)) else trap("VERIFY(locale_id.has_value())")
+    assert(ak.vector_size(&locale_id.extensions) == 1)
+    return *ak.vector_at_const(&locale_id.extensions, 0)
+
+## A LanguageID's expected subtags (TransformedExtension::LanguageID in the C++ test).
+struct ExpectedLanguage:
+    var language: str?
+    var script: str?
+    var region: str?
+    var variants: const str[]
+
+## The language_id checks of the `pass` lambdas.
+func expect_language(actual: const LanguageId*, expected: ExpectedLanguage):
+    assert(optional_equals(actual.language, expected.language))
+    assert(optional_equals(actual.script, expected.script))
+    assert(optional_equals(actual.region, expected.region))
+    assert(string_vector_equals(&actual.variants, expected.variants))
+
+## A key and its value (Keyword and TransformedField in the C++ test).
+struct ExpectedPair:
+    var key: str
+    var value: str
+
+## No pairs (`{}`).
+var no_pairs: const ExpectedPair[]
+
+## The `pass` lambda of TEST_CASE(parse_unicode_locale_id).
+func expect_locale_parses(locale: str, expected: ExpectedLanguage):
+    let locale_id = parse_unicode_locale_id(view_of(locale)) else trap("VERIFY(locale_id.has_value())")
+    expect_language(&locale_id.language_id, expected)
+
+## No strings (`{}`).
+var no_strings: const str[]
+
+# mark: parse_unicode_locale_id =================================================================
+
+test "parse_unicode_locale_id":
+    test_parse_unicode_locale_id()
+
+noinline func test_parse_unicode_locale_id():
+    expect_locale_parse_fails("a")
+    expect_locale_parse_fails("1234")
+    expect_locale_parse_fails("aaa-")
+    expect_locale_parse_fails("aaa-cc-")
+    expect_locale_parse_fails("aaa-bbbb-cc-")
+    expect_locale_parse_fails("aaa-bbbb-cc-123")
+    expect_locale_parses("aaa", ExpectedLanguage(language = "aaa", script = none, region = none, variants = no_strings))
+    expect_locale_parses("aaa-bbbb", ExpectedLanguage(language = "aaa", script = "bbbb", region = none, variants = no_strings))
+    expect_locale_parses("aaa-cc", ExpectedLanguage(language = "aaa", script = none, region = "cc", variants = no_strings))
+    expect_locale_parses("aaa-bbbb-cc", ExpectedLanguage(language = "aaa", script = "bbbb", region = "cc", variants = no_strings))
+    expect_locale_parses("aaa-bbbb-cc-1234", ExpectedLanguage(language = "aaa", script = "bbbb", region = "cc", variants = ["1234"]))
+    expect_locale_parses("aaa-bbbb-cc-1234-5678", ExpectedLanguage(language = "aaa", script = "bbbb", region = "cc", variants = ["1234", "5678"]))
+
+# mark: Unicode locale extensions ================================================================
+
+## The `pass` lambda of TEST_CASE(parse_unicode_locale_id_with_unicode_locale_extension).
+func expect_locale_extension(locale: str, attributes: const str[], keywords: const ExpectedPair[]):
+    match only_extension(locale):
+        .locale_extension(actual):
+            assert(string_vector_equals(&actual.attributes, attributes))
+            let count = ak.vector_size(&actual.keywords)
+            assert(count == keywords.length)
+            for i in 0..<count:
+                let keyword = ak.vector_at_const(&actual.keywords, i)
+                assert(view_equals(ak.string_bytes_as_string_view(&keyword.key), keywords[i].key))
+                assert(view_equals(ak.string_bytes_as_string_view(&keyword.value), keywords[i].value))
+        _:
+            trap("get<Unicode::LocaleExtension>()")
+
+test "parse_unicode_locale_id_with_unicode_locale_extension":
+    test_parse_unicode_locale_id_with_unicode_locale_extension()
+
+noinline func test_parse_unicode_locale_id_with_unicode_locale_extension():
+    expect_locale_parse_fails("en-u")
+    expect_locale_parse_fails("en-u-")
+    expect_locale_parse_fails("en-u-x")
+    expect_locale_parse_fails("en-u-xx-")
+    expect_locale_parse_fails("en-u--xx")
+    expect_locale_parse_fails("en-u-xx-xxxxx-")
+    expect_locale_parse_fails("en-u-xx--xxxxx")
+    expect_locale_parse_fails("en-u-xx-xxxxxxxxx")
+    expect_locale_parse_fails("en-u-xxxxx-")
+    expect_locale_parse_fails("en-u-xxxxxxxxx")
+    expect_locale_extension("en-u-xx", no_strings, [ExpectedPair(key = "xx", value = "")])
+    expect_locale_extension("en-u-xx-yyyy", no_strings, [ExpectedPair(key = "xx", value = "yyyy")])
+    expect_locale_extension("en-u-xx-yyyy-zzzz", no_strings, [ExpectedPair(key = "xx", value = "yyyy-zzzz")])
+    expect_locale_extension("en-u-xx-yyyy-zzzz-aa", no_strings, [ExpectedPair(key = "xx", value = "yyyy-zzzz"), ExpectedPair(key = "aa", value = "")])
+    expect_locale_extension("en-u-xxx", ["xxx"], no_pairs)
+    expect_locale_extension("en-u-fff-gggg", ["fff", "gggg"], no_pairs)
+    expect_locale_extension("en-u-fff-xx", ["fff"], [ExpectedPair(key = "xx", value = "")])
+    expect_locale_extension("en-u-fff-xx-yyyy", ["fff"], [ExpectedPair(key = "xx", value = "yyyy")])
+    expect_locale_extension("en-u-fff-gggg-xx-yyyy", ["fff", "gggg"], [ExpectedPair(key = "xx", value = "yyyy")])
+
+# mark: Transformed extensions ===================================================================
+
+## The `pass` lambda of TEST_CASE(parse_unicode_locale_id_with_transformed_extension); `language`
+## is none when the C++ expects no LanguageID.
+func expect_transformed_extension(locale: str, language: ExpectedLanguage?, fields: const ExpectedPair[]):
+    match only_extension(locale):
+        .transformed_extension(actual):
+            assert((actual.language != none) == (language != none))
+            if let expected = language:
+                let actual_language = actual.language else trap("VERIFY")
+                expect_language(&actual_language, expected)
+            let count = ak.vector_size(&actual.fields)
+            assert(count == fields.length)
+            for i in 0..<count:
+                let field = ak.vector_at_const(&actual.fields, i)
+                assert(view_equals(ak.string_bytes_as_string_view(&field.key), fields[i].key))
+                assert(view_equals(ak.string_bytes_as_string_view(&field.value), fields[i].value))
+        _:
+            trap("get<Unicode::TransformedExtension>()")
+
+test "parse_unicode_locale_id_with_transformed_extension":
+    test_parse_unicode_locale_id_with_transformed_extension()
+
+noinline func test_parse_unicode_locale_id_with_transformed_extension():
+    expect_locale_parse_fails("en-t")
+    expect_locale_parse_fails("en-t-")
+    expect_locale_parse_fails("en-t-a")
+    expect_locale_parse_fails("en-t-en-")
+    expect_locale_parse_fails("en-t-root")
+    expect_locale_parse_fails("en-t-aaaaaaaaa")
+    expect_locale_parse_fails("en-t-en-aaa")
+    expect_locale_parse_fails("en-t-en-latn-latn")
+    expect_locale_parse_fails("en-t-en-a")
+    expect_locale_parse_fails("en-t-en-00")
+    expect_locale_parse_fails("en-t-en-latn-0")
+    expect_locale_parse_fails("en-t-en-latn-00")
+    expect_locale_parse_fails("en-t-en-latn-xyz")
+    expect_locale_parse_fails("en-t-en-aaaaaaaaa")
+    expect_locale_parse_fails("en-t-en-latn-gb-aaaa")
+    expect_locale_parse_fails("en-t-en-latn-gb-aaaaaaaaa")
+    expect_locale_parse_fails("en-t-k0")
+    expect_locale_parse_fails("en-t-k0-aa")
+    expect_locale_parse_fails("en-t-k0-aaaaaaaaa")
+    expect_transformed_extension("en-t-en", ExpectedLanguage(language = "en", script = none, region = none, variants = no_strings), no_pairs)
+    expect_transformed_extension("en-t-en-latn", ExpectedLanguage(language = "en", script = "latn", region = none, variants = no_strings), no_pairs)
+    expect_transformed_extension("en-t-en-us", ExpectedLanguage(language = "en", script = none, region = "us", variants = no_strings), no_pairs)
+    expect_transformed_extension("en-t-en-latn-us", ExpectedLanguage(language = "en", script = "latn", region = "us", variants = no_strings), no_pairs)
+    expect_transformed_extension("en-t-en-posix", ExpectedLanguage(language = "en", script = none, region = none, variants = ["posix"]), no_pairs)
+    expect_transformed_extension("en-t-en-latn-posix", ExpectedLanguage(language = "en", script = "latn", region = none, variants = ["posix"]), no_pairs)
+    expect_transformed_extension("en-t-en-us-posix", ExpectedLanguage(language = "en", script = none, region = "us", variants = ["posix"]), no_pairs)
+    expect_transformed_extension("en-t-en-latn-us-posix", ExpectedLanguage(language = "en", script = "latn", region = "us", variants = ["posix"]), no_pairs)
+    expect_transformed_extension("en-t-k0-aaa", none, [ExpectedPair(key = "k0", value = "aaa")])
+    expect_transformed_extension("en-t-k0-aaa-bbbb", none, [ExpectedPair(key = "k0", value = "aaa-bbbb")])
+    expect_transformed_extension("en-t-k0-aaa-k1-bbbb", none, [ExpectedPair(key = "k0", value = "aaa"), ExpectedPair(key = "k1", value = "bbbb")])
+    expect_transformed_extension("en-t-en-k0-aaa", ExpectedLanguage(language = "en", script = none, region = none, variants = no_strings), [ExpectedPair(key = "k0", value = "aaa")])
+
+# mark: Other extensions =========================================================================
+
+## The `pass` lambda of TEST_CASE(parse_unicode_locale_id_with_other_extension).
+func expect_other_extension(locale: str, key: u8, value: str):
+    match only_extension(locale):
+        .other_extension(actual):
+            assert(actual.key == key)
+            assert(view_equals(ak.string_bytes_as_string_view(&actual.value), value))
+        _:
+            trap("get<Unicode::OtherExtension>()")
+
+test "parse_unicode_locale_id_with_other_extension":
+    test_parse_unicode_locale_id_with_other_extension()
+
+noinline func test_parse_unicode_locale_id_with_other_extension():
+    expect_locale_parse_fails("en-z")
+    expect_locale_parse_fails("en-0")
+    expect_locale_parse_fails("en-z-")
+    expect_locale_parse_fails("en-0-")
+    expect_locale_parse_fails("en-z-a")
+    expect_locale_parse_fails("en-0-a")
+    expect_locale_parse_fails("en-z-aaaaaaaaa")
+    expect_locale_parse_fails("en-0-aaaaaaaaa")
+    expect_locale_parse_fails("en-z-aaa-")
+    expect_locale_parse_fails("en-0-aaa-")
+    expect_locale_parse_fails("en-z-aaa-a")
+    expect_locale_parse_fails("en-0-aaa-a")
+    expect_other_extension("en-z-aa", 'z', "aa")
+    expect_other_extension("en-z-aa-bbb", 'z', "aa-bbb")
+    expect_other_extension("en-z-aa-bbb-cccccccc", 'z', "aa-bbb-cccccccc")
+
+# mark: Private-use extensions ===================================================================
+
+## The `pass` lambda of TEST_CASE(parse_unicode_locale_id_with_private_use_extension).
+func expect_private_use(locale: str, expected: const str[]):
+    let locale_id = parse_unicode_locale_id(view_of(locale)) else trap("VERIFY(locale_id.has_value())")
+    assert(string_vector_equals(&locale_id.private_use_extensions, expected))
+
+test "parse_unicode_locale_id_with_private_use_extension":
+    test_parse_unicode_locale_id_with_private_use_extension()
+
+noinline func test_parse_unicode_locale_id_with_private_use_extension():
+    expect_locale_parse_fails("en-x")
+    expect_locale_parse_fails("en-x-")
+    expect_locale_parse_fails("en-x-aaaaaaaaa")
+    expect_locale_parse_fails("en-x-aaa-")
+    expect_locale_parse_fails("en-x-aaa-aaaaaaaaa")
+    expect_private_use("en-x-a", ["a"])
+    expect_private_use("en-x-aaaaaaaa", ["aaaaaaaa"])
+    expect_private_use("en-x-aaa-bbb", ["aaa", "bbb"])
+    expect_private_use("en-x-aaa-x-bbb", ["aaa", "x", "bbb"])
+
+# mark: Canonicalization ========================================================================
+
+## The `test` lambda of TEST_CASE(canonicalize_unicode_locale_id).
+func expect_canonical(locale: str, expected: str):
+    let canonical_locale = canonicalize_unicode_locale_id(view_of(locale))
+    assert(view_equals(ak.string_bytes_as_string_view(&canonical_locale), expected))
+
+test "canonicalize_unicode_locale_id":
+    test_canonicalize_unicode_locale_id()
+
+noinline func test_canonicalize_unicode_locale_id():
+    expect_canonical("aaa", "aaa")
+    expect_canonical("AaA", "aaa")
+    expect_canonical("aaa-bbbb", "aaa-Bbbb")
+    expect_canonical("aaa-cc", "aaa-CC")
+    expect_canonical("aaa-bBBB-cC", "aaa-Bbbb-CC")
+    expect_canonical("aaa-bbbb-cc-1234", "aaa-Bbbb-CC-1234")
+    expect_canonical("aaa-bbbb-cc-ABCDE", "aaa-Bbbb-CC-abcde")
+
+    expect_canonical("en-u-aa", "en-u-aa")
+    expect_canonical("EN-U-AA", "en-u-aa")
+    expect_canonical("en-u-aa-bbb", "en-u-aa-bbb")
+    expect_canonical("EN-U-AA-BBB", "en-u-aa-bbb")
+    expect_canonical("en-u-aa-ccc-bbb", "en-u-aa-ccc-bbb")
+    expect_canonical("EN-U-AA-CCC-BBB", "en-u-aa-ccc-bbb")
+    expect_canonical("en-u-ddd-bbb-ccc", "en-u-bbb-ccc-ddd")
+    expect_canonical("EN-U-DDD-BBB-CCC", "en-u-bbb-ccc-ddd")
+    expect_canonical("en-u-2k-aaa-1k-bbb", "en-u-1k-bbb-2k-aaa")
+    expect_canonical("EN-U-2K-AAA-1K-BBB", "en-u-1k-bbb-2k-aaa")
+    expect_canonical("en-u-ccc-bbb-2k-aaa-1k-bbb", "en-u-bbb-ccc-1k-bbb-2k-aaa")
+    expect_canonical("EN-U-CCC-BBB-2K-AAA-1K-BBB", "en-u-bbb-ccc-1k-bbb-2k-aaa")
+    expect_canonical("en-u-1k-true", "en-u-1k")
+    expect_canonical("EN-U-1K-TRUE", "en-u-1k")
+    expect_canonical("en-u-1k-true-abcd", "en-u-1k-true-abcd")
+    expect_canonical("EN-U-1K-TRUE-ABCD", "en-u-1k-true-abcd")
+
+    # Keys for which "yes" is alased to "true" in the CLDR, which is then removed.
+    expect_canonical("en-u-kb-yes", "en-u-kb")
+    expect_canonical("EN-U-KB-YES", "en-u-kb")
+    expect_canonical("en-u-kc-yes", "en-u-kc")
+    expect_canonical("en-u-kh-yes", "en-u-kh")
+    expect_canonical("en-u-kk-yes", "en-u-kk")
+    expect_canonical("en-u-kn-yes", "en-u-kn")
+
+    # Keys for which "yes" is not alased to "true" in the CLDR, which is then preserved.
+    expect_canonical("en-u-ka-yes", "en-u-ka-yes")
+    expect_canonical("EN-U-KA-YES", "en-u-ka-yes")
+    expect_canonical("en-u-kf-yes", "en-u-kf-yes")
+    expect_canonical("en-u-kr-yes", "en-u-kr-yes")
+    expect_canonical("en-u-ks-yes", "en-u-ks-yes")
+    expect_canonical("en-u-kv-yes", "en-u-kv-yes")
+
+    expect_canonical("en-u-ka-yes-kb-yes", "en-u-ka-yes-kb")
+    expect_canonical("en-u-kb-yes-abcd", "en-u-kb-yes-abcd")
+    expect_canonical("EN-U-KB-YES-ABCD", "en-u-kb-yes-abcd")
+
+    expect_canonical("en-u-1k-names", "en-u-1k-names")
+    expect_canonical("EN-U-1K-NAMES", "en-u-1k-names")
+    # CLDR alias, not ported: expect_canonical("en-u-ks-primary", "en-u-ks-level1")
+    # CLDR alias, not ported: expect_canonical("EN-U-KS-PRIMARY", "en-u-ks-level1")
+    expect_canonical("en-u-ka-primary", "en-u-ka-primary")
+    expect_canonical("EN-U-KA-PRIMARY", "en-u-ka-primary")
+    # CLDR alias, not ported: expect_canonical("en-u-ms-imperial", "en-u-ms-uksystem")
+    # CLDR alias, not ported: expect_canonical("EN-U-MS-IMPERIAL", "en-u-ms-uksystem")
+    expect_canonical("en-u-ma-imperial", "en-u-ma-imperial")
+    expect_canonical("EN-U-MA-IMPERIAL", "en-u-ma-imperial")
+    # CLDR alias, not ported: expect_canonical("en-u-tz-hongkong", "en-u-tz-hkhkg")
+    # CLDR alias, not ported: expect_canonical("EN-U-TZ-HONGKONG", "en-u-tz-hkhkg")
+    expect_canonical("en-u-ta-hongkong", "en-u-ta-hongkong")
+    expect_canonical("EN-U-TA-HONGKONG", "en-u-ta-hongkong")
+    # CLDR alias, not ported: expect_canonical("en-u-ca-ethiopic-amete-alem", "en-u-ca-ethioaa")
+    # CLDR alias, not ported: expect_canonical("EN-U-CA-ETHIOPIC-AMETE-ALEM", "en-u-ca-ethioaa")
+    expect_canonical("en-u-ca-alem-ethiopic-amete", "en-u-ca-alem-ethiopic-amete")
+    expect_canonical("EN-U-CA-ALEM-ETHIOPIC-AMETE", "en-u-ca-alem-ethiopic-amete")
+    expect_canonical("en-u-ca-ethiopic-amete-xxx-alem", "en-u-ca-ethiopic-amete-xxx-alem")
+    expect_canonical("EN-U-CA-ETHIOPIC-AMETE-XXX-ALEM", "en-u-ca-ethiopic-amete-xxx-alem")
+    expect_canonical("en-u-cb-ethiopic-amete-alem", "en-u-cb-ethiopic-amete-alem")
+    expect_canonical("EN-U-CB-ETHIOPIC-AMETE-ALEM", "en-u-cb-ethiopic-amete-alem")
+
+    expect_canonical("en-t-en", "en-t-en")
+    expect_canonical("EN-T-EN", "en-t-en")
+    expect_canonical("en-latn-t-en-latn", "en-Latn-t-en-latn")
+    expect_canonical("EN-LATN-T-EN-LATN", "en-Latn-t-en-latn")
+    expect_canonical("en-us-t-en-us", "en-US-t-en-us")
+    expect_canonical("EN-US-T-EN-US", "en-US-t-en-us")
+    expect_canonical("en-latn-us-t-en-latn-us", "en-Latn-US-t-en-latn-us")
+    expect_canonical("EN-LATN-US-T-EN-LATN-US", "en-Latn-US-t-en-latn-us")
+    expect_canonical("en-t-en-k2-bbb-k1-aaa", "en-t-en-k1-aaa-k2-bbb")
+    expect_canonical("EN-T-EN-K2-BBB-K1-AAA", "en-t-en-k1-aaa-k2-bbb")
+    expect_canonical("en-t-k1-true", "en-t-k1-true")
+    expect_canonical("EN-T-K1-TRUE", "en-t-k1-true")
+    expect_canonical("en-t-k1-yes", "en-t-k1-yes")
+    expect_canonical("EN-T-K1-YES", "en-t-k1-yes")
+    # CLDR alias, not ported: expect_canonical("en-t-m0-names", "en-t-m0-prprname")
+    # CLDR alias, not ported: expect_canonical("EN-T-M0-NAMES", "en-t-m0-prprname")
+    expect_canonical("en-t-k1-names", "en-t-k1-names")
+    expect_canonical("EN-T-K1-NAMES", "en-t-k1-names")
+    expect_canonical("en-t-k1-primary", "en-t-k1-primary")
+    expect_canonical("EN-T-K1-PRIMARY", "en-t-k1-primary")
+    expect_canonical("en-t-k1-imperial", "en-t-k1-imperial")
+    expect_canonical("EN-T-K1-IMPERIAL", "en-t-k1-imperial")
+    expect_canonical("en-t-k1-hongkong", "en-t-k1-hongkong")
+    expect_canonical("EN-T-K1-HONGKONG", "en-t-k1-hongkong")
+    expect_canonical("en-t-k1-ethiopic-amete-alem", "en-t-k1-ethiopic-amete-alem")
+    expect_canonical("EN-T-K1-ETHIOPIC-AMETE-ALEM", "en-t-k1-ethiopic-amete-alem")
+
+    expect_canonical("en-0-aaa", "en-0-aaa")
+    expect_canonical("EN-0-AAA", "en-0-aaa")
+    expect_canonical("en-0-bbb-aaa", "en-0-bbb-aaa")
+    expect_canonical("EN-0-BBB-AAA", "en-0-bbb-aaa")
+    expect_canonical("en-z-bbb-0-aaa", "en-0-aaa-z-bbb")
+    expect_canonical("EN-Z-BBB-0-AAA", "en-0-aaa-z-bbb")
+
+    expect_canonical("en-x-aa", "en-x-aa")
+    expect_canonical("EN-X-AA", "en-x-aa")
+    expect_canonical("en-x-bbb-aa", "en-x-bbb-aa")
+    expect_canonical("EN-X-BBB-AA", "en-x-bbb-aa")
+
+    expect_canonical("en-u-aa-t-en", "en-t-en-u-aa")
+    expect_canonical("EN-U-AA-T-EN", "en-t-en-u-aa")
+    expect_canonical("en-z-bbb-u-aa-t-en-0-aaa", "en-0-aaa-t-en-u-aa-z-bbb")
+    expect_canonical("EN-Z-BBB-U-AA-T-EN-0-AAA", "en-0-aaa-t-en-u-aa-z-bbb")
+    expect_canonical("en-z-bbb-u-aa-t-en-0-aaa-x-ccc", "en-0-aaa-t-en-u-aa-z-bbb-x-ccc")
+    expect_canonical("EN-Z-BBB-U-AA-T-EN-0-AAA-X-CCC", "en-0-aaa-t-en-u-aa-z-bbb-x-ccc")
+
+    # Language subtag aliases.
+    # CLDR alias, not ported: expect_canonical("sh", "sr-Latn")
+    # CLDR alias, not ported: expect_canonical("SH", "sr-Latn")
+    # CLDR alias, not ported: expect_canonical("sh-cyrl", "sr-Cyrl")
+    # CLDR alias, not ported: expect_canonical("SH-CYRL", "sr-Cyrl")
+    # CLDR alias, not ported: expect_canonical("cnr", "sr-ME")
+    # CLDR alias, not ported: expect_canonical("CNR", "sr-ME")
+    # CLDR alias, not ported: expect_canonical("cnr-ba", "sr-BA")
+    # CLDR alias, not ported: expect_canonical("CNR-BA", "sr-BA")
+
+    # Territory subtag aliases.
+    # CLDR alias, not ported: expect_canonical("ru-su", "ru-RU")
+    # CLDR alias, not ported: expect_canonical("RU-SU", "ru-RU")
+    # CLDR alias, not ported: expect_canonical("ru-810", "ru-RU")
+    # CLDR alias, not ported: expect_canonical("RU-810", "ru-RU")
+    # CLDR alias, not ported: expect_canonical("en-su", "en-RU")
+    # CLDR alias, not ported: expect_canonical("EN-SU", "en-RU")
+    # CLDR alias, not ported: expect_canonical("en-810", "en-RU")
+    # CLDR alias, not ported: expect_canonical("EN-810", "en-RU")
+    # CLDR alias, not ported: expect_canonical("hy-su", "hy-AM")
+    # CLDR alias, not ported: expect_canonical("HY-SU", "hy-AM")
+    # CLDR alias, not ported: expect_canonical("hy-810", "hy-AM")
+    # CLDR alias, not ported: expect_canonical("HY-810", "hy-AM")
+    # CLDR alias, not ported: expect_canonical("und-Armn-su", "und-Armn-AM")
+    # CLDR alias, not ported: expect_canonical("UND-ARMN-SU", "und-Armn-AM")
+    # CLDR alias, not ported: expect_canonical("und-Armn-810", "und-Armn-AM")
+    # CLDR alias, not ported: expect_canonical("UND-ARMN-810", "und-Armn-AM")
+
+    # Script subtag aliases.
+    # CLDR alias, not ported: expect_canonical("en-qaai", "en-Zinh")
+    # CLDR alias, not ported: expect_canonical("EN-QAAI", "en-Zinh")
+
+    # Variant subtag aliases.
+    # CLDR alias, not ported: expect_canonical("en-polytoni", "en-polyton")
+    # CLDR alias, not ported: expect_canonical("EN-POLYTONI", "en-polyton")
+
+    # Subdivision subtag aliases.
+    # CLDR alias, not ported: expect_canonical("en-u-sd-cn11", "en-u-sd-cnbj")
+    # CLDR alias, not ported: expect_canonical("EN-U-SD-CN11", "en-u-sd-cnbj")
+    # CLDR alias, not ported: expect_canonical("en-u-rg-cn12", "en-u-rg-cntj")
+    # CLDR alias, not ported: expect_canonical("EN-U-RG-CN12", "en-u-rg-cntj")
+    expect_canonical("en-u-aa-cn11", "en-u-aa-cn11")
+    expect_canonical("EN-U-AA-CN11", "en-u-aa-cn11")
+
+    # Complex aliases.
+    # CLDR alias, not ported: expect_canonical("en-lojban", "en")
+    # CLDR alias, not ported: expect_canonical("EN-LOJBAN", "en")
+    # CLDR alias, not ported: expect_canonical("art-lojban", "jbo")
+    # CLDR alias, not ported: expect_canonical("ART-LOJBAN", "jbo")
+    # CLDR alias, not ported: expect_canonical("cel-gaulish", "xtg")
+    # CLDR alias, not ported: expect_canonical("CEL-GAULISH", "xtg")
+    # CLDR alias, not ported: expect_canonical("zh-guoyu", "zh")
+    # CLDR alias, not ported: expect_canonical("ZH-GUOYU", "zh")
+    # CLDR alias, not ported: expect_canonical("zh-hakka", "hak")
+    # CLDR alias, not ported: expect_canonical("ZH-HAKKA", "hak")
+    # CLDR alias, not ported: expect_canonical("zh-xiang", "hsn")
+    # CLDR alias, not ported: expect_canonical("ZH-XIANG", "hsn")
+    # CLDR alias, not ported: expect_canonical("ja-latn-hepburn-heploc", "ja-Latn-alalc97")
+    # CLDR alias, not ported: expect_canonical("JA-LATN-HEPBURN-HEPLOC", "ja-Latn-alalc97")
+
+    # Default content.
+    expect_canonical("en-us", "en-US")
+    expect_canonical("EN-US", "en-US")
+    expect_canonical("zh-Hans-CN", "zh-Hans-CN")
+    expect_canonical("ZH-HANS-CN", "zh-Hans-CN")
+
+# mark: Locale aliases ==========================================================================
+
+test "supports_locale_aliases":
+    assert(is_locale_available(view_of("zh")))
+    assert(is_locale_available(view_of("zh-Hant")))
+    assert(is_locale_available(view_of("zh-TW")))
+    assert(is_locale_available(view_of("zh-Hant-TW")))

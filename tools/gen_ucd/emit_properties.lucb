@@ -1,0 +1,213 @@
+#==============================================================================================
+#
+#   emit_properties - generated_ucd_properties.lucb: the per-code-point property records
+#
+#   DESCRIPTION:
+#       Every code point's enumerated properties, script extensions and binary properties
+#       are one record; equal records are stored once. A two-stage table maps a code point
+#       to its record: stage 1 gives the block of 128 code points its stage-2 block, stage 2
+#       gives each code point its record. All three are fixed-width hexadecimal text, which
+#       keeps the compiler's work independent of the table sizes.
+#
+#==============================================================================================
+
+## The code points of one stage-2 block.
+let block_shift: u32 = 7
+let block_size: usize = 128
+
+## The hexadecimal digits of one record (see the fragment's header for the layout).
+let record_digits: usize = 44
+
+## One code point's properties.
+struct Record:
+    var gc: u8
+    var bc: u8
+    var lb: u8
+    var ea: u8
+    var gcb: u8
+    var wb: u8
+    var sb: u8
+    var incb: u8
+    var sc: u8
+    var jt: u8
+    var ccc: u8
+    var scx: u16
+    var bits_low: u64
+    var bits_high: u64
+
+func record_of(database: const Database*, code_point: u32) -> Record:
+    let index = (usize)code_point
+    return Record(gc = database.gc[index], bc = database.bc[index], lb = database.lb[index],
+                  ea = database.ea[index], gcb = database.gcb[index], wb = database.wb[index],
+                  sb = database.sb[index], incb = database.incb[index], sc = database.sc[index],
+                  jt = database.jt[index], ccc = database.ccc[index], scx = database.scx[index],
+                  bits_low = database.bits[index * 2], bits_high = database.bits[index * 2 + 1])
+
+## A hash of a record, for finding equal records.
+func record_hash(record: const Record*) -> u64:
+    var value: u64 = 14695981039346656037
+    for part in [(u64)record.gc, (u64)record.bc, (u64)record.lb, (u64)record.ea, (u64)record.gcb,
+                 (u64)record.wb, (u64)record.sb, (u64)record.incb, (u64)record.sc, (u64)record.jt,
+                 (u64)record.ccc, (u64)record.scx, record.bits_low, record.bits_high]:
+        value = (value ^ part) *% 1099511628211
+    return value
+
+## An open-addressing table from a hash to the first index with that hash; the caller
+## compares the candidates.
+struct HashIndex:
+    var keys: u64[]
+    var values: u32[]
+    var used: bool[]
+
+    static func create(capacity: usize) -> HashIndex!:
+        return HashIndex(keys = try new u64[capacity], values = try new u32[capacity], used = try new bool[capacity])
+
+    ## The slot of `key` with `equal(value)`, or the free slot where it belongs.
+    func find(key: u64, context: const void*, equal: func(const void*, u32) -> bool) -> usize:
+        var slot = (usize)(key % (u64)self.keys.length)
+        while self.used[slot]:
+            if self.keys[slot] == key and equal(context, self.values[slot]):
+                return slot
+            slot = (slot + 1) % self.keys.length
+        return slot
+
+    mutating func insert(slot: usize, key: u64, value: u32):
+        self.keys[slot] = key
+        self.values[slot] = value
+        self.used[slot] = true
+
+struct RecordSearch:
+    var records: const Record[]
+    var wanted: Record
+
+func record_equal(context: const void*, index: u32) -> bool:
+    let search = (const RecordSearch*)context
+    return search.records[(usize)index] == search.wanted
+
+struct BlockSearch:
+    var stage2: const u32[]
+    var wanted: const u32[]
+
+func block_equal(context: const void*, index: u32) -> bool:
+    let search = (const BlockSearch*)context
+    let start = (usize)index * block_size
+    return same_u32s(search.stage2[start..<start + block_size], search.wanted)
+
+func emit_properties(database: const Database*) -> str!:
+    # Records, in order of first use.
+    var records = try new Record[4096]
+    var record_count: usize = 0
+    var record_index = try HashIndex.create(16384)
+    var record_of_code_point = try new u32[code_point_count]
+    for code_point: u32 in 0..<(u32)code_point_count:
+        let record = record_of(database, code_point)
+        let key = record_hash(&record)
+        let search = RecordSearch(records = records[..<record_count], wanted = record)
+        let slot = record_index.find(key, &search, record_equal)
+        if not record_index.used[slot]:
+            assert(record_count < records.length, "too many distinct records")
+            records[record_count] = record
+            record_index.insert(slot, key, (u32)record_count)
+            record_count += 1
+        record_of_code_point[(usize)code_point] = record_index.values[slot]
+    assert(record_count <= 4096, "record numbers need more than three hexadecimal digits")
+
+    # Stage-2 blocks, in order of first use.
+    let block_count = code_point_count // block_size
+    var stage1 = try new u32[block_count]
+    var stage2 = try U32List.create()
+    var distinct_blocks: usize = 0
+    var block_index = try HashIndex.create(4096)
+    for block in 0..<block_count:
+        let wanted = record_of_code_point[block * block_size..<(block + 1) * block_size]
+        var key: u64 = 14695981039346656037
+        for value in wanted:
+            key = (key ^ (u64)value) *% 1099511628211
+        let search = BlockSearch(stage2 = stage2.view(), wanted = wanted)
+        let slot = block_index.find(key, &search, block_equal)
+        if not block_index.used[slot]:
+            block_index.insert(slot, key, (u32)distinct_blocks)
+            distinct_blocks += 1
+            for value in wanted:
+                try stage2.append(value)
+        stage1[block] = block_index.values[slot]
+    assert(distinct_blocks <= 4096, "block numbers need more than three hexadecimal digits")
+
+    var out = try strings.Builder.create(1 << 20)
+    try put_header(&out, "generated_ucd_properties", "the Unicode Character Database properties of every code point", [
+        "Generated by tools/gen_ucd from data/ucd/ppucd.txt, emoji-sequences.txt and",
+        "emoji-zwj-sequences.txt (Unicode 17.0.0, the data ICU 78.2 is built from); do not edit.",
+        "",
+        "A code point's record is found in two steps: ucd_stage1 holds, for each block of 128",
+        "code points, the number of its stage-2 block (3 hexadecimal digits); ucd_stage2 holds",
+        "the blocks, a record number per code point (3 digits); ucd_records holds the records,",
+        "44 digits each: general category, bidi class, line break, East Asian width, grapheme",
+        "cluster break, word break, sentence break, Indic conjunct break, script, joining type,",
+        "canonical combining class and script extension set (2 digits each, ICU's numbering),",
+        "then the binary properties in UProperty order, four per digit, lowest bit first.",
+        "",
+        "Unicode data: Copyright Unicode, Inc., Unicode License v3 (data/ucd/LICENSE.txt).",
+    ])
+    try out.put("\n## The Unicode version of the tables (ICU 78.2's).\npub let ucd_unicode_version: str = \"17.0.0\"\n")
+
+    try out.put("\n# ")
+    try put_decimal(&out, (u64)block_count)
+    try out.put(" blocks of 128 code points.\nlet ucd_stage1: str = \"")
+    for value in stage1:
+        try put_hex(&out, (u64)value, 3)
+    try out.put("\"\n\n# ")
+    try put_decimal(&out, (u64)distinct_blocks)
+    try out.put(" distinct blocks.\nlet ucd_stage2: str = \"")
+    for value in stage2.view():
+        try put_hex(&out, (u64)value, 3)
+    try out.put("\"\n\n# ")
+    try put_decimal(&out, (u64)record_count)
+    try out.put(" distinct records.\nlet ucd_records: str = \"")
+    for record in records[..<record_count]:
+        for field in [record.gc, record.bc, record.lb, record.ea, record.gcb, record.wb, record.sb, record.incb, record.sc, record.jt, record.ccc]:
+            try put_hex(&out, (u64)field, 2)
+        assert(record.scx < 256)
+        try put_hex(&out, (u64)record.scx, 2)
+        for digit in 0..<(u64)20:
+            let bit = digit * 4
+            let nibble = (record.bits_low >> bit) & 15 if bit < 64 else (record.bits_high >> (bit - 64)) & 15
+            try put_hex(&out, nibble, 1)
+    try out.put("\"\n")
+
+    # Script extension sets: count, then scripts, 2 digits each; set N starts at the digit
+    # offset given by the N-th 4-digit entry of the offsets.
+    try out.put("\n# The script extension sets: a count, then the scripts (2 digits each).\nlet ucd_script_extension_sets: str = \"")
+    for value in database.scx_sets.view():
+        try put_hex(&out, (u64)value, 2)
+    try out.put("\"\n\n# The start of each set in ucd_script_extension_sets, in entries (4 digits each).\nlet ucd_script_extension_offsets: str = \"")
+    for value in database.scx_set_offsets.view():
+        try put_hex(&out, (u64)value, 4)
+    try out.put("\"\n")
+
+    var general_category_names: Names[39]
+    for index in 0..<30:
+        general_category_names[index] = database.general_category_names[index]
+    for index in 0..<8:
+        general_category_names[31 + index] = database.general_category_group_names[index]
+    try put_names_table(&out, "## ICU's names of each general category (UCharCategory, 0 through 29), then of the\n## groups LC, L, M, N, P, S, Z and C, which LibUnicode numbers U_CHAR_CATEGORY_COUNT + 1\n## through + 8.\nlet ucd_general_category_names: UcdNames[39]", general_category_names)
+    try put_names_table(&out, "## ICU's names of each binary property (UProperty, 0 through UCHAR_BINARY_LIMIT - 1).\nlet ucd_binary_property_names: UcdNames[76]", database.binary_names)
+    try put_names_table(&out, "## ICU's names of each script (UScriptCode, 0 through USCRIPT_CODE_LIMIT - 1).\nlet ucd_script_names: UcdNames[213]", database.script_names)
+    return out.view()
+
+## A `let` array of UcdNames.
+func put_names_table(out: strings.Builder*, declaration: str, names: const Names[]) -> !:
+    try out.put("\n")
+    try out.put(declaration)
+    try out.put(" = [\n")
+    for entry in names:
+        try put_names(out, entry)
+    try out.put("]\n")
+
+func put_names(out: strings.Builder*, names: Names) -> !:
+    try out.put("    UcdNames(short_name = \"")
+    try out.put(names.short_name)
+    try out.put("\", long_name = \"")
+    try out.put(names.long_name)
+    try out.put("\", additional_name = \"")
+    try out.put(names.additional_name)
+    try out.put("\"),\n")

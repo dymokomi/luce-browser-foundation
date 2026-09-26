@@ -8,18 +8,11 @@
 #       the donor's tests were printed by the reference build's LibURL (Ladybird 47c82b38d0)
 #       for the same input.
 #
-#       web_unicode (region r07) is not merged yet: the tests that reach its IDNA
-#       (public_suffix) or its identifier properties (every URLPattern test) start with
-#       `if not web_unicode_is_ported: return`. Remove the flag when r07 is merged.
-#
 #==============================================================================================
 
 import ak
 import memory
 import web_url
-
-## Whether region r07's web_unicode functions (IDNA, identifier properties) are ported.
-var web_unicode_is_ported: bool = false
 
 # mark: Parsing ================================================================================
 

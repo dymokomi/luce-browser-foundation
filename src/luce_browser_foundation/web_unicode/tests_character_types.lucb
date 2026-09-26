@@ -1,0 +1,465 @@
+#==============================================================================================
+#
+#   tests_character_types - Tests/LibUnicode/TestUnicodeCharacterTypes.cpp
+#
+#   DESCRIPTION:
+#       Ladybird's character type tests. ranges_equal_ignoring_case takes the code points of
+#       the views.
+#
+#==============================================================================================
+
+func general_category_named(name: str) -> u32:
+    return general_category_from_string(view_of(name)) else trap("VERIFY: general_category.has_value()")
+
+# Ported from TestUnicodeCharacterTypes.cpp TEST_CASE(general_category).
+test "general_category":
+    let general_category_c = general_category_named("C")
+    let general_category_other_name = general_category_named("Other")
+    assert(general_category_c == general_category_other_name)
+
+    let general_category_cc = general_category_named("Cc")
+    let general_category_control = general_category_named("Control")
+    assert(general_category_cc == general_category_control)
+
+    let general_category_co = general_category_named("Co")
+    let general_category_private_use = general_category_named("Private_Use")
+    assert(general_category_co == general_category_private_use)
+
+    let general_category_cn = general_category_named("Cn")
+    let general_category_unassigned = general_category_named("Unassigned")
+    assert(general_category_cn == general_category_unassigned)
+
+    let general_category_lc = general_category_named("LC")
+    let general_category_cased_letter_name = general_category_named("Cased_Letter")
+    assert(general_category_lc == general_category_cased_letter_name)
+
+    let general_category_ll = general_category_named("Ll")
+    let general_category_lowercase_letter = general_category_named("Lowercase_Letter")
+    assert(general_category_ll == general_category_lowercase_letter)
+
+    let general_category_lu = general_category_named("Lu")
+    let general_category_uppercase_letter = general_category_named("Uppercase_Letter")
+    assert(general_category_lu == general_category_uppercase_letter)
+
+    for code_point: u32 in 0..=0x1f:
+        assert(code_point_has_general_category(code_point, general_category_c))
+        assert(code_point_has_general_category(code_point, general_category_cc))
+
+        assert(not code_point_has_general_category(code_point, general_category_co))
+        assert(not code_point_has_general_category(code_point, general_category_cn))
+        assert(not code_point_has_general_category(code_point, general_category_lc))
+        assert(not code_point_has_general_category(code_point, general_category_ll))
+        assert(not code_point_has_general_category(code_point, general_category_lu))
+
+    for code_point: u32 in 0xe000..=0xe100:
+        assert(code_point_has_general_category(code_point, general_category_c))
+        assert(code_point_has_general_category(code_point, general_category_co))
+
+        assert(not code_point_has_general_category(code_point, general_category_cc))
+        assert(not code_point_has_general_category(code_point, general_category_cn))
+        assert(not code_point_has_general_category(code_point, general_category_lc))
+        assert(not code_point_has_general_category(code_point, general_category_ll))
+        assert(not code_point_has_general_category(code_point, general_category_lu))
+
+    for code_point: u32 in 0x101fe..=0x1027f:
+        assert(code_point_has_general_category(code_point, general_category_c))
+        assert(code_point_has_general_category(code_point, general_category_cn))
+
+        assert(not code_point_has_general_category(code_point, general_category_cc))
+        assert(not code_point_has_general_category(code_point, general_category_co))
+        assert(not code_point_has_general_category(code_point, general_category_lc))
+        assert(not code_point_has_general_category(code_point, general_category_ll))
+        assert(not code_point_has_general_category(code_point, general_category_lu))
+
+    for code_point: u32 in 0x61..=0x7a:
+        assert(code_point_has_general_category(code_point, general_category_lc))
+        assert(code_point_has_general_category(code_point, general_category_ll))
+
+        assert(not code_point_has_general_category(code_point, general_category_c))
+        assert(not code_point_has_general_category(code_point, general_category_cc))
+        assert(not code_point_has_general_category(code_point, general_category_co))
+        assert(not code_point_has_general_category(code_point, general_category_cn))
+        assert(not code_point_has_general_category(code_point, general_category_lu))
+
+    for code_point: u32 in 0x41..=0x5a:
+        assert(code_point_has_general_category(code_point, general_category_lc))
+        assert(code_point_has_general_category(code_point, general_category_lu))
+
+        assert(not code_point_has_general_category(code_point, general_category_c))
+        assert(not code_point_has_general_category(code_point, general_category_cc))
+        assert(not code_point_has_general_category(code_point, general_category_co))
+        assert(not code_point_has_general_category(code_point, general_category_cn))
+        assert(not code_point_has_general_category(code_point, general_category_ll))
+
+    for code_point: u32 in 0x61..=0x7a:
+        assert(not code_point_has_general_category(code_point, general_category_lu, ak.CaseSensitivity.case_sensitive))
+        assert(code_point_has_general_category(code_point, general_category_lu, ak.CaseSensitivity.case_insensitive))
+
+    for code_point: u32 in 0x41..=0x5a:
+        assert(not code_point_has_general_category(code_point, general_category_ll, ak.CaseSensitivity.case_sensitive))
+        assert(code_point_has_general_category(code_point, general_category_ll, ak.CaseSensitivity.case_insensitive))
+
+    for code_point: u32 in 0x0410..=0x042f:
+        assert(not code_point_has_general_category(code_point, general_category_ll, ak.CaseSensitivity.case_sensitive))
+        assert(code_point_has_general_category(code_point, general_category_ll, ak.CaseSensitivity.case_insensitive))
+
+    for code_point: u32 in 0x0430..=0x044f:
+        assert(not code_point_has_general_category(code_point, general_category_lu, ak.CaseSensitivity.case_sensitive))
+        assert(code_point_has_general_category(code_point, general_category_lu, ak.CaseSensitivity.case_insensitive))
+
+func property_named(name: str) -> u32:
+    return property_from_string(view_of(name)) else trap("VERIFY: property.has_value()")
+
+# Ported from TestUnicodeCharacterTypes.cpp TEST_CASE(property).
+test "property":
+    let property_any_name = property_named("Any")
+    let property_assigned_name = property_named("Assigned")
+    let property_ascii_name = property_named("ASCII")
+    let property_uppercase = property_named("Uppercase")
+    let property_lowercase = property_named("Lowercase")
+
+    let property_white_space = property_named("White_Space")
+    let property_wspace = property_named("WSpace")
+    let property_space = property_named("space")
+    assert(property_white_space == property_wspace)
+    assert(property_white_space == property_space)
+
+    let property_emoji_presentation = property_named("Emoji_Presentation")
+    let property_epres = property_named("EPres")
+    assert(property_emoji_presentation == property_epres)
+
+    var code_point: u32 = 0
+    while code_point <= 0x10ffff:
+        assert(code_point_has_property(code_point, property_any_name))
+        code_point += 1000
+
+    for cp: u32 in 0x101d0..=0x101fd:
+        assert(code_point_has_property(cp, property_any_name))
+        assert(code_point_has_property(cp, property_assigned_name))
+
+        assert(not code_point_has_property(cp, property_ascii_name))
+        assert(not code_point_has_property(cp, property_white_space))
+        assert(not code_point_has_property(cp, property_emoji_presentation))
+
+    for cp: u32 in 0x101fe..=0x1027f:
+        assert(code_point_has_property(cp, property_any_name))
+
+        assert(not code_point_has_property(cp, property_assigned_name))
+        assert(not code_point_has_property(cp, property_ascii_name))
+        assert(not code_point_has_property(cp, property_white_space))
+        assert(not code_point_has_property(cp, property_emoji_presentation))
+
+    for cp: u32 in 0..=0x7f:
+        assert(code_point_has_property(cp, property_any_name))
+        assert(code_point_has_property(cp, property_assigned_name))
+        assert(code_point_has_property(cp, property_ascii_name))
+
+        assert(not code_point_has_property(cp, property_emoji_presentation))
+
+    for cp: u32 in 0x9..=0xd:
+        assert(code_point_has_property(cp, property_any_name))
+        assert(code_point_has_property(cp, property_assigned_name))
+        assert(code_point_has_property(cp, property_ascii_name))
+        assert(code_point_has_property(cp, property_white_space))
+
+        assert(not code_point_has_property(cp, property_emoji_presentation))
+
+    for cp: u32 in 0x1f3e5..=0x1f3f0:
+        assert(code_point_has_property(cp, property_any_name))
+        assert(code_point_has_property(cp, property_assigned_name))
+        assert(code_point_has_property(cp, property_emoji_presentation))
+
+        assert(not code_point_has_property(cp, property_ascii_name))
+        assert(not code_point_has_property(cp, property_white_space))
+
+    for cp: u32 in 0x61..=0x7a:
+        assert(not code_point_has_property(cp, property_uppercase, ak.CaseSensitivity.case_sensitive))
+        assert(code_point_has_property(cp, property_uppercase, ak.CaseSensitivity.case_insensitive))
+
+    for cp: u32 in 0x41..=0x5a:
+        assert(not code_point_has_property(cp, property_lowercase, ak.CaseSensitivity.case_sensitive))
+        assert(code_point_has_property(cp, property_lowercase, ak.CaseSensitivity.case_insensitive))
+
+    for cp: u32 in 0x0430..=0x044f:
+        assert(not code_point_has_property(cp, property_uppercase, ak.CaseSensitivity.case_sensitive))
+        assert(code_point_has_property(cp, property_uppercase, ak.CaseSensitivity.case_insensitive))
+
+    for cp: u32 in 0x0410..=0x042f:
+        assert(not code_point_has_property(cp, property_lowercase, ak.CaseSensitivity.case_sensitive))
+        assert(code_point_has_property(cp, property_lowercase, ak.CaseSensitivity.case_insensitive))
+
+func script_named(name: str) -> u32:
+    return script_from_string(view_of(name)) else trap("VERIFY: script.has_value()")
+
+# Ported from TestUnicodeCharacterTypes.cpp TEST_CASE(script).
+test "script":
+    let script_latin = script_named("Latin")
+    let script_latn = script_named("Latn")
+    assert(script_latin == script_latn)
+
+    let script_cyrillic = script_named("Cyrillic")
+    let script_cyrl = script_named("Cyrl")
+    assert(script_cyrillic == script_cyrl)
+
+    let script_greek = script_named("Greek")
+    let script_grek = script_named("Grek")
+    assert(script_greek == script_grek)
+
+    for code_point: u32 in 0x41..=0x5a:
+        assert(code_point_has_script(code_point, script_latin))
+        assert(code_point_has_script_extension(code_point, script_latin))
+
+        assert(not code_point_has_script(code_point, script_cyrillic))
+        assert(not code_point_has_script(code_point, script_greek))
+
+    for code_point: u32 in 0x61..=0x7a:
+        assert(code_point_has_script(code_point, script_latin))
+        assert(code_point_has_script_extension(code_point, script_latin))
+
+        assert(not code_point_has_script(code_point, script_cyrillic))
+        assert(not code_point_has_script(code_point, script_greek))
+
+    for code_point: u32 in 0x400..=0x481:
+        assert(code_point_has_script(code_point, script_cyrillic))
+        assert(code_point_has_script_extension(code_point, script_cyrillic))
+
+        assert(not code_point_has_script(code_point, script_latin))
+        assert(not code_point_has_script(code_point, script_greek))
+
+    for code_point: u32 in 0x1f80..=0x1fb4:
+        assert(code_point_has_script(code_point, script_greek))
+        assert(code_point_has_script_extension(code_point, script_greek))
+
+        assert(not code_point_has_script(code_point, script_latin))
+        assert(not code_point_has_script(code_point, script_cyrillic))
+
+# Ported from TestUnicodeCharacterTypes.cpp TEST_CASE(script_extension).
+test "script_extension":
+    let script_latin = script_named("Latin")
+    let script_greek = script_named("Greek")
+
+    for code_point: u32 in 0x363..=0x36f:
+        assert(not code_point_has_script(code_point, script_latin))
+        assert(code_point_has_script_extension(code_point, script_latin))
+
+    assert(not code_point_has_script(0x342, script_greek))
+    assert(code_point_has_script_extension(0x342, script_greek))
+
+    assert(not code_point_has_script(0x345, script_greek))
+    assert(code_point_has_script_extension(0x345, script_greek))
+
+    assert(not code_point_has_script(0x1dc0, script_greek))
+    assert(code_point_has_script_extension(0x1dc0, script_greek))
+
+    assert(not code_point_has_script(0x1dc1, script_greek))
+    assert(code_point_has_script_extension(0x1dc1, script_greek))
+
+    let script_common = script_named("Common")
+    let script_zyyy = script_named("Zyyy")
+    assert(script_common == script_zyyy)
+
+    assert(code_point_has_script(0x202f, script_common))
+    assert(not code_point_has_script_extension(0x202f, script_common))
+
+    assert(code_point_has_script(0x3000, script_common))
+    assert(code_point_has_script_extension(0x3000, script_common))
+
+    let script_inherited = script_named("Inherited")
+    let script_qaai = script_named("Qaai")
+    let script_zinh = script_named("Zinh")
+    assert(script_inherited == script_qaai)
+    assert(script_inherited == script_zinh)
+
+    assert(code_point_has_script(0x1ced, script_inherited))
+    assert(not code_point_has_script_extension(0x1ced, script_inherited))
+
+    assert(code_point_has_script(0x101fd, script_inherited))
+    assert(code_point_has_script_extension(0x101fd, script_inherited))
+
+# Ported from TestUnicodeCharacterTypes.cpp TEST_CASE(code_point_bidirectional_character_type).
+test "code_point_bidirectional_character_type":
+    # Left-to-right
+    assert(bidirectional_class(0x41) == BidiClass.left_to_right)
+    assert(bidirectional_class(0x7a) == BidiClass.left_to_right)
+    # European number
+    assert(bidirectional_class(0x37) == BidiClass.european_number)
+    # Whitespace
+    assert(bidirectional_class(0x20) == BidiClass.white_space_neutral)
+    # Arabic right-to-left (U+FEB4 ARABIC LETTER SEEN MEDIAL FORM)
+    assert(bidirectional_class(0xfeb4) == BidiClass.right_to_left_arabic)
+
+# Ported from TestUnicodeCharacterTypes.cpp TEST_CASE(canonicalize).
+test "canonicalize":
+    let latin_capital_a_grave: u32 = 0x00c0
+    let latin_small_a_grave: u32 = 0x00e0
+    let latin_capital_sharp_s: u32 = 0x1e9e
+    let latin_small_sharp_s: u32 = 0x00df
+    let latin_capital_oe: u32 = 0x0152
+    let latin_small_oe: u32 = 0x0153
+    let greek_capital_sigma: u32 = 0x03a3
+    let greek_small_sigma: u32 = 0x03c3
+    let greek_small_final_sigma: u32 = 0x03c2
+    let kelvin_sign: u32 = 0x212a
+
+    assert(canonicalize(0x41, true) == 0x61)
+    assert(canonicalize(0x61, false) == 0x41)
+
+    assert(canonicalize(kelvin_sign, true) == 0x6b)
+    assert(canonicalize(kelvin_sign, false) == kelvin_sign)
+
+    assert(canonicalize(latin_capital_a_grave, true) == latin_small_a_grave)
+    assert(canonicalize(latin_small_a_grave, false) == latin_capital_a_grave)
+
+    assert(canonicalize(latin_capital_sharp_s, true) == latin_small_sharp_s)
+    assert(canonicalize(latin_small_sharp_s, false) == latin_small_sharp_s)
+
+    assert(canonicalize(greek_capital_sigma, true) == greek_small_sigma)
+    assert(canonicalize(greek_small_final_sigma, true) == greek_small_sigma)
+
+    assert(canonicalize(latin_capital_oe, true) == latin_small_oe)
+    assert(canonicalize(latin_small_oe, false) == latin_capital_oe)
+
+## any_of(ranges, [](auto const& range) { return range.from == from && range.to == to; }).
+func has_range(ranges: const ak.Vector[CodePointRange]*, from_: u32, to: u32) -> bool:
+    for range in ak.vector_span_const(ranges):
+        if range.from_ == from_ and range.to == to:
+            return true
+    return false
+
+# Ported from TestUnicodeCharacterTypes.cpp TEST_CASE(expand_range_case_insensitive).
+test "expand_range_case_insensitive":
+    let latin_ranges = expand_range_case_insensitive((u32)'a', (u32)'z')
+    assert(ak.vector_size(&latin_ranges) == 4)
+    assert(has_range(&latin_ranges, (u32)'a', (u32)'z'))
+    assert(has_range(&latin_ranges, (u32)'A', (u32)'Z'))
+    # LATIN SMALL LETTER LONG S (ſ)
+    assert(has_range(&latin_ranges, 0x017f, 0x017f))
+    # KELVIN SIGN (K)
+    assert(has_range(&latin_ranges, 0x212a, 0x212a))
+
+    let k_ranges = expand_range_case_insensitive((u32)'k', (u32)'k')
+    assert(ak.vector_size(&k_ranges) == 3)
+    # KELVIN SIGN (K)
+    assert(has_range(&k_ranges, 0x212a, 0x212a))
+
+func collect_code_point(context: void*?, code_point: u32) -> ak.IterationDecision:
+    let collected = (CodePointBuffer*)(context else trap("no capture"))
+    collected.append(code_point)
+    return ak.IterationDecision.continue_
+
+func case_folded_code_points(code_point: u32) -> CodePointBuffer:
+    var collected = CodePointBuffer.create(4)
+    for_each_case_folded_code_point(code_point, ak.Function1[u32, ak.IterationDecision](call = collect_code_point, context = &collected))
+    return collected
+
+func contains_code_point(list: const CodePointBuffer*, code_point: u32) -> bool:
+    for value in list.view():
+        if value == code_point:
+            return true
+    return false
+
+# Ported from TestUnicodeCharacterTypes.cpp TEST_CASE(for_each_case_folded_code_point).
+test "for_each_case_folded_code_point":
+    let folded_a = case_folded_code_points(0x41)
+    assert(contains_code_point(&folded_a, 0x41))
+    assert(contains_code_point(&folded_a, 0x61))
+
+    let folded_sigma = case_folded_code_points(0x03a3)
+    assert(contains_code_point(&folded_sigma, 0x03a3))
+    assert(contains_code_point(&folded_sigma, 0x03c3))
+    assert(contains_code_point(&folded_sigma, 0x03c2))
+
+    let folded_kelvin = case_folded_code_points(0x212a)
+    assert(contains_code_point(&folded_kelvin, 0x212a))
+    assert(contains_code_point(&folded_kelvin, 0x4b))
+    assert(contains_code_point(&folded_kelvin, 0x6b))
+
+# Ported from TestUnicodeCharacterTypes.cpp TEST_CASE(code_point_matches_range_ignoring_case).
+test "code_point_matches_range_ignoring_case":
+    assert(code_point_matches_range_ignoring_case(0x42, 0x61, 0x7a, true))
+    assert(code_point_matches_range_ignoring_case(0x62, 0x41, 0x5a, true))
+
+    assert(code_point_matches_range_ignoring_case(0x212a, 0x61, 0x7a, true))
+    assert(not code_point_matches_range_ignoring_case(0x212a, 0x61, 0x7a, false))
+
+    assert(code_point_matches_range_ignoring_case(0x00e0, 0x00c0, 0x00c0, true))
+    assert(code_point_matches_range_ignoring_case(0x00c0, 0x00e0, 0x00e0, true))
+
+    assert(code_point_matches_range_ignoring_case(0x03c2, 0x03c3, 0x03c3, true))
+    assert(code_point_matches_range_ignoring_case(0x00b5, 0x03bc, 0x03bc, true))
+
+func code_points_of(text: str) -> CodePointBuffer:
+    return code_points_of_bytes(text.bytes)
+
+func equal_ignoring_case(a: str, b: str, unicode_mode: bool) -> bool:
+    let x = code_points_of(a)
+    let y = code_points_of(b)
+    return ranges_equal_ignoring_case(x.view(), y.view(), unicode_mode)
+
+# Ported from TestUnicodeCharacterTypes.cpp TEST_CASE(ranges_equal_ignoring_case).
+test "ranges_equal_ignoring_case":
+    assert(equal_ignoring_case("Hello", "HELLO", true))
+    assert(equal_ignoring_case("Hello", "hello", true))
+
+    assert(equal_ignoring_case("Σσς", "ΣΣΣ", true))
+    assert(equal_ignoring_case("straße", "STRAẞE", true))
+    assert(equal_ignoring_case("CAFÉ", "café", true))
+    assert(equal_ignoring_case("Œ", "œ", true))
+
+    assert(equal_ignoring_case("\u{212A}", "K", true))
+    assert(not equal_ignoring_case("\u{212A}", "K", false))
+
+# Not in Ladybird's tests: the other predicates, pinned to ICU 78.2's answers.
+test "predicates and classes":
+    assert(code_point_is_printable(0x61) and not code_point_is_printable(0x7f) and not code_point_is_printable(0xe000))
+    assert(code_point_has_identifier_start_property(0x61) and not code_point_has_identifier_start_property(0x31))
+    assert(code_point_has_identifier_continue_property(0x31) and not code_point_has_identifier_continue_property(0))
+    assert(code_point_has_emoji_property(0x1f600) and code_point_has_emoji_presentation_property(0x1f600))
+    assert(code_point_has_emoji_modifier_base_property(0x1f44d))
+    assert(code_point_has_regional_indicator_property(0x1f1fa))
+    assert(code_point_has_variation_selector_property(0xfe0f))
+    assert(code_point_has_white_space_property(0x3000) and not code_point_has_white_space_property(0x200b))
+    assert(code_point_has_space_separator_general_category(0xa0))
+    assert(code_point_has_punctuation_general_category(0x2019) and code_point_has_symbol_general_category(0x2b))
+    assert(code_point_has_mark_general_category(0x301) and code_point_has_number_general_category(0x661))
+    assert(code_point_has_letter_general_category(0x5d0) and code_point_has_control_general_category(0x85))
+    assert(code_point_has_separator_general_category(0x2028))
+    assert(line_break_class(0x61) == LineBreakClass.alphabetic and line_break_class(0x5d0) == LineBreakClass.alphabetic)
+    assert(line_break_class(0x31) == LineBreakClass.numeric and line_break_class(0x4e00) == LineBreakClass.ideographic)
+    assert(line_break_class(0xac00) == LineBreakClass.ideographic and line_break_class(0xa7) == LineBreakClass.ambiguous)
+    assert(line_break_class(0xe01) == LineBreakClass.complex_context and line_break_class(0x301) == LineBreakClass.combining_mark)
+    assert(line_break_class(0x20) == LineBreakClass.other)
+    assert(bidirectional_class(0x5d0) == BidiClass.right_to_left and bidirectional_class(0x661) == BidiClass.arabic_number)
+    assert(bidirectional_class(0x2067) == BidiClass.right_to_left_isolate and bidirectional_class(0x200b) == BidiClass.boundary_neutral)
+    assert(is_ecma262_property(property_named("Alphabetic")) and not is_ecma262_property(property_named("NFD_Inert")))
+    assert(is_ecma262_string_property(property_named("RGI_Emoji")) and not is_ecma262_string_property(property_named("Emoji")))
+    assert(general_category_from_string(view_of("")) == none and property_from_string(view_of("Bogus")) == none)
+
+# Not in Ladybird's tests: the LibRegex interface, pinned to ICU 78.2's answers.
+test "unicode_property_matches":
+    let sc = "sc"
+    let greek = "Greek"
+    let lu = "Lu"
+    let lowercase = "Lowercase"
+    let basic_emoji = "RGI_Emoji_Flag_Sequence"
+    assert(unicode_property_matches(0x3b1, sc.bytes.data, sc.length, greek.bytes.data, greek.length))
+    assert(not unicode_property_matches(0x61, sc.bytes.data, sc.length, greek.bytes.data, greek.length))
+    assert(unicode_property_matches(0x41, lu.bytes.data, lu.length, none, 0))
+    assert(unicode_property_matches_case_insensitive(0x61, lu.bytes.data, lu.length, none, 0))
+    assert(not unicode_property_all_case_equivalents_match(0x61, lowercase.bytes.data, lowercase.length, none, 0))
+    var kind: u8 = 0
+    var id: u32 = 0
+    assert(unicode_resolve_property(sc.bytes.data, sc.length, greek.bytes.data, greek.length, &kind, &id))
+    assert(kind == (u8)ResolvedPropertyKind.script and id == 14)
+    assert(unicode_resolved_property_matches(0x3b1, kind, id))
+    assert(unicode_is_string_property(basic_emoji.bytes.data, basic_emoji.length))
+    assert(unicode_is_valid_ecma262_property(lu.bytes.data, lu.length, none, 0))
+    # 259 flags of two code points each: 1 + 259 * 3 values.
+    assert(unicode_get_string_property_data(basic_emoji.bytes.data, basic_emoji.length, none, 0) == 1 + 259 * 3)
+    var closure: u32[8]
+    assert(unicode_get_case_closure(0x212a, &closure[0], 8) == 3)
+    assert(unicode_simple_case_fold(0x212a, true) == 0x6b)
+    assert(unicode_code_point_matches_range_ignoring_case(0x212a, 0x61, 0x7a, true))
+    assert(unicode_code_point_has_space_separator_general_category(0x20))
+    assert(unicode_code_point_has_identifier_start_property(0x61))
+    assert(unicode_code_point_has_identifier_continue_property(0x5f))

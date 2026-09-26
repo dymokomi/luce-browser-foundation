@@ -1,0 +1,153 @@
+#==============================================================================================
+#
+#   tests_break_conformance - the UCD break tests over the boundary rules
+#
+#   DESCRIPTION:
+#       GraphemeBreakTest.txt, WordBreakTest.txt, SentenceBreakTest.txt and LineBreakTest.txt
+#       of Unicode 17.0.0 (tests/data/ucd, as ICU 78.2 ships them), run through the rules of
+#       break_grapheme, break_word, break_sentence and break_line. Like ICU's own run of
+#       these files, word cases with characters ICU segments by dictionary (complex-context
+#       scripts, Han, Hiragana, Katakana) are skipped: ICU tailors them.
+#
+#==============================================================================================
+
+## The rules under test.
+enum BreakRules:
+    grapheme
+    word
+    sentence
+    line
+
+## The boundaries `rules` find in `code_points`.
+func conformance_boundaries(rules: BreakRules, code_points: const u32[]) -> CodePointBuffer:
+    var boundaries = CodePointBuffer.create(code_points.length + 2)
+    var statuses = CodePointBuffer.create(code_points.length + 2)
+    match rules:
+        .grapheme: grapheme_boundaries(code_points, &boundaries)
+        .word: word_boundaries(code_points, &boundaries, &statuses)
+        .sentence: sentence_boundaries(code_points, &boundaries)
+        .line: line_boundaries(code_points, &boundaries)
+    return boundaries
+
+## Whether ICU segments `code_point` by dictionary in word breaking.
+func is_dictionary_character(code_point: u32) -> bool:
+    let script = ucd_script(code_point)
+    return ucd_line_break(code_point) == lb_sa or script == usc_han or script == usc_hiragana or ucd_word_break(code_point) == wb_katakana
+
+extern func fopen(path: const u8*, mode: const u8*) -> void*?
+extern func fread(buffer: void*, size: usize, count: usize, stream: void*) -> usize
+extern func fclose(stream: void*) -> i32
+
+## The bytes of the test data file at `path` (relative to the package, where test.sh runs),
+## read with the C library (the module does not import luce-std's files for its tests).
+func read_test_file(path: str) -> u8[]!:
+    let stream = fopen(path.bytes.data, "rb".bytes.data) else error(ak.ak_error, "cannot open a test data file")
+    defer discard(fclose(stream))
+    var data = try new u8[1 << 16]
+    var used: usize = 0
+    while true:
+        if used == data.length:
+            let grown = try new u8[data.length * 2]
+            for index in 0..<used:
+                grown[index] = data[index]
+            data = grown
+        let count = fread(&data[used], 1, data.length - used, stream)
+        if count == 0:
+            break
+        used += count
+    return data[..<used]
+
+func read_break_test_file(rules: BreakRules) -> u8[]!:
+    match rules:
+        .grapheme: return try read_test_file("tests/data/ucd/GraphemeBreakTest.txt")
+        .word: return try read_test_file("tests/data/ucd/WordBreakTest.txt")
+        .sentence: return try read_test_file("tests/data/ucd/SentenceBreakTest.txt")
+        .line: return try read_test_file("tests/data/ucd/LineBreakTest.txt")
+
+## Run one test file; answers the number of cases run. Prints and counts every failure.
+func run_break_test_file(rules: BreakRules) -> (usize, usize):
+    let data = read_break_test_file(rules) else trap("cannot read a break test file")
+    var cases: usize = 0
+    var failures: usize = 0
+    var offset: usize = 0
+    while offset < data.length:
+        var end = offset
+        while end < data.length and data[end] != '\n':
+            end += 1
+        let line = data[offset..<end]
+        offset = end + 1
+        var code_points = CodePointBuffer.create(16)
+        var expected = CodePointBuffer.create(16)
+        var skip = false
+        var index: usize = 0
+        while index < line.length and line[index] != '#':
+            let byte = line[index]
+            if byte == 0xc3 and index + 1 < line.length and line[index + 1] == 0xb7:
+                # ÷
+                expected.append((u32)code_points.count)
+                index += 2
+            elif byte == 0xc3 and index + 1 < line.length and line[index + 1] == 0x97:
+                # ×
+                index += 2
+            elif (byte >= '0' and byte <= '9') or (byte >= 'A' and byte <= 'F'):
+                var value: u32 = 0
+                while index < line.length and ((line[index] >= '0' and line[index] <= '9') or (line[index] >= 'A' and line[index] <= 'F')):
+                    let digit = line[index]
+                    value = value * 16 + (u32)(digit - '0' if digit <= '9' else digit - 'A' + 10)
+                    index += 1
+                code_points.append(value)
+                if rules == BreakRules.word and is_dictionary_character(value):
+                    skip = true
+            else:
+                index += 1
+        if code_points.count == 0 or skip:
+            continue
+        cases += 1
+        # LineBreakTest.txt writes "×" at the start of text (LB2); the start is a boundary of
+        # the iterator all the same.
+        if expected.count == 0 or expected.items[0] != 0:
+            var with_start = CodePointBuffer.create(expected.count + 1)
+            with_start.append(0)
+            with_start.append_all(expected.view())
+            expected = with_start
+        let actual = conformance_boundaries(rules, code_points.view())
+        var same = actual.count == expected.count
+        if same:
+            for position in 0..<actual.count:
+                if actual.items[position] != expected.items[position]:
+                    same = false
+        if not same:
+            failures += 1
+            if failures <= 10:
+                print(f"break test failure: {(str)line}")
+                var got: u8[256]
+                var length: usize = 0
+                for boundary in actual.view():
+                    let text = format(got[length..], f"{boundary} ") else break
+                    length += text.length
+                print(f"  got boundaries: {(str)got[..<length]}")
+    return (cases, failures)
+
+test "GraphemeBreakTest.txt":
+    with memory.heap:
+        let (cases, failures) = run_break_test_file(BreakRules.grapheme)
+        assert(cases > 700)
+        assert(failures == 0)
+
+test "WordBreakTest.txt":
+    with memory.heap:
+        let (cases, failures) = run_break_test_file(BreakRules.word)
+        assert(cases > 1500)
+        assert(failures == 0)
+
+test "SentenceBreakTest.txt":
+    with memory.heap:
+        let (cases, failures) = run_break_test_file(BreakRules.sentence)
+        assert(cases > 400)
+        assert(failures == 0)
+
+test "LineBreakTest.txt":
+    with memory.heap:
+        let (cases, failures) = run_break_test_file(BreakRules.line)
+        assert(cases > 15000)
+        assert(failures == 0)

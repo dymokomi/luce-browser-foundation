@@ -1,10 +1,9 @@
-# Integration of regions r01–r06
+# Integration of regions r01–r07
 
 The region branches were merged into `main` in this order: r01 (ak_core), r02 (ak_text), r03
-(ak_format and web_infra), r06 (text_codec), r04 (gc), r05 (web_url). Region r07 (web_unicode) is
-**not** merged: `web_unicode` is still the skeleton's stubs. Each region's own notes are in
-`docs/regions/rNN.md`. This file records what the merge changed to make the regions fit, what is
-still a stub, and which tests stay gated.
+(ak_format and web_infra), r06 (text_codec), r04 (gc), r05 (web_url), then r07 (web_unicode) in
+a second pass. Each region's own notes are in `docs/regions/rNN.md`. This file records what the
+merge changed to make the regions fit, what is still unported, and why nothing is gated.
 
 ## What the merge changed
 
@@ -156,12 +155,37 @@ still a stub, and which tests stay gated.
 
   `make_weak_ptr` moved to ak.
 
-## Remaining stubs
+### r07 (web_unicode)
 
-| Region | Where | What |
-| --- | --- | --- |
-| r07 web_unicode | `web_unicode/stub_r07_web_unicode.lucb` (126 functions) | all of LibUnicode: character types and properties, IDNA, normalization, segmentation, locales |
-| r07 web_unicode | `ak/stub_r07_web_unicode.lucb` (13 functions) | the LibUnicode-defined AK::String / Utf16String methods (to_lowercase, to_uppercase, to_titlecase, to_casefold, to_fullwidth, equals_ignoring_case, trim_whitespace, find_byte_offset_ignoring_case); r07 moves them to `web_unicode.string_*` |
+- **Merge conflicts.** `ak/ORDER` lost `stub_r07_web_unicode.lucb`. `test.sh` keeps the
+  integration's structure and adds web_unicode's tests and the `tools/gen_ucd` regenerate-and-
+  compare step. `docs/namemap.tsv` took r07's 13 moved rows by a three-way row merge:
+  AK::String/Utf16String methods that now live in web_unicode.
+- **ak cleanup.** ak's unused `Icu78UnicodeString` (`types_generated_unistr.lucb`) and
+  `EmptyOrStringOrIcu78UnicodeString` are dropped, with their namemap rows.
+- **ak additions for web_unicode.** `ak.StringStringViewTraits` (`HashCompatibleTraits[String,
+  StringView]`) lets `is_locale_available` look up its `HashTable<String>` by a StringView, as
+  the donor does.
+- **Stand-ins replaced by ak:**
+  - the Locale parsers use ak's `GenericLexer[u8]` (with `is_any_of("-_")`, `ignore`,
+    `retreat(n)`, `consume_until`, `consume_specific`) instead of r07's `LocaleLexer`;
+  - `Vector<StringView>` locals are `ak.Vector[ak.StringView]` instead of `ViewList`;
+  - `vector_items` is `ak.vector_span_const`.
+- **A real bug the new tests found.** `locale_data_canonicalize` kept the keys of "yes" keywords
+  as views into a short String on the stack, so `en-u-ka-yes-kb-yes` restored "yes" on the wrong
+  keyword. The keys are now a `HashTable<String>`, as the donor's `HashTable<ByteString>`.
+- **Tests now through the real AK String entry points.** TestUnicodeNormalization, TestIDNA's
+  `to_ascii`, TestSegmenter's String cases and `expand_range_case_insensitive` go through
+  `normalize`, `idna_to_ascii`, `for_each_boundary(String)` and the returned Vector.
+- **TestLocale's remaining cases** are ported in `tests_locale_2`: the five
+  `parse_unicode_locale_id*` cases, `canonicalize_unicode_locale_id` and
+  `supports_locale_aliases`.
+- The web_url tests' `web_unicode_is_ported` gate is removed: all 66 run.
+- web_unicode's generated upcast methods are `pub`, like the other modules'.
+
+## Remaining stubs and unported cases
+
+No region stub fragment is left in any module.
 
 The following trap by design and are not region work:
 
@@ -169,32 +193,15 @@ The following trap by design and are not region work:
 - Variant's parameter-pack functions;
 - the one `TODO` in `format_parameters` (a C++ `TODO()`).
 
+Not ported, because web_unicode canonicalizes locales by syntax only (no CLDR alias data, see
+`r07.md`): the 57 `canonicalize_unicode_locale_id` cases of TestLocale that need CLDR aliases.
+They are the ks, ms, tz and ca value aliases, t's m0 alias, and the language, territory,
+script, variant, subdivision and complex subtag aliases. They stay in `tests_locale_2` as
+comments marked "CLDR alias, not ported".
+
 ## Gated tests
 
-`tests/web_url_tests/support.lucb` has `var web_unicode_is_ported: bool = false`. The 16 tests
-below return at their start until r07 is merged. Remove the flag then.
-
-| Test | File | Needs |
-| --- | --- | --- |
-| public_suffix | test_url | `Unicode::IDNA::to_ascii` (its Arabic hosts) |
-| url_pattern_matches_named_groups, url_pattern_ignore_case_matching | test_url_pattern | identifier start/continue properties (pattern names) |
-| basic_http_url_no_pattern_or_path, url_with_pathname_and_regexp, http_url_regexp_in_pathname_and_hostname, https_url_with_fragment, http_url_with_query, matches_on_sub_url, ipv6_with_port_number, non_special_scheme_and_arbitrary_hostname, ipv6_with_named_group | test_url_pattern_constructor_string_parser | identifier properties (the constructor string parser tokenizes names) |
-| tokenizer, component_compile, pattern_create_and_match, pattern_errors | test_pinned | identifier properties |
-
-The list was found by running the tests against non-trapping stand-ins of the three web_unicode
-functions (scratch only, never committed). No other test reaches a stub.
-
-## Region r07: not merged
-
-The coordinator asked for r07 (port/r07 c684dd3) to be merged before r05. The permission
-classifier refused that merge in this session, so r07 is left for a later merge. At that merge:
-
-- r07 removes `ak/stub_r07_web_unicode.lucb` and moves those methods to web_unicode.
-- Drop ak's now-unused `EmptyOrStringOrIcu78UnicodeString` and `Icu78UnicodeString`.
-- Switch r07's `LocaleLexer` to r02's `GenericLexer[u8]`, which is faithful now.
-- Remove `web_unicode_is_ported` from the web_url tests.
-- Port TestLocale's parse and canonicalize cases, which need ak's String and Vector.
-- Write `docs/regions/r07.md` from r07's notes.
+None. Every test block runs.
 
 ## Compiler issues found at integration
 

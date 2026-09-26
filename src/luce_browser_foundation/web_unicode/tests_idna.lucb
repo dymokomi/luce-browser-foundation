@@ -1,0 +1,171 @@
+#==============================================================================================
+#
+#   tests_idna - UTS #46 processing: IdnaTestV2.txt and Tests/LibUnicode/TestIDNA.cpp
+#
+#   DESCRIPTION:
+#       The toAsciiN column of IdnaTestV2.txt (Unicode 17.0.0) through the port of ICU's
+#       UTS46::nameToASCII_UTF8, with every check on (UseSTD3ASCIIRules, CheckHyphens,
+#       CheckBidi, CheckJoiners, VerifyDnsLength) as ICU runs it, and the cases of Ladybird's TestIDNA.cpp
+#       through the same core (idna_to_ascii itself returns an AK String, which ak's stubs
+#       cannot build yet).
+#
+#==============================================================================================
+
+# The options of the conformance run: nontransitional, every check.
+let idna_test_options: u32 = uidna_check_bidi | uidna_check_contextj | uidna_use_std3_rules | uidna_nontransitional_to_ascii | uidna_nontransitional_to_unicode
+
+## Append the UTF-8 of an IdnaTestV2 field, decoding \uXXXX and \x{XXXX}.
+func unescape_idna_field(field: const u8[], out: ByteBuffer*):
+    var index: usize = 0
+    while index < field.length:
+        if field[index] == '\\' and index + 1 < field.length and (field[index + 1] == 'u' or field[index + 1] == 'x'):
+            var position = index + 2
+            let braced = position < field.length and field[position] == '{'
+            if braced:
+                position += 1
+            var value: u32 = 0
+            var digits: usize = 0
+            while position < field.length and (not braced or field[position] != '}') and (braced or digits < 4):
+                let digit = field[position]
+                value = value * 16 + (u32)(digit - '0' if digit <= '9' else (digit - 'A' + 10 if digit <= 'F' else digit - 'a' + 10))
+                digits += 1
+                position += 1
+            if braced:
+                position += 1
+            encode_utf8(value, out)
+            index = position
+        else:
+            out.append(field[index])
+            index += 1
+
+## The fields of an IdnaTestV2 line.
+type IdnaTestField = const u8[]
+type IdnaTestFields = IdnaTestField[7]
+
+## The fields of an IdnaTestV2 line, trimmed.
+func idna_test_fields(line: const u8[], fields: IdnaTestFields*) -> usize:
+    var count: usize = 0
+    var start: usize = 0
+    for index in 0..=line.length:
+        if index == line.length or line[index] == ';' or line[index] == '#':
+            if count < 7:
+                var first = start
+                var last = index
+                while first < last and (line[first] == ' ' or line[first] == '\t'):
+                    first += 1
+                while last > first and (line[last - 1] == ' ' or line[last - 1] == '\t'):
+                    last -= 1
+                (*fields)[count] = line[first..<last]
+                count += 1
+            start = index + 1
+            if index < line.length and line[index] == '#':
+                break
+    return count
+
+## Whether `name` ends with the root label (a trailing dot) and its other labels are 1 to 63
+## bytes long.
+func labels_fit_before_root(name: const u8[]) -> bool:
+    if name.length == 0 or name[name.length - 1] != '.':
+        return false
+    var start: usize = 0
+    for index in 0..<name.length:
+        if name[index] == '.':
+            let length = index - start
+            if length == 0 or length > 63:
+                return false
+            start = index + 1
+    return true
+
+test "IdnaTestV2.txt toAsciiN":
+    with memory.heap:
+        let data = read_test_file("tests/data/ucd/IdnaTestV2.txt") else trap("cannot read IdnaTestV2.txt")
+        var cases: usize = 0
+        var failures: usize = 0
+        var offset: usize = 0
+        while offset < data.length:
+            var end = offset
+            while end < data.length and data[end] != '\n':
+                end += 1
+            let line = data[offset..<end]
+            offset = end + 1
+            if line.length == 0 or line[0] == '#':
+                continue
+            var fields: IdnaTestFields
+            if idna_test_fields(line, &fields) < 7:
+                continue
+            var source = ByteBuffer.create(fields[0].length + 1)
+            if not bytes_equal(fields[0], b"\"\""):
+                unescape_idna_field(fields[0], &source)
+            # toAsciiN, defaulting to toUnicode, defaulting to the source; its status,
+            # defaulting to toUnicode's.
+            var expected_field = fields[3]
+            if expected_field.length == 0:
+                expected_field = fields[1]
+            var expected = ByteBuffer.create(expected_field.length + 1)
+            if expected_field.length == 0:
+                expected = source
+            elif not bytes_equal(expected_field, b"\"\""):
+                unescape_idna_field(expected_field, &expected)
+            var status = fields[4]
+            if status.length == 0:
+                status = fields[2]
+            var expect_success = status.length == 0 or bytes_equal(status, b"[]")
+            # ICU permits the empty root label after a trailing dot, which the file reports
+            # as A4_2 (see uts46.cpp processUnicode); so does the port.
+            if bytes_equal(status, b"[A4_2]") and labels_fit_before_root(expected.view()):
+                expect_success = true
+            cases += 1
+            var info = IdnaInfo()
+            let result = uts46_name_to_ascii_utf8(source.view(), idna_test_options, &info)
+            let success = not info.failed and info.errors == 0
+            var ok = success == expect_success
+            if ok and success:
+                ok = bytes_equal(result.view(), expected.view())
+            if not ok:
+                failures += 1
+                if failures <= 10:
+                    print(f"IDNA test failure ({info.errors}): {(str)line}")
+                    print(f"  got {(str)result.view()}")
+        assert(cases > 6000)
+        assert(failures == 0)
+
+## Unicode::IDNA::to_ascii's processing of `input` with the default ToAsciiOptions (or
+## transitional processing), or none where to_ascii fails.
+func to_ascii_with_default_options(input: str, transitional: bool = false) -> ak.String?:
+    var options = ToAsciiOptions()
+    to_ascii_options_init_fields(&options)
+    if transitional:
+        options.transitional_processing = TransitionalProcessing.yes
+    var view: ak.Utf8View
+    ak.utf8_view_construct_string_view(&view, view_of(input))
+    return idna_to_ascii(view, options) catch:
+        return none
+
+func expect_to_ascii(input: str, expected: str, transitional: bool = false):
+    let actual = to_ascii_with_default_options(input, transitional) else trap("to_ascii failed")
+    if not view_equals(ak.string_bytes_as_string_view(&actual), expected):
+        print(f"to_ascii({input}): expected {expected}, got {ak.string_view_text(ak.string_bytes_as_string_view(&actual))}")
+        trap("to_ascii")
+
+# Ported from Tests/LibUnicode/TestIDNA.cpp TEST_CASE(to_ascii).
+test "to_ascii":
+    expect_to_ascii("www.аррӏе.com", "www.xn--80ak6aa92e.com")
+    expect_to_ascii("ö.com", "xn--nda.com")
+    expect_to_ascii("o\u{308}.com", "xn--nda.com")
+    expect_to_ascii("\u{1FACD}.ge", "xn--i29h.ge")
+
+    # Select cases from IdnaTestV2.txt
+    expect_to_ascii("Faß.de", "xn--fa-hia.de")
+    expect_to_ascii("Faß.de", "fass.de", transitional = true)
+    expect_to_ascii("¡", "xn--7a")
+    expect_to_ascii("Bücher.de", "xn--bcher-kva.de")
+    expect_to_ascii("\u{646}\u{627}\u{645}\u{647}\u{627}\u{6CC}", "xn--mgba3gch31f")
+    expect_to_ascii("A.b.c。D。", "a.b.c.d.")
+    expect_to_ascii("βόλος", "xn--nxasmm1c")
+    expect_to_ascii("βόλος", "xn--nxasmq6b", transitional = true)
+
+    assert(to_ascii_with_default_options("xn--o-ccb.com") == none)
+    assert(to_ascii_with_default_options("wh--f.com") == none)
+    assert(to_ascii_with_default_options("xn--whf-cec.com") == none)
+    assert(to_ascii_with_default_options("-whf.com") == none)
+    assert(to_ascii_with_default_options("whf-.com") == none)

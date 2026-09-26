@@ -10,41 +10,35 @@
 #
 #==============================================================================================
 
-# mark: PropertyName ============================================================================
+# mark: General category groups =================================================================
 
-## Unicode::PropertyName (Libraries/LibUnicode/CharacterTypes.cpp:24): a generic struct.
-pub struct PropertyName[TPropertyType]:
-    pub var long_name: ak.StringView?
-    pub var short_name: ak.StringView?
-    pub var additional_name: ak.StringView?
-
-## Unicode::ADDITIONAL_NAME (Libraries/LibUnicode/CharacterTypes.cpp:32).
-# C++ initializer: static_cast < UPropertyNameChoice > ( U_LONG_PROPERTY_NAME + 1 )
-pub var additional_name: CEUPropertyNameChoice
+# Unicode::PropertyName<T> and Unicode::ADDITIONAL_NAME (CharacterTypes.cpp:24, 32) hold the
+# names ICU gives properties; in the port they are the generated UcdNames tables
+# (hand-edited: the generated declarations are replaced).
 
 ## Unicode::GENERAL_CATEGORY_CASED_LETTER (Libraries/LibUnicode/CharacterTypes.cpp:46).
 # C++ initializer: U_CHAR_CATEGORY_COUNT + 1
-pub var general_category_cased_letter: u32
+let general_category_cased_letter: u32 = 31
 
 ## Unicode::GENERAL_CATEGORY_LETTER (Libraries/LibUnicode/CharacterTypes.cpp:47).
 # C++ initializer: U_CHAR_CATEGORY_COUNT + 2
-pub var general_category_letter: u32
+let general_category_letter: u32 = 32
 
 ## Unicode::GENERAL_CATEGORY_MARK (Libraries/LibUnicode/CharacterTypes.cpp:48).
 # C++ initializer: U_CHAR_CATEGORY_COUNT + 3
-pub var general_category_mark: u32
+let general_category_mark: u32 = 33
 
 ## Unicode::GENERAL_CATEGORY_NUMBER (Libraries/LibUnicode/CharacterTypes.cpp:49).
 # C++ initializer: U_CHAR_CATEGORY_COUNT + 4
-pub var general_category_number: u32
+let general_category_number: u32 = 34
 
 ## Unicode::GENERAL_CATEGORY_PUNCTUATION (Libraries/LibUnicode/CharacterTypes.cpp:50).
 # C++ initializer: U_CHAR_CATEGORY_COUNT + 5
-pub var general_category_punctuation: u32
+let general_category_punctuation: u32 = 35
 
 ## Unicode::GENERAL_CATEGORY_SYMBOL (Libraries/LibUnicode/CharacterTypes.cpp:51).
 # C++ initializer: U_CHAR_CATEGORY_COUNT + 6
-pub var general_category_symbol: u32
+let general_category_symbol: u32 = 36
 
 ## Unicode::BidiClass (Libraries/LibUnicode/CharacterTypes.h:52).
 pub enum BidiClass as i32:
@@ -74,21 +68,19 @@ pub enum BidiClass as i32:
 
 ## Unicode::GENERAL_CATEGORY_SEPARATOR (Libraries/LibUnicode/CharacterTypes.cpp:52).
 # C++ initializer: U_CHAR_CATEGORY_COUNT + 7
-pub var general_category_separator: u32
+let general_category_separator: u32 = 37
 
 ## Unicode::GENERAL_CATEGORY_OTHER (Libraries/LibUnicode/CharacterTypes.cpp:53).
 # C++ initializer: U_CHAR_CATEGORY_COUNT + 8
-pub var general_category_other: u32
+let general_category_other: u32 = 38
 
 ## Unicode::GENERAL_CATEGORY_LIMIT (Libraries/LibUnicode/CharacterTypes.cpp:54).
 # C++ initializer: U_CHAR_CATEGORY_COUNT + 9
-pub var general_category_limit: u32
+let general_category_limit: u32 = 39
 
-## Unicode::s_category_sets_with_case_closure (Libraries/LibUnicode/CharacterTypes.cpp:56).
-pub var s_category_sets_with_case_closure: ak.HashMap[u32, Icu78UnicodeSet*, ak.U32Traits]
-
-## Unicode::s_property_sets_with_case_closure (Libraries/LibUnicode/CharacterTypes.cpp:57).
-pub var s_property_sets_with_case_closure: ak.HashMap[u32, Icu78UnicodeSet*, ak.U32Traits]
+# Unicode::s_category_sets_with_case_closure and s_property_sets_with_case_closure
+# (CharacterTypes.cpp:56, 57) cache ICU UnicodeSets; the port answers from the case closure
+# table instead (hand-edited: the generated declarations are removed).
 
 ## Unicode::LineBreakClass (Libraries/LibUnicode/CharacterTypes.h:80).
 pub enum LineBreakClass as i32:
@@ -109,19 +101,19 @@ pub struct CodePointRange:
 
 ## Unicode::PROPERTY_ANY (Libraries/LibUnicode/CharacterTypes.cpp:183).
 # C++ initializer: UCHAR_BINARY_LIMIT + 1
-pub var property_any: u32
+let property_any: u32 = 77
 
 ## Unicode::PROPERTY_ASCII (Libraries/LibUnicode/CharacterTypes.cpp:184).
 # C++ initializer: UCHAR_BINARY_LIMIT + 2
-pub var property_ascii: u32
+let property_ascii: u32 = 78
 
 ## Unicode::PROPERTY_ASSIGNED (Libraries/LibUnicode/CharacterTypes.cpp:185).
 # C++ initializer: UCHAR_BINARY_LIMIT + 3
-pub var property_assigned: u32
+let property_assigned: u32 = 79
 
 ## Unicode::PROPERTY_LIMIT (Libraries/LibUnicode/CharacterTypes.cpp:186).
 # C++ initializer: UCHAR_BINARY_LIMIT + 4
-pub var property_limit: u32
+let property_limit: u32 = 80
 
 ## ResolvedPropertyKind (Libraries/LibUnicode/CharacterTypes.cpp:641).
 pub enum ResolvedPropertyKind as u8:

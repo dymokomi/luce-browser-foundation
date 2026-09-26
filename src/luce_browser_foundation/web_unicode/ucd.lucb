@@ -1,0 +1,213 @@
+#==============================================================================================
+#
+#   ucd - property lookup over the generated Unicode Character Database tables
+#
+#   DESCRIPTION:
+#       Not a port: Ladybird asks ICU (uchar.h, uscript.h) for character properties; the
+#       luce-browser port answers from the tables tools/gen_ucd generates from the data ICU
+#       78.2 is built from (DESIGN.md §1.1, §7.1). Values use ICU's numbering: UCharCategory,
+#       UCharDirection, ULineBreak, UEastAsianWidth, UGraphemeClusterBreak, UWordBreakValues,
+#       USentenceBreak, UIndicConjunctBreak, UScriptCode, UJoiningType and UProperty.
+#
+#       The tables are fixed-width hexadecimal text (see generated_ucd_properties.lucb).
+#
+#==============================================================================================
+
+# mark: Table access ============================================================================
+
+## The short, long and additional name ICU gives a property or a property value; an empty
+## name is absent.
+struct UcdNames:
+    let short_name: str
+    let long_name: str
+    let additional_name: str
+
+## The value of one hexadecimal digit of a table.
+func ucd_hex_digit(byte: u8) -> u32:
+    return (u32)(byte - '0') if byte <= '9' else (u32)(byte - 'a' + 10)
+
+## The `digits`-digit hexadecimal number at digit `offset` of `table`.
+func ucd_hex(table: str, offset: usize, digits: usize) -> u32:
+    let bytes = table.bytes
+    var value: u32 = 0
+    for index in offset..<offset + digits:
+        value = (value << 4) | ucd_hex_digit(bytes[index])
+    return value
+
+# Out-of-range values are answered like an unassigned code point with every default value,
+# as ICU's lookups do.
+let ucd_default_code_point: u32 = 0x50000
+
+## The digit offset of the record of `code_point` in ucd_records.
+func ucd_record(code_point: u32) -> usize:
+    let clamped = code_point if code_point <= 0x10ffff else ucd_default_code_point
+    let block = (usize)ucd_hex(ucd_stage1, (usize)(clamped >> 7) * 3, 3)
+    let record = (usize)ucd_hex(ucd_stage2, (block * 128 + (usize)(clamped & 127)) * 3, 3)
+    return record * 44
+
+# The fields of a record, as digit offsets.
+let ucd_field_general_category: usize = 0
+let ucd_field_bidi_class: usize = 2
+let ucd_field_line_break: usize = 4
+let ucd_field_east_asian_width: usize = 6
+let ucd_field_grapheme_cluster_break: usize = 8
+let ucd_field_word_break: usize = 10
+let ucd_field_sentence_break: usize = 12
+let ucd_field_indic_conjunct_break: usize = 14
+let ucd_field_script: usize = 16
+let ucd_field_joining_type: usize = 18
+let ucd_field_combining_class: usize = 20
+let ucd_field_script_extensions: usize = 22
+let ucd_field_binary_properties: usize = 24
+
+## The field at `field` of the record of `code_point`.
+func ucd_field(code_point: u32, field: usize) -> u32:
+    return ucd_hex(ucd_records, ucd_record(code_point) + field, 2)
+
+# mark: Enumerated properties ===================================================================
+
+## u_charType: the general category (UCharCategory).
+func ucd_general_category(code_point: u32) -> u32:
+    return ucd_field(code_point, ucd_field_general_category)
+
+## u_charDirection: the bidi class (UCharDirection).
+func ucd_bidi_class(code_point: u32) -> u32:
+    return ucd_field(code_point, ucd_field_bidi_class)
+
+## u_getIntPropertyValue(UCHAR_LINE_BREAK) (ULineBreak).
+func ucd_line_break(code_point: u32) -> u32:
+    return ucd_field(code_point, ucd_field_line_break)
+
+## u_getIntPropertyValue(UCHAR_GRAPHEME_CLUSTER_BREAK) (UGraphemeClusterBreak).
+func ucd_grapheme_cluster_break(code_point: u32) -> u32:
+    return ucd_field(code_point, ucd_field_grapheme_cluster_break)
+
+## u_getIntPropertyValue(UCHAR_WORD_BREAK) (UWordBreakValues).
+func ucd_word_break(code_point: u32) -> u32:
+    return ucd_field(code_point, ucd_field_word_break)
+
+## u_getIntPropertyValue(UCHAR_SENTENCE_BREAK) (USentenceBreak).
+func ucd_sentence_break(code_point: u32) -> u32:
+    return ucd_field(code_point, ucd_field_sentence_break)
+
+## u_getIntPropertyValue(UCHAR_INDIC_CONJUNCT_BREAK) (UIndicConjunctBreak).
+func ucd_indic_conjunct_break(code_point: u32) -> u32:
+    return ucd_field(code_point, ucd_field_indic_conjunct_break)
+
+## uscript_getScript (UScriptCode).
+func ucd_script(code_point: u32) -> u32:
+    return ucd_field(code_point, ucd_field_script)
+
+## u_getIntPropertyValue(UCHAR_JOINING_TYPE) (UJoiningType).
+func ucd_joining_type(code_point: u32) -> u32:
+    return ucd_field(code_point, ucd_field_joining_type)
+
+## u_getCombiningClass.
+func ucd_combining_class(code_point: u32) -> u32:
+    return ucd_field(code_point, ucd_field_combining_class)
+
+## uscript_hasScript: whether `script` is in the Script_Extensions of `code_point`, which
+## are its Script when it has none.
+func ucd_has_script_extension(code_point: u32, script: u32) -> bool:
+    let record = ucd_record(code_point)
+    let set = (usize)ucd_hex(ucd_records, record + ucd_field_script_extensions, 2)
+    if set == 0:
+        return ucd_hex(ucd_records, record + ucd_field_script, 2) == script
+    let offset = (usize)ucd_hex(ucd_script_extension_offsets, set * 4, 4)
+    let count = (usize)ucd_hex(ucd_script_extension_sets, offset * 2, 2)
+    for index in 0..<count:
+        if ucd_hex(ucd_script_extension_sets, (offset + 1 + index) * 2, 2) == script:
+            return true
+    return false
+
+# mark: Binary properties =======================================================================
+
+## u_hasBinaryProperty for 0 <= property < UCHAR_BINARY_LIMIT.
+func ucd_has_binary_property(code_point: u32, property: u32) -> bool:
+    let digit = ucd_hex(ucd_records, ucd_record(code_point) + ucd_field_binary_properties + (usize)(property >> 2), 1)
+    return (digit >> (property & 3)) & 1 != 0
+
+# UProperty numbers of the binary properties used by name in this module.
+let uchar_alphabetic: u32 = 0
+let uchar_default_ignorable_code_point: u32 = 5
+let uchar_id_continue: u32 = 15
+let uchar_id_start: u32 = 16
+let uchar_lowercase: u32 = 22
+let uchar_soft_dotted: u32 = 27
+let uchar_uppercase: u32 = 30
+let uchar_white_space: u32 = 31
+let uchar_cased: u32 = 49
+let uchar_case_ignorable: u32 = 50
+let uchar_emoji: u32 = 57
+let uchar_emoji_presentation: u32 = 58
+let uchar_emoji_modifier: u32 = 59
+let uchar_emoji_modifier_base: u32 = 60
+let uchar_emoji_component: u32 = 61
+let uchar_regional_indicator: u32 = 62
+let uchar_extended_pictographic: u32 = 64
+let uchar_basic_emoji: u32 = 65
+let uchar_emoji_keycap_sequence: u32 = 66
+let uchar_rgi_emoji_modifier_sequence: u32 = 67
+let uchar_rgi_emoji_flag_sequence: u32 = 68
+let uchar_rgi_emoji_tag_sequence: u32 = 69
+let uchar_rgi_emoji_zwj_sequence: u32 = 70
+let uchar_rgi_emoji: u32 = 71
+let uchar_variation_selector: u32 = 36
+let uchar_binary_limit: u32 = 76
+
+# mark: General category masks ==================================================================
+
+# UCharCategory numbers used by name.
+let u_unassigned: u32 = 0
+let u_uppercase_letter: u32 = 1
+let u_lowercase_letter: u32 = 2
+let u_titlecase_letter: u32 = 3
+let u_modifier_letter: u32 = 4
+let u_other_letter: u32 = 5
+let u_non_spacing_mark: u32 = 6
+let u_enclosing_mark: u32 = 7
+let u_combining_spacing_mark: u32 = 8
+let u_decimal_digit_number: u32 = 9
+let u_letter_number: u32 = 10
+let u_space_separator: u32 = 12
+let u_control_char: u32 = 15
+let u_format_char: u32 = 16
+let u_surrogate: u32 = 18
+let u_connector_punctuation: u32 = 22
+let u_char_category_count: u32 = 30
+
+## U_MASK: the bit of one general category in a UCharCategory mask.
+func u_mask(category: u32) -> u32:
+    return (u32)1 << category
+
+# The general category group masks of uchar.h.
+let u_gc_lc_mask: u32 = 0xe
+let u_gc_l_mask: u32 = 0x3e
+let u_gc_m_mask: u32 = 0x1c0
+let u_gc_n_mask: u32 = 0xe00
+let u_gc_z_mask: u32 = 0x7000
+let u_gc_c_mask: u32 = 0x78001
+let u_gc_p_mask: u32 = 0x30f80000
+let u_gc_s_mask: u32 = 0xf000000
+
+## U_GET_GC_MASK: the mask of the general category of `code_point`.
+func ucd_general_category_mask(code_point: u32) -> u32:
+    return u_mask(ucd_general_category(code_point))
+
+# mark: uchar.h predicates ======================================================================
+
+## u_isprint: not a control, format, private-use, surrogate or unassigned character (C*).
+func ucd_is_print(code_point: u32) -> bool:
+    return (ucd_general_category_mask(code_point) & u_gc_c_mask) == 0
+
+## u_isdefined: assigned (not Cn).
+func ucd_is_defined(code_point: u32) -> bool:
+    return ucd_general_category(code_point) != u_unassigned
+
+## u_isIDStart (ICU 78 uprops.cpp): the ID_Start property.
+func ucd_is_id_start(code_point: u32) -> bool:
+    return ucd_has_binary_property(code_point, uchar_id_start)
+
+## u_isIDPart (ICU 78 uprops.cpp): the ID_Continue property.
+func ucd_is_id_part(code_point: u32) -> bool:
+    return ucd_has_binary_property(code_point, uchar_id_continue)

@@ -1,0 +1,571 @@
+#==============================================================================================
+#
+#   locale_data - Unicode::Locale: canonicalization, availability, likely subtags, to_string
+#
+#   DESCRIPTION:
+#       Port of LibUnicode/Locale.cpp (lines 479-730) and the extension templates of Locale.h
+#       (lines 62-90). Where the C++ hands the locale to ICU (LocaleData::for_locale and
+#       canonicalize of LibUnicode/ICU.cpp, icu::Locale, icu::LocaleBuilder), the port works
+#       on the parsed LocaleID and on ICU 78.2's data in generated_icu_locales.lucb.
+#
+#==============================================================================================
+
+# mark: ICU replacement: the canonical syntax ===================================================
+
+## A copy of the bytes of `view`, cased: 0 lowercase, 1 uppercase, 2 titlecase.
+func case_view(view: ak.StringView, mode: u32) -> ak.String:
+    let bytes = view_bytes(view)
+    var cased = new u8[bytes.length] else trap("out of memory")
+    for index in 0..<bytes.length:
+        var c = bytes[index]
+        let upper = mode == 1 or (mode == 2 and index == 0)
+        if upper and c >= 'a' and c <= 'z':
+            c -= 32
+        elif not upper and c >= 'A' and c <= 'Z':
+            c += 32
+        cased[index] = c
+    return string_of(view_of_bytes(cased))
+
+## The bytes of an AK String.
+func string_bytes(string: const ak.String*) -> const u8[]:
+    return ak.string_base_bytes(&string.string_base)
+
+func string_view_of(string: const ak.String*) -> ak.StringView:
+    return view_of_bytes(string_bytes(string))
+
+## Whether two Strings hold the same bytes.
+func strings_equal(a: const ak.String*, b: const ak.String*) -> bool:
+    let x = string_bytes(a)
+    let y = string_bytes(b)
+    if x.length != y.length:
+        return false
+    for index in 0..<x.length:
+        if x[index] != y[index]:
+            return false
+    return true
+
+## Whether `a` sorts before `b` by bytes.
+func string_less(a: const ak.String*, b: const ak.String*) -> bool:
+    let x = string_bytes(a)
+    let y = string_bytes(b)
+    var index: usize = 0
+    while index < x.length and index < y.length:
+        if x[index] != y[index]:
+            return x[index] < y[index]
+        index += 1
+    return x.length < y.length
+
+## Sort the Strings of a Vector by bytes (insertion sort: the lists are short).
+func sort_strings(vector: ak.Vector[ak.String]*):
+    let items = ak.vector_span_const(vector)
+    let string_list = ak.String[]((ak.String*)items.data, items.length)
+    for index in 1..<string_list.length:
+        let value = string_list[index]
+        var position = index
+        while position > 0 and string_less(&value, &string_list[position - 1]):
+            string_list[position] = string_list[position - 1]
+            position -= 1
+        string_list[position] = value
+
+## The canonical case of a language identifier (UTS #35: lowercase language and variants,
+## titlecase script, uppercase region), variants sorted.
+func canonicalize_language_id(language_id: LanguageId*):
+    if let language = language_id.language:
+        language_id.language = case_view(string_view_of(&language), 0)
+    if let script = language_id.script:
+        language_id.script = case_view(string_view_of(&script), 2)
+    if let region = language_id.region:
+        language_id.region = case_view(string_view_of(&region), 1)
+    let variants = ak.vector_span_const(&language_id.variants)
+    let string_list = ak.String[]((ak.String*)variants.data, variants.length)
+    for index in 0..<string_list.length:
+        string_list[index] = case_view(string_view_of(&string_list[index]), 0)
+    sort_strings(&language_id.variants)
+
+## The singleton of an extension, lowercase.
+func extension_singleton(extension: const Extension*) -> u8:
+    match *extension:
+        .locale_extension(_): return 'u'
+        .transformed_extension(_): return 't'
+        .other_extension(value):
+            return value.key + 32 if value.key >= 'A' and value.key <= 'Z' else value.key
+
+## icu::Locale::canonicalize and toLanguageTag, without CLDR's alias replacement: the
+## canonical syntax of UTS #35. A -u- keyword whose value is "true" (or "yes", which ICU
+## treats as "true") loses its value.
+func canonicalize_locale_id(locale_id: LocaleId*):
+    if locale_id.language_id.is_root:
+        locale_id.language_id.is_root = false
+        locale_id.language_id.language = string_of(view_of("und"))
+    canonicalize_language_id(&locale_id.language_id)
+    let extensions = ak.vector_span_const(&locale_id.extensions)
+    let list = Extension[]((Extension*)extensions.data, extensions.length)
+    for index in 0..<list.length:
+        match list[index]:
+            .locale_extension(value):
+                var extension = value
+                let attributes = ak.vector_span_const(&extension.attributes)
+                let attribute_list = ak.String[]((ak.String*)attributes.data, attributes.length)
+                for attribute_index in 0..<attribute_list.length:
+                    attribute_list[attribute_index] = case_view(string_view_of(&attribute_list[attribute_index]), 0)
+                sort_strings(&extension.attributes)
+                let keywords = ak.vector_span_const(&extension.keywords)
+                let keyword_list = Keyword[]((Keyword*)keywords.data, keywords.length)
+                for keyword_index in 0..<keyword_list.length:
+                    keyword_list[keyword_index].key = case_view(string_view_of(&keyword_list[keyword_index].key), 0)
+                    let value_ = case_view(string_view_of(&keyword_list[keyword_index].value), 0)
+                    let value_view = string_view_of(&value_)
+                    keyword_list[keyword_index].value = string_of(view_of("")) if view_equals(value_view, "true") or view_equals(value_view, "yes") else value_
+                # Keywords sorted by key.
+                for keyword_index in 1..<keyword_list.length:
+                    let keyword = keyword_list[keyword_index]
+                    var position = keyword_index
+                    while position > 0 and string_less(&keyword.key, &keyword_list[position - 1].key):
+                        keyword_list[position] = keyword_list[position - 1]
+                        position -= 1
+                    keyword_list[position] = keyword
+                list[index] = Extension.locale_extension(value = extension)
+            .transformed_extension(value):
+                var extension = value
+                if let language = extension.language:
+                    var lowered = language
+                    canonicalize_language_id(&lowered)
+                    if let script = lowered.script:
+                        lowered.script = case_view(string_view_of(&script), 0)
+                    if let region = lowered.region:
+                        lowered.region = case_view(string_view_of(&region), 0)
+                    extension.language = lowered
+                let fields = ak.vector_span_const(&extension.fields)
+                let field_list = TransformedField[]((TransformedField*)fields.data, fields.length)
+                for field_index in 0..<field_list.length:
+                    field_list[field_index].key = case_view(string_view_of(&field_list[field_index].key), 0)
+                    field_list[field_index].value = case_view(string_view_of(&field_list[field_index].value), 0)
+                for field_index in 1..<field_list.length:
+                    let field = field_list[field_index]
+                    var position = field_index
+                    while position > 0 and string_less(&field.key, &field_list[position - 1].key):
+                        field_list[position] = field_list[position - 1]
+                        position -= 1
+                    field_list[position] = field
+                list[index] = Extension.transformed_extension(value = extension)
+            .other_extension(value):
+                var extension = value
+                extension.key = extension_singleton(&list[index])
+                extension.value = case_view(string_view_of(&extension.value), 0)
+                list[index] = Extension.other_extension(value = extension)
+    # Extensions sorted by singleton.
+    for index in 1..<list.length:
+        let extension = list[index]
+        var position = index
+        while position > 0 and extension_singleton(&extension) < extension_singleton(&list[position - 1]):
+            list[position] = list[position - 1]
+            position -= 1
+        list[position] = extension
+    let private_use = ak.vector_span_const(&locale_id.private_use_extensions)
+    let private_list = ak.String[]((ak.String*)private_use.data, private_use.length)
+    for index in 0..<private_list.length:
+        private_list[index] = case_view(string_view_of(&private_list[index]), 0)
+
+## LocaleData::for_locale: the locale, parsed and in canonical syntax (ICU accepts what
+## icu::Locale::forLanguageTag accepts).
+func locale_data_for_locale(locale: ak.StringView) -> LocaleId?:
+    var locale_id = parse_unicode_locale_id(locale) else return none
+    canonicalize_locale_id(&locale_id)
+    return locale_id
+
+# The keys whose value "yes" CLDR aliases to "true" (uloc_toUnicodeLocaleType(key, "yes")).
+func is_key_with_yes_alias(key: ak.StringView) -> bool:
+    return view_equals(key, "kb") or view_equals(key, "kc") or view_equals(key, "kh") or view_equals(key, "kk") or view_equals(key, "kn")
+
+## LocaleData::canonicalize (LibUnicode/ICU.cpp).
+func locale_data_canonicalize(locale: ak.StringView) -> ak.String:
+    # FIXME: ICU's canonicalize() and toLanguageTag() incorrectly convert the Unicode extension value "yes" to "true"
+    #        for all keywords (and then remove "true" per UTS 35). Per CLDR BCP47 data, only specific keys define "yes"
+    #        as an alias for "true" (kb, kc, kh, kk, kn). For other keys, "yes" must be preserved. See:
+    #        https://unicode-org.atlassian.net/browse/ICU-21367
+    var keywords_with_yes: ak.HashTable[ak.String, ak.StringTraits]
+
+    var parsed = parse_unicode_locale_id(locale) else trap("VERIFY: LocaleData::for_locale")
+    for extension in ak.vector_span_const(&parsed.extensions):
+        match extension:
+            .locale_extension(value):
+                for keyword in ak.vector_span_const(&value.keywords):
+                    if not view_equals_ignoring_ascii_case(string_view_of(&keyword.value), "yes"):
+                        continue
+                    let key = case_view(string_view_of(&keyword.key), 0)
+                    if not is_key_with_yes_alias(string_view_of(&key)):
+                        discard(ak.hash_table_set(&keywords_with_yes, key))
+            _:
+                discard(0)
+
+    canonicalize_locale_id(&parsed)
+
+    if not ak.hash_table_is_empty(&keywords_with_yes):
+        let extensions = ak.vector_span_const(&parsed.extensions)
+        let list = Extension[]((Extension*)extensions.data, extensions.length)
+        for index in 0..<list.length:
+            match list[index]:
+                .locale_extension(value):
+                    let keywords = ak.vector_span_const(&value.keywords)
+                    let keyword_list = Keyword[]((Keyword*)keywords.data, keywords.length)
+                    for keyword_index in 0..<keyword_list.length:
+                        if string_bytes(&keyword_list[keyword_index].value).length == 0 and ak.hash_table_contains_k[ak.String, ak.StringTraits, ak.StringView, ak.StringStringViewTraits](&keywords_with_yes, string_view_of(&keyword_list[keyword_index].key)):
+                            keyword_list[keyword_index].value = string_of(view_of("yes"))
+                _:
+                    discard(0)
+
+    return locale_id_to_string(&parsed)
+
+func view_equals_ignoring_ascii_case(view: ak.StringView, text: str) -> bool:
+    return ascii_equals_ignoring_case(view_bytes(view), text)
+
+# mark: Canonicalization and availability =======================================================
+
+## Ported from Libraries/LibUnicode/Locale.cpp:479 Unicode::canonicalize_unicode_locale_id.
+pub func canonicalize_unicode_locale_id(locale: ak.StringView) -> ak.String:
+    return locale_data_canonicalize(locale)
+
+## Ported from Libraries/LibUnicode/Locale.cpp:484 Unicode::canonicalize_unicode_extension_values.
+## icu::LocaleBuilder::setUnicodeLocaleKeyword and getUnicodeKeywordValue: the value in
+## lowercase, "yes" as "true" (without CLDR's type aliases).
+pub func canonicalize_unicode_extension_values(key: ak.StringView, value: ak.StringView) -> ak.String:
+    discard(key)
+    let result = case_view(value, 0)
+    if view_equals(string_view_of(&result), "yes"):
+        return string_of(view_of("true"))
+    return result
+
+## Ported from Libraries/LibUnicode/Locale.cpp:500 Unicode::default_locale.
+pub func default_locale() -> ak.StringView:
+    return view_of("en")
+
+## Ported from Libraries/LibUnicode/Locale.cpp:505 Unicode::define_locales_without_scripts.
+func define_locales_without_scripts(locales: ak.HashTable[ak.String, ak.StringTraits]*, list: const ak.String[]):
+    # https://tc39.es/ecma402/#sec-internal-slots
+    # For locales that include a script subtag in addition to language and region, the corresponding locale without a
+    # script subtag must also be supported.
+
+    # (The C++ iterates `locales`; the port iterates the list the table was filled from.)
+    for locale in list:
+        let parsed_locale = parse_unicode_language_id_string_view(string_view_of(&locale)) else continue
+        let language = parsed_locale.language else continue
+        if parsed_locale.script == none:
+            continue
+        let region = parsed_locale.region else continue
+
+        var builder: ak.StringBuilder
+        ak.string_builder_construct(&builder)
+        ak.string_builder_append_string_view(&builder, string_view_of(&language))
+        ak.string_builder_append_u8(&builder, '-')
+        ak.string_builder_append_string_view(&builder, string_view_of(&region))
+        let locale_without_script = ak.string_builder_to_string(&builder) else trap("MUST: String::formatted")
+        discard(ak.hash_table_set(locales, locale_without_script))
+
+# The static available_locales of is_locale_available.
+var available_locales: ak.HashTable[ak.String, ak.StringTraits]
+var available_locales_initialized: bool
+
+## Ported from Libraries/LibUnicode/Locale.cpp:531 Unicode::is_locale_available.
+pub func is_locale_available(locale: ak.StringView) -> bool:
+    if not available_locales_initialized:
+        # icu::Locale::getAvailableLocales(), as language tags.
+        var list: ak.Vector[ak.String]
+        var start: usize = 0
+        let bytes = icu_available_locales.bytes
+        for index in 0..=bytes.length:
+            if index == bytes.length or bytes[index] == ' ':
+                ak.vector_append_t(&list, string_of(view_of_bytes(bytes[start..<index])))
+                start = index + 1
+        for tag in ak.vector_span_const(&list):
+            discard(ak.hash_table_set(&available_locales, tag))
+        define_locales_without_scripts(&available_locales, ak.vector_span_const(&list))
+        available_locales_initialized = true
+
+    return ak.hash_table_contains_k[ak.String, ak.StringTraits, ak.StringView, ak.StringStringViewTraits](&available_locales, locale)
+
+## Ported from Libraries/LibUnicode/Locale.cpp:557 Unicode::style_from_string.
+pub func style_from_string(style: ak.StringView) -> Style:
+    if view_equals(style, "narrow"):
+        return Style.narrow
+    if view_equals(style, "short"):
+        return Style.short
+    if view_equals(style, "long"):
+        return Style.long
+    trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibUnicode/Locale.cpp:568 Unicode::style_to_string.
+pub func style_to_string(style: Style) -> ak.StringView:
+    match style:
+        .narrow: return view_of("narrow")
+        .short: return view_of("short")
+        .long: return view_of("long")
+        _: trap("VERIFY_NOT_REACHED")
+
+# mark: Likely subtags ==========================================================================
+
+## Ported from Libraries/LibUnicode/Locale.cpp:582 Unicode::apply_extensions_to_locale.
+## icu::LocaleBuilder: the extensions of `locale_with_extensions` with the language, script,
+## region and variants of `locale`.
+func apply_extensions_to_locale(locale: LocaleId*, locale_with_extensions: const LocaleId*):
+    locale.extensions = locale_with_extensions.extensions
+    locale.private_use_extensions = locale_with_extensions.private_use_extensions
+
+## The maximized form of `tag` in ICU's likely subtags data, or none.
+func likely_subtags_lookup(tag: const u8[]) -> ak.StringView?:
+    let table = icu_likely_subtags.bytes
+    var start: usize = 0
+    while start < table.length:
+        var end = start
+        while end < table.length and table[end] != ';':
+            end += 1
+        var space = start
+        while space < end and table[space] != ' ':
+            space += 1
+        if ascii_equals_ignoring_case_bytes(table[start..<space], tag):
+            return view_of_bytes(table[space + 1..<end])
+        start = end + 1
+    return none
+
+func ascii_equals_ignoring_case_bytes(a: const u8[], b: const u8[]) -> bool:
+    if a.length != b.length:
+        return false
+    for index in 0..<a.length:
+        var x = a[index]
+        var y = b[index]
+        if x >= 'A' and x <= 'Z':
+            x += 32
+        if y >= 'A' and y <= 'Z':
+            y += 32
+        if x != y:
+            return false
+    return true
+
+## `language[-script][-region]` as bytes.
+func base_tag(language: ak.StringView, script: ak.StringView?, region: ak.StringView?) -> ByteBuffer:
+    var tag = ByteBuffer.create(16)
+    for byte in view_bytes(language):
+        tag.append(byte)
+    if let found = script:
+        tag.append('-')
+        for byte in view_bytes(found):
+            tag.append(byte)
+    if let found = region:
+        tag.append('-')
+        for byte in view_bytes(found):
+            tag.append(byte)
+    return tag
+
+## icu::Locale::addLikelySubtags of the language, script and region of `language_id`
+## (UTS #35 "Add Likely Subtags" over ICU's data): the maximized identifier, or none when
+## the data has nothing for it.
+func maximize_language_id(language_id: const LanguageId*) -> LanguageId?:
+    let und = view_of("und")
+    var language = und
+    if let found = language_id.language:
+        language = string_view_of(&found)
+    var script: ak.StringView?
+    if let found = language_id.script:
+        script = string_view_of(&found)
+    var region: ak.StringView?
+    if let found = language_id.region:
+        region = string_view_of(&found)
+    # Lookup: language_script_region, language_region, language_script, language,
+    # und_script, und_region.
+    var maximized: ak.StringView?
+    if script != none and region != none:
+        maximized = likely_subtags_lookup(base_tag(language, script, region).view())
+    if maximized == none and region != none:
+        maximized = likely_subtags_lookup(base_tag(language, none, region).view())
+    if maximized == none and script != none:
+        maximized = likely_subtags_lookup(base_tag(language, script, none).view())
+    if maximized == none:
+        maximized = likely_subtags_lookup(base_tag(language, none, none).view())
+    if maximized == none and script != none:
+        maximized = likely_subtags_lookup(base_tag(und, script, none).view())
+    if maximized == none and region != none:
+        maximized = likely_subtags_lookup(base_tag(und, none, region).view())
+    let found = maximized else return none
+    var result = parse_unicode_language_id_string_view(found) else return none
+    # Replace the fields that were in the input.
+    if not view_equals(language, "und"):
+        result.language = language_id.language
+    if language_id.script != none:
+        result.script = language_id.script
+    if language_id.region != none:
+        result.region = language_id.region
+    result.variants = language_id.variants
+    return result
+
+## Whether two language identifiers name the same language, script and region.
+func same_language_script_region(a: const LanguageId*, b: const LanguageId*) -> bool:
+    return same_optional_string(a.language, b.language) and same_optional_string(a.script, b.script) and same_optional_string(a.region, b.region)
+
+func same_optional_string(a: ak.String?, b: ak.String?) -> bool:
+    let x = a else return b == none
+    let y = b else return false
+    return strings_equal(&x, &y)
+
+## Ported from Libraries/LibUnicode/Locale.cpp:597 Unicode::add_likely_subtags.
+pub func add_likely_subtags(locale: ak.StringView) -> ak.String?:
+    let locale_data = locale_data_for_locale(locale) else return none
+
+    # ICU doesn't seem to handle maximizing locales that have keywords. For example, "und-x-private" should become
+    # "en-Latn-US-x-private" (in the same manner that "und" becomes "en-Latn-US"). So here, we maximize the locale
+    # without keywords, then add them back if needed.
+    var maximized = LocaleId(language_id = locale_data.language_id)
+    if let found = maximize_language_id(&locale_data.language_id):
+        maximized.language_id = found
+
+    if locale_data.extensions.m_size != 0 or locale_data.private_use_extensions.m_size != 0:
+        apply_extensions_to_locale(&maximized, &locale_data)
+
+    return locale_id_to_string(&maximized)
+
+## Ported from Libraries/LibUnicode/Locale.cpp:624 Unicode::remove_likely_subtags.
+pub func remove_likely_subtags(locale: ak.StringView) -> ak.String?:
+    let locale_data = locale_data_for_locale(locale) else return none
+
+    # ICU doesn't seem to handle minimizing locales that have keywords. For example, "und-x-private" should become
+    # "en-x-private" (in the same manner that "und" becomes "en"). So here, we minimize the locale without keywords,
+    # then add them back if needed.
+    # icu::Locale::minimizeSubtags (UTS #35 "Remove Likely Subtags", favoring the region).
+    var minimized = LocaleId(language_id = locale_data.language_id)
+    if let maximal = maximize_language_id(&locale_data.language_id):
+        var trials: LanguageId[3]
+        trials[0] = LanguageId(language = maximal.language)
+        trials[1] = LanguageId(language = maximal.language, region = maximal.region)
+        trials[2] = LanguageId(language = maximal.language, script = maximal.script)
+        for trial in trials:
+            let trial_maximal = maximize_language_id(&trial) else continue
+            if same_language_script_region(&trial_maximal, &maximal):
+                minimized.language_id = trial
+                minimized.language_id.variants = locale_data.language_id.variants
+                break
+
+    if locale_data.extensions.m_size != 0 or locale_data.private_use_extensions.m_size != 0:
+        apply_extensions_to_locale(&minimized, &locale_data)
+
+    return locale_id_to_string(&minimized)
+
+## Ported from Libraries/LibUnicode/Locale.cpp:651 Unicode::is_locale_character_ordering_right_to_left.
+pub func is_locale_character_ordering_right_to_left(locale: ak.StringView) -> bool:
+    let locale_data = locale_data_for_locale(locale) else return false  # Default to left-to-right
+
+    # icu::Locale::isRightToLeft: the script subtag, else the likely script.
+    var script = locale_data.language_id.script
+    if script == none:
+        if let maximized = maximize_language_id(&locale_data.language_id):
+            script = maximized.script
+    let found = script else return false
+    let script_bytes = string_bytes(&found)
+    let scripts = icu_rtl_scripts.bytes
+    var start: usize = 0
+    while start + 4 <= scripts.length:
+        if ascii_equals_ignoring_case_bytes(scripts[start..<start + 4], script_bytes):
+            return true
+        start += 5
+    return false
+
+# mark: Serialization ===========================================================================
+
+## append_segment of LanguageID::to_string and LocaleID::to_string.
+func append_segment(builder: ak.StringBuilder*, segment: ak.StringView):
+    if segment.m_length == 0:
+        return
+    if not ak.string_builder_is_empty(builder):
+        ak.string_builder_append_u8(builder, '-')
+    ak.string_builder_append_string_view(builder, segment)
+
+## Ported from Libraries/LibUnicode/Locale.cpp:660 Unicode::LanguageID::to_string.
+pub func language_id_to_string(this: const LanguageId*) -> ak.String:
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+
+    if let language = this.language:
+        append_segment(&builder, string_view_of(&language))
+    if let script = this.script:
+        append_segment(&builder, string_view_of(&script))
+    if let region = this.region:
+        append_segment(&builder, string_view_of(&region))
+    for variant in ak.vector_span_const(&this.variants):
+        append_segment(&builder, string_view_of(&variant))
+
+    return ak.string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")
+
+## Ported from Libraries/LibUnicode/Locale.cpp:681 Unicode::LocaleID::to_string.
+pub func locale_id_to_string(this: const LocaleId*) -> ak.String:
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+
+    let language = language_id_to_string(&this.language_id)
+    append_segment(&builder, string_view_of(&language))
+
+    for extension in ak.vector_span_const(&this.extensions):
+        match extension:
+            .locale_extension(ext):
+                ak.string_builder_append_string_view(&builder, view_of("-u"))
+                for attribute in ak.vector_span_const(&ext.attributes):
+                    append_segment(&builder, string_view_of(&attribute))
+                for keyword in ak.vector_span_const(&ext.keywords):
+                    append_segment(&builder, string_view_of(&keyword.key))
+                    append_segment(&builder, string_view_of(&keyword.value))
+            .transformed_extension(ext):
+                ak.string_builder_append_string_view(&builder, view_of("-t"))
+                if let language_id = ext.language:
+                    let tlang = language_id_to_string(&language_id)
+                    append_segment(&builder, string_view_of(&tlang))
+                for field in ak.vector_span_const(&ext.fields):
+                    append_segment(&builder, string_view_of(&field.key))
+                    append_segment(&builder, string_view_of(&field.value))
+            .other_extension(ext):
+                ak.string_builder_append_u8(&builder, '-')
+                ak.string_builder_append_u8(&builder, ext.key)
+                append_segment(&builder, string_view_of(&ext.value))
+
+    if this.private_use_extensions.m_size != 0:
+        ak.string_builder_append_string_view(&builder, view_of("-x"))
+        for extension in ak.vector_span_const(&this.private_use_extensions):
+            append_segment(&builder, string_view_of(&extension))
+
+    return ak.string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")
+
+# mark: Extension templates =====================================================================
+
+## The alternatives of Unicode::Extension, standing for the ExtensionType template parameter.
+pub enum ExtensionKind:
+    locale_extension
+    transformed_extension
+    other_extension
+
+func extension_is_kind(extension: const Extension*, kind: ExtensionKind) -> bool:
+    match *extension:
+        .locale_extension(_): return kind == ExtensionKind.locale_extension
+        .transformed_extension(_): return kind == ExtensionKind.transformed_extension
+        .other_extension(_): return kind == ExtensionKind.other_extension
+
+## Ported from Libraries/LibUnicode/Locale.h:62 Unicode::LocaleID::remove_extension_type.
+## remove_extension_type<ExtensionType>() with the type as `kind`.
+pub func locale_id_remove_extension_type(this: LocaleId*, kind: ExtensionKind) -> ak.Vector[Extension]:
+    var removed_extensions: ak.Vector[Extension]
+    let tmp_extensions = this.extensions
+    this.extensions = ak.Vector[Extension]()
+
+    for extension in ak.vector_span_const(&tmp_extensions):
+        if extension_is_kind(&extension, kind):
+            ak.vector_append_t(&removed_extensions, extension)
+        else:
+            ak.vector_append_t(&this.extensions, extension)
+
+    return removed_extensions
+
+## Ported from Libraries/LibUnicode/Locale.h:78 Unicode::LocaleID::for_each_extension_of_type.
+## for_each_extension_of_type<ExtensionType>(callback) with the type as `kind`; the callback
+## receives the Extension.
+pub func locale_id_for_each_extension_of_type(this: LocaleId*, kind: ExtensionKind, callback: ak.Function1[Extension*, ak.IterationDecision]):
+    let items = ak.vector_span_const(&this.extensions)
+    let extensions = Extension[]((Extension*)items.data, items.length)
+    let call = callback.call else trap("an empty AK::Function was called")
+    for index in 0..<extensions.length:
+        if extension_is_kind(&extensions[index], kind):
+            if call(callback.context, &extensions[index]) == ak.IterationDecision.break_:
+                break

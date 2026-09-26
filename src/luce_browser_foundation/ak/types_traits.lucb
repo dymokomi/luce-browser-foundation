@@ -40,6 +40,18 @@ pub struct StringTraits: Traits[String]:
 
     func equals(a: const String*, b: const String*) -> bool: return string_equals(a, b)
 
+## Concepts::HashCompatible<String, StringView>: looking a String table up by a StringView. A
+## StringView hashes as the String with the same bytes, and `String == StringView` compares
+## the bytes (added at integration for web_unicode's available-locale table).
+pub struct StringStringViewTraits: HashCompatibleTraits[String, StringView]:
+    var empty_: u8
+
+    func hash_of(key: const StringView*) -> u32: return string_view_hash(key)
+
+    func equals(entry: const String*, key: const StringView*) -> bool:
+        let view = string_bytes_as_string_view(entry)
+        return string_view_eq_string_view(&view, *key)
+
 ## AK::Traits<u32>: AK's hash and equality for the key type.
 pub struct U32Traits: Traits[u32]:
     var empty_: u8

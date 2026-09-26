@@ -1,0 +1,173 @@
+#==============================================================================================
+#
+#   break_iterator - the navigation of ICU's BreakIterator over precomputed boundaries
+#
+#   DESCRIPTION:
+#       Not a port: replaces icu::BreakIterator (RuleBasedBreakIterator) for the Segmenter.
+#       Setting the text computes every boundary at once (ICU computes them lazily through a
+#       cache; the boundaries are the same). first, next, current, following, preceding and
+#       isBoundary keep ICU's semantics, including where they leave the current position.
+#       Offsets are code units of the text: bytes for UTF-8 text, code units for UTF-16.
+#
+#==============================================================================================
+
+## BreakIterator::DONE.
+let break_iterator_done: i32 = -1
+
+## A break iterator of one granularity over one text.
+struct BreakIterator:
+    var granularity: SegmenterGranularity
+    ## The boundaries, ascending, in code units.
+    var boundaries: CodePointBuffer
+    ## The word rule status of each boundary (word iterators only).
+    var statuses: CodePointBuffer
+    ## The code unit offset of each code point, then the length (for alignment).
+    var starts: CodePointBuffer
+    ## The index in `boundaries` of the current boundary.
+    var position: usize
+
+## BreakIterator::create*Instance: an iterator over the empty text.
+func break_iterator_create(granularity: SegmenterGranularity) -> BreakIterator*:
+    var starts = CodePointBuffer.create(1)
+    starts.append(0)
+    var boundaries = CodePointBuffer.create(1)
+    boundaries.append(0)
+    var statuses = CodePointBuffer.create(1)
+    statuses.append(0)
+    return new BreakIterator(granularity = granularity, boundaries = boundaries, statuses = statuses, starts = starts, position = 0) else trap("out of memory")
+
+## BreakIterator::clone. The boundary arrays are never changed once computed, so the clone
+## may share them.
+func break_iterator_clone(this: const BreakIterator*) -> BreakIterator*:
+    return new BreakIterator(granularity = this.granularity, boundaries = this.boundaries, statuses = this.statuses, starts = this.starts, position = this.position) else trap("out of memory")
+
+## BreakIterator::setText over UTF-8 bytes.
+func break_iterator_set_text_utf8(this: BreakIterator*, bytes: const u8[]):
+    var code_points = CodePointBuffer.create(bytes.length + 1)
+    var starts = CodePointBuffer.create(bytes.length + 2)
+    decode_utf8(bytes, &code_points, &starts)
+    break_iterator_set_code_points(this, code_points.view(), starts)
+
+## BreakIterator::setText over UTF-16 code units.
+func break_iterator_set_text_utf16(this: BreakIterator*, units: const u16[]):
+    var code_points = CodePointBuffer.create(units.length + 1)
+    var starts = CodePointBuffer.create(units.length + 2)
+    decode_utf16(units, &code_points, &starts)
+    break_iterator_set_code_points(this, code_points.view(), starts)
+
+## Compute the boundaries of `code_points`, whose code unit offsets are `starts`.
+func break_iterator_set_code_points(this: BreakIterator*, code_points: const u32[], starts: CodePointBuffer):
+    var indexes = CodePointBuffer.create(code_points.length + 2)
+    var statuses = CodePointBuffer.create(1)
+    match this.granularity:
+        .grapheme: grapheme_boundaries(code_points, &indexes)
+        .word: word_boundaries(code_points, &indexes, &statuses)
+        .line: line_boundaries(code_points, &indexes)
+        .sentence: sentence_boundaries(code_points, &indexes)
+        _: trap("VERIFY_NOT_REACHED")
+    # Code point indexes to code units.
+    var boundaries = CodePointBuffer.create(indexes.count)
+    for index in indexes.view():
+        boundaries.append(starts.items[(usize)index])
+    this.boundaries = boundaries
+    this.statuses = statuses
+    this.starts = starts
+    this.position = 0
+
+## The length of the text in code units.
+func break_iterator_length(this: const BreakIterator*) -> u32:
+    return this.starts.items[this.starts.count - 1]
+
+## The start of the code point containing `offset`, clamped to the text
+## (utext_setNativeIndex + utext_getNativeIndex).
+func break_iterator_align(this: const BreakIterator*, offset: usize) -> u32:
+    let length = break_iterator_length(this)
+    if offset >= (usize)length:
+        return length
+    # The last code point start not after `offset`.
+    var low: usize = 0
+    var high = this.starts.count - 1
+    while low + 1 < high:
+        let middle = low + (high - low) // 2
+        if (usize)this.starts.items[middle] <= offset:
+            low = middle
+        else:
+            high = middle
+    return this.starts.items[low]
+
+## The index of the last boundary not after `offset` (BreakCache::seek).
+func break_iterator_seek(this: const BreakIterator*, offset: u32) -> usize:
+    var low: usize = 0
+    var high = this.boundaries.count
+    while low + 1 < high:
+        let middle = low + (high - low) // 2
+        if this.boundaries.items[middle] <= offset:
+            low = middle
+        else:
+            high = middle
+    return low
+
+## BreakIterator::first.
+func break_iterator_first(this: BreakIterator*) -> i32:
+    this.position = 0
+    return (i32)this.boundaries.items[0]
+
+## BreakIterator::next.
+func break_iterator_next(this: BreakIterator*) -> i32:
+    if this.position + 1 >= this.boundaries.count:
+        return break_iterator_done
+    this.position += 1
+    return (i32)this.boundaries.items[this.position]
+
+## BreakIterator::current.
+func break_iterator_current(this: const BreakIterator*) -> i32:
+    return (i32)this.boundaries.items[this.position]
+
+## BreakIterator::following: the first boundary after `offset`, or DONE.
+func break_iterator_following(this: BreakIterator*, offset: i32) -> i32:
+    if offset < 0:
+        return break_iterator_first(this)
+    let aligned = break_iterator_align(this, (usize)offset)
+    this.position = break_iterator_seek(this, aligned)
+    return break_iterator_next(this)
+
+## BreakIterator::preceding: the last boundary before `offset`, or DONE.
+func break_iterator_preceding(this: BreakIterator*, offset: i32) -> i32:
+    if offset < 0 or offset > (i32)break_iterator_length(this):
+        this.position = this.boundaries.count - 1
+        if offset < 0:
+            this.position = 0
+            return break_iterator_done
+        return break_iterator_current(this)
+    let aligned = break_iterator_align(this, (usize)offset)
+    let index = break_iterator_seek(this, aligned)
+    if this.boundaries.items[index] == aligned:
+        if index == 0:
+            this.position = 0
+            return break_iterator_done
+        this.position = index - 1
+    else:
+        this.position = index
+    return break_iterator_current(this)
+
+## BreakIterator::isBoundary: whether `offset` is a boundary. Otherwise the current position
+## moves to the following boundary.
+func break_iterator_is_boundary(this: BreakIterator*, offset: i32) -> bool:
+    if offset < 0:
+        discard(break_iterator_first(this))
+        return false
+    let aligned = break_iterator_align(this, (usize)offset)
+    this.position = break_iterator_seek(this, aligned)
+    let result = (i32)this.boundaries.items[this.position] == offset
+    if result and (i32)aligned < offset:
+        # The offset is beyond the end of the text; the position stays at its end.
+        return false
+    if not result:
+        discard(break_iterator_next(this))
+    return result
+
+## BreakIterator::getRuleStatus: the status of the current boundary (word iterators).
+func break_iterator_rule_status(this: const BreakIterator*) -> i32:
+    if this.position >= this.statuses.count:
+        return 0
+    return (i32)this.statuses.items[this.position]

@@ -392,7 +392,6 @@ func expect_public_suffix(host: str, expected: str?):
         assert(suffix == none)
 
 test "public_suffix":
-    if not web_unicode_is_ported: return
     expect_public_suffix("com", "com")
     expect_public_suffix("example.com", "com")
     expect_public_suffix("www.example.com", "com")

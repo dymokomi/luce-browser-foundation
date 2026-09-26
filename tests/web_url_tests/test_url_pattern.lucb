@@ -27,7 +27,6 @@ func expect_group(groups: const ak.OrderedHashMap[ak.String, ak.StringOrEmpty, a
         .empty: trap("expected a String, got Empty")
 
 test "url_pattern_matches_named_groups":
-    if not web_unicode_is_ported: return
     let pattern = must_create_pattern("https://example.com/:category/:id")
     let result = must_match(&pattern, "https://example.com/books/42")
 
@@ -37,7 +36,6 @@ test "url_pattern_matches_named_groups":
     expect_group(&result.pathname.groups, "id", "42")
 
 test "url_pattern_ignore_case_matching":
-    if not web_unicode_is_ported: return
     let pattern = must_create_pattern("https://example.com/:value", web_url.IgnoreCase.yes)
     let result = must_match(&pattern, "https://example.com/CaseSensitive")
 
