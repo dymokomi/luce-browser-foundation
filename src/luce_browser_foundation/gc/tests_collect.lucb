@@ -174,6 +174,20 @@ func test_conservative_vector_possible_values_impl(this: ConservativeVectorBase*
     let vector = (TestConservativeVector*)this
     return gc_vector_span(&vector.words)
 
+## vector.cells += the cell of `weak`, without leaving its address in the caller's frame.
+noinline func append_to_root_vector(vector: TestRootVector*, weak: const Weak[TestCell]*):
+    gc_vector_append(&vector.cells, weak_ptr(weak) else trap("dead"))
+
+## map.values[key] = the cell of `weak`, without leaving its address in the caller's frame.
+noinline func set_in_root_hash_map(map: TestRootHashMap*, key: usize, weak: const Weak[TestCell]*):
+    gc_hash_map_set(&map.values, key, weak_ptr(weak) else trap("dead"))
+
+## conservative.words += an interior pointer to the cell of `weak`, NaN-boxed as LibJS stores
+## cells in Values, without leaving the address in the caller's frame.
+noinline func append_to_conservative_vector(conservative: TestConservativeVector*, weak: const Weak[TestCell]*):
+    let cell_address = (u64)(usize)(weak_ptr(weak) else trap("dead")) + 8
+    gc_vector_append(&conservative.words, cell_address | shifted_is_cell_pattern)
+
 test "roots: root vectors, root hash maps, conservative vectors":
     clobber_stack()
     run_root_containers()
@@ -188,13 +202,11 @@ noinline func run_root_containers():
     conservative_vector_base_construct(&conservative.base, heap)
 
     let weak_in_vector = make_unreferenced_cell(heap, 30)
-    gc_vector_append(&vector.cells, weak_ptr(&weak_in_vector) else trap("dead"))
+    append_to_root_vector(vector, &weak_in_vector)
     let weak_in_map = make_unreferenced_cell(heap, 31)
-    gc_hash_map_set(&map.values, 42, weak_ptr(&weak_in_map) else trap("dead"))
+    set_in_root_hash_map(map, 42, &weak_in_map)
     let weak_in_conservative = make_unreferenced_cell(heap, 32)
-    # an interior pointer, NaN-boxed as LibJS stores cells in Values
-    let cell_address = (u64)(usize)(weak_ptr(&weak_in_conservative) else trap("dead")) + 8
-    gc_vector_append(&conservative.words, cell_address | shifted_is_cell_pattern)
+    append_to_conservative_vector(conservative, &weak_in_conservative)
     let weak_free = make_unreferenced_cell(heap, 33)
 
     clobber_stack()
