@@ -6,6 +6,10 @@
 #       Port of Tests/AK/TestGenericLexer.cpp. The constexpr/static_assert cases run at run
 #       time; each case checks the char lexer and then the char16_t lexer.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 ## `[](auto c) { return is_ascii_alpha(c) || is_ascii_space(c); }` for the char lexer.
@@ -37,30 +41,45 @@ struct TestLexerIsCodePoint: CodePointPredicate:
         return code_point == self.expected
 
 test "GenericLexer: should_constexpr_construct_from_empty_string_view":
+    test_genericlexer_should_constexpr_construct_from_empty_string_view()
+
+noinline func test_genericlexer_should_constexpr_construct_from_empty_string_view():
     let sut = generic_lexer_new(StringView())
     assert(generic_lexer_is_eof(&sut))
     let utf16_sut = utf16_generic_lexer_new(utf16_view_new())
     assert(utf16_generic_lexer_is_eof(&utf16_sut))
 
 test "GenericLexer: should_construct_from_string_view":
+    test_genericlexer_should_construct_from_string_view()
+
+noinline func test_genericlexer_should_construct_from_string_view():
     let sut = generic_lexer_new(sv("abcdef"))
     assert(not generic_lexer_is_eof(&sut))
     let utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
     assert(not utf16_generic_lexer_is_eof(&utf16_sut))
 
 test "GenericLexer: should_constexpr_tell":
+    test_genericlexer_should_constexpr_tell()
+
+noinline func test_genericlexer_should_constexpr_tell():
     let sut = generic_lexer_new(sv("abcdef"))
     assert(generic_lexer_tell(&sut) == 0)
     let utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
     assert(utf16_generic_lexer_tell(&utf16_sut) == 0)
 
 test "GenericLexer: should_constexpr_tell_remaining":
+    test_genericlexer_should_constexpr_tell_remaining()
+
+noinline func test_genericlexer_should_constexpr_tell_remaining():
     let sut = generic_lexer_new(sv("abcdef"))
     assert(generic_lexer_tell_remaining(&sut) == 6)
     let utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
     assert(utf16_generic_lexer_tell_remaining(&utf16_sut) == 6)
 
 test "GenericLexer: should_constexpr_peek":
+    test_genericlexer_should_constexpr_peek()
+
+noinline func test_genericlexer_should_constexpr_peek():
     let sut = generic_lexer_new(sv("abcdef"))
     assert(generic_lexer_peek(&sut) == 'a')
     assert(generic_lexer_peek(&sut, 2) == 'c')
@@ -71,6 +90,9 @@ test "GenericLexer: should_constexpr_peek":
     assert(utf16_generic_lexer_peek(&utf16_sut, 100) == 0)
 
 test "GenericLexer: should_constexpr_next_is":
+    test_genericlexer_should_constexpr_next_is()
+
+noinline func test_genericlexer_should_constexpr_next_is():
     let sut = generic_lexer_new(sv("abcdef"))
     assert(generic_lexer_next_is_t_char_type(&sut, 'a'))
     assert(generic_lexer_next_is_string_view(&sut, sv("abc")))
@@ -79,6 +101,9 @@ test "GenericLexer: should_constexpr_next_is":
     assert(utf16_generic_lexer_next_is_string_view(&utf16_sut, sv("abc")))
 
 test "GenericLexer: should_constexpr_retreat":
+    test_genericlexer_should_constexpr_retreat()
+
+noinline func test_genericlexer_should_constexpr_retreat():
     var sut = generic_lexer_new(sv("abcdef"))
     discard(generic_lexer_consume(&sut))
     generic_lexer_retreat(&sut)
@@ -89,6 +114,9 @@ test "GenericLexer: should_constexpr_retreat":
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'a')
 
 test "GenericLexer: should_constexpr_consume_1":
+    test_genericlexer_should_constexpr_consume_1()
+
+noinline func test_genericlexer_should_constexpr_consume_1():
     var sut = generic_lexer_new(sv("abcdef"))
     discard(generic_lexer_consume(&sut))
     assert(generic_lexer_peek(&sut) == 'b')
@@ -97,6 +125,9 @@ test "GenericLexer: should_constexpr_consume_1":
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'b')
 
 test "GenericLexer: should_constexpr_consume_specific_char":
+    test_genericlexer_should_constexpr_consume_specific_char()
+
+noinline func test_genericlexer_should_constexpr_consume_specific_char():
     var sut = generic_lexer_new(sv("abcdef"))
     discard(generic_lexer_consume_specific_t_char_type(&sut, 'a'))
     assert(generic_lexer_peek(&sut) == 'b')
@@ -105,6 +136,9 @@ test "GenericLexer: should_constexpr_consume_specific_char":
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'b')
 
 test "GenericLexer: should_constexpr_consume_specific_string_view":
+    test_genericlexer_should_constexpr_consume_specific_string_view()
+
+noinline func test_genericlexer_should_constexpr_consume_specific_string_view():
     var sut = generic_lexer_new(sv("abcdef"))
     assert(generic_lexer_consume_specific_string_view(&sut, sv("ab")))
     assert(generic_lexer_peek(&sut) == 'c')
@@ -113,6 +147,9 @@ test "GenericLexer: should_constexpr_consume_specific_string_view":
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'e')
 
 test "GenericLexer: should_constexpr_consume_specific_with_predicate":
+    test_genericlexer_should_constexpr_consume_specific_with_predicate()
+
+noinline func test_genericlexer_should_constexpr_consume_specific_with_predicate():
     var sut = generic_lexer_new(sv("h e l l o !"))
     let pred = TestLexerAlphaOrSpace(unused = 0)
     for _i in 0..<100:
@@ -125,6 +162,9 @@ test "GenericLexer: should_constexpr_consume_specific_with_predicate":
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'!')
 
 test "GenericLexer: should_constexpr_ignore_until":
+    test_genericlexer_should_constexpr_ignore_until()
+
+noinline func test_genericlexer_should_constexpr_ignore_until():
     var sut = generic_lexer_new(sv("abcdef"))
     generic_lexer_ignore_until_t_char_type(&sut, 'd')
     assert(generic_lexer_peek(&sut) == 'd')
@@ -133,6 +173,9 @@ test "GenericLexer: should_constexpr_ignore_until":
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'d')
 
 test "GenericLexer: should_constexpr_next_is_pred":
+    test_genericlexer_should_constexpr_next_is_pred()
+
+noinline func test_genericlexer_should_constexpr_next_is_pred():
     let pred = TestLexerIs(expected = 'a')
     let sut = generic_lexer_new(sv("abcdef"))
     assert(generic_lexer_next_is_tt_predicate(&sut, &pred))
@@ -141,6 +184,9 @@ test "GenericLexer: should_constexpr_next_is_pred":
     assert(utf16_generic_lexer_next_is_tt_predicate(&utf16_sut, &utf16_pred))
 
 test "GenericLexer: should_constexpr_ignore_while_pred":
+    test_genericlexer_should_constexpr_ignore_while_pred()
+
+noinline func test_genericlexer_should_constexpr_ignore_while_pred():
     let pred = TestLexerIs(expected = 'a')
     var sut = generic_lexer_new(sv("abcdef"))
     generic_lexer_ignore_while(&sut, &pred)
@@ -151,6 +197,9 @@ test "GenericLexer: should_constexpr_ignore_while_pred":
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'b')
 
 test "GenericLexer: should_constexpr_ignore_until_pred":
+    test_genericlexer_should_constexpr_ignore_until_pred()
+
+noinline func test_genericlexer_should_constexpr_ignore_until_pred():
     let pred = TestLexerIs(expected = 'c')
     var sut = generic_lexer_new(sv("abcdef"))
     generic_lexer_ignore_until_tt_predicate(&sut, &pred)
@@ -175,6 +224,9 @@ func test_code_point(code_point: u32) -> UnicodeEscapeResult:
     return UnicodeEscapeResult.success(code_point = code_point)
 
 test "GenericLexer: consume_escaped_code_point":
+    test_genericlexer_consume_escaped_code_point()
+
+noinline func test_genericlexer_consume_escaped_code_point():
     let malformed = UnicodeEscapeResult.failure(reason = UnicodeEscapeError.malformed_unicode_escape)
     let overflow = UnicodeEscapeResult.failure(reason = UnicodeEscapeError.unicode_escape_overflow)
 
@@ -217,6 +269,9 @@ func test_check_lexer_position(char_lexer: const GenericLexer[u8]*, utf16_lexer:
     assert(utf16_generic_lexer_tell(utf16_lexer) == expected)
 
 test "GenericLexer: consume_decimal_integer_correctly_parses":
+    test_genericlexer_consume_decimal_integer_correctly_parses()
+
+noinline func test_genericlexer_consume_decimal_integer_correctly_parses():
     # CHECK_PARSES_INTEGER(test, expected, type) for each type, on both lexers.
     let u8_cases: (str, u8)[4] = [("0", 0), ("-0", 0), ("10", 10), ("255", 255)]
     for (text, expected) in u8_cases:
@@ -342,6 +397,9 @@ func test_decimal_integer_error(text: str, type_name: str) -> (str, str):
     return (char_error, utf16_error)
 
 test "GenericLexer: consume_decimal_integer_fails_with_correct_error":
+    test_genericlexer_consume_decimal_integer_fails_with_correct_error()
+
+noinline func test_genericlexer_consume_decimal_integer_fails_with_correct_error():
     let cases: (str, str, str)[20] = [
         ("Well hello GenericLexer!", "u64", "EINVAL"),
         ("+", "u64", "EINVAL"),

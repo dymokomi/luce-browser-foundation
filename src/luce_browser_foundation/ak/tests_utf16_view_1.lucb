@@ -8,6 +8,10 @@
 #       t16u (explicit code units, for lonely surrogates). EXPECT_DEATH checks are not ported:
 #       a trap cannot be caught.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 # mark: Helpers =================================================================================
@@ -80,6 +84,9 @@ func t16_to_utf8_fails(view: Utf16View, allow: AllowLonelySurrogates) -> bool:
 # mark: Decoding ================================================================================
 
 test "decode_ascii":
+    test_decode_ascii()
+
+noinline func test_decode_ascii():
     let string = utf16_string_from_utf8_string_view(sv("Hello World!11"))
     let view = t16s_view(&string)
 
@@ -90,6 +97,9 @@ test "decode_ascii":
     t16_expect_code_points(view, [72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33, 49, 49])
 
 test "decode_utf8":
+    test_decode_utf8()
+
+noinline func test_decode_utf8():
     let string = utf16_string_from_utf8_string_view(sv("Привет, мир! 😀 γειά σου κόσμος こんにちは世界"))
     let view = t16s_view(&string)
 
@@ -100,6 +110,9 @@ test "decode_utf8":
     t16_expect_code_points(view, [1055, 1088, 1080, 1074, 1077, 1090, 44, 32, 1084, 1080, 1088, 33, 32, 128512, 32, 947, 949, 953, 940, 32, 963, 959, 965, 32, 954, 972, 963, 956, 959, 962, 32, 12371, 12435, 12395, 12385, 12399, 19990, 30028])
 
 test "encode_utf8":
+    test_encode_utf8()
+
+noinline func test_encode_utf8():
     let utf8_string = string_from_str("Привет, мир! 😀 γειά σου κόσμος こんにちは世界")
     let string = utf16_string_from_utf8_string(&utf8_string)
     let view = t16s_view(&string)
@@ -111,6 +124,9 @@ test "encode_utf8":
     assert(t16_to_utf8_fails(lonely, AllowLonelySurrogates.no))
 
 test "decode_utf16":
+    test_decode_utf16()
+
+noinline func test_decode_utf16():
     let view = t16("Привет, мир! 😀 γειά σου κόσμος こんにちは世界")
     assert(utf16_view_length_in_code_units(&view) == 39)
 
@@ -121,6 +137,9 @@ test "decode_utf16":
     t16_expect_code_points(view, [1055, 1088, 1080, 1074, 1077, 1090, 44, 32, 1084, 1080, 1088, 33, 32, 128512, 32, 947, 949, 953, 940, 32, 963, 959, 965, 32, 954, 972, 963, 956, 959, 962, 32, 12371, 12435, 12395, 12385, 12399, 19990, 30028])
 
 test "null_view":
+    test_null_view()
+
+noinline func test_null_view():
     let view = utf16_view_new()
     assert(utf16_view_validate(&view))
     assert(utf16_view_length_in_code_units(&view) == 0)
@@ -132,6 +151,9 @@ test "null_view":
     assert(utf16_code_point_iterator_done(&it))
 
 test "default_empty_view_is_empty_ascii_string":
+    test_default_empty_view_is_empty_ascii_string()
+
+noinline func test_default_empty_view_is_empty_ascii_string():
     let view = utf16_view_new()
     assert(utf16_view_has_ascii_storage(&view))
     assert(utf16_view_ascii_span(&view).length == 0)
@@ -139,6 +161,9 @@ test "default_empty_view_is_empty_ascii_string":
     assert(t16_eq_str(view, ""))
 
 test "utf16_literal":
+    test_utf16_literal()
+
+noinline func test_utf16_literal():
     let empty = t16("")
     assert(utf16_view_validate(&empty))
     assert(utf16_view_length_in_code_units(&empty) == 0)
@@ -170,6 +195,9 @@ func t16_expect_iterator(it: const Utf16CodePointIterator*, expected: const u32[
     assert(utf16_code_point_iterator_peek(it, expected.length) == none)
 
 test "iterate_utf16":
+    test_iterate_utf16()
+
+noinline func test_iterate_utf16():
     let view = t16("Привет 😀🙃")
     let end = utf16_view_end(&view)
     var iterator = utf16_view_begin(&view)
@@ -212,6 +240,9 @@ func t16_expect_invalid(code_units: const u16[], expected_valid_code_units: usiz
     assert(valid_code_units == expected_valid_code_units)
 
 test "validate_invalid_utf16":
+    test_validate_invalid_utf16()
+
+noinline func test_validate_invalid_utf16():
     # Lonely high surrogate.
     t16_expect_invalid([0xd800], 0)
     t16_expect_invalid([0xdbff], 0)
@@ -233,6 +264,9 @@ test "validate_invalid_utf16":
     t16_expect_invalid([0x0041, 0x0041, 0xd800], 2)
 
 test "decode_invalid_utf16":
+    test_decode_invalid_utf16()
+
+noinline func test_decode_invalid_utf16():
     # Lonely high surrogate.
     let high = t16u([0x41, 0x42, 0xd800])
     assert(utf16_view_length_in_code_units(&high) == 3)
@@ -264,6 +298,9 @@ func t16_is_ascii_whitespace(text: str) -> bool:
     return utf16_view_is_ascii_whitespace(&view)
 
 test "is_ascii":
+    test_is_ascii_2()
+
+noinline func test_is_ascii_2():
     let empty = utf16_view_new()
     assert(utf16_view_is_ascii(&empty))
     assert(t16_is_ascii("a"))
@@ -277,6 +314,9 @@ test "is_ascii":
     assert(not t16_is_ascii("The quick (“brown”) fox can’t jump 32.3 feet, right?"))
 
 test "is_ascii_whitespace":
+    test_is_ascii_whitespace()
+
+noinline func test_is_ascii_whitespace():
     let empty = utf16_view_new()
     assert(utf16_view_is_ascii_whitespace(&empty))
     assert(t16_is_ascii_whitespace(" "))
@@ -312,6 +352,9 @@ func t16_titlecase_is(input: str, expected: str) -> bool:
     return t16s_eq(&result, t16(expected))
 
 test "to_ascii_lowercase":
+    test_to_ascii_lowercase_3()
+
+noinline func test_to_ascii_lowercase_3():
     assert(t16_lowercase_is("", ""))
     assert(t16_lowercase_is("foobar", "foobar"))
     assert(t16_lowercase_is("FooBar", "foobar"))
@@ -319,6 +362,9 @@ test "to_ascii_lowercase":
     assert(t16_lowercase_is("FOO 😀 BAR", "foo 😀 bar"))
 
 test "to_ascii_uppercase":
+    test_to_ascii_uppercase_3()
+
+noinline func test_to_ascii_uppercase_3():
     assert(t16_uppercase_is("", ""))
     assert(t16_uppercase_is("foobar", "FOOBAR"))
     assert(t16_uppercase_is("FooBar", "FOOBAR"))
@@ -326,6 +372,9 @@ test "to_ascii_uppercase":
     assert(t16_uppercase_is("foo 😀 bar", "FOO 😀 BAR"))
 
 test "to_ascii_titlecase":
+    test_to_ascii_titlecase()
+
+noinline func test_to_ascii_titlecase():
     assert(t16_titlecase_is("", ""))
     assert(t16_titlecase_is("foobar", "Foobar"))
     assert(t16_titlecase_is("FooBar", "Foobar"))
@@ -336,6 +385,9 @@ test "to_ascii_titlecase":
 # mark: Comparison ==============================================================================
 
 test "equals_utf8":
+    test_equals_utf8()
+
+noinline func test_equals_utf8():
     assert(t16_eq_str(t16(""), ""))
 
     assert(t16_eq_str(t16("foo bar"), "foo bar"))
@@ -352,6 +404,9 @@ test "equals_utf8":
     assert(not t16_eq_str(t16("foo 😂 bar"), "foo 😀 bar"))
 
 test "comparison":
+    test_comparison()
+
+noinline func test_comparison():
     assert(not (t16_cmp(t16(""), t16("")) < 0))
     assert(not (t16_cmp(t16(""), t16("")) > 0))
     assert(t16_cmp(t16(""), t16("")) <= 0)

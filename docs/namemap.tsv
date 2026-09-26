@@ -1,4 +1,6 @@
 # C++ name	package	module	Luce name	file:line	kind
+(integration: __format_value<Duration>, the formatter arg_custom takes.)	luce-browser-foundation	ak	format_value_duration	-	addition
+(integration: __format_value<UnixDateTime>, the formatter arg_custom takes.)	luce-browser-foundation	ak	format_value_unix_date_time	-	addition
 (integration: a StringView as text for a debug message; non-UTF-8 bytes print as a marker.)	luce-browser-foundation	ak	string_view_text	-	addition
 (r02: A `Function<bool(char)>`-shaped predicate over bytes (StringView::split_view_if).)	luce-browser-foundation	ak	CharPredicate	-	addition
 (r02: A `Function<bool(u32)>`-shaped predicate over code points (Utf8View::for_each_split_view's)	luce-browser-foundation	ak	CodePointPredicate	-	addition
@@ -1160,6 +1162,8 @@ AK::FormatParser::consume_number	luce-browser-foundation	ak	format_parser_consum
 AK::FormatParser::consume_replacement_field	luce-browser-foundation	ak	format_parser_consume_replacement_field	AK/Format.cpp:204	stub
 AK::FormatParser::consume_specifier	luce-browser-foundation	ak	format_parser_consume_specifier	AK/Format.cpp:164	stub
 AK::FormatString	luce-browser-foundation	ak	FormatString	AK/Format.h:781	struct
+AK::Formatter<AK::Duration>::format	luce-browser-foundation	ak	formatter_duration_format	AK/Time.cpp:271	ported
+AK::Formatter<AK::UnixDateTime>::format	luce-browser-foundation	ak	formatter_unix_date_time_format	AK/Time.h:669	ported
 AK::Function::CallableWrapper	luce-browser-foundation	ak	CallableWrapper	AK/Function.h:212	generic struct
 AK::Function::CallableWrapper::CallableWrapper<CallableType>	luce-browser-foundation	ak	callable_wrapper_construct	AK/Function.h:217	construct
 AK::Function::CallableWrapper::init_and_swap	luce-browser-foundation	ak	callable_wrapper_init_and_swap	AK/Function.h:238	stub

@@ -6,6 +6,10 @@
 #       Port of Tests/AK/TestStringUtils.cpp. hash_compatible (static_asserts on the C++
 #       HashCompatible concept) has no luce-base counterpart.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 ## Whether `spans` holds exactly the (start, length) pairs of `expected`.
@@ -19,6 +23,9 @@ func mask_spans_equal(spans: const Vector[MaskSpan]*, expected: const MaskSpan[]
     return true
 
 test "matches_empty":
+    test_matches_empty()
+
+noinline func test_matches_empty():
     assert(string_utils_matches(sv(""), sv("")))
 
     assert(string_utils_matches(sv(""), sv("*")))
@@ -28,11 +35,17 @@ test "matches_empty":
     assert(not string_utils_matches(sv("a"), sv("")))
 
 test "matches_case_sensitive":
+    test_matches_case_sensitive()
+
+noinline func test_matches_case_sensitive():
     assert(string_utils_matches(sv("a"), sv("a"), CaseSensitivity.case_sensitive))
     assert(not string_utils_matches(sv("a"), sv("A"), CaseSensitivity.case_sensitive))
     assert(not string_utils_matches(sv("A"), sv("a"), CaseSensitivity.case_sensitive))
 
 test "matches_case_insensitive":
+    test_matches_case_insensitive()
+
+noinline func test_matches_case_insensitive():
     assert(not string_utils_matches(sv("aa"), sv("a")))
     assert(string_utils_matches(sv("aa"), sv("*")))
     assert(not string_utils_matches(sv("cb"), sv("?a")))
@@ -40,6 +53,9 @@ test "matches_case_insensitive":
     assert(not string_utils_matches(sv("acdcb"), sv("a*c?b")))
 
 test "matches_with_positions":
+    test_matches_with_positions()
+
+noinline func test_matches_with_positions():
     var spans: Vector[MaskSpan]
     assert(string_utils_matches(sv("abbb"), sv("a*"), CaseSensitivity.case_sensitive, &spans))
     assert(mask_spans_equal(&spans, [MaskSpan(start = 1, length = 3)]))
@@ -58,11 +74,17 @@ test "matches_with_positions":
 
 # #4607
 test "matches_trailing":
+    test_matches_trailing()
+
+noinline func test_matches_trailing():
     assert(string_utils_matches(sv("ab"), sv("ab*")))
     assert(string_utils_matches(sv("ab"), sv("ab****")))
     assert(string_utils_matches(sv("ab"), sv("*ab****")))
 
 test "match_backslash_escape":
+    test_match_backslash_escape()
+
+noinline func test_match_backslash_escape():
     assert(string_utils_matches(sv("ab*"), sv("ab\\*")))
     assert(not string_utils_matches(sv("abc"), sv("ab\\*")))
     assert(not string_utils_matches(sv("abcd"), sv("ab\\*")))
@@ -70,10 +92,16 @@ test "match_backslash_escape":
     assert(not string_utils_matches(sv("abc"), sv("ab\\?")))
 
 test "match_trailing_backslash":
+    test_match_trailing_backslash()
+
+noinline func test_match_trailing_backslash():
     assert(string_utils_matches(sv("x\\"), sv("x\\")))
     assert(string_utils_matches(sv("x\\"), sv("x\\\\")))
 
 test "ends_with":
+    test_ends_with_3()
+
+noinline func test_ends_with_3():
     let test_string = byte_string_from_str("ABCDEF")
     let view = byte_string_view(&test_string)
     assert(string_utils_ends_with(view, sv("DEF"), CaseSensitivity.case_sensitive))
@@ -84,6 +112,9 @@ test "ends_with":
     assert(not string_utils_ends_with(view, sv("def"), CaseSensitivity.case_sensitive))
 
 test "starts_with":
+    test_starts_with_3()
+
+noinline func test_starts_with_3():
     let test_string = byte_string_from_str("ABCDEF")
     let view = byte_string_view(&test_string)
     assert(string_utils_starts_with(view, sv("ABC"), CaseSensitivity.case_sensitive))
@@ -94,6 +125,9 @@ test "starts_with":
     assert(not string_utils_starts_with(view, sv("abc"), CaseSensitivity.case_sensitive))
 
 test "contains":
+    test_contains_2()
+
+noinline func test_contains_2():
     let test_string = byte_string_from_str("ABCDEFABCXYZ")
     let view = byte_string_view(&test_string)
     assert(string_utils_contains(view, sv("ABC"), CaseSensitivity.case_sensitive))
@@ -119,6 +153,9 @@ test "contains":
     assert(string_utils_contains(bug_view, sv("gO bAcK"), CaseSensitivity.case_insensitive))
 
 test "is_whitespace":
+    test_is_whitespace()
+
+noinline func test_is_whitespace():
     assert(string_utils_is_whitespace(sv("")))
     assert(string_utils_is_whitespace(sv("   ")))
     assert(string_utils_is_whitespace(sv("  \t")))
@@ -133,6 +170,9 @@ func string_utils_trim_is(text: str, characters: str, mode: TrimMode, expected: 
     return string_view_equals(&trimmed, expected)
 
 test "trim":
+    test_trim_2()
+
+noinline func test_trim_2():
     assert(string_utils_trim_is("aaa.a.", ".", TrimMode.right, "aaa.a"))
     assert(string_utils_trim_is("...aaa", ".", TrimMode.left, "aaa"))
     assert(string_utils_trim_is("...aaa.a...", ".", TrimMode.both, "aaa.a"))
@@ -142,6 +182,9 @@ test "trim":
     assert(string_utils_trim_is("...", ".", TrimMode.both, ""))
 
 test "find":
+    test_find_2()
+
+noinline func test_find_2():
     let test_string = byte_string_from_str("1234567")
     let view = byte_string_view(&test_string)
     assert((string_utils_find_string_view(view, sv("1")) else 1) == 0)
@@ -153,6 +196,9 @@ test "find":
     assert(string_utils_find_string_view(view, sv("78")) == none)
 
 test "find_last":
+    test_find_last()
+
+noinline func test_find_last():
     let test_string = sv("abcdabc")
 
     assert(string_utils_find_last_string_view(test_string, sv("")) == 7)
@@ -176,6 +222,9 @@ func replace_like_in_jakt(source: StringView) -> ByteString:
     return replaced
 
 test "replace_all_overlapping":
+    test_replace_all_overlapping()
+
+noinline func test_replace_all_overlapping():
     # Replace only should take into account non-overlapping instances of the needle, since it
     # is looking to replace them.
 
@@ -195,6 +244,9 @@ func string_utils_to_snakecase_is(text: str, expected: str) -> bool:
     return byte_string_eq_string_view(&result, sv(expected))
 
 test "to_snakecase":
+    test_to_snakecase()
+
+noinline func test_to_snakecase():
     assert(string_utils_to_snakecase_is("foobar", "foobar"))
     assert(string_utils_to_snakecase_is("Foobar", "foobar"))
     assert(string_utils_to_snakecase_is("FOOBAR", "foobar"))
@@ -212,6 +264,9 @@ func string_utils_to_titlecase_is(text: str, expected: str) -> bool:
     return string_eq_string_view(&result, sv(expected))
 
 test "to_titlecase":
+    test_to_titlecase()
+
+noinline func test_to_titlecase():
     assert(string_utils_to_titlecase_is("", ""))
     assert(string_utils_to_titlecase_is("f", "F"))
     assert(string_utils_to_titlecase_is("foobar", "Foobar"))

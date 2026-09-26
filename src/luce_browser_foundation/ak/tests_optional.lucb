@@ -7,6 +7,10 @@
 #       (the comparisons, value_or, sentinel_optional) and of Tests/AK/TestEnumerate.cpp.
 #       Presence, value() and moves are luce-base's own optionals.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 # SentinelInt of TestOptional.cpp: u32::max is the sentinel.
@@ -29,6 +33,9 @@ func test_optional_fail(context: void*?) -> i32!:
     error(ak_error, "callback failed")
 
 test "optional: comparisons":
+    test_optional_comparisons()
+
+noinline func test_optional_comparisons():
     let opt0: str? = none
     let opt1: str? = none
     assert(eq_opaque_opaque(opt0, opt1))
@@ -49,6 +56,9 @@ test "optional: comparisons":
     assert(not eq_opaque_optional_none(seven, OptionalNone(empty_ = 0)))
 
 test "optional: value_or, lazy evaluation, ensure, ptr":
+    test_optional_value_or_lazy_evaluation_ensure_ptr()
+
+noinline func test_optional_value_or_lazy_evaluation_ensure_ptr():
     var empty: i32? = none
     var five: i32? = 5
     assert(optional_base_value_or(&empty, 3) == 3)
@@ -75,6 +85,9 @@ test "optional: value_or, lazy evaluation, ensure, ptr":
     assert(present == 7)
 
 test "optional: sentinel_optional":
+    test_optional_sentinel_optional()
+
+noinline func test_optional_sentinel_optional():
     var empty: SentinelOptional[TestSentinelInt, TestSentinelIntTraits] = ---
     sentinel_optional_sentinel_optional_t_traits_v(&empty, OptionalNone(empty_ = 0))
     assert(not sentinel_optional_has_value(&empty))
@@ -100,6 +113,9 @@ struct TestIndexAndValue:
     var value: i32
 
 test "enumerate":
+    test_enumerate()
+
+noinline func test_enumerate():
     var values: Vector[i32]
     let initial: i32[4] = [9, 8, 7, 6]
     vector_construct_opaque(&values, initial)

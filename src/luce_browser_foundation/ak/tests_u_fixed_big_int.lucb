@@ -7,6 +7,10 @@
 #       runner's deterministic generator; div_anti_knuth runs 2048 of the donor's 16384
 #       rounds.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 func u256_of(w0: u64, w1: u64, w2: u64, w3: u64) -> U256:
@@ -22,12 +26,18 @@ func check_mod(a: U256, b: U256, expected: U256):
     assert(u256_eq(u_fixed_big_int_rem_t(&a, b), expected))
 
 test "u_fixed_big_int: one_plus_one":
+    test_u_fixed_big_int_one_plus_one()
+
+noinline func test_u_fixed_big_int_one_plus_one():
     let a = u256_of(1, 0, 0, 0)
     let b = u256_of(1, 0, 0, 0)
     assert(u256_eq(u_fixed_big_int_add_opaque(&a, b), u256_of(2, 0, 0, 0)))
     assert(u_fixed_big_int_eq_integer_wrapper(&a, integer_wrapper(1)))
 
 test "u_fixed_big_int: identities":
+    test_u_fixed_big_int_identities()
+
+noinline func test_u_fixed_big_int_identities():
     var i = 0
     while i < 32:
         let x = random_u256()
@@ -48,6 +58,9 @@ test "u_fixed_big_int: identities":
         i += 1
 
 test "u_fixed_big_int: add_overflow_propagation":
+    test_u_fixed_big_int_add_overflow_propagation()
+
+noinline func test_u_fixed_big_int_add_overflow_propagation():
     let a = u256_of(u64_max, u64_max, 0, 0)
     let b = u_fixed_big_int_add_opaque(&a, a)
     let c = u_fixed_big_int_mul_integer_wrapper(&a, integer_wrapper(2))
@@ -59,6 +72,9 @@ test "u_fixed_big_int: add_overflow_propagation":
     assert(u256_eq(b, c))
 
 test "u_fixed_big_int: simple_multiplication":
+    test_u_fixed_big_int_simple_multiplication()
+
+noinline func test_u_fixed_big_int_simple_multiplication():
     for _i in 0..<32:
         let a = random_u256()
         let zero = u_fixed_big_int_mul_integer_wrapper(&a, integer_wrapper(0))
@@ -69,6 +85,9 @@ test "u_fixed_big_int: simple_multiplication":
             assert(u256_eq(u_fixed_big_int_shl(&a, 1), u_fixed_big_int_mul_integer_wrapper(&a, integer_wrapper(2))))
 
 test "u_fixed_big_int: div_mod":
+    test_u_fixed_big_int_div_mod()
+
+noinline func test_u_fixed_big_int_div_mod():
     for _i in 0..<32:
         let a = random_u256()
         let b = random_u256()
@@ -87,6 +106,9 @@ func generate_u512() -> U512:
     return number
 
 test "u_fixed_big_int: div_anti_knuth":
+    test_u_fixed_big_int_div_anti_knuth()
+
+noinline func test_u_fixed_big_int_div_anti_knuth():
     let a = u256_of(0, 0xffffffffffffffff, 1, 0)
     let one = u_fixed_big_int_div_t(&a, U128(m_data = [0x8000000000000001, 0xffffffffffffffff]))
     assert(u_fixed_big_int_eq_integer_wrapper(&one, integer_wrapper(1)))
@@ -110,6 +132,9 @@ test "u_fixed_big_int: div_anti_knuth":
         assert(u_fixed_big_int_cmp_opaque(&mod_, y) < 0)
 
 test "u_fixed_big_int: shifts":
+    test_u_fixed_big_int_shifts()
+
+noinline func test_u_fixed_big_int_shifts():
     let value = U128(m_data = [0x1234, 0])
     let a = u_fixed_big_int_shl(&value, 1)
     assert(u_fixed_big_int_eq_opaque(&a, 0x2468u64))
@@ -119,12 +144,18 @@ test "u_fixed_big_int: shifts":
     assert(u_fixed_big_int_eq_opaque(&c, U128(m_data = [0, 0x1234])))
 
 test "u_fixed_big_int: constexpr_truncate":
+    test_u_fixed_big_int_constexpr_truncate()
+
+noinline func test_u_fixed_big_int_constexpr_truncate():
     var wide: U256
     u_fixed_big_int_construct_opaque(&wide, U128(m_data = [0x8a4b08d32f8b8e48, 0x8459322f67b8e26d]), U128(m_data = [0xeea82af4312d1931, 0x654fb5cfe82dbd58]))
     assert(u_fixed_big_int_to_t[u64[4], u64](&wide) == 0x8a4b08d32f8b8e48)
     assert(u_fixed_big_int_to_t[u64[4], u32](&wide) == 0x2f8b8e48)
 
 test "u_fixed_big_int: bit utilities, comparisons and increments":
+    test_u_fixed_big_int_bit_utilities_comparisons_and_increments()
+
+noinline func test_u_fixed_big_int_bit_utilities_comparisons_and_increments():
     var x = U128(m_data = [0xf0, 0x1])
     assert(u_fixed_big_int_popcnt(&x) == 5)
     assert(u_fixed_big_int_ctz(&x) == 4)
@@ -151,6 +182,9 @@ test "u_fixed_big_int: bit utilities, comparisons and increments":
     assert(x.m_data[0] == 3 and x.m_data[1] == 0)
 
 test "u_fixed_big_int: endian_swap":
+    test_u_fixed_big_int_endian_swap()
+
+noinline func test_u_fixed_big_int_endian_swap():
     let a = U128(m_data = [0x1234567890abcdef, 0xfedcba0987654321])
     var big: BigEndian[U128]
     big_endian_u_fixed_big_int_construct(&big, a)
@@ -162,6 +196,9 @@ test "u_fixed_big_int: endian_swap":
     assert(u_fixed_big_int_eq_opaque(&back, a))
 
 test "u_fixed_big_int: mod_hardcoded":
+    test_u_fixed_big_int_mod_hardcoded()
+
+noinline func test_u_fixed_big_int_mod_hardcoded():
     check_mod(u256_of(0x8a4b08d32f8b8e48, 0x8459322f67b8e26d, 0xeea82af4312d1931, 0x654fb5cfe82dbd58), u256_of(0x40a58652868d5d66, 0x81d674bf7d6d6861, 0xa8314900e6188a82, 0xc273ca947237b4aa), u256_of(0x8a4b08d32f8b8e48, 0x8459322f67b8e26d, 0xeea82af4312d1931, 0x654fb5cfe82dbd58))
     check_mod(u256_of(0xda06d295caa75a3b, 0xe3ae0d460049948e, 0x9a89d29a0325f27f, 0x1c8d90ebadec5607), u256_of(0x38bd4d49ff59fdf8, 0xcba9acf09110de14, 0x51a376c68c4702fe, 0x0d1b59dec8d2338b), u256_of(0x688c3801cbf35e4b, 0x4c5ab364de27d866, 0xf742e50cea97ec82, 0x0256dd2e1c47eef0))
     check_mod(u256_of(0xdfb56d42706bdb28, 0x6c3bd5ea790c7ef5, 0xfebec271d7c757ba, 0x7dbd745d56bc9e0e), u256_of(0x30a309a58aed2c01, 0x64d58c8b485c113d, 0xfa01f558732e9b78, 0x5862b502ebb2dbe9), u256_of(0xaf12639ce57eaf27, 0x0766495f30b06db8, 0x04bccd196498bc42, 0x255abf5a6b09c225))

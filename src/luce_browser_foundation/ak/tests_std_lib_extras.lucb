@@ -8,9 +8,16 @@
 #       TestAllOf.cpp and TestAnyOf.cpp over a Vector, and focused cases for the Function<>
 #       helpers, min/max/clamp and the power-of-two helpers.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 test "std_lib_extras: ceil_div":
+    test_std_lib_extras_ceil_div()
+
+noinline func test_std_lib_extras_ceil_div():
     assert(ceil_div_i32(0, 1) == 0)
     assert(ceil_div_i32(4, 1) == 4)
     assert(ceil_div_i32(-1, 1) == -1)
@@ -41,6 +48,9 @@ test "std_lib_extras: ceil_div":
     assert(ceil_div_u64(8, 2) == 4)
 
 test "std_lib_extras: mix":
+    test_std_lib_extras_mix()
+
+noinline func test_std_lib_extras_mix():
     let a = 1.0
     let b = 3.0
     assert(mix_f64(a, b, 0.0) == 1.0)
@@ -51,6 +61,9 @@ test "std_lib_extras: mix":
     assert(mix_f64(b, a, 1.0) == 1.0)
 
 test "std_lib_extras: swap, exchange, min, max, clamp":
+    test_std_lib_extras_swap_exchange_min_max_clamp()
+
+noinline func test_std_lib_extras_swap_exchange_min_max_clamp():
     var i: i32 = 4
     var j: i32 = 6
     swap_5(&i, &j)
@@ -86,6 +99,9 @@ test "std_lib_extras: swap, exchange, min, max, clamp":
     assert(align_down_to(13, 8) == 8)
 
 test "typed_transfer: overlapping source and destination, relocate":
+    test_typed_transfer_overlapping_source_and_destination_relocate()
+
+noinline func test_typed_transfer_overlapping_source_and_destination_relocate():
     var actual: i32[6] = [1, 2, 3, 4, 5, 6]
     discard(typed_transfer_copy(&actual[0], &actual[2], 4))
     let expected_1: i32[6] = [3, 4, 5, 6, 5, 6]
@@ -112,6 +128,9 @@ func test_find_equals(context: void*?, value: const i32*) -> bool:
     return *value == *wanted
 
 test "find: find, find_if, find_index, find_value":
+    test_find_find_find_if_find_index_find_value()
+
+noinline func test_find_find_find_if_find_index_find_value():
     var zeros: Vector[i32]
     vector_resize(&zeros, 10)
     let not_found = find(vector_begin(&zeros), vector_end(&zeros), 1)
@@ -136,6 +155,9 @@ test "find: find, find_if, find_index, find_value":
     assert(find_value(&a, Function1[const i32*, bool](call = test_find_equals, context = &absent)) == none)
 
 test "all_of and any_of: vacuous truth and single exceptions":
+    test_all_of_and_any_of_vacuous_truth_and_single_exceptions()
+
+noinline func test_all_of_and_any_of_vacuous_truth_and_single_exceptions():
     var empty: Vector[i32]
     var zero: i32 = 0
     assert(all_of_t_container(&empty, Function1[const i32*, bool](call = test_find_equals, context = &zero)))
@@ -158,6 +180,9 @@ func test_function_add(context: void*?, a: i32, b: i32) -> i32:
     return a + b
 
 test "function: call, is_set and clear":
+    test_function_call_is_set_and_clear()
+
+noinline func test_function_call_is_set_and_clear():
     var counter = TestFunctionCounter(calls = 0)
     var function = Function2[i32, i32, i32](call = test_function_add, context = &counter)
     assert(function2_is_set(&function))

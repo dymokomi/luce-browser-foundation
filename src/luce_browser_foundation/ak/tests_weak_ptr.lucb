@@ -6,6 +6,10 @@
 #       Port of the cases of Tests/AK/TestWeakPtr.cpp that apply without destructors: the
 #       object's end of life is weakable_revoke_weak_ptrs, which ~Weakable runs.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 struct TestWeakable:
@@ -13,6 +17,9 @@ struct TestWeakable:
     var m_member: i32
 
 test "weak_ptr: basic_weak":
+    test_weak_ptr_basic_weak()
+
+noinline func test_weak_ptr_basic_weak():
     var simple = TestWeakable(m_member = 123)
     let link1 = weakable_ensure_link(&simple.weakable)
     let link2 = weakable_ensure_link(&simple.weakable)
@@ -26,6 +33,9 @@ test "weak_ptr: basic_weak":
     assert(simple.weakable.m_link == none)
 
 test "weak_ptr: basic_weak (WeakPtr)":
+    test_weak_ptr_basic_weak_weakptr()
+
+noinline func test_weak_ptr_basic_weak_weakptr():
     var simple = TestWeakable(m_member = 123)
     var weak1 = weak_ptr_from_object[TestWeakable](&simple.weakable)
     let weak2 = weakable_make_weak_ptr[TestWeakable, TestWeakable](&simple.weakable)
@@ -42,6 +52,9 @@ test "weak_ptr: basic_weak (WeakPtr)":
     assert(weak1.m_link == none)
 
 test "weak_ptr: weakptr_move":
+    test_weak_ptr_weakptr_move()
+
+noinline func test_weak_ptr_weakptr_move():
     var simple = TestWeakable(m_member = 123)
     var weak1 = weak_ptr_from_object[TestWeakable](&simple.weakable)
     let weak2 = WeakPtr[TestWeakable](m_link = weak_ptr_take_link(&weak1))  # move(weak1)
@@ -60,6 +73,9 @@ func test_weak_callback_body(context: void*?, self_: TestWeakable*):
     captures.was_called = true
 
 test "weak_ptr: weak_callback":
+    test_weak_ptr_weak_callback()
+
+noinline func test_weak_ptr_weak_callback():
     var captures = TestWeakCallbackContext(was_called = false)
     var simple = TestWeakable(m_member = 123)
     let cb = weak_callback(&simple.weakable, Function1[TestWeakable*, unit](call = test_weak_callback_body, context = &captures))

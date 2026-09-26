@@ -6,6 +6,10 @@
 #       Port of Tests/AK/TestDoublyLinkedList.cpp. basic_node_cache does not apply (the node
 #       cache is dropped); a removal and iteration case is added.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 func test_dll_make_list() -> DoublyLinkedList[i32]:
@@ -15,6 +19,9 @@ func test_dll_make_list() -> DoublyLinkedList[i32]:
     return list
 
 test "doubly_linked_list: should_find_mutable":
+    test_doubly_linked_list_should_find_mutable()
+
+noinline func test_doubly_linked_list_should_find_mutable():
     var sut = test_dll_make_list()
     var it = doubly_linked_list_find(&sut, 4)
     assert(*doubly_linked_list_iterator_deref(&it) == 4)
@@ -22,6 +29,9 @@ test "doubly_linked_list: should_find_mutable":
     assert(doubly_linked_list_iterator_eq(&missing, doubly_linked_list_end(&sut)))
 
 test "doubly_linked_list: should_find_const":
+    test_doubly_linked_list_should_find_const()
+
+noinline func test_doubly_linked_list_should_find_const():
     let sut = test_dll_make_list()
     var it = doubly_linked_list_find_const(&sut, 4)
     assert(*doubly_linked_list_iterator_deref(&it) == 4)
@@ -31,6 +41,9 @@ test "doubly_linked_list: should_find_const":
     assert(not doubly_linked_list_contains_slow(&sut, 10))
 
 test "doubly_linked_list: take_first":
+    test_doubly_linked_list_take_first()
+
+noinline func test_doubly_linked_list_take_first():
     var sut = test_dll_make_list()
     assert(doubly_linked_list_take_first(&sut) == 0)
     assert(*doubly_linked_list_first(&sut) == 1)
@@ -38,6 +51,9 @@ test "doubly_linked_list: take_first":
     assert(doubly_linked_list_size(&sut) == 9)
 
 test "doubly_linked_list: take_last":
+    test_doubly_linked_list_take_last()
+
+noinline func test_doubly_linked_list_take_last():
     var sut = test_dll_make_list()
     assert(doubly_linked_list_take_last(&sut) == 9)
     assert(*doubly_linked_list_last(&sut) == 8)
@@ -45,6 +61,9 @@ test "doubly_linked_list: take_last":
     assert(doubly_linked_list_size(&sut) == 9)
 
 test "doubly_linked_list: take_last_all":
+    test_doubly_linked_list_take_last_all()
+
+noinline func test_doubly_linked_list_take_last_all():
     var sut = test_dll_make_list()
     for i: i32 in 0..<10:
         assert(doubly_linked_list_take_last(&sut) == 9 - i)
@@ -52,6 +71,9 @@ test "doubly_linked_list: take_last_all":
     assert(doubly_linked_list_is_empty(&sut))
 
 test "doubly_linked_list: prepend, remove and iterate":
+    test_doubly_linked_list_prepend_remove_and_iterate()
+
+noinline func test_doubly_linked_list_prepend_remove_and_iterate():
     var sut = test_dll_make_list()
     doubly_linked_list_prepend(&sut, -1)
     assert(doubly_linked_list_first_const(&sut) == -1)

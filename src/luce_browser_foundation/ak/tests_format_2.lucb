@@ -1,0 +1,313 @@
+#==============================================================================================
+#
+#   tests_format_2 - tests of the format fragments: floats, spans, Checked, Duration
+#
+#   DESCRIPTION:
+#       The second half of the port of Tests/AK/TestFormat.cpp (Ladybird 47c82b38d0), from
+#       floating_point_numbers on, and its format_duration case (Formatter<Duration> is
+#       time_format's). The helpers are tests_format's.
+#
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
+#==============================================================================================
+
+# mark: TestFormat.cpp, continued ===============================================================
+
+test "floating_point_numbers":
+    test_floating_point_numbers()
+
+noinline func test_floating_point_numbers():
+    assert(formatted("{}", [arg_f64(1.12)]) == "1.12")
+    assert(formatted("{}", [arg_f64(1.0)]) == "1")
+    assert(formatted("{:.3}", [arg_f64(1.12)]) == "1.12")
+    assert(formatted("{:.1}", [arg_f64(1.12)]) == "1.1")
+    assert(formatted("{}", [arg_f64(-1.12)]) == "-1.12")
+    assert(formatted("{:'.4}", [arg_f64(1234.5678)]) == "1,234.5678")
+    assert(formatted("{:'.4}", [arg_f64(-1234.5678)]) == "-1,234.5678")
+
+    let float_max = f32.bits(0x7f7fffff)
+    assert(formatted("{:.5}", [arg_f64(1.2345678e-15)]) == "1.23456e-15")
+    assert(formatted("{:.5}", [arg_f32(float_max)]) == "3.40282e+38")
+    assert(formatted("{:.5}", [arg_f32(-float_max)]) == "-3.40282e+38")
+    assert(formatted("{:.5}", [arg_f64(3.000001e30)]) == "3e+30")
+    assert(formatted("{:.5}", [arg_f64(3.1e30)]) == "3.1e+30")
+
+    assert(formatted("{:.30f}", [arg_f64(1.0)]) == "1.000000000000000000000000000000")
+    assert(formatted("{:.30f}", [arg_f64(1.5)]) == "1.500000000000000000000000000000")
+    assert(formatted("{:.30f}", [arg_f64(-2.0)]) == "-2.000000000000000000000000000000")
+
+    assert(formatted("{:.0f}", [arg_f64(1.4)]) == "1")
+    assert(formatted("{:.0f}", [arg_f64(1.5)]) == "2")
+    assert(formatted("{:.0f}", [arg_f64(-1.9)]) == "-2")
+
+    assert(formatted("{:.1f}", [arg_f64(1.4)]) == "1.4")
+    assert(formatted("{:.1f}", [arg_f64(1.99)]) == "2.0")
+    assert(formatted("{:.1f}", [arg_f64(9.999)]) == "10.0")
+
+    # NAN and INFINITY are floats in C.
+    assert(formatted("{}", [arg_f32((f32)math.nan)]) == "nan")
+    assert(formatted("{}", [arg_f32((f32)math.infinity)]) == "inf")
+    assert(formatted("{}", [arg_f32((f32)-math.infinity)]) == "-inf")
+
+    # FIXME: There is always the question what we mean with the width field. Do we mean significant digits?
+    #        Do we mean the whole width? This is what was the simplest to implement:
+    assert(formatted("{:x>5.1}", [arg_f64(1.12)]) == "xx1.1")
+
+test "floating_point_default_precision":
+    test_floating_point_default_precision()
+
+noinline func test_floating_point_default_precision():
+    assert(formatted("{}", [arg_f32(10.3)]) == "10.3")
+    assert(formatted("{}", [arg_f32(123e4)]) == "1230000")
+    assert(formatted("{}", [arg_f32(1.23e4)]) == "12300")
+    assert(formatted("{}", [arg_f32(134232544.4365)]) == "134232540")
+    assert(formatted("{}", [arg_f64(1.43e24)]) == "1.43e+24")
+    assert(formatted("{}", [arg_f64(1.43e-24)]) == "1.43e-24")
+    assert(formatted("{}", [arg_f32(0.0)]) == "0")
+    assert(formatted("{}", [arg_f64(3.14159265358979)]) == "3.14159265358979")
+    assert(formatted("{}", [arg_f64(1.61803399)]) == "1.61803399")
+    assert(formatted("{}", [arg_f64(2.71827)]) == "2.71827")
+    assert(formatted("{}", [arg_f32(42.0)]) == "42")
+    assert(formatted("{}", [arg_f64(123456.78)]) == "123456.78")
+    assert(formatted("{}", [arg_f64(23456.78910)]) == "23456.7891")
+
+test "no_precision_no_trailing_number":
+    test_no_precision_no_trailing_number()
+
+noinline func test_no_precision_no_trailing_number():
+    assert(formatted("{:.0}", [arg_f64(0.1)]) == "0")
+
+test "precision_with_trailing_zeros":
+    test_precision_with_trailing_zeros()
+
+noinline func test_precision_with_trailing_zeros():
+    assert(formatted("{:0.3f}", [arg_f64(1.12)]) == "1.120")
+    assert(formatted("{:0.3}", [arg_f64(1.12)]) == "1.12")
+    assert(formatted("{:0.1}", [arg_f64(1.12)]) == "1.1")
+
+test "magnitude_less_than_zero":
+    test_magnitude_less_than_zero()
+
+noinline func test_magnitude_less_than_zero():
+    assert(formatted("{}", [arg_f64(-0.654)]) == "-0.654")
+    assert(formatted("{}", [arg_f64(0.654)]) == "0.654")
+
+test "format_nullptr":
+    test_format_nullptr()
+
+noinline func test_format_nullptr():
+    assert(formatted("{}", [arg_nullptr()]) == formatted("{:p}", [arg_u64(0)]))
+
+## struct C { int i; } with a Formatter<FormatString> formatting it as "C(i={})".
+struct FormatTestC:
+    var i: i32
+
+## __format_value<C>.
+func format_value_format_test_c(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    let c_value = (const FormatTestC*)format_value_target(value)
+    try formatter_format_string_format(&formatter, builder, sv("C(i={})"), [arg_i64((i64)c_value.i)])
+
+test "use_format_string_formatter":
+    test_use_format_string_formatter()
+
+noinline func test_use_format_string_formatter():
+    let c_value = FormatTestC(i = 42)
+    assert(formatted("{:*<10}", [arg_custom(&c_value, format_value_format_test_c)]) == "C(i=42)***")
+
+test "long_long_regression":
+    test_long_long_regression()
+
+noinline func test_long_long_regression():
+    assert(formatted("{}", [arg_i64(0x0123456789abcdef)]) == "81985529216486895")
+
+    var builder: StringBuilder
+    string_builder_construct(&builder)
+    var fmtbuilder = FormatBuilder(m_builder = &builder)
+    format_builder_put_i64(&fmtbuilder, 0x0123456789abcdef) else trap("MUST")
+
+    assert(text_of(string_builder_string_view(&builder)) == "81985529216486895")
+
+test "hex_dump":
+    test_hex_dump()
+
+noinline func test_hex_dump():
+    assert(formatted("{:hex-dump}", [lit("0000")]) == "30303030")
+    assert(formatted("{:>4hex-dump}", [lit("0000")]) == "30303030    0000")
+    assert(formatted("{:>2hex-dump}", [lit("0000")]) == "3030    00\n3030    00")
+    assert(formatted("{:*>4hex-dump}", [lit("0000")]) == "30303030****0000")
+
+## An `int` element for Formatter<ReadonlySpan<int>>.
+func span_element_i32(element: const void*) -> TypeErasedParameter:
+    return arg_i64((i64)*(const i32*)element)
+
+## A StringView element for Formatter<ReadonlySpan<StringView>>.
+func span_element_string_view(element: const void*) -> TypeErasedParameter:
+    return arg_string_view(*(const StringView*)element)
+
+## __format_value<ReadonlySpan<int>>: `value` points at a `const i32[]`.
+func format_value_i32_span(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let span = *(const (const i32[])*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_span_format(&formatter, builder, (const void*?)span.data, span.length, sizeof(i32), span_element_i32)
+
+## __format_value<ReadonlySpan<StringView>>: `value` points at a `const StringView[]`.
+func format_value_string_view_span(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let span = *(const (const StringView[])*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_span_format(&formatter, builder, (const void*?)span.data, span.length, sizeof(StringView), span_element_string_view)
+
+## A ReadonlySpan<StringView> element for Formatter<ReadonlySpan<ReadonlySpan<StringView>>>.
+func span_element_string_view_span(element: const void*) -> TypeErasedParameter:
+    return arg_custom(element, format_value_string_view_span)
+
+## __format_value<ReadonlySpan<ReadonlySpan<StringView>>>.
+func format_value_string_view_span_span(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let span = *(const (const (const StringView[])[])*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_span_format(&formatter, builder, (const void*?)span.data, span.length, sizeof(const StringView[]), span_element_string_view_span)
+
+test "span_format":
+    test_span_format()
+
+noinline func test_span_format():
+    let ints: i32[4] = [1, 2, 3, 4]
+    let int_span: const i32[] = ints
+    assert(formatted("{}", [arg_custom(&int_span, format_value_i32_span)]) == "[ 1, 2, 3, 4 ]")
+
+    let views: StringView[4] = [sv("1"), sv("2"), sv("3"), sv("4")]
+    let view_span: const StringView[] = views
+    assert(formatted("{}", [arg_custom(&view_span, format_value_string_view_span)]) == "[ 1, 2, 3, 4 ]")
+
+    let first: StringView[2] = [sv("1"), sv("2")]
+    let second: StringView[2] = [sv("3"), sv("4")]
+    let nested: (const StringView[])[2] = [first, second]
+    let nested_span: const (const StringView[])[] = nested
+    assert(formatted("{}", [arg_custom(&nested_span, format_value_string_view_span_span)]) == "[ [ 1, 2 ], [ 3, 4 ] ]")
+
+## __format_value<Vector<int>>: Formatter<Vector<T>> formats the vector's span.
+func format_value_i32_vector(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let vector = (const Vector[i32]*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_span_format(&formatter, builder, (const void*?)vector.m_outline_buffer, vector_size(vector), sizeof(i32), span_element_i32)
+
+test "vector_format":
+    test_vector_format()
+
+noinline func test_vector_format():
+    var v: Vector[i32]
+    for i: i32 in 1..=4:
+        vector_append_t(&v, i)
+    assert(formatted("{}", [arg_custom(&v, format_value_i32_vector)]) == "[ 1, 2, 3, 4 ]")
+
+test "format_utf32":
+    test_format_utf32()
+
+noinline func test_format_utf32():
+    let a: u32 = 0x61
+    let ladybug: u32 = 0x1f41e
+    assert(formatted("{}", [arg_custom(&a, format_value_char32)]) == "a")
+    assert(formatted("{}", [arg_custom(&ladybug, format_value_char32)]) == "\u{1F41E}")
+    assert(formatted("{:x}", [arg_custom(&a, format_value_char32)]) == "61")
+    assert(formatted("{:x}", [arg_custom(&ladybug, format_value_char32)]) == "1f41e")
+
+    assert(formatted("{:d}", [arg_custom(&a, format_value_char32)]) == "97")
+    assert(formatted("{:d}", [arg_custom(&ladybug, format_value_char32)]) == "128030")
+
+    assert(formatted("{:6}", [arg_custom(&a, format_value_char32)]) == "a     ")
+    assert(formatted("{:6d}", [arg_custom(&a, format_value_char32)]) == "    97")
+    assert(formatted("{:#x}", [arg_custom(&ladybug, format_value_char32)]) == "0x1f41e")
+
+test "format_checked":
+    test_format_checked()
+
+noinline func test_format_checked():
+    let hundred_i32 = Checked[i32](m_value = 100, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&hundred_i32, format_value_checked_i32)]) == "100")
+    let hundred_u32 = Checked[u32](m_value = 100, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&hundred_u32, format_value_checked_u32)]) == "100")
+    let negative_i32 = Checked[i32](m_value = -1234, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&negative_i32, format_value_checked_i32)]) == "-1234")
+
+    var c_i8 = Checked[i8](m_value = 127, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&c_i8, format_value_checked_i8)]) == "127")
+    # r01 ports Checked arithmetic for i32, i64, u32, u64 and usize only: overflow as `+= 100` does.
+    c_i8.m_overflow = true
+    assert(formatted("{}", [arg_custom(&c_i8, format_value_checked_i8)]) == "{ OVERFLOW }")
+
+    var c_i16 = Checked[i16](m_value = 32767, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&c_i16, format_value_checked_i16)]) == "32767")
+    # r01 ports Checked arithmetic for i32, i64, u32, u64 and usize only: overflow as `+= 100` does.
+    c_i16.m_overflow = true
+    assert(formatted("{}", [arg_custom(&c_i16, format_value_checked_i16)]) == "{ OVERFLOW }")
+
+    var c_i32 = Checked[i32](m_value = 2147483647, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&c_i32, format_value_checked_i32)]) == "2147483647")
+    checked_add_i32(&c_i32, 100)
+    assert(formatted("{}", [arg_custom(&c_i32, format_value_checked_i32)]) == "{ OVERFLOW }")
+
+    var c_i64 = Checked[i64](m_value = 9223372036854775807, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&c_i64, format_value_checked_i64)]) == "9223372036854775807")
+    checked_add_i64(&c_i64, 100)
+    assert(formatted("{}", [arg_custom(&c_i64, format_value_checked_i64)]) == "{ OVERFLOW }")
+
+    var c_u8 = Checked[u8](m_value = 255, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&c_u8, format_value_checked_u8)]) == "255")
+    # r01 ports Checked arithmetic for i32, i64, u32, u64 and usize only: overflow as `+= 100` does.
+    c_u8.m_overflow = true
+    assert(formatted("{}", [arg_custom(&c_u8, format_value_checked_u8)]) == "{ OVERFLOW }")
+
+    var c_u16 = Checked[u16](m_value = 65535, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&c_u16, format_value_checked_u16)]) == "65535")
+    # r01 ports Checked arithmetic for i32, i64, u32, u64 and usize only: overflow as `+= 100` does.
+    c_u16.m_overflow = true
+    assert(formatted("{}", [arg_custom(&c_u16, format_value_checked_u16)]) == "{ OVERFLOW }")
+
+    var c_u32 = Checked[u32](m_value = 4294967295, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&c_u32, format_value_checked_u32)]) == "4294967295")
+    checked_add_u32(&c_u32, 100)
+    assert(formatted("{}", [arg_custom(&c_u32, format_value_checked_u32)]) == "{ OVERFLOW }")
+
+    var c_u64 = Checked[u64](m_value = 18446744073709551615, m_overflow = false)
+    assert(formatted("{}", [arg_custom(&c_u64, format_value_checked_u64)]) == "18446744073709551615")
+    checked_add_u64(&c_u64, 100)
+    assert(formatted("{}", [arg_custom(&c_u64, format_value_checked_u64)]) == "{ OVERFLOW }")
+
+## ByteString::formatted(fmtstr, duration) against `expected` (TEST_CASE(format_duration)).
+func expect_duration_formatted(fmtstr: str, duration: Duration, expected: str):
+    assert(formatted(fmtstr, [arg_custom(&duration, format_value_duration)]) == expected)
+
+test "format_duration":
+    test_format_duration()
+
+noinline func test_format_duration():
+    expect_duration_formatted("{}", duration_from_seconds(0), "0")
+    expect_duration_formatted("{}", duration_from_seconds(9223372036854775807), "9223372036854775807")
+    expect_duration_formatted("{}", duration_from_seconds(-9223372036854775808), "-9223372036854775808")
+    expect_duration_formatted("{}", duration_from_microseconds(6500), "0.0065")
+    expect_duration_formatted("{}", duration_from_microseconds(-6500), "-0.0065")
+    expect_duration_formatted("{}", duration_from_milliseconds(-1500), "-1.5")
+    expect_duration_formatted("{}", duration_from_nanoseconds(1), "0.000000001")
+    expect_duration_formatted("{}", duration_from_nanoseconds(999999999), "0.999999999")
+    expect_duration_formatted("{}", duration_from_nanoseconds(-999999999), "-0.999999999")
+    expect_duration_formatted("{:05}", duration_from_seconds(1), "00001")
+    expect_duration_formatted("{:8}", duration_from_milliseconds(1250), "    1.25")
+    expect_duration_formatted("{:|>4}", duration_from_seconds(1), "|||1")
+    expect_duration_formatted("{:.<20}", duration_from_nanoseconds(1050250000001), "1050.250000001......")
+    expect_duration_formatted("{:^5}", duration_from_milliseconds(1500), " 1.5 ")
+    expect_duration_formatted("{:^+6}", duration_from_milliseconds(1500), " +1.5 ")
+    expect_duration_formatted("{:.10}", duration_from_milliseconds(100000500), "100000.5000000000")
+    expect_duration_formatted("{:.0}", duration_from_milliseconds(67500), "67")
+    expect_duration_formatted("{:.0}", duration_from_nanoseconds(123456789), "0")
+    expect_duration_formatted("{:.3}", duration_from_nanoseconds(123456789), "0.123")
+    expect_duration_formatted("{:.9}", duration_from_milliseconds(500), "0.500000000")
+    expect_duration_formatted("{:.21}", duration_from_milliseconds(500), "0.500000000000000000000")
+    expect_duration_formatted("{:#}", duration_from_milliseconds(12054), "12.054s")
+    expect_duration_formatted("{:^#8}", duration_from_milliseconds(1512), " 1.512s ")

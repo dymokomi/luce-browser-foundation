@@ -5,6 +5,10 @@
 #   DESCRIPTION:
 #       Port of Tests/AK/TestBase64.cpp.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 ## The `decode_equal` lambda of test_decode / test_urldecode.
@@ -28,6 +32,9 @@ func tests_base64_decode_fails(input: const u8[], url: bool) -> bool:
     return failed
 
 test "base64: decode":
+    test_base64_decode()
+
+noinline func test_base64_decode():
     tests_base64_decode_equal("", "", false)
     tests_base64_decode_equal("Zg==", "f", false)
     tests_base64_decode_equal("Zm8=", "fo", false)
@@ -54,6 +61,9 @@ func tests_base64_decode_into_equal(input: str, expected: str, buffer_size: usiz
     assert(string_view_equals(&decoded, expected))
 
 test "base64: decode into":
+    test_base64_decode_into()
+
+noinline func test_base64_decode_into():
     tests_base64_decode_into_equal("", "", none)
 
     tests_base64_decode_into_equal("Zg==", "f", none)
@@ -76,6 +86,9 @@ test "base64: decode into":
     tests_base64_decode_into_equal("Zm9vYmFy", "foobar", 7)
 
 test "base64: decode invalid":
+    test_base64_decode_invalid()
+
+noinline func test_base64_decode_invalid():
     assert(tests_base64_decode_fails(b"asdf\xffqwe", false))
     assert(tests_base64_decode_fails(b"asdf\x80qwe", false))
     assert(tests_base64_decode_fails(b"asdf:qwe", false))
@@ -88,6 +101,9 @@ test "base64: decode invalid":
     assert(tests_base64_decode_fails(b"YQ=", false))
 
 test "base64: decode only padding":
+    test_base64_decode_only_padding()
+
+noinline func test_base64_decode_only_padding():
     # Only padding is not allowed
     assert(tests_base64_decode_fails(b"=", false))
     assert(tests_base64_decode_fails(b"==", false))
@@ -105,6 +121,9 @@ func tests_base64_encode_equal(input: str, expected: str, url: bool, omit_paddin
     assert(string_eq_string_view(&encoded, sv(expected)))
 
 test "base64: encode":
+    test_base64_encode()
+
+noinline func test_base64_encode():
     tests_base64_encode_equal("", "", false, .no)
     tests_base64_encode_equal("f", "Zg==", false, .no)
     tests_base64_encode_equal("fo", "Zm8=", false, .no)
@@ -114,6 +133,9 @@ test "base64: encode":
     tests_base64_encode_equal("foobar", "Zm9vYmFy", false, .no)
 
 test "base64: encode omit padding":
+    test_base64_encode_omit_padding()
+
+noinline func test_base64_encode_omit_padding():
     tests_base64_encode_equal("", "", false, .yes)
     tests_base64_encode_equal("f", "Zg", false, .yes)
     tests_base64_encode_equal("fo", "Zm8", false, .yes)
@@ -123,6 +145,9 @@ test "base64: encode omit padding":
     tests_base64_encode_equal("foobar", "Zm9vYmFy", false, .yes)
 
 test "base64: urldecode":
+    test_base64_urldecode()
+
+noinline func test_base64_urldecode():
     tests_base64_decode_equal("", "", true)
     tests_base64_decode_equal("Zg==", "f", true)
     tests_base64_decode_equal("Zm8=", "fo", true)
@@ -137,6 +162,9 @@ test "base64: urldecode":
     tests_base64_decode_equal("aGVsbG8_d29ybGQ=", "hello?world", true)
 
 test "base64: urlencode":
+    test_base64_urlencode()
+
+noinline func test_base64_urlencode():
     tests_base64_encode_equal("", "", true, .no)
     tests_base64_encode_equal("f", "Zg==", true, .no)
     tests_base64_encode_equal("fo", "Zm8=", true, .no)
@@ -151,6 +179,9 @@ test "base64: urlencode":
     tests_base64_encode_equal("hello!!world", "aGVsbG8hIXdvcmxk", true, .no)
 
 test "base64: urlencode omit padding":
+    test_base64_urlencode_omit_padding()
+
+noinline func test_base64_urlencode_omit_padding():
     tests_base64_encode_equal("", "", true, .yes)
     tests_base64_encode_equal("f", "Zg", true, .yes)
     tests_base64_encode_equal("fo", "Zm8", true, .yes)
@@ -165,6 +196,9 @@ test "base64: urlencode omit padding":
     tests_base64_encode_equal("hello!!world", "aGVsbG8hIXdvcmxk", true, .yes)
 
 test "base64: simdutf decoding without a ByteBuffer":
+    test_base64_simdutf_decoding_without_a_bytebuffer()
+
+noinline func test_base64_simdutf_decoding_without_a_bytebuffer():
     # The replacement kernel itself, pinned to the donor's results.
     var output: u8[16]
     var outlen: usize = 16

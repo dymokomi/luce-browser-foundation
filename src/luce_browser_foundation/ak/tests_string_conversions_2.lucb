@@ -8,6 +8,10 @@
 #       parse_completely_must_be_just_floating_point. Every check runs over a StringView and
 #       over UTF-16 storage (the C++'s u"..."sv).
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 ## `parse_number<double>` of `text` over a StringView and over UTF-16 storage; both must agree.
@@ -57,6 +61,9 @@ func test_parse_first_double(text: str) -> (u64, usize)?:
         return (from_bytes.value.bits(), from_bytes.characters_parsed)
 
 test "StringConversions: simple_cases (special values)":
+    test_stringconversions_simple_cases_special_values()
+
+noinline func test_stringconversions_simple_cases_special_values():
     let negative_zero: u64 = 0x8000000000000000
     assert((test_parse_complete_double("0") else trap("0")).bits() == 0)
     assert((test_parse_complete_double("-0") else trap("-0")).bits() == negative_zero)
@@ -95,6 +102,9 @@ func test_parse_to_infinity(text: str):
         assert((test_parse_complete_float((str)negative) else trap("inf")).bits() == infinity_bits_f32 | 0x80000000)
 
 test "StringConversions: simple_cases (infinities)":
+    test_stringconversions_simple_cases_infinities()
+
+noinline func test_stringconversions_simple_cases_infinities():
     test_parse_to_infinity("123.456e789")
     test_parse_to_infinity("123456.456789e789")
     test_parse_to_infinity("1438456663141390273526118207642235581183227845246331231162636653790368152091394196930365828634687637948157940776599182791387527135353034738357134110310609455693900824193549772792016543182680519740580354365467985440183598701312257624545562331397018329928613196125590274187720073914818062530830316533158098624984118889298281371812288789537310599037529113415438738954894752124724983067241108764488346454376699018673078404751121414804937224240805993123816932326223683090770561597570457793932985826162604255884529134126396282202126526253389383421806727954588525596114379801269094096329805054803089299736996870951258573010877404407451953846698609198213926882692078557033228265259305481198526059813164469187586693257335779522020407645498684263339921905227556616698129967412891282231685504660671277927198290009824680186319750978665734576683784255802269708917361719466043175201158849097881370477111850171579869056016061666173029059588433776015644439705050377554277696143928278093453792803846252715966016733222646442382892123940052441346822429721593884378212558701004356924243030059517489346646577724622498919752597382095222500311124181823512251071356181769376577651390028297796156208815375089159128394945710515861334486267101797497111125909272505194792870889617179758703442608016143343262159998149700606597792535574457560429226974273443630323818747730771316763398572110874959981923732463076884528677392654150010269822239401993427482376513231389212353583573566376915572650916866553612366187378959554983566712767093372906030188976220169058025354973622211666504549316958271880975697143546564469806791358707318873075708383345004090151974068325838177531266954177406661392229801349994695941509935655355652985723782153570084089560139142231.738475042362596875449154552392299548947138162081694168675340677843807613129780449323363759027012972466987370921816813162658754726545121090545507240267000456594786540949605260722461937870630634874991729398208026467698131898691830012167897399682179601734569071423681e-733")
@@ -113,6 +123,9 @@ func test_parse_first_consumes(text: str, bits: u64, characters: usize):
     assert(parsed == characters)
 
 test "StringConversions: partial_parse_stops_at_right_spot":
+    test_stringconversions_partial_parse_stops_at_right_spot()
+
+noinline func test_stringconversions_partial_parse_stops_at_right_spot():
     test_parse_first_consumes("0x", 0, 1)
     test_parse_first_consumes("0e", 0, 1)
     test_parse_first_consumes("0e+", 0, 1)
@@ -126,6 +139,9 @@ test "StringConversions: partial_parse_stops_at_right_spot":
     test_parse_first_consumes("0e-+1", 0, 1)
 
 test "StringConversions: invalid_parse":
+    test_stringconversions_invalid_parse()
+
+noinline func test_stringconversions_invalid_parse():
     let failures: str[17] = ["", "e", ".", "-.", "+.", ".e", "-.e", "+.e", ".e1", "-.e1", "+.e1", "++2", "++1", "++0", "++2e1", "++1e1", "++0e1"]
     for text in failures:
         assert(test_parse_first_double(text) == none)
@@ -138,6 +154,9 @@ test "StringConversions: invalid_parse":
             assert(test_parse_first_double(text) == none)
 
 test "StringConversions: detect_out_of_range_values":
+    test_stringconversions_detect_out_of_range_values()
+
+noinline func test_stringconversions_detect_out_of_range_values():
     let (small, _small_length) = test_parse_first_double("10e-10000") else trap("small")
     assert(small == 0)
     let (negative_small, _negative_small_length) = test_parse_first_double("-10e-10000") else trap("small")
@@ -148,6 +167,9 @@ test "StringConversions: detect_out_of_range_values":
     assert(negative_large == 0xfff0000000000000)
 
 test "StringConversions: parse_completely_must_be_just_floating_point":
+    test_stringconversions_parse_completely_must_be_just_floating_point()
+
+noinline func test_stringconversions_parse_completely_must_be_just_floating_point():
     let failures: str[39] = [
         "", "-", "+", "++1", "+-1", "-+1", "--1",
         "1 ", "1. ", "1e ", "1.e ", "1.e123 ",

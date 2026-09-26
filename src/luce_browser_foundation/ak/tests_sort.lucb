@@ -7,6 +7,10 @@
 #       (the randomized cases run over the test's deterministic seed), and the order
 #       quick_sort leaves equal keys in, pinned against the donor's AK (it is not stable).
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 struct TestSortPair:
@@ -26,6 +30,9 @@ func test_sort_int_less(context: void*?, a: const i32*, b: const i32*) -> bool:
     return *a < *b
 
 test "quick_sort: sorts_without_copy":
+    test_quick_sort_sorts_without_copy()
+
+noinline func test_quick_sort_sorts_without_copy():
     var array: TestSortPair[64]
     for i in 0..<64usize:
         array[i].key = (i32)((64 - i) % 32 + 32)
@@ -40,6 +47,9 @@ test "quick_sort: sorts_without_copy":
         assert(array[i].key <= array[i + 1].key)
 
 test "quick_sort: maximum_stack_depth":
+    test_quick_sort_maximum_stack_depth()
+
+noinline func test_quick_sort_maximum_stack_depth():
     var data: i32[256]
     for i in 0..<256usize:
         data[i] = (i32)i
@@ -52,6 +62,9 @@ test "quick_sort: maximum_stack_depth":
         assert(data[i] == (i32)i)
 
 test "quick_sort: the order of equal keys matches the donor":
+    test_quick_sort_the_order_of_equal_keys_matches_the_donor()
+
+noinline func test_quick_sort_the_order_of_equal_keys_matches_the_donor():
     var v: Vector[TestSortPair]
     var w: Vector[TestSortPair]
     for i: i32 in 0..<40:
@@ -68,12 +81,18 @@ test "quick_sort: the order of equal keys matches the donor":
         assert(vector_at(&w, i).id == single[i])
 
 test "quick_sort: default comparison":
+    test_quick_sort_default_comparison()
+
+noinline func test_quick_sort_default_comparison():
     var values: i64[7] = [5, -3, 9, 0, 9, 2, -8]
     quick_sort_t_collection(values)
     for i in 0..<6usize:
         assert(values[i] <= values[i + 1])
 
 test "insertion_sort: sorts_ascending and sorts_descending":
+    test_insertion_sort_sorts_ascending_and_sorts_descending()
+
+noinline func test_insertion_sort_sorts_ascending_and_sorts_descending():
     for iteration in 0..<10:
         discard(iteration)
         var ints: i32[10]
@@ -91,6 +110,9 @@ test "insertion_sort: sorts_ascending and sorts_descending":
             assert(ints[j] >= ints[j + 1])
 
 test "insertion_sort: sorts_subrange_without_affecting_outside_elements":
+    test_insertion_sort_sorts_subrange_without_affecting_outside_elements()
+
+noinline func test_insertion_sort_sorts_subrange_without_affecting_outside_elements():
     var ints: i32[10] = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
     let original_ints = ints
     let start: isize = 3
@@ -104,6 +126,9 @@ test "insertion_sort: sorts_subrange_without_affecting_outside_elements":
         assert(ints[i] == original_ints[i])
 
 test "binary_search: vector_ints, single_element, not_found, no_elements":
+    test_binary_search_vector_ints_single_element_not_found_no_elements()
+
+noinline func test_binary_search_vector_ints_single_element_not_found_no_elements():
     var ints: Vector[i32]
     vector_append_t(&ints, 1)
     vector_append_t(&ints, 2)
@@ -119,6 +144,9 @@ test "binary_search: vector_ints, single_element, not_found, no_elements":
     assert(binary_search(vector_span_const(&empty), 1i32, none, compare) == none)
 
 test "binary_search: span_rvalue_reference, array_doubles and unsigned_to_signed_regression":
+    test_binary_search_span_rvalue_reference_array_doubles_and_unsigned_to_signed_regression()
+
+noinline func test_binary_search_span_rvalue_reference_array_doubles_and_unsigned_to_signed_regression():
     let array: i64[3] = [1, 2, 3]
     var nearby_index: usize = 0
     let pointer = binary_search(array, 2i64, &nearby_index, default_comparator[i64]()) else trap("missing")
@@ -137,6 +165,9 @@ test "binary_search: span_rvalue_reference, array_doubles and unsigned_to_signed
     assert(nearby_index == 1)
 
 test "binary_search: finds present numbers and not absent ones":
+    test_binary_search_finds_present_numbers_and_not_absent_ones()
+
+noinline func test_binary_search_finds_present_numbers_and_not_absent_ones():
     for round in 0..<20:
         discard(round)
         var values: u64[16]

@@ -1,0 +1,401 @@
+#==============================================================================================
+#
+#   tests_time_2 - the calendar, UnixDateTime's strings and parsing, the Duration conversions
+#
+#   DESCRIPTION:
+#       Port of the second half of Tests/AK/TestTime.cpp (the calendar cases, time_to_string,
+#       parse_time and the conversions); the helpers are tests_time's.
+#
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
+#==============================================================================================
+
+# mark: time_to_string ==========================================================================
+
+# The `test` lambda of TEST_CASE(time_to_string).
+func expect_time_to_string(format_: str, expected: str, year: i32, month: u8, day: u8, hour: u8, minute: u8, second: u8):
+    let time = unix_date_time_from_unix_time_parts(year, month, day, hour, minute, second, 0)
+    let result = unix_date_time_to_string(&time, sv(format_), UnixDateTimeLocalTime.no) else trap("VERIFY(!result.is_error())")
+    let view = string_bytes_as_string_view(&result)
+    assert(string_view_eq_string_view(&view, sv(expected)))
+
+test "time: time_to_string":
+    test_time_time_to_string()
+
+noinline func test_time_time_to_string():
+    expect_time_to_string("%Y/%m/%d %R", "2023/01/23 10:50", 2023, 1, 23, 10, 50, 10)
+
+    # two-digit year and century
+    expect_time_to_string("%y %C", "23 20", 2023, 1, 23, 10, 50, 10)
+
+    # zero- and space-padded day, and %D shortcut
+    expect_time_to_string("%d %e", "05  5", 2023, 1, 5, 0, 0, 0)
+    expect_time_to_string("%D", "01/23/23", 2023, 1, 23, 0, 0, 0)
+
+    # full time and seconds
+    expect_time_to_string("%T", "10:50:10", 2023, 1, 23, 10, 50, 10)
+    expect_time_to_string("%S", "05", 2023, 1, 1, 0, 0, 5)
+
+    # 12-hour clock with AM/PM
+    expect_time_to_string("%H %I %p", "00 12 AM", 2023, 1, 5, 0, 0, 0)
+    expect_time_to_string("%H %I %p", "15 03 PM", 2023, 1, 5, 15, 0, 0)
+
+    # short/long weekday and month names
+    expect_time_to_string("%a %A", "Mon Monday", 2023, 1, 23, 0, 0, 0)
+    expect_time_to_string("%b %B", "Jan January", 2023, 1, 5, 0, 0, 0)
+
+    # numeric weekday and day‐of‐year
+    expect_time_to_string("%w %j", "1 023", 2023, 1, 23, 0, 0, 0)
+
+    # newline, tab and literal '%'
+    expect_time_to_string("%n", "\n", 2023, 1, 1, 0, 0, 0)
+    expect_time_to_string("%t", "\t", 2023, 1, 1, 0, 0, 0)
+    expect_time_to_string("%%", "%", 2023, 1, 1, 0, 0, 0)
+
+# mark: Calendar ================================================================================
+
+test "time: years_to_days_since_epoch_points":
+    test_time_years_to_days_since_epoch_points()
+
+noinline func test_time_years_to_days_since_epoch_points():
+    let years: i32[24] = [1969, 1970, 1971, 1900, 2023, 1800, 2100, 0, -1, -2, -3, -4, -5, -6, 4000, -10000, 10000, -1000000, 1000000, -5877640, 5881474, -999999, 2147483647, -2147483648]
+    let days: i64[24] = [-365, 0, 365, -25567, 19358, -62091, 47482, -719528, -719893, -720258, -720623, -720989, -721354, -721719, 741442, -4371953, 2932897, -365962028, 364522972, -2147483456, 2147444740, -365961662, 784351576412, -784353015833]
+    for i in 0..<24usize:
+        assert(years_to_days_since_epoch(years[i]) == days[i])
+
+test "time: days_since_epoch":
+    test_time_days_since_epoch()
+
+noinline func test_time_days_since_epoch():
+    assert(days_since_epoch(1970, 1, 1) == 0)
+    assert(days_since_epoch(1970, 1, 2) == 1)
+    assert(days_since_epoch(1970, 2, 1) == 31)
+    assert(days_since_epoch(1970, 2, 27) == 57)
+    assert(days_since_epoch(1970, 2, 28) == 58)
+    assert(days_since_epoch(1970, 2, 29) == 59)
+    assert(days_since_epoch(1970, 3, 1) == 59)
+    assert(days_since_epoch(1971, 1, 1) == 365)
+    assert(days_since_epoch(1972, 1, 1) == 730)
+    assert(days_since_epoch(1972, 2, 1) == 761)
+    assert(days_since_epoch(1972, 2, 27) == 787)
+    assert(days_since_epoch(1972, 2, 28) == 788)
+    assert(days_since_epoch(1972, 2, 29) == 789)
+    assert(days_since_epoch(1972, 3, 1) == 790)
+    assert(days_since_epoch(1971, 1, 0) == 364)
+    assert(days_since_epoch(1971, 0, 1) == 365)
+    assert(days_since_epoch(1971, 0, 0) == 365)
+    assert(days_since_epoch(1971, 13, 3) == 365)
+    assert(days_since_epoch(0, 1, 1) == -719528)
+    assert(days_since_epoch(-1000000, 1, 1) == -365962028)
+    assert(days_since_epoch(-2147483648, 1, 1) == -784353015833)
+    assert(days_since_epoch(1000000, 1, 1) == 364522972)
+    assert(days_since_epoch(2147483647, 1, 1) == 784351576412)
+    assert(days_since_epoch(2147483647, 12, 31) == 784351576776)
+    assert(days_since_epoch(2147483647, 12, 255) == 784351577000)
+
+test "time: div_floor_by":
+    test_time_div_floor_by()
+
+noinline func test_time_div_floor_by():
+    let expected: i64[14] = [-2, -1, -1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1, 2]
+    for i in 0..<14usize:
+        assert(floor_div_by(4, (i64)i - 5) == expected[i])
+
+test "time: mod_zeros_in_range":
+    test_time_mod_zeros_in_range()
+
+noinline func test_time_mod_zeros_in_range():
+    assert(mod_zeros_in_range(4, 0, 0) == 0)
+    assert(mod_zeros_in_range(4, 0, 1) == 1)
+    assert(mod_zeros_in_range(4, 0, 4) == 1)
+    assert(mod_zeros_in_range(4, 0, 5) == 2)
+    assert(mod_zeros_in_range(4, 1, 4) == 0)
+    assert(mod_zeros_in_range(4, 1, 5) == 1)
+    assert(mod_zeros_in_range(4, 2, 5) == 1)
+    assert(mod_zeros_in_range(4, 3, 4) == 0)
+    assert(mod_zeros_in_range(4, 3, 5) == 1)
+    assert(mod_zeros_in_range(4, 4, 4) == 0)
+    assert(mod_zeros_in_range(4, 4, 5) == 1)
+    assert(mod_zeros_in_range(4, 5, 6) == 0)
+    assert(mod_zeros_in_range(4, 6, 6) == 0)
+    assert(mod_zeros_in_range(4, -5, 3) == 2)
+    assert(mod_zeros_in_range(4, -4, 3) == 2)
+    assert(mod_zeros_in_range(4, -3, 3) == 1)
+    assert(mod_zeros_in_range(4, -1, 3) == 1)
+    assert(mod_zeros_in_range(4, 0, 3) == 1)
+    assert(mod_zeros_in_range(4, 1, 3) == 0)
+
+test "time: years_to_days_since_epoch_span":
+    test_time_years_to_days_since_epoch_span()
+
+noinline func test_time_years_to_days_since_epoch_span():
+    # Data was pre-computed with a slow, but known-correct implementation.
+    let test_data: i64[606] = [
+        -25567, -25202, -24837, -24472, -24107, -23741, -23376, -23011, -22646, -22280,
+        -21915, -21550, -21185, -20819, -20454, -20089, -19724, -19358, -18993, -18628,
+        -18263, -17897, -17532, -17167, -16802, -16436, -16071, -15706, -15341, -14975,
+        -14610, -14245, -13880, -13514, -13149, -12784, -12419, -12053, -11688, -11323,
+        -10958, -10592, -10227, -9862, -9497, -9131, -8766, -8401, -8036, -7670,
+        -7305, -6940, -6575, -6209, -5844, -5479, -5114, -4748, -4383, -4018,
+        -3653, -3287, -2922, -2557, -2192, -1826, -1461, -1096, -731, -365,
+        0, 365, 730, 1096, 1461, 1826, 2191, 2557, 2922, 3287,
+        3652, 4018, 4383, 4748, 5113, 5479, 5844, 6209, 6574, 6940,
+        7305, 7670, 8035, 8401, 8766, 9131, 9496, 9862, 10227, 10592,
+        10957, 11323, 11688, 12053, 12418, 12784, 13149, 13514, 13879, 14245,
+        14610, 14975, 15340, 15706, 16071, 16436, 16801, 17167, 17532, 17897,
+        18262, 18628, 18993, 19358, 19723, 20089, 20454, 20819, 21184, 21550,
+        21915, 22280, 22645, 23011, 23376, 23741, 24106, 24472, 24837, 25202,
+        25567, 25933, 26298, 26663, 27028, 27394, 27759, 28124, 28489, 28855,
+        29220, 29585, 29950, 30316, 30681, 31046, 31411, 31777, 32142, 32507,
+        32872, 33238, 33603, 33968, 34333, 34699, 35064, 35429, 35794, 36160,
+        36525, 36890, 37255, 37621, 37986, 38351, 38716, 39082, 39447, 39812,
+        40177, 40543, 40908, 41273, 41638, 42004, 42369, 42734, 43099, 43465,
+        43830, 44195, 44560, 44926, 45291, 45656, 46021, 46387, 46752, 47117,
+        47482, 47847, 48212, 48577, 48942, 49308, 49673, 50038, 50403, 50769,
+        51134, 51499, 51864, 52230, 52595, 52960, 53325, 53691, 54056, 54421,
+        54786, 55152, 55517, 55882, 56247, 56613, 56978, 57343, 57708, 58074,
+        58439, 58804, 59169, 59535, 59900, 60265, 60630, 60996, 61361, 61726,
+        62091, 62457, 62822, 63187, 63552, 63918, 64283, 64648, 65013, 65379,
+        65744, 66109, 66474, 66840, 67205, 67570, 67935, 68301, 68666, 69031,
+        69396, 69762, 70127, 70492, 70857, 71223, 71588, 71953, 72318, 72684,
+        73049, 73414, 73779, 74145, 74510, 74875, 75240, 75606, 75971, 76336,
+        76701, 77067, 77432, 77797, 78162, 78528, 78893, 79258, 79623, 79989,
+        80354, 80719, 81084, 81450, 81815, 82180, 82545, 82911, 83276, 83641,
+        84006, 84371, 84736, 85101, 85466, 85832, 86197, 86562, 86927, 87293,
+        87658, 88023, 88388, 88754, 89119, 89484, 89849, 90215, 90580, 90945,
+        91310, 91676, 92041, 92406, 92771, 93137, 93502, 93867, 94232, 94598,
+        94963, 95328, 95693, 96059, 96424, 96789, 97154, 97520, 97885, 98250,
+        98615, 98981, 99346, 99711, 100076, 100442, 100807, 101172, 101537, 101903,
+        102268, 102633, 102998, 103364, 103729, 104094, 104459, 104825, 105190, 105555,
+        105920, 106286, 106651, 107016, 107381, 107747, 108112, 108477, 108842, 109208,
+        109573, 109938, 110303, 110669, 111034, 111399, 111764, 112130, 112495, 112860,
+        113225, 113591, 113956, 114321, 114686, 115052, 115417, 115782, 116147, 116513,
+        116878, 117243, 117608, 117974, 118339, 118704, 119069, 119435, 119800, 120165,
+        120530, 120895, 121260, 121625, 121990, 122356, 122721, 123086, 123451, 123817,
+        124182, 124547, 124912, 125278, 125643, 126008, 126373, 126739, 127104, 127469,
+        127834, 128200, 128565, 128930, 129295, 129661, 130026, 130391, 130756, 131122,
+        131487, 131852, 132217, 132583, 132948, 133313, 133678, 134044, 134409, 134774,
+        135139, 135505, 135870, 136235, 136600, 136966, 137331, 137696, 138061, 138427,
+        138792, 139157, 139522, 139888, 140253, 140618, 140983, 141349, 141714, 142079,
+        142444, 142810, 143175, 143540, 143905, 144271, 144636, 145001, 145366, 145732,
+        146097, 146462, 146827, 147193, 147558, 147923, 148288, 148654, 149019, 149384,
+        149749, 150115, 150480, 150845, 151210, 151576, 151941, 152306, 152671, 153037,
+        153402, 153767, 154132, 154498, 154863, 155228, 155593, 155959, 156324, 156689,
+        157054, 157420, 157785, 158150, 158515, 158881, 159246, 159611, 159976, 160342,
+        160707, 161072, 161437, 161803, 162168, 162533, 162898, 163264, 163629, 163994,
+        164359, 164725, 165090, 165455, 165820, 166186, 166551, 166916, 167281, 167647,
+        168012, 168377, 168742, 169108, 169473, 169838, 170203, 170569, 170934, 171299,
+        171664, 172030, 172395, 172760, 173125, 173491, 173856, 174221, 174586, 174952,
+        175317, 175682, 176047, 176413, 176778, 177143, 177508, 177874, 178239, 178604,
+        178969, 179335, 179700, 180065, 180430, 180796, 181161, 181526, 181891, 182257,
+        182622, 182987, 183352, 183718, 184083, 184448, 184813, 185179, 185544, 185909,
+        186274, 186640, 187005, 187370, 187735, 188101, 188466, 188831, 189196, 189562,
+        189927, 190292, 190657, 191023, 191388, 191753, 192118, 192484, 192849, 193214,
+        193579, 193944, 194309, 194674, 195039, 195405,
+    ]
+    for offset in 0..<test_data.length:
+        assert(years_to_days_since_epoch((i32)offset + 1900) == test_data[offset])
+
+test "time: calendar helpers":
+    test_time_calendar_helpers()
+
+noinline func test_time_calendar_helpers():
+    assert(is_leap_year(2000) and is_leap_year(2024) and not is_leap_year(1900) and not is_leap_year(2023))
+    assert(day_of_week(2023, 1, 23) == 1)
+    assert(day_of_year(2024, 3, 1) == 60)
+    assert(days_in_month(2024, 2) == 29)
+    assert(days_in_month(2023, 4) == 30)
+    assert(days_in_year(2023) == 365)
+    assert(iso8061_weeks_in_year(2004) == 53)
+    assert(iso8061_weeks_in_year(2005) == 52)
+    assert(seconds_since_epoch_to_year(0) == 1970)
+    # The donor truncates toward zero for values in (-1, 0): -1s is still 1970.
+    assert(seconds_since_epoch_to_year(-1) == 1970)
+    assert(seconds_since_epoch_to_year(-40000000) == 1968)
+    assert(seconds_since_epoch_to_year(1684953880) == 2023)
+
+test "time: user_defined_literals":
+    test_time_user_defined_literals()
+
+noinline func test_time_user_defined_literals():
+    assert(duration_from_nanoseconds(123) == time_literals_literalns(123))
+    assert(dv_cmp(time_literals_literalms(100), time_literals_literalms(10)) > 0)
+    assert(time_literals_literalns(1000) == time_literals_literalus(1))
+    assert(dv_cmp(time_literals_literalsec(1), time_literals_literalms(1)) > 0)
+    assert(dv_cmp(time_literals_literalms(100), time_literals_literalus(100000)) >= 0)
+    assert(dv_cmp(time_literals_literalms(100), time_literals_literalus(99999)) >= 0)
+    assert(dv_cmp(time_literals_literalms(100), time_literals_literalus(100000)) <= 0)
+    assert(dv_cmp(time_literals_literalms(100), time_literals_literalus(100001)) <= 0)
+    assert(time_literals_literalsec(1) != time_literals_literalsec(2))
+
+# mark: Parsing =================================================================================
+
+test "time: parse_time":
+    test_time_parse_time()
+
+noinline func test_time_parse_time():
+    expect_parsed("%d-%m-%Y %H:%M", "05-01-2023 00:00", 2023, 1, 5, 0, 0, 0)
+    expect_parsed("%d-%m-%Y %H:%M GMT", "05-01-2023 00:00 GMT", 2023, 1, 5, 0, 0, 0)
+    expect_parsed("%Y/%m/%d %R", "2023/01/23 10:50", 2023, 1, 23, 10, 50, 0)
+    expect_parsed("%Y-%m-%d %H:%M", "1999-12-31 23:59", 1999, 12, 31, 23, 59, 0)
+    expect_parsed("%Y/%m/%d %R", "1970/01/01 00:00", 1970, 1, 1, 0, 0, 0)
+    expect_parsed("%Y/%m/%d %R", "2000/02/29 12:34", 2000, 2, 29, 12, 34, 0)
+    expect_parsed("%Y-%m-%d %T", "2023-01-23 10:50:15", 2023, 1, 23, 10, 50, 15)
+    expect_parsed("%Y-%m-%d %H:%M:%S", "2023-01-23 10:50:42", 2023, 1, 23, 10, 50, 42)
+    expect_parsed("%Y-%m-%d %I:%M %p", "2023-01-23 03:21 PM", 2023, 1, 23, 15, 21, 0)
+    expect_parsed("%Y-%m-%d %I:%M %p", "2023-01-23 12:01 AM", 2023, 1, 23, 0, 1, 0)
+    expect_parsed("%D %H:%M:%S", "01/23/23 10:50:59", 2023, 1, 23, 10, 50, 59)
+    expect_parsed("%y %C %m %d %H:%M:%S", "23 20 01 23 10:50:11", 2023, 1, 23, 10, 50, 11)
+    expect_parsed("%Y-%m-%d %a", "2023-01-23 Mon", 2023, 1, 23, 0, 0, 0)
+    expect_parsed("%Y-%m-%d %A", "2023-01-23 Monday", 2023, 1, 23, 0, 0, 0)
+    expect_parsed("%d %b %Y", "05 Jan 2023", 2023, 1, 5, 0, 0, 0)
+    expect_parsed("%d %B %Y", "05 January 2023", 2023, 1, 5, 0, 0, 0)
+    expect_parsed("%Y %j %H:%M:%S", "2023 023 10:50:12", 2023, 1, 23, 10, 50, 12)
+    expect_parsed("%Y-%m-%d %w %H:%M:%S", "2023-01-23 1 10:50:13", 2023, 1, 23, 10, 50, 13)
+    expect_parsed("%Y-%m-%d%n%H:%M:%S", "2023-01-23\n10:50:14", 2023, 1, 23, 10, 50, 14)
+    expect_parsed("%Y-%m-%d%t%H:%M:%S", "2023-01-23\t10:50:15", 2023, 1, 23, 10, 50, 15)
+    expect_parsed("%Y-%m-%d %% %H:%M:%S", "2023-01-23 % 10:50:16", 2023, 1, 23, 10, 50, 16)
+
+test "time: parse_wildcard_characters":
+    test_time_parse_wildcard_characters()
+
+noinline func test_time_parse_wildcard_characters():
+    assert(parse_of("%+", "") == none)
+    assert(parse_of("foo%+", "foo") == none)
+    assert(parse_of("[%*]", "[foo") == none)
+    assert(parse_of("[%*]", "foo]") == none)
+    assert(parse_of("%+%b", "fooJan") == none)
+    expect_parsed("%Y %+ %m %d", "2023 whf 01 23", 2023, 1, 23, 0, 0, 0)
+    expect_parsed("%Y %m %d %+", "2023 01 23 whf", 2023, 1, 23, 0, 0, 0)
+    expect_parsed("%Y [%+] %m %d", "2023 [well hello friends!] 01 23", 2023, 1, 23, 0, 0, 0)
+    expect_parsed("%Y %m %d [%+]", "2023 01 23 [well hello friends!]", 2023, 1, 23, 0, 0, 0)
+
+test "time: parse_time_from_gmt":
+    test_time_parse_time_from_gmt()
+
+noinline func test_time_parse_time_from_gmt():
+    assert(parse_of("%Y-%m-%d %H:%M:%S", "2023-01-15 12:00:00", true) != none)
+    let test_gmt = parse_of("%Y-%m-%d %H:%M:%S", "1970-01-01 00:00:00", true) else trap("none")
+    assert(unix_date_time_seconds_since_epoch(&test_gmt) == 0)
+    let test_gmt2 = parse_of("%Y-%m-%d %H:%M:%S", "1970-01-01 01:00:00", true) else trap("none")
+    assert(unix_date_time_seconds_since_epoch(&test_gmt2) == 3600)
+    let test_gmt3 = parse_of("%Y-%m-%d %H:%M:%S", "2023-06-15 18:30:45", true) else trap("none")
+    let result_time = unaware_time_to_timespec(&test_gmt3.unaware_time)
+    var tm = zeroed_tm()
+    discard(gmtime_r(&result_time.tv_sec, &tm) else trap("gmtime_r failed"))
+    assert(tm.tm_year + 1900 == 2023)
+    assert(tm.tm_mon + 1 == 6)
+    assert(tm.tm_mday == 15)
+    assert(tm.tm_hour == 18)
+    assert(tm.tm_min == 30)
+    assert(tm.tm_sec == 45)
+
+# mark: Conversions =============================================================================
+
+test "time: from_f64_seconds":
+    test_time_from_f64_seconds()
+
+noinline func test_time_from_f64_seconds():
+    let max_seconds = duration_from_seconds(i64_max)
+    assert(duration_from_seconds_f64((f64)f32_max) == max_seconds)
+    let smaller_float = f32.bits(f32_max.bits() - 1)
+    assert(duration_from_seconds_f64((f64)smaller_float) == max_seconds)
+    # nextafterf(static_cast<float>(i64 max), 0.0f)
+    let max_representable_float = f32.bits(((f32)i64_max).bits() - 1)
+    let max_representable_float_as_integer: i64 = 9223371487098961920
+    assert(duration_from_seconds_f64((f64)max_representable_float) == duration_from_seconds(max_representable_float_as_integer))
+    let min_seconds = duration_from_seconds(i64_min)
+    assert(duration_from_seconds_f64((f64)f32_lowest) == min_seconds)
+    assert(duration_from_seconds_f64(-(f64)smaller_float) == min_seconds)
+    assert(duration_from_seconds_f64(-(f64)max_representable_float) == duration_from_seconds(-max_representable_float_as_integer))
+    assert(duration_from_seconds_f64(1.5) == duration_from_milliseconds(1500))
+    assert(duration_from_seconds_f64(205321.25) == duration_from_milliseconds(205321250))
+    assert(duration_from_seconds_f64(-0.25) == duration_from_milliseconds(-250))
+    assert(duration_from_seconds_f64(-1.75) == duration_from_milliseconds(-1750))
+
+test "time: time_units":
+    test_time_time_units()
+
+noinline func test_time_time_units():
+    assert(duration_from_time_units(1, 1, 1) == duration_from_seconds(1))
+    assert(duration_from_time_units(-312, 1, 48000) == duration_from_microseconds(-6500))
+    assert(duration_from_time_units(960, 1, 48000) == duration_from_microseconds(20000))
+    assert(duration_from_time_units(8, 4, 1) == duration_from_seconds(32))
+    assert(duration_from_time_units(3, 3, 2000000000) == duration_from_nanoseconds(5))
+    assert(duration_from_time_units(4, 3, 2000000000) == duration_from_nanoseconds(6))
+    assert(duration_from_time_units(999999998, 1, 2000000000) == duration_from_nanoseconds(499999999))
+    assert(duration_from_time_units(999999999, 1, 2000000000) == duration_from_nanoseconds(500000000))
+    assert(duration_from_time_units(1000000000, 1, 2000000000) == duration_from_nanoseconds(500000000))
+    assert(duration_from_time_units(i64_max, 1, 2) == dv_add(duration_from_seconds(i64_max // 2), duration_from_milliseconds(500)))
+    assert(duration_from_time_units(i64_max // 2, 2, 1) == duration_from_seconds(i64_max - 1))
+    assert(duration_from_time_units(i64_max // 2 + 1, 2, 1) == duration_from_seconds(i64_max))
+    assert(duration_from_time_units(i64_min // 2, 2, 1) == duration_from_seconds(i64_min))
+    assert(duration_from_time_units(i64_min // 2 - 1, 2, 1) == duration_from_seconds(i64_min))
+    assert(duration_from_time_units(-43776, 1, 14592) == duration_from_seconds(-3))
+    assert(duration_from_time_units(i64_min, 1, 2) == duration_from_seconds(i64_min // 2))
+    assert(duration_from_time_units(i64_min + 1, 1, 2) == dv_add(duration_from_seconds(i64_min // 2), duration_from_milliseconds(500)))
+    assert(duration_from_time_units(i64_min, 1, 3) == dv_sub(duration_from_seconds(i64_min // 3), duration_from_nanoseconds(666666667)))
+    assert(duration_from_time_units(-1, 1, 2000000000) == duration_zero())
+    assert(duration_from_time_units(-2, 1, 2000000000) == duration_from_nanoseconds(-1))
+    assert(dv_to_time_units(duration_from_milliseconds(999), 1, 48000) == 47952)
+    assert(dv_to_time_units(duration_from_milliseconds(-12500), 1, 1000) == -12500)
+    assert(dv_to_time_units(duration_from_nanoseconds(154489696), 1, 48000) == 7416)
+    assert(dv_to_time_units(duration_from_nanoseconds(154489375), 1, 48000) == 7415)
+    assert(dv_to_time_units(duration_from_nanoseconds(-154489696), 1, 48000) == -7416)
+    assert(dv_to_time_units(duration_from_nanoseconds(-154489375), 1, 48000) == -7415)
+    assert(dv_to_time_units(duration_from_nanoseconds(1900000000), 3, 2) == 1)
+    assert(dv_to_time_units(duration_from_nanoseconds(1800000000), 3, 1) == 1)
+    assert(dv_to_time_units(duration_from_seconds(3), 4, 1) == 1)
+    assert(dv_to_time_units(duration_from_seconds(4), 4, 1) == 1)
+    assert(dv_to_time_units(duration_from_seconds(5), 4, 1) == 1)
+    assert(dv_to_time_units(duration_from_seconds(6), 4, 1) == 2)
+    assert(dv_to_time_units(duration_from_seconds(2147483649), 1, u32_max) == i64_max)
+    assert(dv_to_time_units(duration_from_seconds(2147483648), 1, u32_max) == i64_max - (i64)(u32_max // 2))
+    assert(dv_to_time_units(dv_add(duration_from_seconds(1), duration_from_nanoseconds(999999999)), u32_max, u32_max - 1) == 2)
+
+test "time: clocks and timeval helpers":
+    test_time_clocks_and_timeval_helpers()
+
+noinline func test_time_clocks_and_timeval_helpers():
+    let a = monotonic_time_now()
+    let b = monotonic_time_now_coarse()
+    assert(monotonic_time_nanoseconds_within_second(&a) < 1000000000)
+    discard(monotonic_time_sub_monotonic_time(&b, a))
+    let now = unix_date_time_now()
+    assert(unix_date_time_seconds_since_epoch(&now) > 1600000000)
+    var tv: Timeval
+    timeval_sub(Timeval(tv_sec = 5, tv_usec = 100), Timeval(tv_sec = 2, tv_usec = 200), &tv)
+    assert(tv.tv_sec == 2 and tv.tv_usec == 999900)
+    var ts: Timespec
+    timespec_add_timeval(Timespec(tv_sec = 1, tv_nsec = 999999999), Timeval(tv_sec = 0, tv_usec = 1), &ts)
+    assert(ts.tv_sec == 2 and ts.tv_nsec == 999)
+    timeval_to_timespec(Timeval(tv_sec = 3, tv_usec = 7), &ts)
+    assert(ts.tv_nsec == 7000)
+
+# mark: Formatter<UnixDateTime> =================================================================
+
+# The `test` lambda of TEST_CASE(formatter_unix_date_time): builder.appendff("{}", data).
+func expect_unix_date_time_formatted(expected: str, year: i32, month: u8, day: u8, hour: u8, minute: u8, second: u8):
+    let data = unix_date_time_from_unix_time_parts(year, month, day, hour, minute, second, 0)
+    var builder = string_builder_new()
+    vformat_arguments(&builder, sv("{}"), [arg_custom(&data, format_value_unix_date_time)]) else trap("VERIFY(!result.is_error())")
+    let result = string_builder_to_string(&builder) else trap("VERIFY(!result.is_error())")
+    let view = string_bytes_as_string_view(&result)
+    assert(string_view_eq_string_view(&view, sv(expected)))
+
+test "time: formatter_unix_date_time":
+    test_time_formatter_unix_date_time()
+
+noinline func test_time_formatter_unix_date_time():
+    expect_unix_date_time_formatted("2023-01-05 00:00:00", 2023, 1, 5, 0, 0, 0)
+    expect_unix_date_time_formatted("1970-01-01 00:00:00", 1970, 1, 1, 0, 0, 0)  # Edge case for Unix epoch
+    expect_unix_date_time_formatted("1970-01-01 23:59:59", 1970, 1, 1, 23, 59, 59)  # Edge case for Unix epoch
+    expect_unix_date_time_formatted("2000-02-29 12:34:56", 2000, 2, 29, 12, 34, 56)  # Leap year (valid)
+    expect_unix_date_time_formatted("1999-12-31 23:59:59", 1999, 12, 31, 23, 59, 59)  # Y2K edge
+    expect_unix_date_time_formatted("2024-02-29 23:59:59", 2024, 2, 29, 23, 59, 59)  # Next leap year
+    expect_unix_date_time_formatted("1980-01-01 00:00:00", 1980, 1, 1, 0, 0, 0)  # Another leap year start
+    expect_unix_date_time_formatted("2038-01-19 03:14:07", 2038, 1, 19, 3, 14, 7)  # 32-bit Unix time max
+    expect_unix_date_time_formatted("2022-12-31 23:59:59", 2022, 12, 31, 23, 59, 59)  # End of year
+    expect_unix_date_time_formatted("2023-04-01 00:00:00", 2023, 4, 1, 0, 0, 0)  # Start of month

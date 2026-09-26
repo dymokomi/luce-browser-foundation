@@ -9,9 +9,16 @@
 #       about std::array/Variant templates, which are `T[N]` and generated enums here).
 #       The xorshift128+ values were computed with the donor's XorShift128PlusRNG.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 test "random: csprng_generates_unique_values":
+    test_random_csprng_generates_unique_values()
+
+noinline func test_random_csprng_generates_unique_values():
     let max_failures: usize = 3
     var failures: usize = 0
     for i in 0..<3:
@@ -34,6 +41,9 @@ test "random: csprng_generates_unique_values":
     assert(failures < max_failures)
 
 test "random: xorshift128+ and uuid layout":
+    test_random_xorshift128_and_uuid_layout()
+
+noinline func test_random_xorshift128_and_uuid_layout():
     var rng = XorShift128PlusRng(m_low = 1, m_high = 2)
     assert(xor_shift128_plus_rng_advance(&rng) == 8388646)
     assert(rng.m_low == 2 and rng.m_high == 8388643)
@@ -56,6 +66,9 @@ test "random: xorshift128+ and uuid layout":
     assert(sum == 15)
 
 test "stack_info: bounds contain the current frame":
+    test_stack_info_bounds_contain_the_current_frame()
+
+noinline func test_stack_info_bounds_contain_the_current_frame():
     var info: StackInfo
     stack_info_construct(&info)
     assert(stack_info_base(&info) < stack_info_top(&info))
@@ -72,6 +85,9 @@ let test_cast_base_class = ClassInfo(name = "Base", first_id = 1, last_id = 3, s
 let test_cast_leaf_class = ClassInfo(name = "Leaf", first_id = 3, last_id = 3, size = 2, vtable = (const void*)&test_cast_leaf_class)
 
 test "type_casts: is, as_if, as":
+    test_type_casts_is_as_if_as()
+
+noinline func test_type_casts_is_as_if_as():
     var leaf = TestCastObject(class_id = 3)
     var base = TestCastObject(class_id = 1)
     assert(is(&leaf, &test_cast_base_class))
@@ -87,6 +103,9 @@ test "type_casts: is, as_if, as":
     assert((void*)bridge_cast[u8, TestCastObject](&leaf) == (void*)&leaf)
 
 test "result: value and error":
+    test_result_value_and_error()
+
+noinline func test_result_value_and_error():
     var ok: Result[i32, str]
     result_construct_t_value_t(&ok, 7)
     assert(not result_is_error(&ok))
@@ -106,6 +125,9 @@ func test_singleton_create() -> i64*:
     return &test_singleton_value
 
 test "singleton: lazily created once":
+    test_singleton_lazily_created_once()
+
+noinline func test_singleton_lazily_created_once():
     var instance: Singleton[i64]
     singleton_construct(&instance, test_singleton_create)
     assert(not singleton_is_initialized(&instance))
@@ -121,6 +143,9 @@ func test_scope_guard_count(context: void*?):
     *count += 1
 
 test "scope_guard: runs on scope exit unless disarmed":
+    test_scope_guard_runs_on_scope_exit_unless_disarmed()
+
+noinline func test_scope_guard_runs_on_scope_exit_unless_disarmed():
     var count: i32 = 0
     if true:
         var guard: ScopeGuard[unit]
@@ -136,6 +161,9 @@ test "scope_guard: runs on scope exit unless disarmed":
     assert(count == 1)
 
 test "temporary_change: restores the old value":
+    test_temporary_change_restores_the_old_value()
+
+noinline func test_temporary_change_restores_the_old_value():
     var value: i32 = 1
     if true:
         var change: TemporaryChange[i32] = ---
@@ -156,6 +184,9 @@ func test_new_cow_value(data: i32) -> TestCowValue*:
     return new TestCowValue(ref_counted = RefCounted[TestCowValue](ref_counted_base = RefCountedBase(m_ref_count = 1)), data = data) else trap("out of memory")
 
 test "copy_on_write: clones a shared value before mutating it":
+    test_copy_on_write_clones_a_shared_value_before_mutating_it()
+
+noinline func test_copy_on_write_clones_a_shared_value_before_mutating_it():
     var a: CopyOnWrite[TestCowValue] = ---
     copy_on_write_construct(&a, test_new_cow_value(1))
     var b = copy_on_write_copy(&a)
@@ -170,6 +201,9 @@ test "copy_on_write: clones a shared value before mutating it":
     assert(copy_on_write_to_const_t(&a).data == 3)
 
 test "default_delete, array and variant helpers":
+    test_default_delete_array_and_variant_helpers()
+
+noinline func test_default_delete_array_and_variant_helpers():
     var deleter: DefaultDelete[i64]
     let object = new i64 else trap("out of memory")
     default_delete_call(&deleter, object)
@@ -180,6 +214,9 @@ test "default_delete, array and variant helpers":
     assert((void*)variant_constructors_internal_cast(&constructors) == (void*)&constructors)
 
 test "id_allocator: unique ids at or above the minimum":
+    test_id_allocator_unique_ids_at_or_above_the_minimum()
+
+noinline func test_id_allocator_unique_ids_at_or_above_the_minimum():
     var allocator: IdAllocator
     id_allocator_construct(&allocator, 100)
     var ids: HashTable[i32, I32Traits]

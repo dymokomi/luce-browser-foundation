@@ -7,15 +7,25 @@
 #       behavior of parse_number) for the to_number of StringView, String, Utf16View,
 #       Utf16StringBase and Utf16FlyString, whose donor tests have none.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 test "ByteString: to_int":
+    test_bytestring_to_int()
+
+noinline func test_bytestring_to_int():
     let positive = byte_string_from_str("123")
     assert(byte_string_to_number_i32(&positive) == 123)
     let negative = byte_string_from_str("-123")
     assert(byte_string_to_number_i32(&negative) == -123)
 
 test "to_number: StringView":
+    test_to_number_stringview()
+
+noinline func test_to_number_stringview():
     let hex_text = sv("ff")
     assert(string_view_to_number_u8(&hex_text, TrimWhitespace.yes, 16) == 255)
     assert(string_view_to_number_i8(&hex_text, TrimWhitespace.yes, 16) == none)
@@ -28,6 +38,9 @@ test "to_number: StringView":
     assert(string_view_to_number_i32(&fraction) == none)
 
 test "to_number: String":
+    test_to_number_string()
+
+noinline func test_to_number_string():
     let short = string_from_str("-7")
     assert(string_to_number_i16(&short) == -7)
     assert(string_to_number_u16(&short) == none)
@@ -35,6 +48,9 @@ test "to_number: String":
     assert(string_to_number_f64(&exponent) == 250.0)
 
 test "to_number: Utf16View and Utf16String":
+    test_to_number_utf16view_and_utf16string()
+
+noinline func test_to_number_utf16view_and_utf16string():
     let ascii = utf16_sv("1234")
     assert(utf16_view_to_number_u32(&ascii) == 1234)
     var code_units: u16[5] = [(u16)' ', (u16)'-', (u16)'5', (u16)'6', (u16)' ']
@@ -47,12 +63,18 @@ test "to_number: Utf16View and Utf16String":
     assert(utf16_string_base_to_number_u8(&string.utf16_string_base, TrimWhitespace.yes, 8) == 63)
 
 test "to_number: Utf16FlyString":
+    test_to_number_utf16flystring()
+
+noinline func test_to_number_utf16flystring():
     let fly = utf16_fly_string_from_utf8_string_view(sv("10"))
     assert(utf16_fly_string_to_number_i32(&fly) == 10)
     assert(utf16_fly_string_to_number_i32(&fly, TrimWhitespace.yes, 2) == 2)
     assert(utf16_fly_string_to_number_f32(&fly) == 10.0f32)
 
 test "to_number: parse_hexadecimal_number":
+    test_to_number_parse_hexadecimal_number()
+
+noinline func test_to_number_parse_hexadecimal_number():
     assert(parse_hexadecimal_number_string_view_u32(sv("DeadBeef")) == 0xdeadbeef)
     assert(parse_hexadecimal_number_string_view_u32(sv("0x10")) == none)
     assert(parse_hexadecimal_number_utf16_view_u16(utf16_sv("ffff")) == 0xffff)

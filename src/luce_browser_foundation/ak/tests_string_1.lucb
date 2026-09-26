@@ -10,6 +10,10 @@
 #       to_lowercase/to_uppercase/to_titlecase/to_casefold tests (lines 323-750): those String
 #       members live in LibUnicode, not AK.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 # mark: Helpers =================================================================================
@@ -50,12 +54,18 @@ func string_error_contains(failure: Error, message: str) -> bool:
 # mark: Tests ===================================================================================
 
 test "short_ascii_literal_is_constexpr":
+    test_short_ascii_literal_is_constexpr_2()
+
+noinline func test_short_ascii_literal_is_constexpr_2():
     # The _string UDL folds short ASCII literals to a compile-time constant.
     let s = string_from_str("foo")
     assert(string_is(&s, "foo"))
     assert(string_base_bytes(&s.string_base).length == 3)
 
 test "construct_empty":
+    test_construct_empty_2()
+
+noinline func test_construct_empty_2():
     let empty = string_new()
     assert(string_is_empty(&empty))
     assert(string_base_bytes(&empty.string_base).length == 0)
@@ -70,6 +80,9 @@ test "construct_empty":
     assert(string_equals(&empty, &empty3))
 
 test "move_assignment":
+    test_move_assignment()
+
+noinline func test_move_assignment():
     var string1 = string_from_str("hello")
     string1 = string_from_str("friends!")
     assert(string_is(&string1, "friends!"))
@@ -81,6 +94,9 @@ func string_copy_assignment(first: String, second: String):
     assert(string_equals(&string1, &second))
 
 test "copy_assignment":
+    test_copy_assignment()
+
+noinline func test_copy_assignment():
     string_copy_assignment(string_new(), string_new())
     string_copy_assignment(string_new(), string_from_str("abc"))
     string_copy_assignment(string_new(), string_from_str("long string"))
@@ -94,6 +110,9 @@ test "copy_assignment":
     string_copy_assignment(string_from_str("long string"), string_from_str("long string"))
 
 test "short_strings":
+    test_short_strings()
+
+noinline func test_short_strings():
     # NOTE: make sure that the test strings' first character has an even ASCII code. This is
     #       important for the odd pointer address checks (this is to test if the ShortString
     #       structs are endian agnostic).
@@ -113,6 +132,9 @@ test "short_strings":
     assert(string_base_raw_string(&string2.string_base) % 2 == 1)
 
 test "long_strings":
+    test_long_strings()
+
+noinline func test_long_strings():
     let string = string_from_utf8(sv("abcdefgh")) else trap("MUST")
     assert(string_base_is_short_string(&string.string_base) == false)
     assert(string_base_bytes(&string.string_base).length == 8)
@@ -120,6 +142,9 @@ test "long_strings":
     assert(string_view_equals(&view, "abcdefgh"))
 
 test "long_streams":
+    test_long_streams()
+
+noinline func test_long_streams():
     let test_view = sv("Well, hello friends")
     var stream1 = string_test_stream(string_view_bytes(&test_view))
 
@@ -154,6 +179,9 @@ test "long_streams":
     assert(is_error == true)
 
 test "invalid_utf8":
+    test_invalid_utf8_2()
+
+noinline func test_invalid_utf8_2():
     var message_ok = false
     # U+110000
     discard(string_from_utf8(string_view_from_bytes(b"long string \xf4\x8f\xbf\xc0")) catch failure:
@@ -176,6 +204,9 @@ test "invalid_utf8":
     assert(message_ok)
 
 test "with_replacement_character":
+    test_with_replacement_character()
+
+noinline func test_with_replacement_character():
     let string1 = string_from_utf8_with_replacement_character(string_view_from_bytes(b"long string \xf4\x8f\xbf\xc0"), StringWithBomHandling.no)  # U+110000
     let string1_expected: u8[24] = [0x6c, 0x6f, 0x6e, 0x67, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x20, 0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd]
     assert(compare_bytes(string_base_bytes(&string1.string_base), string1_expected) == 0)
@@ -197,6 +228,9 @@ test "with_replacement_character":
     assert(string_is(&string7, "\u{fffd}WHF!"))
 
 test "from_utf16_be_with_replacement_character":
+    test_from_utf16_be_with_replacement_character()
+
+noinline func test_from_utf16_be_with_replacement_character():
     # UTF-16 BE for "A" is 0x00 0x41
     let valid_be: u8[2] = [0x00, 0x41]
     let string1 = string_from_utf16_be_with_replacement_character(valid_be) else trap("MUST")
@@ -213,6 +247,9 @@ test "from_utf16_be_with_replacement_character":
     assert(string_is(&string3, "Ø"))
 
 test "from_code_points":
+    test_from_code_points()
+
+noinline func test_from_code_points():
     for code_point: u32 in 0..<0x80:
         let string = string_from_code_point(code_point)
 
@@ -225,6 +262,9 @@ test "from_code_points":
     assert(string_eq_string_view(&string, string_view_from_bytes(b"\xf4\x8f\xbf\xbf")))
 
 test "substring":
+    test_substring_2()
+
+noinline func test_substring_2():
     let superstring = string_from_str("Hello I am a long string")
     let short_substring = string_substring_from_byte_offset_usize(&superstring, 0, 5) else trap("MUST")
     assert(string_is(&short_substring, "Hello"))
@@ -233,6 +273,9 @@ test "substring":
     assert(string_is(&long_substring, "Hello I am"))
 
 test "substring_with_shared_superstring":
+    test_substring_with_shared_superstring()
+
+noinline func test_substring_with_shared_superstring():
     let superstring = string_from_str("Hello I am a long string")
 
     let substring1 = string_substring_from_byte_offset_with_shared_superstring_usize(&superstring, 0, 5) else trap("MUST")
@@ -242,6 +285,9 @@ test "substring_with_shared_superstring":
     assert(string_is(&substring2, "Hello I am"))
 
 test "code_points":
+    test_code_points()
+
+noinline func test_code_points():
     let string = string_from_str("🦬🪒")
 
     var code_points: u32[2]
@@ -258,6 +304,9 @@ test "code_points":
     assert(code_points[1] == 0x1fa92)
 
 test "string_builder":
+    test_string_builder_2()
+
+noinline func test_string_builder_2():
     var builder = string_builder_new()
     string_builder_append_code_point(&builder, 0x1f9ac)
     string_builder_append_code_point(&builder, 0x1fa92)
@@ -267,6 +316,9 @@ test "string_builder":
     assert(string_base_bytes(&string.string_base).length == 8)
 
 test "ak_format":
+    test_ak_format()
+
+noinline func test_ak_format():
     # String::formatted("Hello {}", "friends"_string): the argument goes in as a string view.
     var parameter: TypeErasedParameter
     parameter.value.as_string_view = sv("friends")
@@ -276,6 +328,9 @@ test "ak_format":
     assert(string_is(&foo, "Hello friends"))
 
 test "replace":
+    test_replace_2()
+
+noinline func test_replace_2():
     let haystack = string_from_str("Hello enemies")
     let result1 = string_replace(&haystack, sv("enemies"), sv("friends"), ReplaceMode.all) else trap("MUST")
     assert(string_is(&result1, "Hello friends"))
@@ -292,6 +347,9 @@ func string_test_reverse(test_text: str, expected: str):
     assert(string_is(&result, expected))
 
 test "reverse":
+    test_reverse()
+
+noinline func test_reverse():
     string_test_reverse("", "")
     string_test_reverse("a", "a")
     string_test_reverse("ab", "ba")

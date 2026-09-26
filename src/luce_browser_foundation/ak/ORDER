@@ -238,12 +238,15 @@ json_object_serializer.lucb
 json_parser.lucb
 json_value.lucb
 number_format.lucb
+time_format.lucb
 stub_r07_web_unicode.lucb
 tests_integer_math.lucb
 tests_checked.lucb
 tests_vector.lucb
 tests_hash_table.lucb
+tests_hash_map.lucb
 tests_time.lucb
+tests_time_2.lucb
 tests_u_fixed_big_int.lucb
 tests_fixed_point.lucb
 tests_math.lucb
@@ -292,5 +295,7 @@ tests_text_support.lucb
 tests_floating_point.lucb
 tests_generic_shorthands.lucb
 tests_format.lucb
+tests_format_2.lucb
 tests_json.lucb
+tests_json_2.lucb
 tests_number_format.lucb

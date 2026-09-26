@@ -7,9 +7,16 @@
 #       unicode_emojis_with_low_byte_in_UTF_16_matching_the_value_of_an_ascii_digit, octal,
 #       double_conversion and float_conversion.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 test "StringConversions: signed_integer":
+    test_stringconversions_signed_integer()
+
+noinline func test_stringconversions_signed_integer():
     assert(parse_number_string_view_i32(StringView()) == none)
     assert(parse_number_string_view_i32(sv("")) == none)
     assert(parse_number_string_view_i32(sv("a")) == none)
@@ -35,6 +42,9 @@ test "StringConversions: signed_integer":
     assert(parse_number_string_view_i64(sv("9223372036854775808")) == none)
 
 test "StringConversions: unsigned_integer":
+    test_stringconversions_unsigned_integer()
+
+noinline func test_stringconversions_unsigned_integer():
     assert(parse_number_string_view_u32(StringView()) == none)
     assert(parse_number_string_view_u32(sv("")) == none)
     assert(parse_number_string_view_u32(sv("a")) == none)
@@ -59,6 +69,9 @@ test "StringConversions: unsigned_integer":
     assert(parse_number_string_view_u64(sv("18446744073709551616")) == none)
 
 test "StringConversions: unicode_emojis_with_low_byte_in_UTF_16_matching_the_value_of_an_ascii_digit":
+    test_stringconversions_unicode_emojis_with_low_byte_in_utf_16_matching_the_value_of_an_ascii_digit()
+
+noinline func test_stringconversions_unicode_emojis_with_low_byte_in_utf_16_matching_the_value_of_an_ascii_digit():
     let emojis: str[16] = ["ℹ", "ℹ️", "☸", "☸️", "☹", "☹️", "✳", "✳️", "✴", "✴️", "⤴", "⤴️", "⤵", "⤵️", "〰", "〰️"]
     for emoji in emojis:
         assert(parse_number_string_view_u32(sv(emoji)) == none)
@@ -68,6 +81,9 @@ test "StringConversions: unicode_emojis_with_low_byte_in_UTF_16_matching_the_val
         assert(parse_number_utf16_view_u32(view) == none)
 
 test "StringConversions: octal":
+    test_stringconversions_octal()
+
+noinline func test_stringconversions_octal():
     assert(parse_number_string_view_u16(StringView(), TrimWhitespace.no, 8) == none)
     assert(parse_number_string_view_u16(sv(""), TrimWhitespace.no, 8) == none)
     assert(parse_number_string_view_u16(sv("a"), TrimWhitespace.no, 8) == none)
@@ -100,6 +116,9 @@ func test_converts_f32(value: f32, sign: bool, fraction: u64, exponent: i32):
     assert(form.exponent == exponent)
 
 test "StringConversions: double_conversion":
+    test_stringconversions_double_conversion()
+
+noinline func test_stringconversions_double_conversion():
     test_converts_f64(0.0, false, 0, 0)
     test_converts_f64(-0.0, true, 0, 0)
     test_converts_f64(1.0, false, 1, 0)
@@ -117,6 +136,9 @@ test "StringConversions: double_conversion":
     test_converts_f64(f64.bits(0xc3c04222300db8ac), true, 23430728857074627, 2)
 
 test "StringConversions: float_conversion":
+    test_stringconversions_float_conversion()
+
+noinline func test_stringconversions_float_conversion():
     test_converts_f32(0.0f32, false, 0, 0)
     test_converts_f32(-0.0f32, true, 0, 0)
     test_converts_f32(1.0f32, false, 1, 0)
@@ -132,6 +154,9 @@ test "StringConversions: float_conversion":
 
 ## Shortest digits of random doubles, checked against Python's repr (also shortest round-trip).
 test "StringConversions: double_conversion (random values)":
+    test_stringconversions_double_conversion_random_values()
+
+noinline func test_stringconversions_double_conversion_random_values():
     let cases: (u64, bool, u64, i32)[200] = [
         (0xdcf4bb99f4bea973, true, 6172432358286022, 124),
         (0xd95bafc8f2a4d27b, true, 2859754973339552, 107),

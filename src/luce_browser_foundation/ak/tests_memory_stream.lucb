@@ -7,6 +7,10 @@
 #       test), plus cases for Stream::discard, read_value/write_value and
 #       OutputBufferedSeekable, which the donor does not test.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 func test_ms_sv_equals(view: StringView, text: str) -> bool:
@@ -35,6 +39,9 @@ func test_fixed_stream_mode(bytes: u8[], mode: FixedMemoryStreamMode) -> FixedMe
 # mark: AllocatingMemoryStream ==================================================================
 
 test "memory_stream: allocating_memory_stream_empty":
+    test_memory_stream_allocating_memory_stream_empty()
+
+noinline func test_memory_stream_allocating_memory_stream_empty():
     var stream = test_allocating_stream()
     assert(allocating_memory_stream_used_buffer_size(&stream) == 0)
     var array: u8[32]
@@ -44,6 +51,9 @@ test "memory_stream: allocating_memory_stream_empty":
     assert(offset == none)
 
 test "memory_stream: allocating_memory_stream_offset_of":
+    test_memory_stream_allocating_memory_stream_offset_of()
+
+noinline func test_memory_stream_allocating_memory_stream_offset_of():
     var stream = test_allocating_stream()
     stream_write_until_depleted_span_u8(stream.stream(), "Well Hello Friends! :^)".bytes) else trap("write failed")
     assert((allocating_memory_stream_offset_of(&stream, " ".bytes) else trap("x")) == 4)
@@ -55,6 +65,9 @@ test "memory_stream: allocating_memory_stream_offset_of":
     assert((allocating_memory_stream_offset_of(&stream, "e".bytes) else trap("x")) == 0)
 
 test "memory_stream: allocating_memory_stream_offset_of_oob":
+    test_memory_stream_allocating_memory_stream_offset_of_oob()
+
+noinline func test_memory_stream_allocating_memory_stream_offset_of_oob():
     var stream = test_allocating_stream()
     # First, fill exactly one chunk (in groups of 16 bytes).
     for i in 0..<(allocating_memory_stream_chunk_size // 16):
@@ -66,6 +79,9 @@ test "memory_stream: allocating_memory_stream_offset_of_oob":
     assert((allocating_memory_stream_offset_of(&stream, "A".bytes) else trap("x")) == none)
 
 test "memory_stream: allocating_memory_stream_offset_of_after_chunk_reorder":
+    test_memory_stream_allocating_memory_stream_offset_of_after_chunk_reorder()
+
+noinline func test_memory_stream_allocating_memory_stream_offset_of_after_chunk_reorder():
     var stream = test_allocating_stream()
     for i in 0..<(allocating_memory_stream_chunk_size // 16):
         discard(i)
@@ -78,6 +94,9 @@ test "memory_stream: allocating_memory_stream_offset_of_after_chunk_reorder":
     assert((allocating_memory_stream_offset_of(&stream, "Q".bytes) else trap("x")) == 15)
 
 test "memory_stream: allocating_memory_stream_offset_of_with_write_offset_multiple_of_chunk_size":
+    test_memory_stream_allocating_memory_stream_offset_of_with_write_offset_multiple_of_chunk_size()
+
+noinline func test_memory_stream_allocating_memory_stream_offset_of_with_write_offset_multiple_of_chunk_size():
     var stream = test_allocating_stream()
     for i in 0..<((allocating_memory_stream_chunk_size // 16) - 1):
         discard(i)
@@ -89,6 +108,9 @@ test "memory_stream: allocating_memory_stream_offset_of_with_write_offset_multip
     assert((allocating_memory_stream_offset_of(&stream, "Q".bytes) else trap("x")) == allocating_memory_stream_chunk_size - 32 - 1)
 
 test "memory_stream: allocating stream read, peek and read_until_eof":
+    test_memory_stream_allocating_stream_read_peek_and_read_until_eof()
+
+noinline func test_memory_stream_allocating_stream_read_peek_and_read_until_eof():
     var stream = test_allocating_stream()
     for i in 0..<300:
         discard(i)
@@ -109,6 +131,9 @@ test "memory_stream: allocating stream read, peek and read_until_eof":
 # mark: FixedMemoryStream =======================================================================
 
 test "memory_stream: fixed_memory_read_write":
+    test_memory_stream_fixed_memory_read_write()
+
+noinline func test_memory_stream_fixed_memory_read_write():
     let some_words = "These are some words"
     var empty = byte_buffer_create_uninitialized(some_words.length) else trap("create failed")
     var stream = test_fixed_stream_mode(byte_buffer_bytes(&empty), FixedMemoryStreamMode.read_write)
@@ -120,6 +145,9 @@ test "memory_stream: fixed_memory_read_write":
     assert(bytes_equal(byte_buffer_bytes_const(&contents), some_words.bytes))
 
 test "memory_stream: fixed_memory_close":
+    test_memory_stream_fixed_memory_close()
+
+noinline func test_memory_stream_fixed_memory_close():
     var empty = byte_buffer_create_uninitialized(64) else trap("create failed")
     var stream = test_fixed_stream_mode(byte_buffer_bytes(&empty), FixedMemoryStreamMode.read_write)
     assert(stream_is_open(stream.stream()))
@@ -127,6 +155,9 @@ test "memory_stream: fixed_memory_close":
     assert(stream_is_open(stream.stream()))
 
 test "memory_stream: fixed_memory_read_only":
+    test_memory_stream_fixed_memory_read_only()
+
+noinline func test_memory_stream_fixed_memory_read_only():
     let some_words = "These are some words"
     var stream = test_fixed_stream(some_words.bytes)
     let contents = stream_read_until_eof(stream.stream(), 4096) else trap("read_until_eof failed")
@@ -142,6 +173,9 @@ test "memory_stream: fixed_memory_read_only":
     assert(not stream_is_eof(stream.stream()))
 
 test "memory_stream: fixed_memory_seeking_around":
+    test_memory_stream_fixed_memory_seeking_around()
+
+noinline func test_memory_stream_fixed_memory_seeking_around():
     with memory.heap:
         var stream_buffer = byte_buffer_create_zeroed(8702) else trap("create failed")
         var stream = test_fixed_stream(byte_buffer_bytes(&stream_buffer))
@@ -159,6 +193,9 @@ test "memory_stream: fixed_memory_seeking_around":
         assert((seekable_stream_tell(stream.seekable_stream()) else trap("tell failed")) == 8613)
 
 test "memory_stream: fixed_memory_tell":
+    test_memory_stream_fixed_memory_tell()
+
+noinline func test_memory_stream_fixed_memory_tell():
     with memory.heap:
         var stream_buffer = byte_buffer_create_zeroed(10240) else trap("create failed")
         var stream = test_fixed_stream(byte_buffer_bytes(&stream_buffer))
@@ -177,6 +214,9 @@ test "memory_stream: fixed_memory_tell":
             assert(expected_fixed_memory_offset == seek_fixed_memory_offset)
 
 test "memory_stream: fixed_memory_truncate":
+    test_memory_stream_fixed_memory_truncate()
+
+noinline func test_memory_stream_fixed_memory_truncate():
     var stream_buffer = byte_buffer_create_zeroed(64) else trap("create failed")
     var stream = test_fixed_stream(byte_buffer_bytes(&stream_buffer))
     var failed = false
@@ -186,6 +226,9 @@ test "memory_stream: fixed_memory_truncate":
     assert(failed)
 
 test "memory_stream: fixed_memory_read_in_place":
+    test_memory_stream_fixed_memory_read_in_place()
+
+noinline func test_memory_stream_fixed_memory_read_in_place():
     let some_words = "These are some words"
     var readonly_stream = test_fixed_stream(some_words.bytes)
     # Trying to read mutable values from a read-only stream should fail.
@@ -213,6 +256,9 @@ test "memory_stream: fixed_memory_read_in_place":
     assert(stream_is_eof(mutable_stream.stream()))
 
 test "memory_stream: read_value, write_value and discard":
+    test_memory_stream_read_value_write_value_and_discard()
+
+noinline func test_memory_stream_read_value_write_value_and_discard():
     var storage: u8[16]
     var stream = test_fixed_stream_mode(storage, FixedMemoryStreamMode.read_write)
     stream_write_value[u32](stream.stream(), 0x04030201) else trap("write failed")
@@ -233,6 +279,9 @@ test "memory_stream: read_value, write_value and discard":
 # mark: Buffered streams ========================================================================
 
 test "memory_stream: buffered_memory_stream_read_line":
+    test_memory_stream_buffered_memory_stream_read_line()
+
+noinline func test_memory_stream_buffered_memory_stream_read_line():
     var array: u8[32]
     # First line: 8 bytes, second line: 24 bytes
     memory.set(array, 'A')
@@ -280,12 +329,18 @@ func test_line_with_resize(buffer_size: usize, newlines: bool):
     assert(read_bytes.m_length == 0)
 
 test "memory_stream: buffered_memory_stream_read_line_with_resizing":
+    test_memory_stream_buffered_memory_stream_read_line_with_resizing()
+
+noinline func test_memory_stream_buffered_memory_stream_read_line_with_resizing():
     test_line_with_resize(64, true)
     test_line_with_resize(6, true)
     test_line_with_resize(64, false)
     test_line_with_resize(6, false)
 
 test "memory_stream: input buffered seek and output buffered writes":
+    test_memory_stream_input_buffered_seek_and_output_buffered_writes()
+
+noinline func test_memory_stream_input_buffered_seek_and_output_buffered_writes():
     let some_words = "These are some words"
     var input_stream = test_fixed_stream(some_words.bytes)
     let buffered = input_buffered_seekable_create(&input_stream, 8) else trap("create failed")

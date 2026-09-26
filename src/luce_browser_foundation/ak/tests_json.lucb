@@ -11,6 +11,10 @@
 #       has no luce-base counterpart. json_object_move_from_value does not check that the
 #       moved-from object is empty: a move is a copy in the port (DESIGN.md §3.3 rule 1).
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 # mark: Helpers =================================================================================
@@ -80,6 +84,9 @@ func load_form_member(context: void*?, property_name: const String*, property_va
 # mark: TestJSON.cpp ============================================================================
 
 test "load_form":
+    test_load_form()
+
+noinline func test_load_form():
     var form_json = parse_json(raw_form_json)
 
     assert(json_value2_is_object(&form_json))
@@ -95,24 +102,36 @@ test "load_form":
     json_array_for_each_const(widgets else trap("VERIFY_NOT_REACHED"), load_form_widget, none)
 
 test "json_empty_string":
+    test_json_empty_string()
+
+noinline func test_json_empty_string():
     let json = parse_json("\"\"")
     assert(json_value2_type(&json) == JsonValueType.string)
     let string = json_value2_as_string(&json)
     assert(string_is_empty(&string))
 
 test "json_string":
+    test_json_string()
+
+noinline func test_json_string():
     let json = parse_json("\"A\"")
     assert(json_value2_type(&json) == JsonValueType.string)
     assert(text_of_string(json_value2_as_string(&json)).length == 1)
     assert(text_of_string(json_value2_as_string(&json)) == "A")
 
 test "json_utf8_character":
+    test_json_utf8_character()
+
+noinline func test_json_utf8_character():
     let json = parse_json("\"\\u0041\"")
     assert(json_value2_type(&json) == JsonValueType.string)
     assert(text_of_string(json_value2_as_string(&json)).length == 1)
     assert(text_of_string(json_value2_as_string(&json)) == "A")
 
 test "json_encoded_surrogates":
+    test_json_encoded_surrogates()
+
+noinline func test_json_encoded_surrogates():
     let pair = parse_json("\"\\uD83E\\uDD13\"")
     assert(json_value2_type(&pair) == JsonValueType.string)
     assert(text_of_string(json_value2_as_string(&pair)).length == 4)
@@ -136,6 +155,9 @@ test "json_encoded_surrogates":
     assert(low_bytes[0] == 0xed and low_bytes[1] == 0xb4 and low_bytes[2] == 0x93)
 
 test "json_64_bit_value":
+    test_json_64_bit_value()
+
+noinline func test_json_64_bit_value():
     let big_value: u64 = 0x12345678aabbccdd
     var big_json_value = json_value2_create()
     json_value2_construct_u64_2(&big_json_value, big_value)
@@ -146,6 +168,9 @@ test "json_64_bit_value":
     assert(json_value2_equals(&big_json_value, &big_json_value_copy))
 
 test "json_64_bit_value_coerced_to_32_bit":
+    test_json_64_bit_value_coerced_to_32_bit()
+
+noinline func test_json_64_bit_value_coerced_to_32_bit():
     let min_i64: i64 = -9223372036854775808
     let max_i64: i64 = 9223372036854775807
 
@@ -169,6 +194,9 @@ test "json_64_bit_value_coerced_to_32_bit":
     assert(not json_value2_is_integer_u32(&json))
 
 test "json_duplicate_keys":
+    test_json_duplicate_keys()
+
+noinline func test_json_duplicate_keys():
     var json: JsonObject
     json_object_construct(&json)
     json_object_set_string_view(&json, sv("test"), json_string_value("foo"))
@@ -177,6 +205,9 @@ test "json_duplicate_keys":
     assert(text_of_string(json_object_serialized(&json)) == "{\"test\":\"baz\"}")
 
 test "json_u64_roundtrip":
+    test_json_u64_roundtrip()
+
+noinline func test_json_u64_roundtrip():
     let big_value: u64 = 0xffffffffffffffff
     var big = json_value2_create()
     json_value2_construct_u64_2(&big, big_value)
@@ -185,13 +216,22 @@ test "json_u64_roundtrip":
     assert(json_value2_as_integer_u64(&value) == big_value)
 
 test "json_parse_empty_string":
+    test_json_parse_empty_string()
+
+noinline func test_json_parse_empty_string():
     assert(parse_json_fails(""))
 
 test "json_parse_long_decimals":
+    test_json_parse_long_decimals()
+
+noinline func test_json_parse_long_decimals():
     let value = parse_json("1644452550.6489999294281")
     assert(json_value2_get_double_with_precision_loss(&value) == 1644452550.6489999294281)
 
 test "json_parse_number_with_exponent":
+    test_json_parse_number_with_exponent()
+
+noinline func test_json_parse_number_with_exponent():
     let value_without_fraction = parse_json("10e5")
     assert(json_value2_get_double_with_precision_loss(&value_without_fraction) == 1000000.0)
 
@@ -206,6 +246,9 @@ func expect_to_match_number_bit_wise(text: str, expected: f64):
     assert(value_as_double.bits() == expected.bits())
 
 test "json_parse_special_numbers":
+    test_json_parse_special_numbers()
+
+noinline func test_json_parse_special_numbers():
     expect_to_match_number_bit_wise("-0", -0.0)
     expect_to_match_number_bit_wise("-0.0", -0.0)
     expect_to_match_number_bit_wise("-0.00", -0.0)
@@ -239,10 +282,16 @@ let invalid_numbers: str[73] = [
 ]
 
 test "json_parse_fails_on_invalid_number":
+    test_json_parse_fails_on_invalid_number()
+
+noinline func test_json_parse_fails_on_invalid_number():
     for text in invalid_numbers:
         assert(parse_json_fails(text))
 
 test "json_parse_rejects_excessive_nesting_depth":
+    test_json_parse_rejects_excessive_nesting_depth()
+
+noinline func test_json_parse_rejects_excessive_nesting_depth():
     var input: StringBuilder
     string_builder_construct(&input)
     let nesting_depth: usize = 4096
@@ -254,6 +303,9 @@ test "json_parse_rejects_excessive_nesting_depth":
     assert(parse_json_fails(text_of(string_builder_string_view(&input))))
 
 test "json_parse_accepts_reasonable_nesting_depth":
+    test_json_parse_accepts_reasonable_nesting_depth()
+
+noinline func test_json_parse_accepts_reasonable_nesting_depth():
     var input: StringBuilder
     string_builder_construct(&input)
     let nesting_depth: usize = 64
@@ -295,6 +347,9 @@ func failing_element_callback(context: void*?, value: const JsonValue2*) -> !:
     error(ak_error, "nanananana")
 
 test "fallible_json_object_for_each":
+    test_fallible_json_object_for_each()
+
+noinline func test_fallible_json_object_for_each():
     let json = parse_json(raw_member_json)
     let object = json_value2_as_object_const(&json)
 
@@ -307,6 +362,9 @@ test "fallible_json_object_for_each":
     assert(message == "nanananana")
 
 test "fallible_json_array_for_each":
+    test_fallible_json_array_for_each()
+
+noinline func test_fallible_json_array_for_each():
     let json = parse_json(raw_element_json)
     let array = json_value2_as_array_const(&json)
 
@@ -317,221 +375,3 @@ test "fallible_json_array_for_each":
         message = failure.message
         recover ()
     assert(message == "nanananana")
-
-test "json_array_is_empty":
-    var json_value = parse_json("[]")
-    var array = json_array_clone(json_value2_as_array(&json_value))
-    assert(json_array_is_empty(&array))
-
-    json_value = parse_json("[1, 2]")
-    array = json_array_clone(json_value2_as_array(&json_value))
-    assert(not json_array_is_empty(&array))
-
-## setup_json_array: [1, 2, "WHF", 802.11, 16].
-func setup_json_array() -> JsonArray:
-    var json_value = parse_json("[1, 2, \"WHF\", 802.11, 16]")
-    return json_array_clone(json_value2_as_array(&json_value))
-
-test "json_array_size":
-    var array = setup_json_array()
-    assert(json_array_size(&array) == 5)
-
-    var empty = parse_json("[]")
-    array = json_array_clone(json_value2_as_array(&empty))
-    assert(json_array_size(&array) == 0)
-
-test "json_array_at":
-    let array = setup_json_array()
-    let element = json_array_at_const(&array, 1)
-    assert(json_value2_as_integer_u8(element) == 2)
-
-test "json_array_subscript_operator":
-    let array = setup_json_array()
-    let element = json_array_at_const_2(&array, 1)
-    assert(json_value2_as_integer_u8(element) == 2)
-
-test "json_array_take":
-    var array = setup_json_array()
-    let element = json_array_take(&array, 2)
-    assert(json_array_size(&array) == 4)
-    assert(text_of_string(json_value2_as_string(&element)) == "WHF")
-
-test "json_array_must_append":
-    var array = setup_json_array()
-    json_array_must_append(&array, parse_json("32"))
-    assert(json_array_size(&array) == 6)
-    assert(json_value2_as_integer_u8(json_array_at_const(&array, json_array_size(&array) - 1)) == 32)
-
-test "json_array_try_append":
-    var array = setup_json_array()
-    json_array_append(&array, parse_json("32")) else trap("MUST")
-    assert(json_array_size(&array) == 6)
-    assert(json_value2_as_integer_u8(json_array_at_const(&array, json_array_size(&array) - 1)) == 32)
-
-test "json_array_clear":
-    var array = setup_json_array()
-    json_array_clear(&array)
-    assert(json_array_is_empty(&array))
-
-test "json_array_set":
-    var array = setup_json_array()
-    json_array_set(&array, 1, parse_json("-32"))
-    assert(json_array_size(&array) == 5)
-    assert(json_value2_as_integer_i8(json_array_at_const(&array, 1)) == -32)
-
-test "json_array_ensure_capacity":
-    var array = setup_json_array()
-    let new_capacity: usize = 16
-    json_array_ensure_capacity(&array, new_capacity)
-    assert(vector_capacity(json_array_values_const(&array)) == new_capacity)
-
-## The counting lambda of json_array_for_each: `context` is the count.
-func count_json_array_element(context: void*?, value: const JsonValue2*):
-    let count = (usize*)(context else trap("VERIFY_NOT_REACHED"))
-    *count += 1
-    assert((usize)json_value2_as_integer_u8(value) == *count)
-
-test "json_array_for_each":
-    var json_value = parse_json("[1, 2, 3, 4]")
-    let array = json_array_clone(json_value2_as_array(&json_value))
-    var count: usize = 0
-    json_array_for_each_const(&array, count_json_array_element, &count)
-    assert(json_array_size(&array) == count)
-
-test "json_array_serialized":
-    let raw_json = "[\"Hello\",2,3.14,4,\"World\"]"
-    var json_value = parse_json(raw_json)
-    let array = json_array_clone(json_value2_as_array(&json_value))
-    let serialized_json = json_array_serialized(&array)
-    assert(text_of_string(serialized_json) == raw_json)
-
-test "json_array_serialize":
-    let raw_json = "[\"Hello\",2,3.14,4,\"World\"]"
-    var json_value = parse_json(raw_json)
-    let array = json_array_clone(json_value2_as_array(&json_value))
-    var builder: StringBuilder
-    string_builder_construct(&builder)
-    json_array_serialize(&array, &builder)
-    assert(text_of(string_builder_string_view(&builder)) == raw_json)
-
-test "json_array_values":
-    var json_value = parse_json("[1, 2, 3, 4]")
-    let array = json_array_clone(json_value2_as_array(&json_value))
-    let values = json_array_values_const(&array)
-    assert(vector_size(values) == 4)
-
-    for i in 0..<vector_size(values):
-        assert((usize)json_value2_as_integer_u8(json_array_at_const(&array, i)) == i + 1)
-
-## check_is_valid_for_all_types of json_value_as_integer.
-func check_is_valid_for_all_types(value: const JsonValue2*):
-    assert(json_value2_is_integer_u8(value))
-    assert(json_value2_as_integer_u8(value) == 42)
-    assert(json_value2_is_integer_u16(value))
-    assert(json_value2_as_integer_u16(value) == 42)
-    assert(json_value2_is_integer_u32(value))
-    assert(json_value2_as_integer_u32(value) == 42)
-    assert(json_value2_is_integer_u64(value))
-    assert(json_value2_as_integer_u64(value) == 42)
-    assert(json_value2_is_integer_i8(value))
-    assert(json_value2_as_integer_i8(value) == 42)
-    assert(json_value2_is_integer_i16(value))
-    assert(json_value2_as_integer_i16(value) == 42)
-    assert(json_value2_is_integer_i32(value))
-    assert(json_value2_as_integer_i32(value) == 42)
-    assert(json_value2_is_integer_i64(value))
-    assert(json_value2_as_integer_i64(value) == 42)
-
-test "json_value_as_integer":
-    # is_integer() should validate based on the value, not the underlying type.
-    var value_int = json_value2_create()
-    json_value2_construct_i32(&value_int, 42)
-    var value_unsigned = json_value2_create()
-    json_value2_construct_u32(&value_unsigned, 42)
-    var value_long = json_value2_create()
-    json_value2_construct_i64(&value_long, 42)
-    var value_long_unsigned = json_value2_create()
-    json_value2_construct_u64(&value_long_unsigned, 42)
-    var value_long_long = json_value2_create()
-    json_value2_construct_i64_2(&value_long_long, 42)
-    var value_long_long_unsigned = json_value2_create()
-    json_value2_construct_u64_2(&value_long_long_unsigned, 42)
-
-    check_is_valid_for_all_types(&value_int)
-    check_is_valid_for_all_types(&value_unsigned)
-    check_is_valid_for_all_types(&value_long)
-    check_is_valid_for_all_types(&value_long_unsigned)
-    check_is_valid_for_all_types(&value_long_long)
-    check_is_valid_for_all_types(&value_long_long_unsigned)
-
-    # Negative values should only fit in signed types.
-    var negative_value = json_value2_create()
-    json_value2_construct_i32(&negative_value, -42)
-    assert(not json_value2_is_integer_u8(&negative_value))
-    assert(not json_value2_is_integer_u16(&negative_value))
-    assert(not json_value2_is_integer_u32(&negative_value))
-    assert(not json_value2_is_integer_u64(&negative_value))
-    assert(json_value2_is_integer_i8(&negative_value))
-    assert(json_value2_is_integer_i16(&negative_value))
-    assert(json_value2_is_integer_i32(&negative_value))
-    assert(json_value2_is_integer_i64(&negative_value))
-
-    # 64-bit only
-    var very_large_value = json_value2_create()
-    json_value2_construct_i64_2(&very_large_value, 9223372036854775807)
-    assert(not json_value2_is_integer_u8(&very_large_value))
-    assert(not json_value2_is_integer_u16(&very_large_value))
-    assert(not json_value2_is_integer_u32(&very_large_value))
-    assert(json_value2_is_integer_u64(&very_large_value))
-    assert(not json_value2_is_integer_i8(&very_large_value))
-    assert(not json_value2_is_integer_i16(&very_large_value))
-    assert(not json_value2_is_integer_i32(&very_large_value))
-    assert(json_value2_is_integer_i64(&very_large_value))
-
-test "json_object_move_from_value":
-    var array: JsonArray
-    var false_value = json_value2_create()
-    json_value2_json_value(&false_value, false)
-    json_array_must_append(&array, false_value)
-    json_array_must_append(&array, json_string_value("string"))
-
-    var object: JsonObject
-    json_object_construct(&object)
-    json_object_set_string_view(&object, sv("foo"), json_string_value("bar"))
-    var array_value = json_value2_create()
-    json_value2_construct_json_array_2(&array_value, array)
-    json_object_set_string_view(&object, sv("baz"), array_value)
-
-    var value = json_value2_create()
-    json_value2_construct_json_object_2(&value, object)
-    object = *json_value2_as_object(&value)
-
-    assert(json_value2_is_object(&value))
-
-    assert(json_object_size(&object) == 2)
-    assert(text_of_string(json_object_get_string(&object, sv("foo")) else trap("no foo")) == "bar")
-
-    let array2 = json_object_get_array_const(&object, sv("baz")) else trap("no baz")
-    assert(json_value2_as_bool(json_array_at_const(array2, 0)) == false)
-    assert(text_of_string(json_value2_as_string(json_array_at_const(array2, 1))) == "string")
-
-test "invalid_utf8":
-    # Incomplete 2-byte sequence
-    assert(parse_json_fails_bytes(b"{\"key\": \"value\xcf\"}"))
-    assert(parse_json_fails_bytes(b"{\"key\xcf\": \"value\"}"))
-
-    # Incomplete 3-byte sequence
-    assert(parse_json_fails_bytes(b"{\"key\": \"value\xef\xbf\"}"))
-    assert(parse_json_fails_bytes(b"{\"key\xef\xbf\": \"value\"}"))
-
-    # Invalid start byte
-    assert(parse_json_fails_bytes(b"{\"key\": \"value\xf8\"}"))
-    assert(parse_json_fails_bytes(b"{\"key\xf8\": \"value\"}"))
-
-    # Invalid continuation byte
-    assert(parse_json_fails_bytes(b"{\"key\": \"value\xc3\x28\"}"))
-    assert(parse_json_fails_bytes(b"{\"key\xc3\x28\": \"value\"}"))
-
-    # Multiple invalid bytes
-    assert(parse_json_fails_bytes(b"{\"key\": \"value\xff\xff\"}"))
-    assert(parse_json_fails_bytes(b"{\"key\xff\xff\": \"value\"}"))

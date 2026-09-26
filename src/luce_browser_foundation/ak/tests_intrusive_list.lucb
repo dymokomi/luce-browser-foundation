@@ -7,6 +7,10 @@
 #       count references the intrusive list takes on its values; containers are raw pointers
 #       here (DESIGN.md §2.6), so they reduce to insertion and removal, which are tested.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 struct IntrusiveTestItem:
@@ -24,10 +28,16 @@ func test_new_item(value: i32) -> IntrusiveTestItem*:
     return item
 
 test "intrusive_list: construct":
+    test_intrusive_list_construct()
+
+noinline func test_intrusive_list_construct():
     var empty: IntrusiveTestList
     assert(intrusive_list_is_empty(&empty))
 
 test "intrusive_list: insert":
+    test_intrusive_list_insert()
+
+noinline func test_intrusive_list_insert():
     var list: IntrusiveTestList
     intrusive_list_append(&list, test_new_item(0), test_item_member())
     assert(not intrusive_list_is_empty(&list))
@@ -36,6 +46,9 @@ test "intrusive_list: insert":
     assert(intrusive_list_is_empty(&list))
 
 test "intrusive_list: insert_before":
+    test_intrusive_list_insert_before()
+
+noinline func test_intrusive_list_insert_before():
     var list: IntrusiveTestList
     let two = test_new_item(2)
     intrusive_list_append(&list, two, test_item_member())
@@ -63,6 +76,9 @@ test "intrusive_list: insert_before":
         free(elem)
 
 test "intrusive_list: enumeration":
+    test_intrusive_list_enumeration()
+
+noinline func test_intrusive_list_enumeration():
     let expected_size: usize = 10
     var list: IntrusiveTestList
     for i in 0..<expected_size:
@@ -86,6 +102,9 @@ test "intrusive_list: enumeration":
         free(elem)
 
 test "intrusive_list: remove, prepend, erase and clear":
+    test_intrusive_list_remove_prepend_erase_and_clear()
+
+noinline func test_intrusive_list_remove_prepend_erase_and_clear():
     var list: IntrusiveTestList
     var items: IntrusiveTestItem*[4] = [test_new_item(0), test_new_item(1), test_new_item(2), test_new_item(3)]
     for item in items:

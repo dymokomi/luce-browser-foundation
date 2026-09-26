@@ -8,6 +8,10 @@
 #       the runs repeat. The RefPtr container cases do not apply (containers are raw
 #       pointers, DESIGN.md §2.6).
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 # A permutation of 0..<amount in a fixed pseudo-random order.
@@ -22,11 +26,17 @@ func test_rbt_shuffled_keys(amount: usize) -> Vector[i32]:
     return keys
 
 test "red_black_tree: construct":
+    test_red_black_tree_construct()
+
+noinline func test_red_black_tree_construct():
     var empty: RedBlackTree[i32, i32]
     assert(base_red_black_tree_is_empty(&empty.base))
     assert(base_red_black_tree_size(&empty.base) == 0)
 
 test "red_black_tree: ints":
+    test_red_black_tree_ints()
+
+noinline func test_red_black_tree_ints():
     var ints: RedBlackTree[i32, i32]
     red_black_tree_insert(&ints, 1, 10)
     red_black_tree_insert(&ints, 3, 20)
@@ -42,6 +52,9 @@ test "red_black_tree: ints":
     assert(base_red_black_tree_size(&ints.base) == 0)
 
 test "red_black_tree: largest_smaller_than":
+    test_red_black_tree_largest_smaller_than()
+
+noinline func test_red_black_tree_largest_smaller_than():
     var ints: RedBlackTree[i32, i32]
     red_black_tree_insert(&ints, 1, 10)
     red_black_tree_insert(&ints, 11, 20)
@@ -54,6 +67,9 @@ test "red_black_tree: largest_smaller_than":
     assert(*(red_black_tree_find_smallest_not_below(&ints, 12) else trap("missing")) == 30)
 
 test "red_black_tree: key_ordered_iteration":
+    test_red_black_tree_key_ordered_iteration()
+
+noinline func test_red_black_tree_key_ordered_iteration():
     with memory.heap:
         let amount: usize = 10000
         var tree: RedBlackTree[i32, usize]
@@ -73,6 +89,9 @@ test "red_black_tree: key_ordered_iteration":
         assert(base_red_black_tree_is_empty(&tree.base))
 
 test "red_black_tree: clear":
+    test_red_black_tree_clear()
+
+noinline func test_red_black_tree_clear():
     with memory.heap:
         var tree: RedBlackTree[usize, usize]
         for i in 0..<1000usize:
@@ -81,6 +100,9 @@ test "red_black_tree: clear":
         assert(base_red_black_tree_size(&tree.base) == 0)
 
 test "red_black_tree: find_smallest_not_below_iterator":
+    test_red_black_tree_find_smallest_not_below_iterator()
+
+noinline func test_red_black_tree_find_smallest_not_below_iterator():
     var tree: RedBlackTree[usize, usize]
     for i in 0..<8usize:
         let above_all = red_black_tree_find_smallest_not_below_iterator(&tree, i)
@@ -102,6 +124,9 @@ test "red_black_tree: find_smallest_not_below_iterator":
     assert(not red_black_tree_iterator_is_begin(&three))
 
 test "red_black_tree: iterators_on_emptied_tree":
+    test_red_black_tree_iterators_on_emptied_tree()
+
+noinline func test_red_black_tree_iterators_on_emptied_tree():
     var tree: RedBlackTree[usize, usize]
     red_black_tree_insert(&tree, 1, 1)
     discard(red_black_tree_remove(&tree, 1))
@@ -112,6 +137,9 @@ test "red_black_tree: iterators_on_emptied_tree":
     assert(not red_black_tree_iterator_ne(&begin_iterator, end_iterator))
 
 test "red_black_tree: unsafe_remove and reverse steps":
+    test_red_black_tree_unsafe_remove_and_reverse_steps()
+
+noinline func test_red_black_tree_unsafe_remove_and_reverse_steps():
     var tree: RedBlackTree[i32, i32]
     for i: i32 in 0..<20:
         red_black_tree_insert(&tree, i, i * 2)
@@ -140,11 +168,17 @@ func test_irbt_new(value: i32) -> IntrusiveTest*:
     return entry
 
 test "intrusive_red_black_tree: construct":
+    test_intrusive_red_black_tree_construct()
+
+noinline func test_intrusive_red_black_tree_construct():
     var empty: IntrusiveRBTree
     assert(base_red_black_tree_is_empty(&empty.base))
     assert(base_red_black_tree_size(&empty.base) == 0)
 
 test "intrusive_red_black_tree: ints":
+    test_intrusive_red_black_tree_ints()
+
+noinline func test_intrusive_red_black_tree_ints():
     var tree: IntrusiveRBTree
     let first = test_irbt_new(10)
     intrusive_red_black_tree_insert(&tree, 1, first, test_irbt_member())
@@ -166,6 +200,9 @@ test "intrusive_red_black_tree: ints":
     assert(not intrusive_red_black_tree_node_is_in_tree(&first.m_tree_node))
 
 test "intrusive_red_black_tree: largest_smaller_than":
+    test_intrusive_red_black_tree_largest_smaller_than()
+
+noinline func test_intrusive_red_black_tree_largest_smaller_than():
     var tree: IntrusiveRBTree
     intrusive_red_black_tree_insert(&tree, 1, test_irbt_new(10), test_irbt_member())
     intrusive_red_black_tree_insert(&tree, 11, test_irbt_new(20), test_irbt_member())
@@ -180,6 +217,9 @@ test "intrusive_red_black_tree: largest_smaller_than":
     assert(intrusive_red_black_tree_remove(&tree, 21))
 
 test "intrusive_red_black_tree: key_ordered_iteration":
+    test_intrusive_red_black_tree_key_ordered_iteration()
+
+noinline func test_intrusive_red_black_tree_key_ordered_iteration():
     with memory.heap:
         let amount: usize = 10000
         var tree: IntrusiveRBTree
@@ -195,6 +235,9 @@ test "intrusive_red_black_tree: key_ordered_iteration":
             assert(intrusive_red_black_tree_remove(&tree, (i32)i))
 
 test "intrusive_red_black_tree: clear and begin_from":
+    test_intrusive_red_black_tree_clear_and_begin_from()
+
+noinline func test_intrusive_red_black_tree_clear_and_begin_from():
     with memory.heap:
         var tree: IntrusiveRBTree
         var entries: Vector[IntrusiveTest*]

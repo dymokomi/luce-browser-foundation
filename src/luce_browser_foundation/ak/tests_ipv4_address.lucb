@@ -5,20 +5,33 @@
 #   DESCRIPTION:
 #       Port of Tests/AK/TestIPv4Address.cpp; the static_asserts are checked at run time.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 test "ipv4: should default constructor with 0s":
+    test_ipv4_should_default_constructor_with_0s()
+
+noinline func test_ipv4_should_default_constructor_with_0s():
     let addr = IPv4Address()
 
     assert(i_pv4_address_is_zero(&addr))
 
 test "ipv4: should construct from c array":
+    test_ipv4_should_construct_from_c_array()
+
+noinline func test_ipv4_should_construct_from_c_array():
     var addr = IPv4Address()
     i_pv4_address_construct_array_u8(&addr, [1, 2, 3, 4])
 
     assert(not i_pv4_address_is_zero(&addr))
 
 test "ipv4: should construct from u32":
+    test_ipv4_should_construct_from_u32()
+
+noinline func test_ipv4_should_construct_from_u32():
     var a: BigEndian[u32]
     big_endian_construct(&a, 0x11_22_33_44)
     var addr = IPv4Address()
@@ -28,6 +41,9 @@ test "ipv4: should construct from u32":
     assert(i_pv4_address_to_u32(&addr) == 0x11_22_33_44)
 
 test "ipv4: should get octets by byte offset":
+    test_ipv4_should_get_octets_by_byte_offset()
+
+noinline func test_ipv4_should_get_octets_by_byte_offset():
     let addr = i_pv4_address_from_octets(1, 25, 39, 42)
 
     assert(1 == i_pv4_address_at(&addr, 0))
@@ -36,6 +52,9 @@ test "ipv4: should get octets by byte offset":
     assert(42 == i_pv4_address_at(&addr, 3))
 
 test "ipv4: should convert to string":
+    test_ipv4_should_convert_to_string()
+
+noinline func test_ipv4_should_convert_to_string():
     let addr = i_pv4_address_from_octets(1, 25, 39, 42)
 
     let text = i_pv4_address_to_byte_string(&addr)
@@ -54,34 +73,61 @@ func tests_ipv4_expect_octets(text: str, a: u8, b: u8, c_: u8, d: u8):
     assert(d == i_pv4_address_at(&addr, 3))
 
 test "ipv4: should make ipv4 address from string":
+    test_ipv4_should_make_ipv4_address_from_string()
+
+noinline func test_ipv4_should_make_ipv4_address_from_string():
     tests_ipv4_expect_octets("192.168.0.1", 192, 168, 0, 1)
 
 test "ipv4: should make empty optional from bad string":
+    test_ipv4_should_make_empty_optional_from_bad_string()
+
+noinline func test_ipv4_should_make_empty_optional_from_bad_string():
     assert(i_pv4_address_from_string(sv("bad string")) == none)
 
 test "ipv4: should make empty optional from out of range values":
+    test_ipv4_should_make_empty_optional_from_out_of_range_values()
+
+noinline func test_ipv4_should_make_empty_optional_from_out_of_range_values():
     assert(i_pv4_address_from_string(sv("192.168.0.500")) == none)
 
 test "ipv4: should fill d octet from 1 part":
+    test_ipv4_should_fill_d_octet_from_1_part()
+
+noinline func test_ipv4_should_fill_d_octet_from_1_part():
     tests_ipv4_expect_octets("1", 0, 0, 0, 1)
 
 test "ipv4: should fill a and d octets from 2 parts":
+    test_ipv4_should_fill_a_and_d_octets_from_2_parts()
+
+noinline func test_ipv4_should_fill_a_and_d_octets_from_2_parts():
     tests_ipv4_expect_octets("192.1", 192, 0, 0, 1)
 
 test "ipv4: should fill a b d octets from 3 parts":
+    test_ipv4_should_fill_a_b_d_octets_from_3_parts()
+
+noinline func test_ipv4_should_fill_a_b_d_octets_from_3_parts():
     tests_ipv4_expect_octets("192.168.1", 192, 168, 0, 1)
 
 test "ipv4: should convert to in addr t":
+    test_ipv4_should_convert_to_in_addr_t()
+
+noinline func test_ipv4_should_convert_to_in_addr_t():
     let addr = i_pv4_address_from_octets(1, 2, 3, 4)
 
     assert(0x04_03_02_01 == i_pv4_address_to_in_addr_t(&addr))
 
 test "ipv4: should convert to u32":
+    test_ipv4_should_convert_to_u32()
+
+noinline func test_ipv4_should_convert_to_u32():
     let addr = i_pv4_address_from_octets(1, 2, 3, 4)
 
     assert(0x04_03_02_01 == i_pv4_address_to_u32(&addr))
 
 test "ipv4: should compare":
+    test_ipv4_should_compare()
+
+noinline func test_ipv4_should_compare():
     let addr_a = i_pv4_address_from_octets(1, 2, 3, 4)
     let addr_b = i_pv4_address_from_octets(1, 2, 3, 5)
 
@@ -89,6 +135,9 @@ test "ipv4: should compare":
     assert(addr_a == addr_a)
 
 test "ipv4: netmask from cidr":
+    test_ipv4_netmask_from_cidr()
+
+noinline func test_ipv4_netmask_from_cidr():
     assert(i_pv4_address_netmask_from_cidr(24) == i_pv4_address_from_octets(255, 255, 255, 0))
 
     assert(i_pv4_address_netmask_from_cidr(0) == i_pv4_address_from_octets(0, 0, 0, 0))

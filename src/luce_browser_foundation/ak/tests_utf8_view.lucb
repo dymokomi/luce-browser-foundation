@@ -6,6 +6,10 @@
 #       Port of Tests/AK/TestUtf8View.cpp (lines 1-360). EXPECT_DEATH checks are not ported
 #       (a trap ends the test run).
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 ## Whether two byte spans hold the same bytes.
@@ -30,6 +34,9 @@ func tc_check_decoding(raw: const u8[], expected_characters: const u32[], expect
     assert(i == expected_characters.length)
 
 test "decode_ascii":
+    test_decode_ascii_2()
+
+noinline func test_decode_ascii_2():
     let utf8 = Utf8View(m_string = sv("Hello World!11"))
     assert(utf8_view_validate_allow_lonely_surrogates(&utf8))
 
@@ -45,6 +52,9 @@ test "decode_ascii":
     assert(i == expected.length)
 
 test "decode_utf8":
+    test_decode_utf8_2()
+
+noinline func test_decode_utf8_2():
     let utf8 = Utf8View(m_string = sv("Привет, мир! 😀 γειά σου κόσμος こんにちは世界"))
     var valid_bytes: usize = 0
     assert(utf8_view_validate_usize(&utf8, &valid_bytes))
@@ -64,6 +74,9 @@ test "decode_utf8":
     assert(i == expected.length)
 
 test "null_view":
+    test_null_view_2()
+
+noinline func test_null_view_2():
     let view = Utf8View()
     assert(utf8_view_validate_allow_lonely_surrogates(&view, AllowLonelySurrogates.no))
     assert(utf8_view_validate_allow_lonely_surrogates(&view, AllowLonelySurrogates.yes))
@@ -74,6 +87,9 @@ test "null_view":
     assert(utf8_code_point_iterator_done(&it))
 
 test "validate_invalid_ut8":
+    test_validate_invalid_ut8()
+
+noinline func test_validate_invalid_ut8():
     var valid_bytes: usize = 0
     let utf8_1 = Utf8View(m_string = string_view_from_bytes(b"\x2a\x23\xb6\x09"))
     assert(not utf8_view_validate_usize(&utf8_1, &valid_bytes))
@@ -107,6 +123,9 @@ test "validate_invalid_ut8":
     assert(valid_bytes == 0)
 
 test "validate_overlong_utf8":
+    test_validate_overlong_utf8()
+
+noinline func test_validate_overlong_utf8():
     var valid_bytes: usize = 0
 
     # Overlong 2-byte encoding of U+002F
@@ -140,6 +159,9 @@ test "validate_overlong_utf8":
     assert(valid_bytes == 2)
 
 test "iterate_utf8":
+    test_iterate_utf8()
+
+noinline func test_iterate_utf8():
     let view = Utf8View(m_string = sv("Some weird characters \u{a9}\u{266a}\u{a755}"))
     var iterator = utf8_view_begin(&view)
 
@@ -170,6 +192,9 @@ test "iterate_utf8":
     assert(utf8_code_point_iterator_peek(&iterator, 0) == none)
 
 test "decode_invalid_ut8":
+    test_decode_invalid_ut8()
+
+noinline func test_decode_invalid_ut8():
     # Test case 1 : Getting an extension byte as first byte of the code point
     let expected_1: u32[4] = [(u32)'a', (u32)'b', 0xfffd, (u32)'d']
     let underlying_1: (const u8[])[4] = [b"a", b"b", b"\xa0", b"d"]
@@ -207,6 +232,9 @@ func tc_check_trims(text: str, both: str, left: str, right: str):
     assert(tc_view_is(utf8_view_as_string(&trimmed_right), right))
 
 test "trim":
+    test_trim_5()
+
+noinline func test_trim_5():
     tc_check_trims("word", "word", "word", "word")
     tc_check_trims("   word", "word", "word", "   word")
     tc_check_trims("word   ", "word", "word   ", "word")
@@ -240,6 +268,9 @@ func tc_check_gather(split_behavior: SplitBehavior, expected: const str[]):
         assert(tc_view_is(gather.parts[i], expected[i]))
 
 test "for_each_split_view":
+    test_for_each_split_view()
+
+noinline func test_for_each_split_view():
     let nothing: str[3] = ["Well", "hello", "friends!"]
     tc_check_gather(SplitBehavior.nothing, nothing)
     let keep_empty: str[10] = ["", "", "", "Well", "", "hello", "friends!", "", "", ""]
@@ -250,6 +281,9 @@ test "for_each_split_view":
     tc_check_gather(SplitBehavior.keep_empty | SplitBehavior.keep_trailing_separator, both)
 
 test "code_point_offset_of":
+    test_code_point_offset_of_2()
+
+noinline func test_code_point_offset_of_2():
     let view = Utf8View(m_string = sv("😭foo"))
 
     assert(utf8_view_code_point_offset_of(&view, 0) == 0)
@@ -262,6 +296,9 @@ test "code_point_offset_of":
     assert(utf8_view_code_point_offset_of(&view, 7) == 4)
 
 test "byte_offset_of":
+    test_byte_offset_of()
+
+noinline func test_byte_offset_of():
     let view = Utf8View(m_string = sv("😂foo"))
 
     assert(utf8_view_byte_offset_of_usize(&view, 0) == 0)

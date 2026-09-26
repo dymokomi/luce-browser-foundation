@@ -8,6 +8,10 @@
 #       Tests/AK/TestCircularBuffer.cpp, plus focused cases for the ByteBuffer members the
 #       donor does not test (inline/outline transitions, trim, slice, xor, overwrite).
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 # mark: TestByteBuffer ==========================================================================
@@ -16,6 +20,9 @@ func test_bb_copy(text: str, count: usize) -> ByteBuffer:
     return byte_buffer_copy_void(text.bytes.data, count) else trap("copy failed")
 
 test "byte_buffer: equality_operator":
+    test_byte_buffer_equality_operator()
+
+noinline func test_byte_buffer_equality_operator():
     let a = test_bb_copy("Hello, world", 7)
     let b = test_bb_copy("Hello, friend", 7)
     # `a` and `b` are both "Hello, ".
@@ -32,10 +39,16 @@ test "byte_buffer: equality_operator":
     assert(byte_buffer_eq(&d, &d))
 
 test "byte_buffer: bytes_compare":
+    test_byte_buffer_bytes_compare()
+
+noinline func test_byte_buffer_bytes_compare():
     let a = test_bb_copy("Hello, friend", 13)
     assert(bytes_equal(byte_buffer_bytes_const(&a), "Hello, friend".bytes))
 
 test "byte_buffer: zero_fill_new_elements_on_growth":
+    test_byte_buffer_zero_fill_new_elements_on_growth()
+
+noinline func test_byte_buffer_zero_fill_new_elements_on_growth():
     var buffer = byte_buffer_create_uninitialized(5) else trap("create failed")
     memory.set(byte_buffer_span(&buffer), 1)
     let five: u8[5] = [1, 1, 1, 1, 1]
@@ -49,6 +62,9 @@ test "byte_buffer: zero_fill_new_elements_on_growth":
     assert(bytes_equal(byte_buffer_span(&buffer), ten))
 
 test "byte_buffer: inline and outline storage":
+    test_byte_buffer_inline_and_outline_storage()
+
+noinline func test_byte_buffer_inline_and_outline_storage():
     var buffer: ByteBuffer
     assert(byte_buffer_is_inline(&buffer))
     assert(byte_buffer_capacity(&buffer) == 32)
@@ -76,6 +92,9 @@ test "byte_buffer: inline and outline storage":
     assert(byte_buffer_is_empty(&buffer))
 
 test "byte_buffer: xor, overwrite, get_bytes_for_writing":
+    test_byte_buffer_xor_overwrite_get_bytes_for_writing()
+
+noinline func test_byte_buffer_xor_overwrite_get_bytes_for_writing():
     let first: u8[3] = [0x0f, 0xf0, 0xaa]
     let second: u8[3] = [0xff, 0xff, 0x0f]
     let result = byte_buffer_xor_buffers(first, second) else trap("xor failed")
@@ -125,6 +144,9 @@ func test_cb_discard(buffer: CircularBuffer*, size: usize):
     circular_buffer_discard(buffer, size) else trap("discard failed")
 
 test "circular_buffer: simple_write_read and writing_above_limits":
+    test_circular_buffer_simple_write_read_and_writing_above_limits()
+
+noinline func test_circular_buffer_simple_write_read_and_writing_above_limits():
     var buffer = test_cb_create(1)
     test_cb_write(&buffer, 42)
     test_cb_read(&buffer, 42)
@@ -134,6 +156,9 @@ test "circular_buffer: simple_write_read and writing_above_limits":
     assert(circular_buffer_write(&full, u8[](&value, 1)) == 0)
 
 test "circular_buffer: usage_with_wrapping_around":
+    test_circular_buffer_usage_with_wrapping_around()
+
+noinline func test_circular_buffer_usage_with_wrapping_around():
     let capacity: usize = 3
     var buffer = test_cb_create(capacity)
     for i: u8 in 0..<3:
@@ -152,6 +177,9 @@ test "circular_buffer: usage_with_wrapping_around":
     assert(circular_buffer_used_space(&buffer) == 0)
 
 test "circular_buffer: full_read aligned and non-aligned":
+    test_circular_buffer_full_read_aligned_and_non_aligned()
+
+noinline func test_circular_buffer_full_read_aligned_and_non_aligned():
     var buffer = test_cb_create(3)
     for i: u8 in 0..<3:
         test_cb_write(&buffer, i)
@@ -171,6 +199,9 @@ test "circular_buffer: full_read aligned and non-aligned":
     assert(result2 == source2)
 
 test "circular_buffer: full_write aligned and non-aligned":
+    test_circular_buffer_full_write_aligned_and_non_aligned()
+
+noinline func test_circular_buffer_full_write_aligned_and_non_aligned():
     let source: u8[3] = [12, 13, 14]
     var buffer = test_cb_create(3)
     assert(circular_buffer_write(&buffer, source) == 3)
@@ -187,6 +218,9 @@ test "circular_buffer: full_write aligned and non-aligned":
     assert(circular_buffer_used_space(&other) == 0)
 
 test "circular_buffer: create_from_bytebuffer":
+    test_circular_buffer_create_from_bytebuffer()
+
+noinline func test_circular_buffer_create_from_bytebuffer():
     let source: u8[3] = [2, 4, 6]
     let byte_buffer = byte_buffer_copy_span_u8(source) else trap("copy failed")
     var circular_buffer = circular_buffer_create_initialized(byte_buffer) else trap("create failed")
@@ -197,6 +231,9 @@ test "circular_buffer: create_from_bytebuffer":
     test_cb_read(&circular_buffer, 6)
 
 test "circular_buffer: discard, discard_on_edge, discard_too_much":
+    test_circular_buffer_discard_discard_on_edge_discard_too_much()
+
+noinline func test_circular_buffer_discard_discard_on_edge_discard_too_much():
     var buffer = test_cb_create(3)
     test_cb_write(&buffer, 11)
     test_cb_write(&buffer, 12)
@@ -228,6 +265,9 @@ func test_sv(text: str) -> StringView:
     return StringView(m_characters = text.bytes.data, m_length = text.length)
 
 test "circular_buffer: offset_of":
+    test_circular_buffer_offset_of()
+
+noinline func test_circular_buffer_offset_of():
     let source = "Well Hello Friends!"
     var byte_buffer = byte_buffer_copy_span_u8(source.bytes) else trap("copy failed")
     var circular_buffer = circular_buffer_create_initialized(byte_buffer_clone(&byte_buffer)) else trap("create failed")
@@ -240,6 +280,9 @@ test "circular_buffer: offset_of":
     assert(circular_buffer_offset_of(&circular_buffer, test_sv("e"), 2) == 9)
 
 test "circular_buffer: offset_of_with_until_and_after":
+    test_circular_buffer_offset_of_with_until_and_after()
+
+noinline func test_circular_buffer_offset_of_with_until_and_after():
     let source = "Well Hello Friends!"
     var byte_buffer = byte_buffer_copy_span_u8(source.bytes) else trap("copy failed")
     var circular_buffer = circular_buffer_create_initialized(byte_buffer_clone(&byte_buffer)) else trap("create failed")
@@ -253,6 +296,9 @@ test "circular_buffer: offset_of_with_until_and_after":
     assert((circular_buffer_offset_of(&circular_buffer, test_sv("el"), 3, 17) else 42) == 15)
 
 test "circular_buffer: offset_of_with_until_and_after_wrapping_around":
+    test_circular_buffer_offset_of_with_until_and_after_wrapping_around()
+
+noinline func test_circular_buffer_offset_of_with_until_and_after_wrapping_around():
     let source = "Well Hello Friends!"
     var byte_buffer = byte_buffer_copy_span_u8(source.bytes) else trap("copy failed")
     var circular_buffer = test_cb_create(19)
@@ -271,6 +317,9 @@ func test_expect_match(found: SearchableCircularBufferMatch?, distance: usize, l
     assert(m.length == length)
 
 test "circular_buffer: find_copy_in_seekback":
+    test_circular_buffer_find_copy_in_seekback()
+
+noinline func test_circular_buffer_find_copy_in_seekback():
     let haystack = "ABABCABCDAB".bytes
     let needle = "ABCD".bytes
     # Set up the buffer for testing.
@@ -308,6 +357,9 @@ test "circular_buffer: find_copy_in_seekback":
     assert(searchable_circular_buffer_find_copy_in_seekback_usize(&buffer, 12, 13) == none)
 
 test "circular_buffer: copy_from_seekback and read_with_seekback":
+    test_circular_buffer_copy_from_seekback_and_read_with_seekback()
+
+noinline func test_circular_buffer_copy_from_seekback_and_read_with_seekback():
     var circular_buffer = test_cb_create(64)
     assert(circular_buffer_write(&circular_buffer, "ab".bytes) == 2)
     let copied = circular_buffer_copy_from_seekback(&circular_buffer, 2, 9) else trap("copy failed")

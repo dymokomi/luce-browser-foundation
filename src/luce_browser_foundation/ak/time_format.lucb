@@ -1,0 +1,140 @@
+#==============================================================================================
+#
+#   time_format - Formatter<Duration> and Formatter<UnixDateTime>
+#
+#   DESCRIPTION:
+#       Port of AK/Time.cpp (lines 271-374, Formatter<Duration>::format) and AK/Time.h
+#       (lines 667-684, Formatter<UnixDateTime>). They need both AK/Time (region r01) and
+#       AK/Format (region r03), so they were ported at integration. `format_value_duration`
+#       and `format_value_unix_date_time` are their `__format_value<T>` for arg_custom.
+#
+#==============================================================================================
+
+# mark: Formatter<Duration> =====================================================================
+
+## Ported from AK/Time.cpp:271 AK::Formatter<Duration>::format: seconds with the fraction
+## trimmed to its significant digits, or to the precision; the alternative form adds "s".
+pub func formatter_duration_format(this: StandardFormatter*, builder: FormatBuilder*, value: Duration) -> !:
+    if value.m_nanoseconds >= 1000000000:
+        return try format_builder_put_string(builder, sv("{ INVALID }"))
+
+    var align = this.m_align
+    if align == FormatBuilderAlign.default:
+        align = FormatBuilderAlign.right
+
+    var sign_mode = this.m_sign_mode
+    if sign_mode == format_builder_sign_mode_default:
+        sign_mode = FormatBuilderSignMode.only_if_needed
+
+    let align_width = (usize)(this.m_width else 0)
+
+    var base_: u8 = 10
+    var upper_case = false
+    match this.m_mode:
+        .default, .fixed_point:
+            base_ = 10
+        .hexfloat:
+            base_ = 16
+        .hexfloat_uppercase:
+            base_ = 16
+            upper_case = true
+        .binary:
+            base_ = 2
+        .binary_uppercase:
+            base_ = 2
+            upper_case = true
+        .octal:
+            base_ = 8
+        _:
+            trap("VERIFY_NOT_REACHED")
+
+    let is_negative = value.m_seconds < 0
+    var seconds = 0 -% (u64)value.m_seconds if is_negative else (u64)value.m_seconds
+    var nanoseconds = value.m_nanoseconds
+    if is_negative and nanoseconds > 0:
+        seconds -= 1
+        nanoseconds = 1000000000 - nanoseconds
+
+    assert(nanoseconds < 1000000000)
+
+    var integer_width: usize = 1
+    if seconds != 0:
+        var remaining_seconds = seconds // 10
+        while remaining_seconds != 0:
+            remaining_seconds //= (u64)base_
+            integer_width += 1
+    if sign_mode != FormatBuilderSignMode.only_if_needed:
+        integer_width += 1
+
+    let nanoseconds_length: usize = 9
+    var precision: usize = 0
+    var nanoseconds_to_precision = (u64)nanoseconds
+    if let requested = this.m_precision:
+        precision = min((usize)requested, nanoseconds_length)
+        var i = nanoseconds_length
+        while i > precision:
+            nanoseconds_to_precision //= (u64)base_
+            i -= 1
+    elif nanoseconds_to_precision != 0:
+        var trailing_zeroes: usize = 0
+        while (nanoseconds_to_precision % (u64)base_) == 0:
+            nanoseconds_to_precision //= (u64)base_
+            trailing_zeroes += 1
+        precision = nanoseconds_length - trailing_zeroes
+
+    var non_integer_width: usize = 0
+    if precision != 0:
+        non_integer_width = precision + 1
+    if this.m_alternative_form:
+        non_integer_width += 1
+
+    let total_width = integer_width + non_integer_width
+
+    var integer_align_width: usize = 0
+    if align == FormatBuilderAlign.right:
+        integer_align_width = saturating_sub_usize(align_width, non_integer_width)
+    elif align == FormatBuilderAlign.center:
+        integer_align_width = integer_width + saturating_sub_usize(align_width, total_width) // 2
+    try format_builder_put_u64(builder, seconds, base_, false, upper_case, this.m_zero_pad, this.m_use_separator, FormatBuilderAlign.right, integer_align_width, this.m_fill, this.m_sign_mode, is_negative)
+
+    if nanoseconds_to_precision != 0:
+        try string_builder_try_append_u8(format_builder_builder(builder), '.')
+        try format_builder_put_u64(builder, nanoseconds_to_precision, base_, false, upper_case, true, this.m_use_separator, FormatBuilderAlign.right, precision)
+        if let requested = this.m_precision:
+            if (usize)requested > nanoseconds_length:
+                let zeroes = (usize)requested - nanoseconds_length
+                try format_builder_put_padding(builder, '0', zeroes)
+
+    if this.m_alternative_form:
+        try string_builder_try_append_u8(format_builder_builder(builder), 's')
+
+    if align_width > 0 and align != FormatBuilderAlign.right:
+        let padding_width = saturating_sub_usize(align_width, max(integer_width, integer_align_width) + non_integer_width)
+        try string_builder_try_append_repeated_u8(format_builder_builder(builder), this.m_fill, padding_width)
+
+## __format_value<Duration>.
+pub func format_value_duration(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let duration = (const Duration*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_duration_format(&formatter, builder, *duration)
+
+# mark: Formatter<UnixDateTime> =================================================================
+
+## Ported from AK/Time.h:669 AK::Formatter<UnixDateTime>::format: "YYYY-MM-DD hh:mm:ss" in UTC.
+pub func formatter_unix_date_time_format(this: StandardFormatter*, builder: FormatBuilder*, value: const UnixDateTime*) -> !:
+    discard(this)
+    let result_time = unaware_time_to_timespec(&value.unaware_time).tv_sec
+    var tm: Tm
+    if gmtime_r(&result_time, &tm) == none:
+        error(ak_error, "Formatter<UnixDateTime>::format gmtime_r failed")
+
+    let parameters = [arg_i64((i64)tm.tm_year + 1900), arg_i64((i64)tm.tm_mon + 1), arg_i64((i64)tm.tm_mday), arg_i64((i64)tm.tm_hour), arg_i64((i64)tm.tm_min), arg_i64((i64)tm.tm_sec)]
+    try vformat_arguments(format_builder_builder(builder), sv("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}"), parameters)
+
+## __format_value<UnixDateTime>.
+pub func format_value_unix_date_time(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
+    let time = (const UnixDateTime*)format_value_target(value)
+    var formatter = standard_formatter_create()
+    standard_formatter_parse(&formatter, params, parser)
+    try formatter_unix_date_time_format(&formatter, builder, time)

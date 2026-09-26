@@ -9,6 +9,10 @@
 #       The LibUnicode-backed case mappings (to_lowercase/to_uppercase/to_titlecase/to_casefold,
 #       lines 526-1027 of the donor) are not in AK and are not ported.
 #
+#       Each test's body is a noinline function the test block calls, so that the test
+#       runner's `main` does not inline every body (# workaround:
+#       compiler-issues/ranges_facts_cubic).
+#
 #==============================================================================================
 
 # mark: Helpers =================================================================================
@@ -44,6 +48,9 @@ func t16_utf32(code_points: const u32[]) -> Utf32View:
 # mark: Creation ================================================================================
 
 test "short_ascii_literal_is_constexpr":
+    test_short_ascii_literal_is_constexpr_3()
+
+noinline func test_short_ascii_literal_is_constexpr_3():
     # The _utf16 UDL folds short ASCII literals to compile-time constants, both for char and
     # char16_t inputs.
     let from_char = literalutf16_u8("foo".bytes.data, 3)
@@ -54,12 +61,18 @@ test "short_ascii_literal_is_constexpr":
     assert(utf16_string_base_length_in_code_units(&from_char16.utf16_string_base) == 3)
 
 test "empty_string":
+    test_empty_string_2()
+
+noinline func test_empty_string_2():
     let string = utf16_string_new()
     t16s_expect(&string, true, false, true, 0, 0)
     let ascii = utf16_string_base_ascii_view(&string.utf16_string_base)
     assert(string_view_eq_string_view(&ascii, StringView()))
 
 test "from_utf8":
+    test_from_utf8()
+
+noinline func test_from_utf8():
     let string1 = utf16_string_from_utf8_string_view(sv("hello!"))
     t16s_expect(&string1, true, false, true, 6, 6)
     assert(t16s_ascii_view_is(&string1, "hello!"))
@@ -85,6 +98,9 @@ test "from_utf8":
     assert(t16_eq(t16s_view(&string6), t16u([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xdc00, 0x21])))
 
 test "from_utf8_with_replacement_character":
+    test_from_utf8_with_replacement_character()
+
+noinline func test_from_utf8_with_replacement_character():
     # U+110000
     let string1 = utf16_string_from_utf8_with_replacement_character(string_view_from_bytes(b"long string \xf4\x8f\xbf\xc0"), Utf16StringWithBomHandling.no)
     assert(t16s_eq(&string1, t16("long string \u{fffd}\u{fffd}\u{fffd}\u{fffd}")))
@@ -106,6 +122,9 @@ test "from_utf8_with_replacement_character":
     assert(t16s_eq(&string7, t16("\u{fffd}WHF!")))
 
 test "from_utf16":
+    test_from_utf16()
+
+noinline func test_from_utf16():
     let string1 = utf16_string_from_utf16(t16("hello!"))
     t16s_expect(&string1, true, false, true, 6, 6)
     assert(t16s_ascii_view_is(&string1, "hello!"))
@@ -133,6 +152,9 @@ test "from_utf16":
     assert(t16_eq(t16s_view(&string6), low))
 
 test "from_utf32":
+    test_from_utf32()
+
+noinline func test_from_utf32():
     let string1 = utf16_string_from_utf32(t16_utf32([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x21]))
     t16s_expect(&string1, true, false, true, 6, 6)
     assert(t16s_ascii_view_is(&string1, "hello!"))
@@ -167,6 +189,9 @@ struct T16CodeUnits: Utf16CodeUnitCallback:
         self.count += 1
 
 test "from_code_point":
+    test_from_code_point()
+
+noinline func test_from_code_point():
     with memory.heap:
         var code_point: u32 = 0
 
@@ -192,6 +217,9 @@ test "from_code_point":
             code_point += 1
 
 test "formatted":
+    test_formatted()
+
+noinline func test_formatted():
     # Utf16String::formatted("{}", 42) and formatted("whf {} {} {}!", ...) are variadic
     # templates the port does not have.
     let string = utf16_string_number_i64(42)
@@ -214,6 +242,9 @@ func t16_repeated_is(code_point: u32, count: usize, length: usize, expected: str
     return utf16_string_base_length_in_code_units(&string.utf16_string_base) == length and t16s_eq(&string, t16(expected))
 
 test "repeated":
+    test_repeated_3()
+
+noinline func test_repeated_3():
     let empty1 = utf16_string_repeated(0x61, 0)
     assert(utf16_string_base_is_empty(&empty1.utf16_string_base))
 
@@ -235,6 +266,9 @@ test "repeated":
     assert(t16_repeated_is(0x10300, 10, 20, "𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀"))
 
 test "from_string_builder":
+    test_from_string_builder()
+
+noinline func test_from_string_builder():
     var builder = string_builder_new_mode(StringBuilderMode.utf16)
     string_builder_append_code_point(&builder, 0x61)
     string_builder_append_code_point(&builder, 0x62)
@@ -270,6 +304,9 @@ func t16_utf16_bytes(view: Utf16View) -> ByteBuffer:
     return string_builder_to_byte_buffer(&builder) else trap("MUST: to_byte_buffer")
 
 test "from_ipc_stream":
+    test_from_ipc_stream()
+
+noinline func test_from_ipc_stream():
     # FixedMemoryStream belongs to region r01.
     let string1 = t16_from_ipc_stream("abc".bytes, 3, true) else trap("from_ipc_stream")
     t16s_expect(&string1, true, false, true, 3, 3)
