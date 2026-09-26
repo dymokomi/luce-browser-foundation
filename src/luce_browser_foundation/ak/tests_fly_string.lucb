@@ -9,8 +9,8 @@
 #       in managed memory nothing dies and the table persists across tests, so the port checks
 #       how much the count grows, with strings no other test interns, and drops the checks that
 #       a dead string left the table and that a moved-from FlyString is empty (moves are copies).
-#       Interned strings and the table live in `memory.heap`, not the per-test buffer, because
-#       the table outlives the test.
+#       The tests intern under the per-test allocator: interned strings and the table live in
+#       `memory.heap` whatever allocator is current (see fly_string.lucb).
 #
 #       Each test's body is a noinline function the test block calls, so that the test
 #       runner's `main` does not inline every body (# workaround:
@@ -83,87 +83,83 @@ test "long_string":
     test_long_string()
 
 noinline func test_long_string():
-    with memory.heap:
-        let before = fly_string_number_of_fly_strings()
+    let before = fly_string_number_of_fly_strings()
 
-        let fly1 = tc_fly("long_string: thisisdefinitelymorethan7bytes")
-        assert(tc_fly_is(&fly1, "long_string: thisisdefinitelymorethan7bytes"))
-        assert(fly_string_number_of_fly_strings() == before + 1)
+    let fly1 = tc_fly("long_string: thisisdefinitelymorethan7bytes")
+    assert(tc_fly_is(&fly1, "long_string: thisisdefinitelymorethan7bytes"))
+    assert(fly_string_number_of_fly_strings() == before + 1)
 
-        let fly2 = tc_fly("long_string: thisisdefinitelymorethan7bytes")
-        assert(tc_fly_is(&fly2, "long_string: thisisdefinitelymorethan7bytes"))
-        assert(fly_string_number_of_fly_strings() == before + 1)
+    let fly2 = tc_fly("long_string: thisisdefinitelymorethan7bytes")
+    assert(tc_fly_is(&fly2, "long_string: thisisdefinitelymorethan7bytes"))
+    assert(fly_string_number_of_fly_strings() == before + 1)
 
-        let fly3 = tc_fly("long_string: thisisalsoforsuremorethan7bytes")
-        assert(tc_fly_is(&fly3, "long_string: thisisalsoforsuremorethan7bytes"))
-        assert(fly_string_number_of_fly_strings() == before + 2)
+    let fly3 = tc_fly("long_string: thisisalsoforsuremorethan7bytes")
+    assert(tc_fly_is(&fly3, "long_string: thisisalsoforsuremorethan7bytes"))
+    assert(fly_string_number_of_fly_strings() == before + 2)
 
-        assert(fly_string_eq_fly_string(&fly1, &fly2))
-        assert(not fly_string_eq_fly_string(&fly1, &fly3))
-        assert(not fly_string_eq_fly_string(&fly2, &fly3))
+    assert(fly_string_eq_fly_string(&fly1, &fly2))
+    assert(not fly_string_eq_fly_string(&fly1, &fly3))
+    assert(not fly_string_eq_fly_string(&fly2, &fly3))
 
-        let string1 = fly_string_to_string_const_2(&fly1)
-        let string2 = fly_string_to_string_const_2(&fly2)
-        let string3 = fly_string_to_string_const_2(&fly3)
-        assert(not string_base_is_short_string(&string1.string_base))
-        assert(not string_base_is_short_string(&string2.string_base))
-        assert(not string_base_is_short_string(&string3.string_base))
+    let string1 = fly_string_to_string_const_2(&fly1)
+    let string2 = fly_string_to_string_const_2(&fly2)
+    let string3 = fly_string_to_string_const_2(&fly3)
+    assert(not string_base_is_short_string(&string1.string_base))
+    assert(not string_base_is_short_string(&string2.string_base))
+    assert(not string_base_is_short_string(&string3.string_base))
 
 test "from_string_view":
     test_from_string_view()
 
 noinline func test_from_string_view():
-    with memory.heap:
-        let before = fly_string_number_of_fly_strings()
+    let before = fly_string_number_of_fly_strings()
 
-        let fly1 = fly_string_from_str("from_string_view: thisisdefinitelymorethan7bytes")
-        assert(tc_fly_is(&fly1, "from_string_view: thisisdefinitelymorethan7bytes"))
-        assert(fly_string_number_of_fly_strings() == before + 1)
+    let fly1 = fly_string_from_str("from_string_view: thisisdefinitelymorethan7bytes")
+    assert(tc_fly_is(&fly1, "from_string_view: thisisdefinitelymorethan7bytes"))
+    assert(fly_string_number_of_fly_strings() == before + 1)
 
-        let fly2 = fly_string_from_str("from_string_view: thisisdefinitelymorethan7bytes")
-        assert(tc_fly_is(&fly2, "from_string_view: thisisdefinitelymorethan7bytes"))
-        assert(fly_string_number_of_fly_strings() == before + 1)
+    let fly2 = fly_string_from_str("from_string_view: thisisdefinitelymorethan7bytes")
+    assert(tc_fly_is(&fly2, "from_string_view: thisisdefinitelymorethan7bytes"))
+    assert(fly_string_number_of_fly_strings() == before + 1)
 
-        let fly3 = fly_string_from_str("foo")
-        assert(tc_fly_is(&fly3, "foo"))
-        assert(fly_string_number_of_fly_strings() == before + 1)
+    let fly3 = fly_string_from_str("foo")
+    assert(tc_fly_is(&fly3, "foo"))
+    assert(fly_string_number_of_fly_strings() == before + 1)
 
-        assert(fly_string_eq_fly_string(&fly1, &fly2))
-        assert(not fly_string_eq_fly_string(&fly1, &fly3))
-        assert(not fly_string_eq_fly_string(&fly2, &fly3))
+    assert(fly_string_eq_fly_string(&fly1, &fly2))
+    assert(not fly_string_eq_fly_string(&fly1, &fly3))
+    assert(not fly_string_eq_fly_string(&fly2, &fly3))
 
 test "fly_string_keep_string_data_alive":
     test_fly_string_keep_string_data_alive()
 
 noinline func test_fly_string_keep_string_data_alive():
-    with memory.heap:
-        let before = fly_string_number_of_fly_strings()
-        var fly = fly_string_new()
-        if true:
-            let string = string_from_str("keep_alive: thisisdefinitelymorethan7bytes")
-            fly = fly_string_from_string(string)
-            assert(fly_string_number_of_fly_strings() == before + 1)
-
-        assert(tc_fly_is(&fly, "keep_alive: thisisdefinitelymorethan7bytes"))
+    let before = fly_string_number_of_fly_strings()
+    var fly = fly_string_new()
+    if true:
+        let string = string_from_str("keep_alive: thisisdefinitelymorethan7bytes")
+        fly = fly_string_from_string(string)
         assert(fly_string_number_of_fly_strings() == before + 1)
+
+    assert(tc_fly_is(&fly, "keep_alive: thisisdefinitelymorethan7bytes"))
+    assert(fly_string_number_of_fly_strings() == before + 1)
 
 test "moved_fly_string_becomes_empty":
     test_moved_fly_string_becomes_empty()
 
 noinline func test_moved_fly_string_becomes_empty():
-    with memory.heap:
-        var fly1 = fly_string_new()
-        assert(fly_string_is_empty(&fly1))
+    var fly1 = fly_string_new()
+    assert(fly_string_is_empty(&fly1))
 
-        let before = fly_string_number_of_fly_strings()
-        let fly2 = tc_fly("moved: thisisdefinitelymorethan7bytes")
-        assert(tc_fly_is(&fly2, "moved: thisisdefinitelymorethan7bytes"))
-        assert(fly_string_number_of_fly_strings() == before + 1)
+    let before = fly_string_number_of_fly_strings()
+    let fly2 = tc_fly("moved: thisisdefinitelymorethan7bytes")
+    assert(tc_fly_is(&fly2, "moved: thisisdefinitelymorethan7bytes"))
+    assert(fly_string_number_of_fly_strings() == before + 1)
 
-        fly1 = fly2
+    fly1 = fly2
 
-        assert(tc_fly_is(&fly1, "moved: thisisdefinitelymorethan7bytes"))
-        assert(fly_string_number_of_fly_strings() == before + 1)
+    assert(tc_fly_is(&fly1, "moved: thisisdefinitelymorethan7bytes"))
+    assert(fly_string_number_of_fly_strings() == before + 1)
 
 test "is_one_of":
     test_is_one_of()
@@ -182,3 +178,41 @@ noinline func test_is_one_of():
     assert(fly_string_eq_string_view(&bar, sv("foo")) or fly_string_eq_string_view(&bar, sv("bar")))
     assert(fly_string_eq_string_view(&bar, sv("bar")) or fly_string_eq_string_view(&bar, sv("foo")))
     assert(fly_string_eq_string_view(&bar, sv("bar")))
+
+## The bytes of "scoped: interned under a scoped allocator #`n`": long enough to be interned.
+func tc_scoped_text(buffer: u8[], n: usize) -> u8[]:
+    let prefix = "scoped: interned under a scoped allocator #"
+    for i in 0..<prefix.length:
+        buffer[i] = prefix.bytes[i]
+    buffer[prefix.length] = (u8)('0' + (u8)(n // 10))
+    buffer[prefix.length + 1] = (u8)('0' + (u8)(n % 10))
+    return buffer[..<prefix.length + 2]
+
+test "interned_strings_outlive_the_allocator_that_was_current":
+    test_interned_strings_outlive_the_allocator_that_was_current()
+
+# Not in the donor's tests. The table is a module global that outlives any allocator scope,
+# such as the fixed buffer luce-base's test runner makes current for each test. Strings are
+# interned while a scoped allocator is current (enough of them that the table grows), the
+# scope ends and its memory is overwritten, and the FlyStrings, the table and later lookups
+# must be unaffected.
+noinline func test_interned_strings_outlive_the_allocator_that_was_current():
+    let count: usize = 40
+    var text: u8[64]
+    var flys: FlyString[40]
+    let before = fly_string_number_of_fly_strings()
+
+    var backing: u8[32768]
+    var scoped = memory.FixedBuffer.over(backing)
+    with scoped:
+        for n in 0..<count:
+            flys[n] = fly_string_from_utf8_without_validation(tc_scoped_text(text, n))
+    memory.set(backing, 0xAB)
+
+    assert(fly_string_number_of_fly_strings() == before + count)
+    for n in 0..<count:
+        let expected = string_view_from_bytes(tc_scoped_text(text, n))
+        assert(fly_string_eq_string_view(&flys[n], expected))
+        let again = fly_string_from_utf8_without_validation(tc_scoped_text(text, n))
+        assert(fly_string_eq_fly_string(&again, &flys[n]))
+    assert(fly_string_number_of_fly_strings() == before + count)

@@ -183,6 +183,47 @@ merge changed to make the regions fit, what is still unported, and why nothing i
 - The web_url tests' `web_unicode_is_ported` gate is removed: all 66 run.
 - web_unicode's generated upcast methods are `pub`, like the other modules'.
 
+## After integration
+
+### Interned strings (ak)
+
+- **The bug.** The FlyString and Utf16FlyString tables are module globals, but interning stored
+  the String's own data, and the table's buckets, in whatever allocator was current. luce-base's
+  test runner makes a fresh fixed buffer current for each test, so a string interned in one test
+  dangled in the next, and downstream tests had to run under `with memory.heap:`. The same held
+  for FlyStrings cached in module variables, such as css_data's `string_from_property_id`.
+- **The design.** The tables and every interned string live in `memory.heap`, whatever
+  allocator is current. It outlives every allocator scope, as the donor's `Singleton` table
+  outlives everything:
+  - on a miss, `fly_string_table_add` and `utf16_fly_string_table_add` copy the data into
+    `memory.heap` and intern the copy. The C++ interns the String's own data. The copy is never
+    a substring, so it points at nothing in the collected heap;
+  - every table change (`hash_table_set` and `did_destroy_*`'s remove) runs under
+    `with memory.heap:`. Lookups do not allocate.
+
+  A FlyString is therefore valid wherever it is kept: under any allocator, in a module global,
+  or in a cell. The collector ignores its pointer into `memory.heap`.
+- **FIXME: interned strings are never released.** In the donor, interned data is reference
+  counted, and its destructor removes it from the table. Weak entries would need interned data
+  in the collected heap, a blob finalizer that calls `did_destroy_fly_string_data`, and a
+  `heap_destroy` that drops a heap's entries. gc has no blob finalizers (cells only), so the
+  tables grow by every distinct string longer than 7 bytes that is interned. Revisit when gc
+  gains blob finalizers.
+- **Tests.**
+  - `interned_strings_outlive_the_allocator_that_was_current` (tests_fly_string, and its
+    Utf16FlyString twin) interns 40 strings under a `FixedBuffer`, enough for the table to grow.
+    It then leaves the scope, overwrites the buffer, and checks the strings, the count and
+    re-interning. Before the fix, both tests trapped.
+  - tests_fly_string no longer wraps its tests in `with memory.heap:`.
+  - tests_utf16_fly_string resets the table only at the start of a test, to count from zero as
+    the donor does.
+
+### `CaseInsensitiveAsciiStringViewTraits` (ak)
+
+It conforms to `ak.Traits[StringView]`, as `AK::CaseInsensitiveASCIIStringViewTraits` derives
+from `Traits<StringView>`, so it can be a HashMap's or HashTable's traits.
+`case_insensitive_traits_key_a_hash_map` (tests_string_view) tests it.
+
 ## Remaining stubs and unported cases
 
 No region stub fragment is left in any module.

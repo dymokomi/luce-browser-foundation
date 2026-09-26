@@ -10,6 +10,10 @@
 #       comparison of the eight bytes. The table's HashTable calls are gathered in the
 #       utf16_fly_string_table_* helpers.
 #
+#       The table and every interned Utf16StringData live in `memory.heap`, whatever allocator is
+#       current, as FlyString's do (see fly_string.lucb): interning copies the string's data
+#       there, and the table only changes under `with memory.heap:`.
+#
 #==============================================================================================
 
 # mark: The table ===============================================================================
@@ -27,6 +31,8 @@ pub func utf16_fly_string_table_hash_traits_may_have_slow_equality_check() -> bo
     return true
 
 ## `static Singleton<HashTable<Utf16StringData const*, Utf16FlyStringTableHashTraits>> table`.
+## Its buckets and entries are in `memory.heap`; nothing removes an entry yet (see fly_string.lucb's
+## FIXME), so an interned string lives as long as the process.
 var s_all_utf16_fly_strings: HashTable[const Utf16StringData*?, Utf16FlyStringTableHashTraits]
 
 ## Ported from AK/Utf16FlyString.cpp:19 AK::all_utf16_fly_strings.
@@ -37,7 +43,22 @@ func all_utf16_fly_strings() -> HashTable[const Utf16StringData*?, Utf16FlyStrin
 ## Utf16StringData from the table when it dies (the destructor's call; the collector's finalizer
 ## will make it).
 pub func did_destroy_utf16_fly_string_data(data: const Utf16StringData*):
-    discard(hash_table_remove_t(all_utf16_fly_strings(), data))
+    with memory.heap:
+        discard(hash_table_remove_t(all_utf16_fly_strings(), data))
+
+## Adds a copy of `data` to the table and answers it (addition: the C++ adds `data` itself). The
+## copy and the table's buckets come from `memory.heap`, which outlives any allocator scope, so
+## an interned string stays valid after the allocator that was current when it was interned is
+## gone. The block is flat (header, then the code units), so it is copied byte for byte.
+func utf16_fly_string_table_add(data: const Utf16StringData*) -> const Utf16StringData*:
+    let size = utf16_string_data_allocation_size_for_string_data(utf16_string_data_has_ascii_storage(data), utf16_string_data_length_in_code_units(data))
+    with memory.heap:
+        let slot = alloc(size, alignof(Utf16StringData)) else trap("VERIFY: kmalloc")
+        memory.copy(slot, u8[]((u8*)data, size), size)
+        let interned = (const Utf16StringData*)slot.data
+        discard(hash_table_set(all_utf16_fly_strings(), (const Utf16StringData*?)interned))
+        utf16_string_data_mark_as_fly_string(interned)
+        return interned
 
 ## The captures of the `[&](auto const& entry) { return *entry == string; }` predicate of
 ## create_fly_string_from_cache for a UTF-8 view.
@@ -146,10 +167,10 @@ pub func utf16_fly_string_construct_utf16_string(this: Utf16FlyString*, string: 
 
     var it = hash_table_find_t(all_utf16_fly_strings(), (const Utf16StringData*?)data)
     if hash_table_iterator_eq(&it, hash_table_end(all_utf16_fly_strings())):
+        # The C++ interns `data` itself and marks it; here the table's copy is interned, since
+        # `data` may come from a shorter-lived allocator.
         this.m_data = string.utf16_string_base
-
-        discard(hash_table_set(all_utf16_fly_strings(), (const Utf16StringData*?)data))
-        utf16_string_data_mark_as_fly_string(data)
+        utf16_string_base_set_data(&this.m_data, utf16_fly_string_table_add(data))
     else:
         utf16_string_base_set_data(&this.m_data, *hash_table_iterator_deref(&it) else trap("VERIFY: null Utf16StringData"))
 

@@ -287,3 +287,21 @@ noinline func test_case_insensitive_hash():
     assert(case_insensitive_ascii_string_view_traits_hash(string1) == case_insensitive_ascii_string_view_traits_hash(string2))
     assert(case_insensitive_ascii_string_view_traits_hash(string1) == case_insensitive_ascii_string_view_traits_hash(string3))
     assert(case_insensitive_ascii_string_view_traits_hash(string1) != case_insensitive_ascii_string_view_traits_hash(string4))
+
+test "case_insensitive_traits_key_a_hash_map":
+    test_case_insensitive_traits_key_a_hash_map()
+
+# Not in the donor's tests: CaseInsensitiveASCIIStringViewTraits as the traits of a HashMap, as
+# LibWeb's generated keyword and property tables use it.
+noinline func test_case_insensitive_traits_key_a_hash_map():
+    var map: HashMap[StringView, i32, CaseInsensitiveAsciiStringViewTraits]
+    assert(hash_map_set(&map, sv("background-color"), 1) == HashSetResult.inserted_new_entry)
+    assert(hash_map_set(&map, sv("Color"), 2) == HashSetResult.inserted_new_entry)
+    assert(hash_map_set(&map, sv("BACKGROUND-COLOR"), 3) == HashSetResult.replaced_existing_entry)
+    assert(hash_map_size(&map) == 2)
+
+    let background = hash_map_get_k(&map, sv("Background-Color")) else trap("missing background-color")
+    assert(*background == 3)
+    let color = hash_map_get_k(&map, sv("cOLOR")) else trap("missing color")
+    assert(*color == 2)
+    assert(not hash_map_contains_k(&map, sv("colour")))

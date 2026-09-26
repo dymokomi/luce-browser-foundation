@@ -14,9 +14,8 @@
 #
 #==============================================================================================
 
-## Empties the Utf16FlyString table, as every donor test starts with one. Tests that intern
-## long strings also empty it when they end: the table would otherwise keep pointers into the
-## per-test allocator after the test.
+## Empties the Utf16FlyString table, as every donor test starts with one (in the donor, the
+## strings of earlier tests have died and left it).
 func t16_reset_fly_strings():
     s_all_utf16_fly_strings = HashTable[const Utf16StringData*?, Utf16FlyStringTableHashTraits]()
 
@@ -56,7 +55,6 @@ test "empty_string (Utf16FlyString)":
 
 noinline func test_empty_string_utf16flystring():
     t16_reset_fly_strings()
-    defer t16_reset_fly_strings()
     let fly = utf16_fly_string_new()
     assert(utf16_fly_string_is_empty(&fly))
     assert(t16f_eq_str(&fly, ""))
@@ -69,7 +67,6 @@ test "short_string (Utf16FlyString)":
 
 noinline func test_short_string_utf16flystring():
     t16_reset_fly_strings()
-    defer t16_reset_fly_strings()
     let fly1 = utf16_fly_string_from_utf16_string(utf16_string_from_str("foo"))
     assert(t16f_eq_str(&fly1, "foo"))
 
@@ -98,7 +95,6 @@ test "long_string (Utf16FlyString)":
 
 noinline func test_long_string_utf16flystring():
     t16_reset_fly_strings()
-    defer t16_reset_fly_strings()
     let fly1 = utf16_fly_string_from_utf16_string(utf16_string_from_str("thisisdefinitelymorethan7bytes"))
     assert(t16f_eq_str(&fly1, "thisisdefinitelymorethan7bytes"))
     assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
@@ -127,7 +123,6 @@ test "user_defined_literal (Utf16FlyString)":
 
 noinline func test_user_defined_literal_utf16flystring():
     t16_reset_fly_strings()
-    defer t16_reset_fly_strings()
     let fly1 = t16f("thisisdefinitelymorethan7bytes")
     assert(t16f_eq_str(&fly1, "thisisdefinitelymorethan7bytes"))
     assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
@@ -158,7 +153,6 @@ test "fly_string_keep_string_data_alive (Utf16FlyString)":
 
 noinline func test_fly_string_keep_string_data_alive_utf16flystring():
     t16_reset_fly_strings()
-    defer t16_reset_fly_strings()
     assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
     var fly = utf16_fly_string_new()
     let string = utf16_string_from_str("thisisdefinitelymorethan7bytes")
@@ -173,7 +167,6 @@ test "moved_fly_string_becomes_empty (Utf16FlyString)":
 
 noinline func test_moved_fly_string_becomes_empty_utf16flystring():
     t16_reset_fly_strings()
-    defer t16_reset_fly_strings()
     var fly1 = utf16_fly_string_new()
     assert(utf16_fly_string_is_empty(&fly1))
 
@@ -208,7 +201,6 @@ test "optional (Utf16FlyString)":
 
 noinline func test_optional_utf16flystring():
     t16_reset_fly_strings()
-    defer t16_reset_fly_strings()
     # Optional<Utf16FlyString> is the null sentinel (is_invalid) in the C++.
     var string = utf16_fly_string_new()
     utf16_fly_string_construct_utf16_fly_string(&string)
@@ -222,3 +214,36 @@ noinline func test_optional_utf16flystring():
     assert(not utf16_fly_string_is_invalid(&string))
     let expected = t16("well 😀 hello")
     assert(utf16_fly_string_eq_utf16_view(&string, &expected))
+
+test "interned_strings_outlive_the_allocator_that_was_current (Utf16FlyString)":
+    test_interned_strings_outlive_the_allocator_that_was_current_utf16flystring()
+
+# Not in the donor's tests: as FlyString's test of the same name, for ASCII and UTF-16 storage.
+# Strings are interned while a scoped allocator is current, the scope ends and its memory is
+# overwritten, and the strings, the table and later lookups must be unaffected.
+noinline func test_interned_strings_outlive_the_allocator_that_was_current_utf16flystring():
+    t16_reset_fly_strings()
+    let count: usize = 40
+    var text: u8[64]
+    var flys: Utf16FlyString[40]
+
+    var backing: u8[32768]
+    var scoped = memory.FixedBuffer.over(backing)
+    var emoji = utf16_fly_string_new()
+    with scoped:
+        for n in 0..<count:
+            flys[n] = utf16_fly_string_from_utf8_without_validation(string_view_from_bytes(tc_scoped_text(text, n)))
+        emoji = t16f_lit("scoped: well 😀 hello")
+    memory.set(backing, 0xAB)
+
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == count + 1)
+    for n in 0..<count:
+        let expected = string_view_from_bytes(tc_scoped_text(text, n))
+        assert(utf16_fly_string_eq_string_view(&flys[n], expected))
+        let again = utf16_fly_string_from_utf8_without_validation(expected)
+        assert(t16f_eq(&again, &flys[n]))
+    let emoji_view = t16("scoped: well 😀 hello")
+    assert(utf16_fly_string_eq_utf16_view(&emoji, &emoji_view))
+    let emoji_again = utf16_fly_string_from_utf16(emoji_view)
+    assert(t16f_eq(&emoji_again, &emoji))
+    assert(utf16_fly_string_number_of_utf16_fly_strings() == count + 1)

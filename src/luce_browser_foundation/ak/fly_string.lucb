@@ -11,6 +11,20 @@
 #       its HashTable calls are gathered in the fly_string_table_* helpers, which compare the
 #       found iterator with end() as the C++ does.
 #
+#       The table outlives every allocator scope (a test's buffer, an arena), so the table and
+#       every interned StringData live in `memory.heap`, whatever allocator is current:
+#       interning copies the string's bytes there (the C++ interns the String's own data), and
+#       the table only changes under `with memory.heap:`. A FlyString is therefore valid
+#       wherever it is kept, including module globals such as generated FlyString caches.
+#
+#       FIXME: interned strings are never released. In the C++, StringData is reference
+#       counted and its destructor removes it from the table (did_destroy_fly_string_data);
+#       here nothing is counted or destroyed. Making the entries weak needs the interned data
+#       in the collected heap with a blob finalizer that calls did_destroy_fly_string_data,
+#       which gc does not have (cells only), and a heap_destroy that drops its entries; until
+#       then the table grows by every distinct long string interned, as a static Singleton
+#       that never shrinks. See docs/regions/INTEGRATION.md.
+#
 #==============================================================================================
 
 # mark: The table ===============================================================================
@@ -27,7 +41,8 @@ pub func fly_string_table_hash_traits_equals(a: const StringData*?, b: const Str
 pub func fly_string_table_hash_traits_may_have_slow_equality_check() -> bool:
     return true
 
-## `static Singleton<HashTable<StringData const*, FlyStringTableHashTraits>> table`.
+## `static Singleton<HashTable<StringData const*, FlyStringTableHashTraits>> table`. Its
+## buckets and entries are in `memory.heap` (see the header).
 var s_all_fly_strings: HashTable[const StringData*?, FlyStringTableHashTraits]
 
 ## Ported from AK/FlyString.cpp:23 AK::all_fly_strings.
@@ -62,10 +77,25 @@ func fly_string_table_find(data: const StringData*) -> const StringData*?:
     return *hash_table_iterator_deref(&it)
 
 ## Ported from AK/FlyString.cpp:210 AK::Detail::did_destroy_fly_string_data: drops a StringData
-## from the table when it dies (the StringData destructor's call; the collector's finalizer
-## will make it).
+## from the table when it dies (the StringData destructor's call; nothing makes it yet, see the
+## header's FIXME).
 pub func did_destroy_fly_string_data(string_data: const StringData*):
-    discard(hash_table_remove_t(all_fly_strings(), string_data))
+    with memory.heap:
+        discard(hash_table_remove_t(all_fly_strings(), string_data))
+
+## Adds a copy of `data`'s bytes to the table and answers it (addition: the C++ adds `data`
+## itself). The copy and the table's buckets come from `memory.heap`, which outlives any
+## allocator scope, so an interned string stays valid after the allocator that was current
+## when it was interned is gone. The copy is never a substring, so it points at nothing else.
+func fly_string_table_add(data: const StringData*) -> const StringData*:
+    let bytes = string_data_bytes(data)
+    with memory.heap:
+        var buffer: u8*? = none
+        let interned = string_data_create_uninitialized(bytes.length, &buffer) else trap("MUST: intern a FlyString")
+        copy_bytes(u8[](buffer else trap("VERIFY: interned bytes"), bytes.length), bytes)
+        discard(hash_table_set(all_fly_strings(), (const StringData*?)interned))
+        string_data_set_fly_string(interned, true)
+        return interned
 
 # mark: Creation ================================================================================
 
@@ -119,9 +149,9 @@ pub func fly_string_construct_string(this: FlyString*, string: const String*):
     if let existing = fly_string_table_find(data):
         string_base_construct_string_data(&this.m_data, existing)
     else:
-        this.m_data = string.string_base
-        discard(hash_table_set(all_fly_strings(), (const StringData*?)data))
-        string_data_set_fly_string(data, true)
+        # The C++ interns `data` itself and marks it; here the table's copy is interned, since
+        # `data` may come from a shorter-lived allocator.
+        string_base_construct_string_data(&this.m_data, fly_string_table_add(data))
 
 ## `FlyString { string }`: the value form of the String constructor (and of `operator=(String)`).
 pub func fly_string_from_string(string: String) -> FlyString:

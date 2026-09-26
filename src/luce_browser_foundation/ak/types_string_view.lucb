@@ -28,6 +28,12 @@ pub enum StringViewConsiderCarriageReturn as i32:
 
 # mark: CaseInsensitiveAsciiStringViewTraits ====================================================
 
-## AK::CaseInsensitiveASCIIStringViewTraits (AK/StringView.h:386).
-pub struct CaseInsensitiveAsciiStringViewTraits:
+## AK::CaseInsensitiveASCIIStringViewTraits (AK/StringView.h:386): `Traits<StringView>` with
+## ASCII case-insensitive hash and equality, so it can key a HashMap or HashTable of views. The
+## conformance is filled in by hand.
+pub struct CaseInsensitiveAsciiStringViewTraits: Traits[StringView]:
     pub var empty_: u8
+
+    func hash_of(key: const StringView*) -> u32: return case_insensitive_ascii_string_view_traits_hash(*key)
+
+    func equals(a: const StringView*, b: const StringView*) -> bool: return case_insensitive_ascii_string_view_traits_equals(*a, *b)
