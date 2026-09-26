@@ -1,0 +1,120 @@
+#==============================================================================================
+#
+#   test_text_decoders - Tests/LibTextCodec/TestTextDecoders.cpp
+#
+#   DESCRIPTION:
+#       The donor's decoder tests, ported one TEST_CASE to one test.
+#
+#==============================================================================================
+
+# mark: TestTextDecoders.cpp ===================================================================
+
+test "test_utf8_decode":
+    var decoder = tc.Utf8Decoder(decoder_base = tc.Decoder(vtable = &tc.utf8_decoder_vtable.decoder_vtable, class_id = tc.utf8_decoder_class.first_id))
+    # Bytes for U+1F600 GRINNING FACE
+    let test_string = sv("\u{1F600}")
+
+    assert(tc.decoder_validate((tc.Decoder*)&decoder, test_string))
+
+    var processed_code_points = CodePoints()
+    tc.decoder_process((tc.Decoder*)&decoder, test_string, code_point_collector(&processed_code_points)) else trap("MUST")
+    assert(processed_code_points.count == 1)
+    assert(processed_code_points.items[0] == 0x1F600)
+
+    let output = tc.decoder_to_utf8((tc.Decoder*)&decoder, test_string) else trap("MUST")
+    assert(bytes_equal(string_bytes(&output), "\u{1F600}".bytes))
+
+test "test_utf16be_decode":
+    var decoder = tc.Utf16BeDecoder(decoder_base = tc.Decoder(vtable = &tc.utf16_be_decoder_vtable.decoder_vtable, class_id = tc.utf16_be_decoder_class.first_id))
+    # This is the output of `python3 -c "print('säk😀'.encode('utf-16be'))"`.
+    let test_string = view_of(b"\x00s\x00\xe4\x00k\xd8=\xde\x00")
+
+    assert(tc.decoder_validate((tc.Decoder*)&decoder, test_string))
+    let utf8 = tc.decoder_to_utf8((tc.Decoder*)&decoder, test_string) else trap("MUST")
+    assert(bytes_equal(string_bytes(&utf8), "säk😀".bytes))
+
+test "test_streaming_decoder_utf8_mid_sequence":
+    let decoder = decoder_for("UTF-8")
+    var streaming_decoder = streaming_decoder_for(decoder)
+
+    expect_streaming(&streaming_decoder, b"a\xc3", "a".bytes)
+    expect_streaming(&streaming_decoder, b"\xa9b", "éb".bytes)
+    expect_finish(&streaming_decoder, "".bytes)
+
+test "test_streaming_decoder_finishes_incomplete_sequence":
+    let decoder = decoder_for("UTF-8")
+    var streaming_decoder = streaming_decoder_for(decoder)
+
+    let incomplete_sequence = b"\xc3"
+    expect_streaming(&streaming_decoder, incomplete_sequence, "".bytes)
+    var buffer: u8[16]
+    expect_finish(&streaming_decoder, decoded(decoder, incomplete_sequence, buffer))
+
+test "test_streaming_decoder_utf16_odd_byte":
+    let decoder = decoder_for("UTF-16LE")
+    var streaming_decoder = streaming_decoder_for(decoder)
+
+    expect_streaming(&streaming_decoder, b"\x41\x00\x42", "A".bytes)
+    expect_streaming(&streaming_decoder, b"\x00", "B".bytes)
+    expect_finish(&streaming_decoder, "".bytes)
+
+test "test_streaming_decoder_utf16_surrogate_pair_split":
+    let decoder = decoder_for("UTF-16BE")
+    var streaming_decoder = streaming_decoder_for(decoder)
+
+    expect_streaming(&streaming_decoder, b"\x00\x41\xd8\x3d", "A".bytes)
+    expect_streaming(&streaming_decoder, b"\xde\x00", "😀".bytes)
+    expect_finish(&streaming_decoder, "".bytes)
+
+test "test_streaming_decoder_gb18030_four_byte_tail":
+    let decoder = decoder_for("gb18030")
+    var streaming_decoder = streaming_decoder_for(decoder)
+    let gb18030_sequence = b"\x81\x30\x81\x30"
+
+    expect_streaming(&streaming_decoder, b"a\x81\x30\x81", "a".bytes)
+    var buffer: u8[16]
+    expect_streaming(&streaming_decoder, b"\x30", decoded(decoder, gb18030_sequence, buffer))
+    expect_finish(&streaming_decoder, "".bytes)
+
+test "test_streaming_decoder_big5_overlapping_trail":
+    let decoder = decoder_for("Big5")
+    var streaming_decoder = streaming_decoder_for(decoder)
+    let big5_sequence = b"\xa4\xa4"
+
+    var buffer: u8[16]
+    expect_streaming(&streaming_decoder, big5_sequence, decoded(decoder, big5_sequence, buffer))
+    expect_finish(&streaming_decoder, "".bytes)
+
+    var streaming_decoder_for_split_input = streaming_decoder_for(decoder)
+    expect_streaming(&streaming_decoder_for_split_input, b"\xa4", "".bytes)
+    expect_streaming(&streaming_decoder_for_split_input, b"\xa4", decoded(decoder, big5_sequence, buffer))
+    expect_finish(&streaming_decoder_for_split_input, "".bytes)
+
+test "test_streaming_decoder_euc_jp_three_byte_tail":
+    let decoder = decoder_for("EUC-JP")
+    var streaming_decoder = streaming_decoder_for(decoder)
+    let euc_jp_sequence = b"\x8f\xa2\xaf"
+
+    expect_streaming(&streaming_decoder, b"\x8f\xa2", "".bytes)
+    var buffer: u8[16]
+    expect_streaming(&streaming_decoder, b"\xaf", decoded(decoder, euc_jp_sequence, buffer))
+    expect_finish(&streaming_decoder, "".bytes)
+
+test "test_streaming_decoder_shift_jis_tail":
+    let decoder = decoder_for("Shift_JIS")
+    var streaming_decoder = streaming_decoder_for(decoder)
+    let shift_jis_sequence = b"\x82\xa0"
+
+    expect_streaming(&streaming_decoder, b"\x82", "".bytes)
+    var buffer: u8[16]
+    expect_streaming(&streaming_decoder, b"\xa0", decoded(decoder, shift_jis_sequence, buffer))
+    expect_finish(&streaming_decoder, "".bytes)
+
+test "test_utf16le_decode":
+    var decoder = tc.Utf16LeDecoder(decoder_base = tc.Decoder(vtable = &tc.utf16_le_decoder_vtable.decoder_vtable, class_id = tc.utf16_le_decoder_class.first_id))
+    # This is the output of `python3 -c "print('säk😀'.encode('utf-16le'))"`.
+    let test_string = view_of(b"s\x00\xe4\x00k\x00=\xd8\x00\xde")
+
+    assert(tc.decoder_validate((tc.Decoder*)&decoder, test_string))
+    let utf8 = tc.decoder_to_utf8((tc.Decoder*)&decoder, test_string) else trap("MUST")
+    assert(bytes_equal(string_bytes(&utf8), "säk😀".bytes))

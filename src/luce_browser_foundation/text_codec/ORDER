@@ -2,4 +2,14 @@ module.lucb
 types_decoder.lucb
 types_encoder.lucb
 types_generated_lookup_tables.lucb
-stub_r06_text_codec.lucb
+generated_lookup_tables.lucb
+lookup_tables.lucb
+decoder_1.lucb
+decoder_2.lucb
+decoder_3.lucb
+decoder_4.lucb
+decoder_5.lucb
+encoder_1.lucb
+encoder_2.lucb
+tests_lookup_tables.lucb
+tests_decoder_tails.lucb

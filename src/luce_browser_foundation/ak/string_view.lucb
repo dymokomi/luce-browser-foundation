@@ -443,6 +443,15 @@ pub func string_view_substring_view_starting_after_substring(this: const StringV
     let remaining_length = this.m_length - (remaining_characters - characters)
     return string_view_substring_view_usize(this, remaining_characters - characters, remaining_length)
 
+## Ported from AK/StringView.h:336 AK::StringView::is_one_of_ignoring_ascii_case: whether the
+## view equals any of `strings`, ignoring ASCII case. The C++ parameter pack of string literals
+## is a span of `str` (added at integration for text_codec).
+pub func string_view_is_one_of_ignoring_ascii_case(this: const StringView*, strings: const str[]) -> bool:
+    for string in strings:
+        if string_view_equals_ignoring_ascii_case(this, sv(string)):
+            return true
+    return false
+
 ## Ported from AK/StringView.cpp:261 AK::StringView::copy_characters_to_buffer: copies as much as
 ## fits and a NUL; answers whether everything fit.
 pub func string_view_copy_characters_to_buffer(this: const StringView*, buffer: u8[]) -> bool:
