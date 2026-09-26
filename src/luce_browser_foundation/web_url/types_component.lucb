@@ -26,9 +26,11 @@ pub struct ComponentResult:
     pub var input: ak.String
     pub var groups: ak.OrderedHashMap[ak.String, ak.StringOrEmpty, ak.StringTraits]
 
-## URL::Pattern::Component::ExecutionResult (Libraries/LibURL/Pattern/Component.h:28): opaque in this phase (not in the phase-1 closure).
+## URL::Pattern::Component::ExecutionResult (Libraries/LibURL/Pattern/Component.h:28). Filled by region r05: the
+## generator left it opaque.
 pub struct ComponentExecutionResult:
-    pub var opaque_: u8
+    pub var success: bool  # C++ default: { false }
+    pub var captures: ak.Vector[ak.String?]
 
 # mark: RegularExpressionAndNameList ============================================================
 

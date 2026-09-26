@@ -19,7 +19,7 @@ pub struct Cell: IsCell:
     pub var m_mark: bool  # C++ default: { false }
     pub var m_state: CellState  # C++ default: { State :: Live }
 
-    func cell() -> Cell*: return (Cell*)&self
+    pub func cell() -> Cell*: return (Cell*)&self
 
 ## Upcast to GC::Cell (implemented by every struct in its hierarchy).
 pub interface IsCell:
@@ -88,7 +88,7 @@ pub struct CellVisitor: IsCellVisitor:
     pub var vtable: const CellVisitorVTable*
     pub var class_id: u16
 
-    func cell_visitor() -> CellVisitor*: return (CellVisitor*)&self
+    pub func cell_visitor() -> CellVisitor*: return (CellVisitor*)&self
 
 ## Upcast to GC::Cell::Visitor (implemented by every struct in its hierarchy).
 pub interface IsCellVisitor:

@@ -17,7 +17,7 @@ pub struct Encoder: IsEncoder:
     pub var vtable: const EncoderVTable*
     pub var class_id: u16
 
-    func encoder() -> Encoder*: return (Encoder*)&self
+    pub func encoder() -> Encoder*: return (Encoder*)&self
 
 ## Upcast to TextCodec::Encoder (implemented by every struct in its hierarchy).
 pub interface IsEncoder:
@@ -60,7 +60,7 @@ pub struct Utf8Encoder: IsUtf8Encoder, IsEncoder:
 
     func utf8_encoder() -> Utf8Encoder*: return (Utf8Encoder*)&self
 
-    func encoder() -> Encoder*: return (Encoder*)&self
+    pub func encoder() -> Encoder*: return (Encoder*)&self
 
 ## Upcast to TextCodec::UTF8Encoder (implemented by every struct in its hierarchy).
 pub interface IsUtf8Encoder:
@@ -96,9 +96,9 @@ pub func as_utf8_encoder[P: IsEncoder](p: P*) -> Utf8Encoder*:
 pub struct EucjpEncoder: IsEucjpEncoder, IsEncoder:
     pub var encoder_base: Encoder  # primary base
 
-    func eucjp_encoder() -> EucjpEncoder*: return (EucjpEncoder*)&self
+    pub func eucjp_encoder() -> EucjpEncoder*: return (EucjpEncoder*)&self
 
-    func encoder() -> Encoder*: return (Encoder*)&self
+    pub func encoder() -> Encoder*: return (Encoder*)&self
 
 ## Upcast to TextCodec::EUCJPEncoder (implemented by every struct in its hierarchy).
 pub interface IsEucjpEncoder:
@@ -136,7 +136,7 @@ pub struct Iso2022JpEncoder: IsIso2022JpEncoder, IsEncoder:
 
     func iso2022_jp_encoder() -> Iso2022JpEncoder*: return (Iso2022JpEncoder*)&self
 
-    func encoder() -> Encoder*: return (Encoder*)&self
+    pub func encoder() -> Encoder*: return (Encoder*)&self
 
 ## Upcast to TextCodec::ISO2022JPEncoder (implemented by every struct in its hierarchy).
 pub interface IsIso2022JpEncoder:
@@ -178,9 +178,9 @@ pub enum Iso2022JpEncoderState as i32:
 pub struct ShiftJisEncoder: IsShiftJisEncoder, IsEncoder:
     pub var encoder_base: Encoder  # primary base
 
-    func shift_jis_encoder() -> ShiftJisEncoder*: return (ShiftJisEncoder*)&self
+    pub func shift_jis_encoder() -> ShiftJisEncoder*: return (ShiftJisEncoder*)&self
 
-    func encoder() -> Encoder*: return (Encoder*)&self
+    pub func encoder() -> Encoder*: return (Encoder*)&self
 
 ## Upcast to TextCodec::ShiftJISEncoder (implemented by every struct in its hierarchy).
 pub interface IsShiftJisEncoder:
@@ -216,9 +216,9 @@ pub func as_shift_jis_encoder[P: IsEncoder](p: P*) -> ShiftJisEncoder*:
 pub struct EuckrEncoder: IsEuckrEncoder, IsEncoder:
     pub var encoder_base: Encoder  # primary base
 
-    func euckr_encoder() -> EuckrEncoder*: return (EuckrEncoder*)&self
+    pub func euckr_encoder() -> EuckrEncoder*: return (EuckrEncoder*)&self
 
-    func encoder() -> Encoder*: return (Encoder*)&self
+    pub func encoder() -> Encoder*: return (Encoder*)&self
 
 ## Upcast to TextCodec::EUCKREncoder (implemented by every struct in its hierarchy).
 pub interface IsEuckrEncoder:
@@ -256,7 +256,7 @@ pub struct Big5Encoder: IsBig5Encoder, IsEncoder:
 
     func big5_encoder() -> Big5Encoder*: return (Big5Encoder*)&self
 
-    func encoder() -> Encoder*: return (Encoder*)&self
+    pub func encoder() -> Encoder*: return (Encoder*)&self
 
 ## Upcast to TextCodec::Big5Encoder (implemented by every struct in its hierarchy).
 pub interface IsBig5Encoder:
@@ -295,7 +295,7 @@ pub struct Gb18030Encoder: IsGb18030Encoder, IsEncoder:
 
     func gb18030_encoder() -> Gb18030Encoder*: return (Gb18030Encoder*)&self
 
-    func encoder() -> Encoder*: return (Encoder*)&self
+    pub func encoder() -> Encoder*: return (Encoder*)&self
 
 ## The non-zero default member initializers of TextCodec::GB18030Encoder; the constructor runs them first.
 pub func gb18030_encoder_init_fields(this: Gb18030Encoder*):
@@ -344,7 +344,7 @@ pub struct SingleByteEncoder[TArrayType]: IsEncoder:
     pub var encoder_base: Encoder  # primary base
     pub var m_translation_table: TArrayType[128]
 
-    func encoder() -> Encoder*: return (Encoder*)&self
+    pub func encoder() -> Encoder*: return (Encoder*)&self
 
 ## Virtual functions introduced by TextCodec::SingleByteEncoder.
 pub struct SingleByteEncoderVTable:

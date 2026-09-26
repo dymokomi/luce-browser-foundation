@@ -43,7 +43,8 @@ pub func vector_clone[T](other: const Vector[T]*) -> Vector[T]:
     var vector: Vector[T]
     vector.m_atomic = other.m_atomic
     vector_ensure_capacity(&vector, vector_size(other))
-    if let source = other.m_outline_buffer:
+    if vector_size(other) > 0:
+        let source = other.m_outline_buffer else trap("VERIFY: Vector without storage")
         discard(typed_transfer_copy(vector_slot(&vector, 0), source, vector_size(other)))
     vector.m_size = vector_size(other)
     return vector

@@ -20,7 +20,7 @@ pub struct WeakContainer: IsWeakContainer:
     pub var m_heap: Heap*
     pub var m_list_node: ListNode
 
-    func weak_container() -> WeakContainer*: return (WeakContainer*)&self
+    pub func weak_container() -> WeakContainer*: return (WeakContainer*)&self
 
 ## The non-zero default member initializers of GC::WeakContainer; the constructor runs them first.
 pub func weak_container_init_fields(this: WeakContainer*):

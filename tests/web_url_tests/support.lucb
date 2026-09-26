@@ -1,0 +1,91 @@
+#==============================================================================================
+#
+#   support - helpers of the web_url tests
+#
+#   DESCRIPTION:
+#       The tests of this program go through ak's strings, views and builders, text_codec's
+#       encoders and web_unicode's IDNA and identifier properties. Expectations not taken from
+#       the donor's tests were printed by the reference build's LibURL (Ladybird 47c82b38d0)
+#       for the same input.
+#
+#       web_unicode (region r07) is not merged yet: the tests that reach its IDNA
+#       (public_suffix) or its identifier properties (every URLPattern test) start with
+#       `if not web_unicode_is_ported: return`. Remove the flag when r07 is merged.
+#
+#==============================================================================================
+
+import ak
+import memory
+import web_url
+
+## Whether region r07's web_unicode functions (IDNA, identifier properties) are ported.
+var web_unicode_is_ported: bool = false
+
+# mark: Parsing ================================================================================
+
+# URL::Parser::basic_parse("text"sv).
+func parse(text: str) -> web_url.Url?:
+    return web_url.parser_basic_parse(web_url.sv(text))
+
+# URL::Parser::basic_parse("text"sv).value().
+func must_parse(text: str) -> web_url.Url:
+    return parse(text) else trap("URL::Parser::basic_parse failed")
+
+# URL::Parser::parse_host("text"sv).value().
+func must_parse_host(text: str) -> web_url.Host:
+    return web_url.parser_parse_host(web_url.sv(text)) else trap("URL::Parser::parse_host failed")
+
+# mark: Expectations ===========================================================================
+
+# The bytes of a String as text, for messages.
+func text_of(string: ak.String) -> str:
+    # A short String keeps its bytes inline, in this frame's copy: copy them out.
+    let bytes = ak.string_base_bytes(&string.string_base)
+    let copy = alloc u8[bytes.length] else trap("out of memory")
+    memory.copy(copy, bytes, bytes.length)
+    return (str)copy
+
+# EXPECT_EQ(string, "expected").
+func expect_string(actual: ak.String, expected: str):
+    if not web_url.string_is(actual, expected):
+        print(f"expected \"{expected}\", got \"{text_of(actual)}\"")
+        trap("EXPECT_EQ failed")
+
+# EXPECT_EQ(optional_string, "expected"): present and equal.
+func expect_optional_string(actual: ak.String?, expected: str):
+    if actual == none:
+        print(f"expected \"{expected}\", got no value")
+        trap("EXPECT_EQ failed")
+    expect_string(actual else trap("unreachable"), expected)
+
+# EXPECT_EQ(byte_string, "expected").
+func expect_byte_string(actual: ak.ByteString, expected: str):
+    let view = ak.byte_string_view(&actual)
+    if not web_url.view_is(view, expected):
+        print(f"expected \"{expected}\", got \"{(str)ak.string_view_bytes(&view)}\"")
+        trap("EXPECT_EQ failed")
+
+# EXPECT_EQ(url->serialize(), "expected").
+func expect_serialization(url: web_url.Url, expected: str):
+    expect_string(web_url.url_serialize(&url), expected)
+
+# String::repeated(code_point, count).
+func repeated(byte: u8, count: usize) -> ak.String:
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    ak.string_builder_append_repeated_u8(&builder, byte, count)
+    return ak.string_builder_to_string_without_validation(&builder)
+
+# String::formatted("{}{}{}", prefix, middle, suffix).
+func concatenated(prefix: str, middle: ak.String, suffix: str) -> ak.String:
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    ak.string_builder_append_string_view(&builder, web_url.sv(prefix))
+    web_url.append_string(&builder, middle)
+    ak.string_builder_append_string_view(&builder, web_url.sv(suffix))
+    return ak.string_builder_to_string_without_validation(&builder)
+
+# ByteString from text.
+func byte_string(text: str) -> ak.ByteString:
+    let view = web_url.sv(text)
+    return ak.string_view_to_byte_string(&view)

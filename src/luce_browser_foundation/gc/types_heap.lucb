@@ -102,9 +102,9 @@ pub struct GraphConstructorVisitor: IsGraphConstructorVisitor, IsCellVisitor:
     pub var m_min_block_address: usize
     pub var m_max_block_address: usize
 
-    func graph_constructor_visitor() -> GraphConstructorVisitor*: return (GraphConstructorVisitor*)&self
+    pub func graph_constructor_visitor() -> GraphConstructorVisitor*: return (GraphConstructorVisitor*)&self
 
-    func cell_visitor() -> CellVisitor*: return (CellVisitor*)&self
+    pub func cell_visitor() -> CellVisitor*: return (CellVisitor*)&self
 
 ## Upcast to GC::GraphConstructorVisitor (implemented by every struct in its hierarchy).
 pub interface IsGraphConstructorVisitor:
@@ -154,9 +154,9 @@ pub struct MarkingVisitor: IsMarkingVisitor, IsCellVisitor:
     pub var m_min_block_address: usize
     pub var m_max_block_address: usize
 
-    func marking_visitor() -> MarkingVisitor*: return (MarkingVisitor*)&self
+    pub func marking_visitor() -> MarkingVisitor*: return (MarkingVisitor*)&self
 
-    func cell_visitor() -> CellVisitor*: return (CellVisitor*)&self
+    pub func cell_visitor() -> CellVisitor*: return (CellVisitor*)&self
 
 ## Upcast to GC::MarkingVisitor (implemented by every struct in its hierarchy).
 pub interface IsMarkingVisitor:

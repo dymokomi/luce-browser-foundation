@@ -371,3 +371,15 @@ test "all_of and any_of over a vector":
     var empty: Vector[i32]
     assert(all_of_t_container(&empty, Function1[const i32*, bool](call = test_vector_is_even, context = none)))
     assert(not any_of_t_container(&empty, Function1[const i32*, bool](call = test_vector_is_even, context = none)))
+
+test "vector: copy of an empty vector that has capacity":
+    # Vector(Vector const&) of a cleared-with-capacity vector copies no elements (found by
+    # LibURL's tests at integration).
+    var values: Vector[i32]
+    vector_ensure_capacity(&values, 8)
+    let copy = vector_clone(&values)
+    assert(vector_is_empty(&copy))
+    vector_append_t(&values, 7)
+    vector_clear_with_capacity(&values)
+    let second = vector_clone(&values)
+    assert(vector_size(&second) == 0)

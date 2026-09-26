@@ -1,4 +1,99 @@
 # C++ name	package	module	Luce name	file:line	kind
+(integration: a StringView as text for a debug message; non-UTF-8 bytes print as a marker.)	luce-browser-foundation	ak	string_view_text	-	addition
+(r02: A `Function<bool(char)>`-shaped predicate over bytes (StringView::split_view_if).)	luce-browser-foundation	ak	CharPredicate	-	addition
+(r02: A `Function<bool(u32)>`-shaped predicate over code points (Utf8View::for_each_split_view's)	luce-browser-foundation	ak	CodePointPredicate	-	addition
+(r02: A code_point_to_utf8 callback that writes the bytes into a four-byte array (the C++'s `Arr)	luce-browser-foundation	ak	CodePointAsUtf8	-	addition
+(r02: A plain function (such as is_ascii_digit) used as a CharPredicate.)	luce-browser-foundation	ak	CharPredicateFunction	-	addition
+(r02: A plain function (such as is_ascii_digit) used as a CodePointPredicate.)	luce-browser-foundation	ak	CodePointPredicateFunction	-	addition
+(r02: A view of `bytes` (the value form of StringView(ReadonlyBytes)).)	luce-browser-foundation	ak	string_view_from_bytes	-	addition
+(r02: The VariadicFormatParams of `formatted("{}", value)` for one double: `storage` holds the o)	luce-browser-foundation	ak	type_erased_format_params_for_f64	-	addition
+(r02: The `Callback` of StringView::for_each_split_view: receives each part. The C++ callback ma)	luce-browser-foundation	ak	StringViewCallback	-	addition
+(r02: The `Callback` of UnicodeUtils::code_point_to_utf16: receives one UTF-16 code unit.)	luce-browser-foundation	ak	Utf16CodeUnitCallback	-	addition
+(r02: The `Callback` of UnicodeUtils::code_point_to_utf8: receives one UTF-8 byte.)	luce-browser-foundation	ak	Utf8ByteCallback	-	addition
+(r02: The `Callback` of UnicodeUtils::try_code_point_to_utf16: receives one code unit, may fail.)	luce-browser-foundation	ak	FallibleUtf16CodeUnitCallback	-	addition
+(r02: The `Callback` of UnicodeUtils::try_code_point_to_utf8: receives one UTF-8 byte, may fail.)	luce-browser-foundation	ak	FallibleUtf8ByteCallback	-	addition
+(r02: The `Callback` of Utf16View::for_each_split_view: receives each part, answers whether to g)	luce-browser-foundation	ak	Utf16ViewCallback	-	addition
+(r02: The `Callback` of Utf8View::for_each_split_view: receives each part.)	luce-browser-foundation	ak	Utf8ViewCallback	-	addition
+(r02: The `Func` of StringBase::replace_with_new_short_string: fills a short string's bytes.)	luce-browser-foundation	ak	ShortStringBytesCallback	-	addition
+(r02: The `Func` of StringBase::replace_with_new_string: fills the new string's bytes.)	luce-browser-foundation	ak	BytesCallback	-	addition
+(r02: The `[&](Bytes buffer) { bytes.copy_to(buffer); }` lambda several String functions pass to)	luce-browser-foundation	ak	CopyBytesToBuffer	-	addition
+(r02: The is_any_of lambda applied to a code unit (GenericLexer<char16_t> calls it with char16_t)	luce-browser-foundation	ak	CodePointIsAnyOf	-	addition
+(r02: The lambda of AK::is_any_of: `values.contains(c)`.)	luce-browser-foundation	ak	IsAnyOf	-	addition
+(r02: The lambda of AK::is_not_any_of: `!values.contains(c)`.)	luce-browser-foundation	ak	IsNotAnyOf	-	addition
+(r02: The same lambda for replace_with_new_short_string.)	luce-browser-foundation	ak	CopyBytesToShortString	-	addition
+(r02: The value of `StringBase {}`: the empty string.)	luce-browser-foundation	ak	string_base_new	-	addition
+(r02: Whether the iterator is at the end (`it == view.end()` for an iterator of that view).)	luce-browser-foundation	ak	utf16_code_point_iterator_done	-	addition
+(r02: `"text"_fly_string` from a `str` (DESIGN.md §2.6's generated FlyString constants are built)	luce-browser-foundation	ak	fly_string_from_str	-	addition
+(r02: `"text"_string`: a String of a literal or any other `str` (DESIGN.md §2.6's `ak.string`; a)	luce-browser-foundation	ak	string_from_str	-	addition
+(r02: `"text"sv` for UTF-16 views of ASCII: `Utf16View { "text"sv }`.)	luce-browser-foundation	ak	utf16_sv	-	addition
+(r02: `"text"sv`: a view of a string literal or any other `str` (DESIGN.md §2.6).)	luce-browser-foundation	ak	sv	-	addition
+(r02: `ByteString("text")`: a ByteString of a literal or any other `str`.)	luce-browser-foundation	ak	byte_string_from_str	-	addition
+(r02: `ByteString(impl)`: the value form of the ByteStringImpl constructors.)	luce-browser-foundation	ak	byte_string_from_impl	-	addition
+(r02: `ByteString(view)`: a ByteString of a view's bytes (the value form of the StringView const)	luce-browser-foundation	ak	byte_string_from_string_view	-	addition
+(r02: `FlyString { string }`: the value form of the String constructor (and of `operator=(String)	luce-browser-foundation	ak	fly_string_from_string	-	addition
+(r02: `FlyString {}`: the empty string.)	luce-browser-foundation	ak	fly_string_new	-	addition
+(r02: `GenericLexer lexer(input)`: the value form of the constructor.)	luce-browser-foundation	ak	generic_lexer_new	-	addition
+(r02: `IPv4Address(a, b, c, d)`: the value form of the octets constructor.)	luce-browser-foundation	ak	i_pv4_address_from_octets	-	addition
+(r02: `LexicalPath { path }`: the value form of the constructor.)	luce-browser-foundation	ak	lexical_path_new	-	addition
+(r02: `NumericLimits<size_t>::max()`: an unknown code point count.)	luce-browser-foundation	ak	usize_max_code_points	-	addition
+(r02: `ReadonlySpan<u32> { m_code_points, m_length }`: the code points as a span.)	luce-browser-foundation	ak	utf32_view_span	-	addition
+(r02: `String {}`: the empty string (a zero-initialized String is the invalid sentinel instead).)	luce-browser-foundation	ak	string_new	-	addition
+(r02: `String::operator==(String const&) = default`: compares the StringBases.)	luce-browser-foundation	ak	string_equals	-	addition
+(r02: `StringBuilder builder(initial_capacity);`)	luce-browser-foundation	ak	string_builder_new_usize	-	addition
+(r02: `StringBuilder builder(mode);`)	luce-browser-foundation	ak	string_builder_new_mode	-	addition
+(r02: `StringBuilder builder(mode, initial_capacity_in_code_units);`)	luce-browser-foundation	ak	string_builder_new_mode_usize	-	addition
+(r02: `StringBuilder builder;`: a UTF-8 builder.)	luce-browser-foundation	ak	string_builder_new	-	addition
+(r02: `Traits<ByteString>::hash`: the impl's hash.)	luce-browser-foundation	ak	byte_string_traits_hash	-	addition
+(r02: `Traits<String>::hash` (AK/String.cpp): the string's hash.)	luce-browser-foundation	ak	string_hash_value	-	addition
+(r02: `Utf16FlyString { string }`: the value form of the Utf16String constructor.)	luce-browser-foundation	ak	utf16_fly_string_from_utf16_string	-	addition
+(r02: `Utf16FlyString {}`: the empty string.)	luce-browser-foundation	ak	utf16_fly_string_new	-	addition
+(r02: `Utf16GenericLexer lexer(input)`: the value form of the constructor.)	luce-browser-foundation	ak	utf16_generic_lexer_new	-	addition
+(r02: `Utf16String {}`: the empty string.)	luce-browser-foundation	ak	utf16_string_new	-	addition
+(r02: `Utf16StringBase {}`: the empty string.)	luce-browser-foundation	ak	utf16_string_base_new	-	addition
+(r02: `Utf16View { data, length }` over ASCII bytes (the private constructor; also the ASCII Str)	luce-browser-foundation	ak	utf16_view_from_ascii	-	addition
+(r02: `Utf16View { data, length }` over UTF-16 code units.)	luce-browser-foundation	ak	utf16_view_from_utf16	-	addition
+(r02: `Utf16View {}`: the empty view.)	luce-browser-foundation	ak	utf16_view_new	-	addition
+(r02: `Utf32View { code_points }`: the value form of the span constructor.)	luce-browser-foundation	ak	utf32_view_from_span	-	addition
+(r02: `Utf8CodePointIterator::operator== = default`.)	luce-browser-foundation	ak	utf8_code_point_iterator_eq	-	addition
+(r02: `__builtin_memcmp(a, b, min(a.size(), b.size()))`: compares the common prefix of two byte )	luce-browser-foundation	ak	compare_bytes	-	addition
+(r02: `builder.append("text"sv)`: appends a string literal or any other `str`.)	luce-browser-foundation	ak	string_builder_append	-	addition
+(r02: `bytes.copy_to(buffer)`: copies `bytes` to the front of `buffer`, which must be large enou)	luce-browser-foundation	ak	copy_bytes	-	addition
+(r02: `u"text"_utf16_fly_string` from a `str`.)	luce-browser-foundation	ak	utf16_fly_string_from_str	-	addition
+(r02: `u"text"_utf16` from a `str`: a Utf16String of a literal or any other valid UTF-8 text.)	luce-browser-foundation	ak	utf16_string_from_str	-	addition
+(r02: `view == "text"`: compares with a string literal (the C++'s `sv == "text"sv`).)	luce-browser-foundation	ak	string_view_equals	-	addition
+(r02: simdutf::base64_length_from_binary.)	luce-browser-foundation	ak	simdutf_base64_length_from_binary	-	addition
+(r02: simdutf::base64_options (the values AK uses; base64_reverse_padding is 2).)	luce-browser-foundation	ak	SimdutfBase64Options	-	addition
+(r02: simdutf::base64_to_binary_safe (base64_to_binary_safe_impl): decodes `input` into the firs)	luce-browser-foundation	ak	simdutf_base64_to_binary_safe	-	addition
+(r02: simdutf::binary_to_base64 (scalar::base64::tail_encode_base64): the characters written.)	luce-browser-foundation	ak	simdutf_binary_to_base64	-	addition
+(r02: simdutf::convert_utf16_to_utf8: the UTF-8 bytes written for host-endian UTF-16, or 0 when )	luce-browser-foundation	ak	simdutf_convert_utf16_to_utf8	-	addition
+(r02: simdutf::convert_utf16_to_utf8_with_errors (scalar utf16_to_utf8::convert_with_errors): wr)	luce-browser-foundation	ak	simdutf_convert_utf16_to_utf8_with_errors	-	addition
+(r02: simdutf::convert_utf16le_to_utf8 / convert_utf16be_to_utf8 over raw bytes: the UTF-8 bytes)	luce-browser-foundation	ak	simdutf_convert_utf16_bytes_to_utf8	-	addition
+(r02: simdutf::convert_utf32_to_utf16: the host-endian code units written, or 0 for an invalid v)	luce-browser-foundation	ak	simdutf_convert_utf32_to_utf16	-	addition
+(r02: simdutf::convert_utf32_to_utf8: the UTF-8 bytes written, or 0 for an invalid value.)	luce-browser-foundation	ak	simdutf_convert_utf32_to_utf8	-	addition
+(r02: simdutf::convert_utf8_to_utf16: transcodes UTF-8 into host-endian UTF-16 and answers the c)	luce-browser-foundation	ak	simdutf_convert_utf8_to_utf16	-	addition
+(r02: simdutf::count_utf16: the number of code points of valid UTF-16.)	luce-browser-foundation	ak	simdutf_count_utf16	-	addition
+(r02: simdutf::count_utf8: the number of code points of valid UTF-8 (bytes that are not continua)	luce-browser-foundation	ak	simdutf_count_utf8	-	addition
+(r02: simdutf::error_code.)	luce-browser-foundation	ak	SimdutfErrorCode	-	addition
+(r02: simdutf::find over UTF-16 code units: the index of the first `needle`, or none.)	luce-browser-foundation	ak	simdutf_find_u16	-	addition
+(r02: simdutf::find over bytes: the index of the first `needle`, or none.)	luce-browser-foundation	ak	simdutf_find	-	addition
+(r02: simdutf::full_result: an error, the input and output positions, and whether the error was )	luce-browser-foundation	ak	SimdutfFullResult	-	addition
+(r02: simdutf::last_chunk_handling_options.)	luce-browser-foundation	ak	SimdutfLastChunkHandling	-	addition
+(r02: simdutf::maximal_binary_length_from_base64: an upper bound of the decoded length. We follo)	luce-browser-foundation	ak	simdutf_maximal_binary_length_from_base64	-	addition
+(r02: simdutf::result: an error code and the input position it concerns (or the count processed))	luce-browser-foundation	ak	SimdutfResult	-	addition
+(r02: simdutf::to_well_formed_utf16 (scalar utf16::to_well_formed_utf16): copies host-endian UTF)	luce-browser-foundation	ak	simdutf_to_well_formed_utf16	-	addition
+(r02: simdutf::to_well_formed_utf16le / to_well_formed_utf16be over raw bytes: the well-formed c)	luce-browser-foundation	ak	simdutf_to_well_formed_utf16_bytes	-	addition
+(r02: simdutf::utf16_length_from_utf32.)	luce-browser-foundation	ak	simdutf_utf16_length_from_utf32	-	addition
+(r02: simdutf::utf16_length_from_utf8: the UTF-16 code units valid UTF-8 needs.)	luce-browser-foundation	ak	simdutf_utf16_length_from_utf8	-	addition
+(r02: simdutf::utf8_length_from_utf16: the UTF-8 bytes valid UTF-16 needs.)	luce-browser-foundation	ak	simdutf_utf8_length_from_utf16	-	addition
+(r02: simdutf::utf8_length_from_utf16le / utf8_length_from_utf16be over raw bytes.)	luce-browser-foundation	ak	simdutf_utf8_length_from_utf16_bytes	-	addition
+(r02: simdutf::validate_ascii: whether every byte is below 0x80.)	luce-browser-foundation	ak	simdutf_validate_ascii	-	addition
+(r02: simdutf::validate_utf16: whether host-endian UTF-16 has no lonely surrogate.)	luce-browser-foundation	ak	simdutf_validate_utf16	-	addition
+(r02: simdutf::validate_utf16_as_ascii: whether every code unit is below 0x80.)	luce-browser-foundation	ak	simdutf_validate_utf16_as_ascii	-	addition
+(r02: simdutf::validate_utf16_with_errors (scalar utf16::validate_with_errors).)	luce-browser-foundation	ak	simdutf_validate_utf16_with_errors	-	addition
+(r02: simdutf::validate_utf16le / validate_utf16be over raw bytes (a trailing odd byte is ignore)	luce-browser-foundation	ak	simdutf_validate_utf16_bytes	-	addition
+(r02: simdutf::validate_utf32: whether every value is a Unicode scalar value.)	luce-browser-foundation	ak	simdutf_validate_utf32	-	addition
+(r02: simdutf::validate_utf8.)	luce-browser-foundation	ak	simdutf_validate_utf8	-	addition
+(r02: simdutf::validate_utf8_with_errors (scalar utf8::validate_with_errors): the first error an)	luce-browser-foundation	ak	simdutf_validate_utf8_with_errors	-	addition
 AK::(anonymous)::convert_unsigned_to_string	luce-browser-foundation	ak	convert_unsigned_to_string	AK/Format.cpp:65	stub
 AK::(anonymous)::now_time_from_clock	luce-browser-foundation	ak	now_time_from_clock	AK/Time.cpp:427	stub
 AK::(anonymous)::use_next_index	luce-browser-foundation	ak	use_next_index	AK/Format.cpp:61	variable
@@ -150,10 +245,14 @@ AK::ByteString::impl	luce-browser-foundation	ak	byte_string_impl	AK/ByteString.h
 AK::ByteString::is_empty	luce-browser-foundation	ak	byte_string_is_empty	AK/ByteString.h:190	ported
 AK::ByteString::is_whitespace	luce-browser-foundation	ak	byte_string_is_whitespace	AK/ByteString.h:138	ported
 AK::ByteString::join	luce-browser-foundation	ak	byte_string_join	AK/ByteString.h:112	dropped
+AK::ByteString::join over StringViews with the default "{}"	luce-browser-foundation	ak	byte_string_join_string_view	AK/ByteString.h:112	ported
 AK::ByteString::length	luce-browser-foundation	ak	byte_string_length	AK/ByteString.h:191	ported
 AK::ByteString::matches	luce-browser-foundation	ak	byte_string_matches_case_sensitivity	AK/ByteString.cpp:193	ported
 AK::ByteString::matches	luce-browser-foundation	ak	byte_string_matches_vector	AK/ByteString.cpp:188	ported
 AK::ByteString::number	luce-browser-foundation	ak	byte_string_number	AK/ByteString.h:123	dropped
+AK::ByteString::number for floating-point T: formatted	luce-browser-foundation	ak	byte_string_number_f64	AK/ByteString.h:123	ported
+AK::ByteString::number for signed integral T	luce-browser-foundation	ak	byte_string_number_i64	AK/ByteString.h:123	ported
+AK::ByteString::number for unsigned integral T	luce-browser-foundation	ak	byte_string_number_u64	AK/ByteString.h:123	ported
 AK::ByteString::operator<	luce-browser-foundation	ak	byte_string_lt	AK/ByteString.cpp:29	ported
 AK::ByteString::operator<=	luce-browser-foundation	ak	byte_string_le_byte_string	AK/ByteString.h:229	ported
 AK::ByteString::operator<=	luce-browser-foundation	ak	byte_string_le_u8	AK/ByteString.h:230	ported
@@ -171,6 +270,7 @@ AK::ByteString::reverse	luce-browser-foundation	ak	byte_string_reverse	AK/ByteSt
 AK::ByteString::split	luce-browser-foundation	ak	byte_string_split	AK/ByteString.cpp:79	ported
 AK::ByteString::split_limit	luce-browser-foundation	ak	byte_string_split_limit	AK/ByteString.cpp:84	ported
 AK::ByteString::split_view	luce-browser-foundation	ak	byte_string_split_view_function1	AK/ByteString.cpp:108	dropped
+AK::ByteString::split_view	luce-browser-foundation	ak	byte_string_split_view_if	AK/ByteString.cpp:108	ported
 AK::ByteString::split_view	luce-browser-foundation	ak	byte_string_split_view_u8	AK/ByteString.cpp:132	ported
 AK::ByteString::starts_with	luce-browser-foundation	ak	byte_string_starts_with_string_view	AK/ByteString.cpp:143	ported
 AK::ByteString::starts_with	luce-browser-foundation	ak	byte_string_starts_with_u8	AK/ByteString.cpp:148	ported
@@ -181,6 +281,16 @@ AK::ByteString::substring_view	luce-browser-foundation	ak	byte_string_substring_
 AK::ByteString::to_byte_buffer	luce-browser-foundation	ak	byte_string_to_byte_buffer	AK/ByteString.cpp:137	ported
 AK::ByteString::to_lowercase	luce-browser-foundation	ak	byte_string_to_lowercase	AK/ByteString.cpp:245	ported
 AK::ByteString::to_number	luce-browser-foundation	ak	byte_string_to_number	AK/ByteString.h:129	dropped
+AK::ByteString::to_number<f32>	luce-browser-foundation	ak	byte_string_to_number_f32	AK/ByteString.h:129	ported
+AK::ByteString::to_number<f64>	luce-browser-foundation	ak	byte_string_to_number_f64	AK/ByteString.h:129	ported
+AK::ByteString::to_number<i16>	luce-browser-foundation	ak	byte_string_to_number_i16	AK/ByteString.h:129	ported
+AK::ByteString::to_number<i32>	luce-browser-foundation	ak	byte_string_to_number_i32	AK/ByteString.h:129	ported
+AK::ByteString::to_number<i64>	luce-browser-foundation	ak	byte_string_to_number_i64	AK/ByteString.h:129	ported
+AK::ByteString::to_number<i8>	luce-browser-foundation	ak	byte_string_to_number_i8	AK/ByteString.h:129	ported
+AK::ByteString::to_number<u16>	luce-browser-foundation	ak	byte_string_to_number_u16	AK/ByteString.h:129	ported
+AK::ByteString::to_number<u32>	luce-browser-foundation	ak	byte_string_to_number_u32	AK/ByteString.h:129	ported
+AK::ByteString::to_number<u64>	luce-browser-foundation	ak	byte_string_to_number_u64	AK/ByteString.h:129	ported
+AK::ByteString::to_number<u8>	luce-browser-foundation	ak	byte_string_to_number_u8	AK/ByteString.h:129	ported
 AK::ByteString::to_snakecase	luce-browser-foundation	ak	byte_string_to_snakecase	AK/ByteString.cpp:273	ported
 AK::ByteString::to_uppercase	luce-browser-foundation	ak	byte_string_to_uppercase	AK/ByteString.cpp:259	ported
 AK::ByteString::trim	luce-browser-foundation	ak	byte_string_trim	AK/ByteString.h:140	ported
@@ -358,47 +468,107 @@ AK::Detail::ExtractIntrusiveListTypes	luce-browser-foundation	ak	ExtractIntrusiv
 AK::Detail::ExtractIntrusiveRedBlackTreeTypes	luce-browser-foundation	ak	ExtractIntrusiveRedBlackTreeTypes	AK/IntrusiveRedBlackTree.h:17	struct
 AK::Detail::GenericLexer	luce-browser-foundation	ak	GenericLexer	AK/GenericLexer.h:41	generic struct
 AK::Detail::GenericLexer::GenericLexer<CharType>	luce-browser-foundation	ak	generic_lexer_construct	AK/GenericLexer.h:47	construct
+AK::Detail::GenericLexer::GenericLexer<char16_t>	luce-browser-foundation	ak	utf16_generic_lexer_construct	AK/GenericLexer.h:47	ported
 AK::Detail::GenericLexer::code_unit_at	luce-browser-foundation	ak	generic_lexer_code_unit_at	AK/GenericLexer.h:478	ported
+AK::Detail::GenericLexer::code_unit_at	luce-browser-foundation	ak	utf16_generic_lexer_code_unit_at	AK/GenericLexer.h:478	ported
 AK::Detail::GenericLexer::consume	luce-browser-foundation	ak	generic_lexer_consume	AK/GenericLexer.h:113	ported
 AK::Detail::GenericLexer::consume	luce-browser-foundation	ak	generic_lexer_consume_usize	AK/GenericLexer.h:173	ported
+AK::Detail::GenericLexer::consume	luce-browser-foundation	ak	utf16_generic_lexer_consume	AK/GenericLexer.h:113	ported
+AK::Detail::GenericLexer::consume	luce-browser-foundation	ak	utf16_generic_lexer_consume_usize	AK/GenericLexer.h:173	ported
 AK::Detail::GenericLexer::consume_all	luce-browser-foundation	ak	generic_lexer_consume_all	AK/GenericLexer.h:183	ported
+AK::Detail::GenericLexer::consume_all	luce-browser-foundation	ak	utf16_generic_lexer_consume_all	AK/GenericLexer.h:183	ported
 AK::Detail::GenericLexer::consume_decimal_integer	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer	AK/GenericLexer.h:264	dropped
+AK::Detail::GenericLexer::consume_decimal_integer<T>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_magnitude	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<T>, for	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_magnitude	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<i16>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_i16	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<i16>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_i16	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<i32>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_i32	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<i32>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_i32	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<i64>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_i64	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<i64>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_i64	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<i8>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_i8	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<i8>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_i8	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<u16>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_u16	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<u16>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_u16	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<u32>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_u32	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<u32>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_u32	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<u64>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_u64	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<u64>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_u64	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<u8>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_u8	AK/GenericLexer.h:264	ported
+AK::Detail::GenericLexer::consume_decimal_integer<u8>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_u8	AK/GenericLexer.h:264	ported
 AK::Detail::GenericLexer::consume_escaped_character	luce-browser-foundation	ak	generic_lexer_consume_escaped_character	AK/GenericLexer.h:157	ported
+AK::Detail::GenericLexer::consume_escaped_character. An	luce-browser-foundation	ak	utf16_generic_lexer_consume_escaped_character	AK/GenericLexer.h:157	ported
 AK::Detail::GenericLexer::consume_escaped_code_point	luce-browser-foundation	ak	generic_lexer_consume_escaped_code_point	AK/GenericLexer.h:311	ported
+AK::Detail::GenericLexer::consume_escaped_code_point	luce-browser-foundation	ak	utf16_generic_lexer_consume_escaped_code_point	AK/GenericLexer.h:311	ported
 AK::Detail::GenericLexer::consume_line	luce-browser-foundation	ak	generic_lexer_consume_line	AK/GenericLexer.h:191	ported
+AK::Detail::GenericLexer::consume_line	luce-browser-foundation	ak	utf16_generic_lexer_consume_line	AK/GenericLexer.h:191	ported
 AK::Detail::GenericLexer::consume_quoted_string	luce-browser-foundation	ak	generic_lexer_consume_quoted_string	AK/GenericLexer.h:235	ported
+AK::Detail::GenericLexer::consume_quoted_string	luce-browser-foundation	ak	utf16_generic_lexer_consume_quoted_string	AK/GenericLexer.h:235	ported
 AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	generic_lexer_consume_specific_opaque	AK/GenericLexer.h:134	dropped
 AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	generic_lexer_consume_specific_string_view	AK/GenericLexer.h:147	ported
 AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	generic_lexer_consume_specific_t_char_type	AK/GenericLexer.h:119	ported
 AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	generic_lexer_consume_specific_u8	AK/GenericLexer.h:128	dropped
+AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	utf16_generic_lexer_consume_specific_string_view	AK/GenericLexer.h:147	ported
+AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	utf16_generic_lexer_consume_specific_t_char_type	AK/GenericLexer.h:119	ported
+AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	utf16_generic_lexer_consume_specific_u8	AK/GenericLexer.h:128	ported
+AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	utf16_generic_lexer_consume_specific_utf16_view	AK/GenericLexer.h:134	ported
 AK::Detail::GenericLexer::consume_specific_with_predicate	luce-browser-foundation	ak	generic_lexer_consume_specific_with_predicate	AK/GenericLexer.h:379	ported
+AK::Detail::GenericLexer::consume_specific_with_predicate	luce-browser-foundation	ak	utf16_generic_lexer_consume_specific_with_predicate	AK/GenericLexer.h:379	ported
 AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	generic_lexer_consume_until_opaque	AK/GenericLexer.h:222	dropped
+AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	generic_lexer_consume_until_string_view	AK/GenericLexer.h:222	ported
 AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	generic_lexer_consume_until_t_char_type	AK/GenericLexer.h:205	ported
 AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	generic_lexer_consume_until_tt_predicate	AK/GenericLexer.h:368	ported
 AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	generic_lexer_consume_until_u8	AK/GenericLexer.h:215	dropped
+AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	utf16_generic_lexer_consume_until_t_char_type	AK/GenericLexer.h:205	ported
+AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	utf16_generic_lexer_consume_until_tt_predicate	AK/GenericLexer.h:368	ported
+AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	utf16_generic_lexer_consume_until_u8	AK/GenericLexer.h:215	ported
+AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	utf16_generic_lexer_consume_until_utf16_view	AK/GenericLexer.h:222	ported
 AK::Detail::GenericLexer::consume_while	luce-browser-foundation	ak	generic_lexer_consume_while	AK/GenericLexer.h:356	ported
+AK::Detail::GenericLexer::consume_while	luce-browser-foundation	ak	utf16_generic_lexer_consume_while	AK/GenericLexer.h:356	ported
 AK::Detail::GenericLexer::decode_code_point	luce-browser-foundation	ak	generic_lexer_decode_code_point	AK/GenericLexer.h:405	ported
+AK::Detail::GenericLexer::decode_code_point	luce-browser-foundation	ak	utf16_generic_lexer_decode_code_point	AK/GenericLexer.h:405	ported
 AK::Detail::GenericLexer::decode_single_or_paired_surrogate	luce-browser-foundation	ak	generic_lexer_decode_single_or_paired_surrogate	AK/GenericLexer.h:430	ported
+AK::Detail::GenericLexer::decode_single_or_paired_surrogate	luce-browser-foundation	ak	utf16_generic_lexer_decode_single_or_paired_surrogate	AK/GenericLexer.h:430	ported
 AK::Detail::GenericLexer::ignore	luce-browser-foundation	ak	generic_lexer_ignore	AK/GenericLexer.h:321	ported
+AK::Detail::GenericLexer::ignore	luce-browser-foundation	ak	utf16_generic_lexer_ignore	AK/GenericLexer.h:321	ported
 AK::Detail::GenericLexer::ignore_until	luce-browser-foundation	ak	generic_lexer_ignore_until_t_char_type	AK/GenericLexer.h:327	ported
 AK::Detail::GenericLexer::ignore_until	luce-browser-foundation	ak	generic_lexer_ignore_until_tt_predicate	AK/GenericLexer.h:398	ported
 AK::Detail::GenericLexer::ignore_until	luce-browser-foundation	ak	generic_lexer_ignore_until_u8	AK/GenericLexer.h:333	dropped
+AK::Detail::GenericLexer::ignore_until	luce-browser-foundation	ak	utf16_generic_lexer_ignore_until_t_char_type	AK/GenericLexer.h:327	ported
+AK::Detail::GenericLexer::ignore_until	luce-browser-foundation	ak	utf16_generic_lexer_ignore_until_tt_predicate	AK/GenericLexer.h:398	ported
+AK::Detail::GenericLexer::ignore_until	luce-browser-foundation	ak	utf16_generic_lexer_ignore_until_u8	AK/GenericLexer.h:333	ported
 AK::Detail::GenericLexer::ignore_while	luce-browser-foundation	ak	generic_lexer_ignore_while	AK/GenericLexer.h:390	ported
+AK::Detail::GenericLexer::ignore_while	luce-browser-foundation	ak	utf16_generic_lexer_ignore_while	AK/GenericLexer.h:390	ported
 AK::Detail::GenericLexer::input	luce-browser-foundation	ak	generic_lexer_input	AK/GenericLexer.h:56	ported
+AK::Detail::GenericLexer::input	luce-browser-foundation	ak	utf16_generic_lexer_input	AK/GenericLexer.h:56	ported
 AK::Detail::GenericLexer::input_length	luce-browser-foundation	ak	generic_lexer_input_length	AK/GenericLexer.h:470	ported
+AK::Detail::GenericLexer::input_length	luce-browser-foundation	ak	utf16_generic_lexer_input_length	AK/GenericLexer.h:470	ported
 AK::Detail::GenericLexer::is_eof	luce-browser-foundation	ak	generic_lexer_is_eof	AK/GenericLexer.h:58	ported
+AK::Detail::GenericLexer::is_eof	luce-browser-foundation	ak	utf16_generic_lexer_is_eof	AK/GenericLexer.h:58	ported
 AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	generic_lexer_next_is_opaque	AK/GenericLexer.h:83	dropped
 AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	generic_lexer_next_is_string_view	AK/GenericLexer.h:95	ported
 AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	generic_lexer_next_is_t_char_type	AK/GenericLexer.h:72	ported
 AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	generic_lexer_next_is_tt_predicate	AK/GenericLexer.h:349	ported
 AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	generic_lexer_next_is_u8	AK/GenericLexer.h:77	dropped
+AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	utf16_generic_lexer_next_is_string_view	AK/GenericLexer.h:95	ported
+AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	utf16_generic_lexer_next_is_t_char_type	AK/GenericLexer.h:72	ported
+AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	utf16_generic_lexer_next_is_tt_predicate	AK/GenericLexer.h:349	ported
+AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	utf16_generic_lexer_next_is_u8	AK/GenericLexer.h:77	ported
+AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	utf16_generic_lexer_next_is_utf16_view	AK/GenericLexer.h:83	ported
 AK::Detail::GenericLexer::peek	luce-browser-foundation	ak	generic_lexer_peek	AK/GenericLexer.h:60	ported
+AK::Detail::GenericLexer::peek	luce-browser-foundation	ak	utf16_generic_lexer_peek	AK/GenericLexer.h:60	ported
 AK::Detail::GenericLexer::peek_string	luce-browser-foundation	ak	generic_lexer_peek_string	AK/GenericLexer.h:65	ported
+AK::Detail::GenericLexer::peek_string	luce-browser-foundation	ak	utf16_generic_lexer_peek_string	AK/GenericLexer.h:65	ported
 AK::Detail::GenericLexer::remaining	luce-browser-foundation	ak	generic_lexer_remaining	AK/GenericLexer.h:55	ported
+AK::Detail::GenericLexer::remaining	luce-browser-foundation	ak	utf16_generic_lexer_remaining	AK/GenericLexer.h:55	ported
 AK::Detail::GenericLexer::retreat	luce-browser-foundation	ak	generic_lexer_retreat	AK/GenericLexer.h:101	ported
 AK::Detail::GenericLexer::retreat	luce-browser-foundation	ak	generic_lexer_retreat_usize	AK/GenericLexer.h:107	ported
+AK::Detail::GenericLexer::retreat	luce-browser-foundation	ak	utf16_generic_lexer_retreat	AK/GenericLexer.h:101	ported
+AK::Detail::GenericLexer::retreat	luce-browser-foundation	ak	utf16_generic_lexer_retreat_usize	AK/GenericLexer.h:107	ported
 AK::Detail::GenericLexer::tell	luce-browser-foundation	ak	generic_lexer_tell	AK/GenericLexer.h:52	ported
+AK::Detail::GenericLexer::tell	luce-browser-foundation	ak	utf16_generic_lexer_tell	AK/GenericLexer.h:52	ported
 AK::Detail::GenericLexer::tell_remaining	luce-browser-foundation	ak	generic_lexer_tell_remaining	AK/GenericLexer.h:53	ported
+AK::Detail::GenericLexer::tell_remaining	luce-browser-foundation	ak	utf16_generic_lexer_tell_remaining	AK/GenericLexer.h:53	ported
 AK::Detail::HaveObjcArc	luce-browser-foundation	ak	have_objc_arc	AK/Function.h:63	variable
 AK::Detail::IntegerWrapper	luce-browser-foundation	ak	IntegerWrapper	AK/BigIntBase.h:154	opaque
 AK::Detail::IntrusiveList	luce-browser-foundation	ak	IntrusiveList	AK/IntrusiveList.h:44	generic struct
@@ -677,6 +847,16 @@ AK::Detail::Utf16StringBase::substring_view	luce-browser-foundation	ak	utf16_str
 AK::Detail::Utf16StringBase::substring_view	luce-browser-foundation	ak	utf16_string_base_substring_view_usize	AK/Utf16StringBase.h:227	ported
 AK::Detail::Utf16StringBase::to_byte_string	luce-browser-foundation	ak	utf16_string_base_to_byte_string	AK/Utf16StringBase.h:70	ported
 AK::Detail::Utf16StringBase::to_number	luce-browser-foundation	ak	utf16_string_base_to_number	AK/Utf16StringBase.h:99	dropped
+AK::Detail::Utf16StringBase::to_number<f32>	luce-browser-foundation	ak	utf16_string_base_to_number_f32	AK/Utf16StringBase.h:98	ported
+AK::Detail::Utf16StringBase::to_number<f64>	luce-browser-foundation	ak	utf16_string_base_to_number_f64	AK/Utf16StringBase.h:98	ported
+AK::Detail::Utf16StringBase::to_number<i16>	luce-browser-foundation	ak	utf16_string_base_to_number_i16	AK/Utf16StringBase.h:98	ported
+AK::Detail::Utf16StringBase::to_number<i32>	luce-browser-foundation	ak	utf16_string_base_to_number_i32	AK/Utf16StringBase.h:98	ported
+AK::Detail::Utf16StringBase::to_number<i64>	luce-browser-foundation	ak	utf16_string_base_to_number_i64	AK/Utf16StringBase.h:98	ported
+AK::Detail::Utf16StringBase::to_number<i8>	luce-browser-foundation	ak	utf16_string_base_to_number_i8	AK/Utf16StringBase.h:98	ported
+AK::Detail::Utf16StringBase::to_number<u16>	luce-browser-foundation	ak	utf16_string_base_to_number_u16	AK/Utf16StringBase.h:98	ported
+AK::Detail::Utf16StringBase::to_number<u32>	luce-browser-foundation	ak	utf16_string_base_to_number_u32	AK/Utf16StringBase.h:98	ported
+AK::Detail::Utf16StringBase::to_number<u64>	luce-browser-foundation	ak	utf16_string_base_to_number_u64	AK/Utf16StringBase.h:98	ported
+AK::Detail::Utf16StringBase::to_number<u8>	luce-browser-foundation	ak	utf16_string_base_to_number_u8	AK/Utf16StringBase.h:98	ported
 AK::Detail::Utf16StringBase::to_utf8	luce-browser-foundation	ak	utf16_string_base_to_utf8	AK/Utf16StringBase.h:60	ported
 AK::Detail::Utf16StringBase::to_utf8_but_should_be_ported_to_utf16	luce-browser-foundation	ak	utf16_string_base_to_utf8_but_should_be_ported_to_utf16	AK/Utf16StringBase.h:65	ported
 AK::Detail::Utf16StringBase::utf16_view	luce-browser-foundation	ak	utf16_string_base_utf16_view	AK/Utf16StringBase.h:85	ported
@@ -690,6 +870,8 @@ AK::Detail::Utf16StringData::allocation_size_for_string_data	luce-browser-founda
 AK::Detail::Utf16StringData::ascii_view	luce-browser-foundation	ak	utf16_string_data_ascii_view	AK/Utf16StringData.h:101	ported
 AK::Detail::Utf16StringData::calculate_code_point_length	luce-browser-foundation	ak	utf16_string_data_calculate_code_point_length	AK/Utf16StringData.cpp:202	ported
 AK::Detail::Utf16StringData::create_from_code_point_iterable	luce-browser-foundation	ak	utf16_string_data_create_from_code_point_iterable	AK/Utf16StringData.cpp:32	dropped
+AK::Detail::Utf16StringData::create_from_code_point_iterable	luce-browser-foundation	ak	utf16_string_data_create_from_code_point_iterable_utf32_view	AK/Utf16StringData.cpp:28	ported
+AK::Detail::Utf16StringData::create_from_code_point_iterable	luce-browser-foundation	ak	utf16_string_data_create_from_code_point_iterable_utf8_view	AK/Utf16StringData.cpp:28	ported
 AK::Detail::Utf16StringData::create_uninitialized	luce-browser-foundation	ak	utf16_string_data_create_uninitialized	AK/Utf16StringData.cpp:21	ported
 AK::Detail::Utf16StringData::from_ascii	luce-browser-foundation	ak	utf16_string_data_from_ascii	AK/Utf16StringData.cpp:58	ported
 AK::Detail::Utf16StringData::from_ipc_stream	luce-browser-foundation	ak	utf16_string_data_from_ipc_stream	AK/Utf16StringData.cpp:170	ported
@@ -717,6 +899,7 @@ AK::Detail::VariantConstructors::VariantConstructors<T, Base>	luce-browser-found
 AK::Detail::VariantConstructors::internal_cast	luce-browser-foundation	ak	variant_constructors_internal_cast	AK/Variant.h:152	stub
 AK::Detail::VariantNoClearTag	luce-browser-foundation	ak	VariantNoClearTag	AK/Variant.h:125	struct
 AK::Detail::VectorMetadata	luce-browser-foundation	ak	VectorMetadata	AK/Vector.h:45	generic struct
+AK::Detail::bitap_bitwise: the offset of the first match, or none	luce-browser-foundation	ak	bitap_bitwise	AK/MemMem.h:19	ported
 AK::Detail::block_layout_size	luce-browser-foundation	ak	block_layout_size	AK/Function.h:67	variable
 AK::Detail::did_destroy_fly_string_data	luce-browser-foundation	ak	did_destroy_fly_string_data	AK/FlyString.cpp:210	ported
 AK::Detail::did_destroy_utf16_fly_string_data	luce-browser-foundation	ak	did_destroy_utf16_fly_string_data	AK/Utf16FlyString.cpp:27	ported
@@ -1369,6 +1552,7 @@ AK::LexicalPath::is_absolute	luce-browser-foundation	ak	lexical_path_is_absolute
 AK::LexicalPath::is_absolute_path	luce-browser-foundation	ak	lexical_path_is_absolute_path	AK/LexicalPath.cpp:61	ported
 AK::LexicalPath::is_child_of	luce-browser-foundation	ak	lexical_path_is_child_of	AK/LexicalPath.cpp:85	ported
 AK::LexicalPath::is_root	luce-browser-foundation	ak	lexical_path_is_root	AK/LexicalPath.cpp:66	ported
+AK::LexicalPath::join: `first` and each of `rest`, joined	luce-browser-foundation	ak	lexical_path_join	AK/LexicalPath.h:51	ported
 AK::LexicalPath::parent	luce-browser-foundation	ak	lexical_path_parent	AK/LexicalPath.cpp:210	ported
 AK::LexicalPath::parts	luce-browser-foundation	ak	lexical_path_parts	AK/LexicalPath.cpp:71	ported
 AK::LexicalPath::parts_view	luce-browser-foundation	ak	lexical_path_parts_view	AK/LexicalPath.h:40	ported
@@ -1735,7 +1919,12 @@ AK::String::is_ascii	luce-browser-foundation	ak	string_is_ascii	AK/String.h:118	
 AK::String::is_empty	luce-browser-foundation	ak	string_is_empty	AK/String.h:145	ported
 AK::String::is_invalid	luce-browser-foundation	ak	string_is_invalid	AK/String.h:234	ported
 AK::String::join	luce-browser-foundation	ak	string_join	AK/String.h:214	dropped
+AK::String::join over StringViews with the default "{}" format	luce-browser-foundation	ak	string_join_string_view	AK/String.h:214	ported
+AK::String::join over Strings with the default "{}" format	luce-browser-foundation	ak	string_join_string	AK/String.h:214	ported
 AK::String::number	luce-browser-foundation	ak	string_number	AK/String.h:193	dropped
+AK::String::number	luce-browser-foundation	ak	string_number_f64	AK/String.h:199	ported
+AK::String::number	luce-browser-foundation	ak	string_number_i64	AK/String.h:193	ported
+AK::String::number	luce-browser-foundation	ak	string_number_u64	AK/String.h:193	ported
 AK::String::operator<=>	luce-browser-foundation	ak	string_cmp	AK/String.h:176	ported
 AK::String::operator==	luce-browser-foundation	ak	string_eq_fly_string	AK/String.cpp:254	ported
 AK::String::operator==	luce-browser-foundation	ak	string_eq_string_view	AK/String.cpp:259	ported
@@ -1760,6 +1949,16 @@ AK::String::to_casefold	luce-browser-foundation	ak	string_to_casefold	Libraries/
 AK::String::to_fullwidth	luce-browser-foundation	ak	string_to_fullwidth	Libraries/LibUnicode/String.cpp:90	stub
 AK::String::to_lowercase	luce-browser-foundation	ak	string_to_lowercase	Libraries/LibUnicode/String.cpp:38	stub
 AK::String::to_number	luce-browser-foundation	ak	string_to_number	AK/String.h:199	dropped
+AK::String::to_number<f32>	luce-browser-foundation	ak	string_to_number_f32	AK/String.h:199	ported
+AK::String::to_number<f64>	luce-browser-foundation	ak	string_to_number_f64	AK/String.h:199	ported
+AK::String::to_number<i16>	luce-browser-foundation	ak	string_to_number_i16	AK/String.h:199	ported
+AK::String::to_number<i32>	luce-browser-foundation	ak	string_to_number_i32	AK/String.h:199	ported
+AK::String::to_number<i64>	luce-browser-foundation	ak	string_to_number_i64	AK/String.h:199	ported
+AK::String::to_number<i8>	luce-browser-foundation	ak	string_to_number_i8	AK/String.h:199	ported
+AK::String::to_number<u16>	luce-browser-foundation	ak	string_to_number_u16	AK/String.h:199	ported
+AK::String::to_number<u32>	luce-browser-foundation	ak	string_to_number_u32	AK/String.h:199	ported
+AK::String::to_number<u64>	luce-browser-foundation	ak	string_to_number_u64	AK/String.h:199	ported
+AK::String::to_number<u8>	luce-browser-foundation	ak	string_to_number_u8	AK/String.h:199	ported
 AK::String::to_titlecase	luce-browser-foundation	ak	string_to_titlecase	Libraries/LibUnicode/String.cpp:70	stub
 AK::String::to_uppercase	luce-browser-foundation	ak	string_to_uppercase	Libraries/LibUnicode/String.cpp:54	stub
 AK::String::trim	luce-browser-foundation	ak	string_trim_string_view	AK/String.cpp:338	ported
@@ -1797,6 +1996,10 @@ AK::StringBuilder::initialize_buffer	luce-browser-foundation	ak	string_builder_i
 AK::StringBuilder::inline_capacity	luce-browser-foundation	ak	string_builder_inline_capacity	AK/StringBuilder.h:25	variable
 AK::StringBuilder::is_empty	luce-browser-foundation	ak	string_builder_is_empty	AK/StringBuilder.cpp:113	ported
 AK::StringBuilder::join	luce-browser-foundation	ak	string_builder_join	AK/StringBuilder.h:100	dropped
+AK::StringBuilder::join over FlyStrings with the default	luce-browser-foundation	ak	string_builder_join_fly_string	AK/StringBuilder.h:100	ported
+AK::StringBuilder::join over StringViews with the default	luce-browser-foundation	ak	string_builder_join_string_view	AK/StringBuilder.h:100	ported
+AK::StringBuilder::join over Strings with the default "{}"	luce-browser-foundation	ak	string_builder_join_string	AK/StringBuilder.h:100	ported
+AK::StringBuilder::join over Utf16Views with the default "{}"	luce-browser-foundation	ak	string_builder_join_utf16_view	AK/StringBuilder.h:100	ported
 AK::StringBuilder::leak_buffer_for_string_construction	luce-browser-foundation	ak	string_builder_leak_buffer_for_string_construction	AK/StringBuilder.cpp:559	ported
 AK::StringBuilder::leak_buffer_for_string_construction	luce-browser-foundation	ak	string_builder_leak_buffer_for_string_construction_string_data	AK/StringBuilder.h:118	ported
 AK::StringBuilder::leak_buffer_for_string_construction	luce-browser-foundation	ak	string_builder_leak_buffer_for_string_construction_utf16_string_data	AK/StringBuilder.h:119	ported
@@ -1823,6 +2026,8 @@ AK::StringBuilder::try_append_repeated	luce-browser-foundation	ak	string_builder
 AK::StringBuilder::try_append_repeated	luce-browser-foundation	ak	string_builder_try_append_repeated_u8	AK/StringBuilder.cpp:198	ported
 AK::StringBuilder::try_append_repeated	luce-browser-foundation	ak	string_builder_try_append_repeated_utf16_view	AK/StringBuilder.cpp:227	ported
 AK::StringBuilder::try_join	luce-browser-foundation	ak	string_builder_try_join	AK/StringBuilder.h:106	dropped
+AK::StringBuilder::try_join over StringViews with the	luce-browser-foundation	ak	string_builder_try_join_string_view	AK/StringBuilder.h:106	ported
+AK::StringBuilder::try_join over Strings with the default	luce-browser-foundation	ak	string_builder_try_join_string	AK/StringBuilder.h:106	ported
 AK::StringBuilder::utf16_string_view	luce-browser-foundation	ak	string_builder_utf16_string_view	AK/StringBuilder.cpp:352	ported
 AK::StringBuilder::will_append	luce-browser-foundation	ak	string_builder_will_append	AK/StringBuilder.cpp:70	ported
 AK::StringUtils::SearchDirection	luce-browser-foundation	ak	SearchDirection	AK/StringUtils.h:93	enum
@@ -1888,6 +2093,7 @@ AK::StringView::for_each_split_view	luce-browser-foundation	ak	string_view_for_e
 AK::StringView::hash	luce-browser-foundation	ak	string_view_hash	AK/StringView.h:84	ported
 AK::StringView::is_ascii	luce-browser-foundation	ak	string_view_is_ascii	AK/StringView.cpp:201	ported
 AK::StringView::is_empty	luce-browser-foundation	ak	string_view_is_empty	AK/StringView.h:64	ported
+AK::StringView::is_one_of_ignoring_ascii_case	luce-browser-foundation	ak	string_view_is_one_of_ignoring_ascii_case	AK/StringView.h:336	ported
 AK::StringView::is_whitespace	luce-browser-foundation	ak	string_view_is_whitespace	AK/StringView.h:312	ported
 AK::StringView::length	luce-browser-foundation	ak	string_view_length	AK/StringView.h:67	ported
 AK::StringView::lines	luce-browser-foundation	ak	string_view_lines	AK/StringView.cpp:104	ported
@@ -1918,6 +2124,16 @@ AK::StringView::to_ascii_titlecase_string	luce-browser-foundation	ak	string_view
 AK::StringView::to_ascii_uppercase_string	luce-browser-foundation	ak	string_view_to_ascii_uppercase_string	AK/StringView.cpp:223	ported
 AK::StringView::to_byte_string	luce-browser-foundation	ak	string_view_to_byte_string	AK/StringView.cpp:278	ported
 AK::StringView::to_number	luce-browser-foundation	ak	string_view_to_number	AK/StringView.h:348	dropped
+AK::StringView::to_number<f32>	luce-browser-foundation	ak	string_view_to_number_f32	AK/StringView.h:348	ported
+AK::StringView::to_number<f64>	luce-browser-foundation	ak	string_view_to_number_f64	AK/StringView.h:348	ported
+AK::StringView::to_number<i16>	luce-browser-foundation	ak	string_view_to_number_i16	AK/StringView.h:348	ported
+AK::StringView::to_number<i32>	luce-browser-foundation	ak	string_view_to_number_i32	AK/StringView.h:348	ported
+AK::StringView::to_number<i64>	luce-browser-foundation	ak	string_view_to_number_i64	AK/StringView.h:348	ported
+AK::StringView::to_number<i8>	luce-browser-foundation	ak	string_view_to_number_i8	AK/StringView.h:348	ported
+AK::StringView::to_number<u16>	luce-browser-foundation	ak	string_view_to_number_u16	AK/StringView.h:348	ported
+AK::StringView::to_number<u32>	luce-browser-foundation	ak	string_view_to_number_u32	AK/StringView.h:348	ported
+AK::StringView::to_number<u64>	luce-browser-foundation	ak	string_view_to_number_u64	AK/StringView.h:348	ported
+AK::StringView::to_number<u8>	luce-browser-foundation	ak	string_view_to_number_u8	AK/StringView.h:348	ported
 AK::StringView::trim	luce-browser-foundation	ak	string_view_trim	AK/StringView.h:103	ported
 AK::StringView::trim_whitespace	luce-browser-foundation	ak	string_view_trim_whitespace	AK/StringView.h:104	ported
 AK::TemporaryChange	luce-browser-foundation	ak	TemporaryChange	AK/TemporaryChange.h:15	generic struct
@@ -1927,6 +2143,8 @@ AK::TimeLiterals::operator""_ns	luce-browser-foundation	ak	time_literals_literal
 AK::TimeLiterals::operator""_sec	luce-browser-foundation	ak	time_literals_literalsec	AK/Time.h:663	stub
 AK::TimeLiterals::operator""_us	luce-browser-foundation	ak	time_literals_literalus	AK/Time.h:661	stub
 AK::TrailingCodePointTransformation	luce-browser-foundation	ak	TrailingCodePointTransformation	AK/StringUtils.h:59	enum
+AK::Traits<URL::Origin>	luce-browser-foundation	web_url	OriginTraits	Libraries/LibURL/Origin.h:85	struct
+AK::Traits<URL::Origin>::hash	luce-browser-foundation	web_url	origin_traits_hash	Libraries/LibURL/Origin.cpp:137	ported
 AK::TriState	luce-browser-foundation	ak	TriState	AK/Types.h:187	enum
 AK::Trie	luce-browser-foundation	ak	Trie	AK/Trie.h:288	generic struct
 AK::Trie::Trie<ValueType, MetadataT, ValueTraits, BaseT, MapType>	luce-browser-foundation	ak	trie_construct	AK/Trie.h:299	construct
@@ -2032,6 +2250,8 @@ AK::Utf16FlyString::code_point_offset_of	luce-browser-foundation	ak	utf16_fly_st
 AK::Utf16FlyString::code_unit_at	luce-browser-foundation	ak	utf16_fly_string_code_unit_at	AK/Utf16FlyString.h:133	ported
 AK::Utf16FlyString::code_unit_offset_of	luce-browser-foundation	ak	utf16_fly_string_code_unit_offset_of	AK/Utf16FlyString.h:136	ported
 AK::Utf16FlyString::create_fly_string_from_cache	luce-browser-foundation	ak	utf16_fly_string_create_fly_string_from_cache	AK/Utf16FlyString.cpp:35	dropped
+AK::Utf16FlyString::create_fly_string_from_cache for a	luce-browser-foundation	ak	utf16_fly_string_create_fly_string_from_cache_string_view	AK/Utf16FlyString.cpp:35	ported
+AK::Utf16FlyString::create_fly_string_from_cache for a	luce-browser-foundation	ak	utf16_fly_string_create_fly_string_from_cache_utf16_view	AK/Utf16FlyString.cpp:35	ported
 AK::Utf16FlyString::equals_ignoring_ascii_case	luce-browser-foundation	ak	utf16_fly_string_equals_ignoring_ascii_case_utf16_fly_string	AK/Utf16FlyString.h:105	ported
 AK::Utf16FlyString::equals_ignoring_ascii_case	luce-browser-foundation	ak	utf16_fly_string_equals_ignoring_ascii_case_utf16_view	AK/Utf16FlyString.h:112	ported
 AK::Utf16FlyString::from_ascii_short_string_without_validation	luce-browser-foundation	ak	utf16_fly_string_from_ascii_short_string_without_validation_u16	AK/Utf16FlyString.h:158	ported
@@ -2061,6 +2281,16 @@ AK::Utf16FlyString::to_ascii_lowercase	luce-browser-foundation	ak	utf16_fly_stri
 AK::Utf16FlyString::to_ascii_titlecase	luce-browser-foundation	ak	utf16_fly_string_to_ascii_titlecase	AK/Utf16FlyString.h:80	ported
 AK::Utf16FlyString::to_ascii_uppercase	luce-browser-foundation	ak	utf16_fly_string_to_ascii_uppercase	AK/Utf16FlyString.h:65	ported
 AK::Utf16FlyString::to_number	luce-browser-foundation	ak	utf16_fly_string_to_number	AK/Utf16FlyString.h:86	dropped
+AK::Utf16FlyString::to_number<f32>	luce-browser-foundation	ak	utf16_fly_string_to_number_f32	AK/Utf16FlyString.h:87	ported
+AK::Utf16FlyString::to_number<f64>	luce-browser-foundation	ak	utf16_fly_string_to_number_f64	AK/Utf16FlyString.h:87	ported
+AK::Utf16FlyString::to_number<i16>	luce-browser-foundation	ak	utf16_fly_string_to_number_i16	AK/Utf16FlyString.h:87	ported
+AK::Utf16FlyString::to_number<i32>	luce-browser-foundation	ak	utf16_fly_string_to_number_i32	AK/Utf16FlyString.h:87	ported
+AK::Utf16FlyString::to_number<i64>	luce-browser-foundation	ak	utf16_fly_string_to_number_i64	AK/Utf16FlyString.h:87	ported
+AK::Utf16FlyString::to_number<i8>	luce-browser-foundation	ak	utf16_fly_string_to_number_i8	AK/Utf16FlyString.h:87	ported
+AK::Utf16FlyString::to_number<u16>	luce-browser-foundation	ak	utf16_fly_string_to_number_u16	AK/Utf16FlyString.h:87	ported
+AK::Utf16FlyString::to_number<u32>	luce-browser-foundation	ak	utf16_fly_string_to_number_u32	AK/Utf16FlyString.h:87	ported
+AK::Utf16FlyString::to_number<u64>	luce-browser-foundation	ak	utf16_fly_string_to_number_u64	AK/Utf16FlyString.h:87	ported
+AK::Utf16FlyString::to_number<u8>	luce-browser-foundation	ak	utf16_fly_string_to_number_u8	AK/Utf16FlyString.h:87	ported
 AK::Utf16FlyString::to_utf16_string	luce-browser-foundation	ak	utf16_fly_string_to_utf16_string_const_2	AK/Utf16FlyString.h:44	ported
 AK::Utf16FlyString::view	luce-browser-foundation	ak	utf16_fly_string_view	AK/Utf16FlyString.h:37	ported
 AK::Utf16FlyStringTableHashTraits	luce-browser-foundation	ak	Utf16FlyStringTableHashTraits	AK/Utf16FlyString.cpp:13	struct
@@ -2089,7 +2319,11 @@ AK::Utf16String::from_utf8_with_replacement_character	luce-browser-foundation	ak
 AK::Utf16String::from_utf8_without_validation	luce-browser-foundation	ak	utf16_string_from_utf8_without_validation	AK/Utf16String.cpp:55	ported
 AK::Utf16String::is_invalid	luce-browser-foundation	ak	utf16_string_is_invalid	AK/Utf16String.h:242	ported
 AK::Utf16String::join	luce-browser-foundation	ak	utf16_string_join	AK/Utf16String.h:136	dropped
+AK::Utf16String::join over StringViews with the default "{}"	luce-browser-foundation	ak	utf16_string_join_string_view	AK/Utf16String.h:150	ported
+AK::Utf16String::join over Utf16Views with the default "{}"	luce-browser-foundation	ak	utf16_string_join_utf16_view	AK/Utf16String.h:150	ported
 AK::Utf16String::number	luce-browser-foundation	ak	utf16_string_number	AK/Utf16String.h:130	dropped
+AK::Utf16String::number	luce-browser-foundation	ak	utf16_string_number_i64	AK/Utf16String.h:141	ported
+AK::Utf16String::number	luce-browser-foundation	ak	utf16_string_number_u64	AK/Utf16String.h:141	ported
 AK::Utf16String::repeated	luce-browser-foundation	ak	utf16_string_repeated	AK/Utf16String.cpp:140	ported
 AK::Utf16String::replace	luce-browser-foundation	ak	utf16_string_replace_u16	AK/Utf16String.h:191	ported
 AK::Utf16String::replace	luce-browser-foundation	ak	utf16_string_replace_utf16_view	AK/Utf16String.h:200	ported
@@ -2164,6 +2398,16 @@ AK::Utf16View::to_ascii_titlecase	luce-browser-foundation	ak	utf16_view_to_ascii
 AK::Utf16View::to_ascii_uppercase	luce-browser-foundation	ak	utf16_view_to_ascii_uppercase	AK/Utf16View.cpp:70	ported
 AK::Utf16View::to_byte_string	luce-browser-foundation	ak	utf16_view_to_byte_string	AK/Utf16View.cpp:55	ported
 AK::Utf16View::to_number	luce-browser-foundation	ak	utf16_view_to_number	AK/Utf16View.h:208	dropped
+AK::Utf16View::to_number<f32>	luce-browser-foundation	ak	utf16_view_to_number_f32	AK/Utf16View.h:208	ported
+AK::Utf16View::to_number<f64>	luce-browser-foundation	ak	utf16_view_to_number_f64	AK/Utf16View.h:208	ported
+AK::Utf16View::to_number<i16>	luce-browser-foundation	ak	utf16_view_to_number_i16	AK/Utf16View.h:208	ported
+AK::Utf16View::to_number<i32>	luce-browser-foundation	ak	utf16_view_to_number_i32	AK/Utf16View.h:208	ported
+AK::Utf16View::to_number<i64>	luce-browser-foundation	ak	utf16_view_to_number_i64	AK/Utf16View.h:208	ported
+AK::Utf16View::to_number<i8>	luce-browser-foundation	ak	utf16_view_to_number_i8	AK/Utf16View.h:208	ported
+AK::Utf16View::to_number<u16>	luce-browser-foundation	ak	utf16_view_to_number_u16	AK/Utf16View.h:208	ported
+AK::Utf16View::to_number<u32>	luce-browser-foundation	ak	utf16_view_to_number_u32	AK/Utf16View.h:208	ported
+AK::Utf16View::to_number<u64>	luce-browser-foundation	ak	utf16_view_to_number_u64	AK/Utf16View.h:208	ported
+AK::Utf16View::to_number<u8>	luce-browser-foundation	ak	utf16_view_to_number_u8	AK/Utf16View.h:208	ported
 AK::Utf16View::to_utf8	luce-browser-foundation	ak	utf16_view_to_utf8	AK/Utf16View.cpp:27	ported
 AK::Utf16View::to_utf8_but_should_be_ported_to_utf16	luce-browser-foundation	ak	utf16_view_to_utf8_but_should_be_ported_to_utf16	AK/Utf16View.h:178	ported
 AK::Utf16View::trim	luce-browser-foundation	ak	utf16_view_trim	AK/Utf16View.h:455	ported
@@ -2364,8 +2608,19 @@ AK::WeakLink::is_null	luce-browser-foundation	ak	weak_link_is_null	AK/Weakable.h
 AK::WeakLink::revoke	luce-browser-foundation	ak	weak_link_revoke	AK/Weakable.h:41	stub
 AK::WeakLink::strong_ref	luce-browser-foundation	ak	weak_link_strong_ref	AK/Weakable.h:27	stub
 AK::WeakLink::unsafe_ptr	luce-browser-foundation	ak	weak_link_unsafe_ptr	AK/Weakable.h:34	stub
+AK::WeakPtr	luce-browser-foundation	ak	WeakPtr	AK/WeakPtr.h:15	struct
+AK::WeakPtr::WeakPtr	luce-browser-foundation	ak	weak_ptr_from_object	AK/WeakPtr.h:77	ported
+AK::WeakPtr::clear	luce-browser-foundation	ak	weak_ptr_clear	AK/WeakPtr.h:164	ported
+AK::WeakPtr::has_value	luce-browser-foundation	ak	weak_ptr_has_value	AK/WeakPtr.h:162	ported
+AK::WeakPtr::is_null	luce-browser-foundation	ak	weak_ptr_is_null	AK/WeakPtr.h:161	ported
+AK::WeakPtr::operator bool	luce-browser-foundation	ak	weak_ptr_to_bool	AK/WeakPtr.h:159	ported
+AK::WeakPtr::ptr	luce-browser-foundation	ak	weak_ptr_ptr	AK/WeakPtr.h:142	ported
+AK::WeakPtr::strong_ref	luce-browser-foundation	ak	weak_ptr_strong_ref	AK/WeakPtr.h:137	ported
+AK::WeakPtr::take_link	luce-browser-foundation	ak	weak_ptr_take_link	AK/WeakPtr.h:166	ported
+AK::WeakPtr::unsafe_ptr	luce-browser-foundation	ak	weak_ptr_unsafe_ptr	AK/WeakPtr.h:146	ported
+AK::WeakPtr::value	luce-browser-foundation	ak	weak_ptr_value	AK/WeakPtr.h:153	ported
 AK::Weakable	luce-browser-foundation	ak	Weakable	AK/Weakable.h:54	generic struct
-AK::Weakable::make_weak_ptr	luce-browser-foundation	gc	weakable_make_weak_ptr	AK/Weakable.h:60	stub
+AK::Weakable::make_weak_ptr	luce-browser-foundation	ak	weakable_make_weak_ptr	AK/Weakable.h:60	ported
 AK::Weakable::revoke_weak_ptrs	luce-browser-foundation	ak	weakable_revoke_weak_ptrs	AK/Weakable.h:76	stub
 AK::XorShift128PlusRNG	luce-browser-foundation	ak	XorShift128PlusRng	AK/Random.h:37	struct
 AK::XorShift128PlusRNG::XorShift128PlusRNG	luce-browser-foundation	ak	xor_shift128_plus_rng_construct	AK/Random.cpp:139	construct
@@ -2438,7 +2693,14 @@ AK::convert_between_host_and_big_endian	luce-browser-foundation	ak	convert_betwe
 AK::convert_between_host_and_little_endian	luce-browser-foundation	ak	convert_between_host_and_little_endian	AK/Endian.h:28	stub
 AK::convert_between_host_and_network_endian	luce-browser-foundation	ak	convert_between_host_and_network_endian	AK/Endian.h:58	stub
 AK::convert_to_decimal_exponential_form	luce-browser-foundation	ak	convert_to_decimal_exponential_form	AK/StringConversions.cpp:158	dropped
+AK::convert_to_decimal_exponential_form<double>: the	luce-browser-foundation	ak	convert_to_decimal_exponential_form_f64	AK/StringConversions.cpp:155	ported
+AK::convert_to_decimal_exponential_form<float>	luce-browser-foundation	ak	convert_to_decimal_exponential_form_f32	AK/StringConversions.cpp:155	ported
 AK::create_string_from_number	luce-browser-foundation	ak	create_string_from_number	AK/StringNumber.h:12	dropped
+AK::create_string_from_number: the digits of the magnitude	luce-browser-foundation	ak	create_string_from_number_digits	AK/StringNumber.h:12	ported
+AK::create_string_from_number<String, T> for signed T	luce-browser-foundation	ak	create_string_from_number_string_i64	AK/StringNumber.h:12	ported
+AK::create_string_from_number<String, T> for unsigned T	luce-browser-foundation	ak	create_string_from_number_string_u64	AK/StringNumber.h:12	ported
+AK::create_string_from_number<Utf16String, T> for signed T	luce-browser-foundation	ak	create_string_from_number_utf16_string_i64	AK/StringNumber.h:12	ported
+AK::create_string_from_number<Utf16String, T> for unsigned T	luce-browser-foundation	ak	create_string_from_number_utf16_string_u64	AK/StringNumber.h:12	ported
 AK::current_process_id	luce-browser-foundation	ak	current_process_id	AK/Format.cpp:1308	stub
 AK::current_thread_id	luce-browser-foundation	ak	current_thread_id	AK/Format.cpp:1317	stub
 AK::day_of_week	luce-browser-foundation	ak	day_of_week	AK/Time.cpp:37	stub
@@ -2477,6 +2739,9 @@ AK::fixme_launder_const_through_pointer_cast	luce-browser-foundation	ak	fixme_la
 AK::fixme_launder_const_through_pointer_cast	luce-browser-foundation	ak	fixme_launder_const_through_pointer_cast_3	AK/RefPtr.h:329	stub
 AK::for_each_line	luce-browser-foundation	ak	for_each_line	AK/StringView.cpp:63	ported
 AK::from_chars	luce-browser-foundation	ak	from_chars	AK/StringConversions.cpp:37	dropped
+AK::from_chars for ValueType double	luce-browser-foundation	ak	from_chars_f64	AK/StringConversions.cpp:40	ported
+AK::from_chars for ValueType float	luce-browser-foundation	ak	from_chars_f32	AK/StringConversions.cpp:40	ported
+AK::from_chars for an integral ValueType	luce-browser-foundation	ak	from_chars_integer	AK/StringConversions.cpp:40	ported
 AK::full_memory_barrier	luce-browser-foundation	ak	full_memory_barrier	AK/Atomic.h:25	stub
 AK::gcd	luce-browser-foundation	ak	gcd	AK/IntegralMath.h:89	stub
 AK::generate_random_uuid	luce-browser-foundation	ak	generate_random_uuid	AK/Random.cpp:94	stub
@@ -2538,6 +2803,8 @@ AK::log2	luce-browser-foundation	ak	log2	AK/IntegralMath.h:22	stub
 AK::make_checked	luce-browser-foundation	ak	make_checked	AK/Checked.h:466	stub
 AK::max	luce-browser-foundation	ak	max	AK/StdLibExtras.h:65	stub
 AK::max_format_arguments	luce-browser-foundation	ak	max_format_arguments	AK/Format.h:52	variable
+AK::memmem	luce-browser-foundation	ak	memmem_kmp	AK/MemMem.h:46	ported
+AK::memmem_optional: the offset of `needle` in `haystack`	luce-browser-foundation	ak	memmem_optional	AK/MemMem.h:108	ported
 AK::min	luce-browser-foundation	ak	min	AK/StdLibExtras.h:59	stub
 AK::mix	luce-browser-foundation	ak	mix	AK/StdLibExtras.h:82	stub
 AK::ms_per_day	luce-browser-foundation	ak	ms_per_day	AK/Time.h:32	variable
@@ -2576,10 +2843,66 @@ AK::parse_ascii_digit	luce-browser-foundation	ak	parse_ascii_digit	AK/CharacterT
 AK::parse_ascii_hex_digit	luce-browser-foundation	ak	parse_ascii_hex_digit	AK/CharacterTypes.h:160	ported
 AK::parse_first_number	luce-browser-foundation	ak	parse_first_number_string_view	AK/StringConversions.cpp:63	dropped
 AK::parse_first_number	luce-browser-foundation	ak	parse_first_number_utf16_view	AK/StringConversions.cpp:72	dropped
+AK::parse_first_number<f32>	luce-browser-foundation	ak	parse_first_number_string_view_f32	AK/StringConversions.cpp:70	ported
+AK::parse_first_number<f32>	luce-browser-foundation	ak	parse_first_number_utf16_view_f32	AK/StringConversions.cpp:79	ported
+AK::parse_first_number<f64>	luce-browser-foundation	ak	parse_first_number_string_view_f64	AK/StringConversions.cpp:70	ported
+AK::parse_first_number<f64>	luce-browser-foundation	ak	parse_first_number_utf16_view_f64	AK/StringConversions.cpp:79	ported
+AK::parse_first_number<i16>	luce-browser-foundation	ak	parse_first_number_string_view_i16	AK/StringConversions.cpp:70	ported
+AK::parse_first_number<i16>	luce-browser-foundation	ak	parse_first_number_utf16_view_i16	AK/StringConversions.cpp:79	ported
+AK::parse_first_number<i32>	luce-browser-foundation	ak	parse_first_number_string_view_i32	AK/StringConversions.cpp:70	ported
+AK::parse_first_number<i32>	luce-browser-foundation	ak	parse_first_number_utf16_view_i32	AK/StringConversions.cpp:79	ported
+AK::parse_first_number<i64>	luce-browser-foundation	ak	parse_first_number_string_view_i64	AK/StringConversions.cpp:70	ported
+AK::parse_first_number<i64>	luce-browser-foundation	ak	parse_first_number_utf16_view_i64	AK/StringConversions.cpp:79	ported
+AK::parse_first_number<i8>	luce-browser-foundation	ak	parse_first_number_string_view_i8	AK/StringConversions.cpp:70	ported
+AK::parse_first_number<i8>	luce-browser-foundation	ak	parse_first_number_utf16_view_i8	AK/StringConversions.cpp:79	ported
+AK::parse_first_number<u16>	luce-browser-foundation	ak	parse_first_number_string_view_u16	AK/StringConversions.cpp:70	ported
+AK::parse_first_number<u16>	luce-browser-foundation	ak	parse_first_number_utf16_view_u16	AK/StringConversions.cpp:79	ported
+AK::parse_first_number<u32>	luce-browser-foundation	ak	parse_first_number_string_view_u32	AK/StringConversions.cpp:70	ported
+AK::parse_first_number<u32>	luce-browser-foundation	ak	parse_first_number_utf16_view_u32	AK/StringConversions.cpp:79	ported
+AK::parse_first_number<u64>	luce-browser-foundation	ak	parse_first_number_string_view_u64	AK/StringConversions.cpp:70	ported
+AK::parse_first_number<u64>	luce-browser-foundation	ak	parse_first_number_utf16_view_u64	AK/StringConversions.cpp:79	ported
+AK::parse_first_number<u8>	luce-browser-foundation	ak	parse_first_number_string_view_u8	AK/StringConversions.cpp:70	ported
+AK::parse_first_number<u8>	luce-browser-foundation	ak	parse_first_number_utf16_view_u8	AK/StringConversions.cpp:79	ported
 AK::parse_hexadecimal_number	luce-browser-foundation	ak	parse_hexadecimal_number_string_view	AK/StringConversions.cpp:136	dropped
 AK::parse_hexadecimal_number	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view	AK/StringConversions.cpp:142	dropped
+AK::parse_hexadecimal_number<i16>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_i16	AK/StringConversions.cpp:143	ported
+AK::parse_hexadecimal_number<i16>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_i16	AK/StringConversions.cpp:149	ported
+AK::parse_hexadecimal_number<i32>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_i32	AK/StringConversions.cpp:143	ported
+AK::parse_hexadecimal_number<i32>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_i32	AK/StringConversions.cpp:149	ported
+AK::parse_hexadecimal_number<i64>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_i64	AK/StringConversions.cpp:143	ported
+AK::parse_hexadecimal_number<i64>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_i64	AK/StringConversions.cpp:149	ported
+AK::parse_hexadecimal_number<i8>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_i8	AK/StringConversions.cpp:143	ported
+AK::parse_hexadecimal_number<i8>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_i8	AK/StringConversions.cpp:149	ported
+AK::parse_hexadecimal_number<u16>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_u16	AK/StringConversions.cpp:143	ported
+AK::parse_hexadecimal_number<u16>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_u16	AK/StringConversions.cpp:149	ported
+AK::parse_hexadecimal_number<u32>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_u32	AK/StringConversions.cpp:143	ported
+AK::parse_hexadecimal_number<u32>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_u32	AK/StringConversions.cpp:149	ported
+AK::parse_hexadecimal_number<u64>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_u64	AK/StringConversions.cpp:143	ported
+AK::parse_hexadecimal_number<u64>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_u64	AK/StringConversions.cpp:149	ported
+AK::parse_hexadecimal_number<u8>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_u8	AK/StringConversions.cpp:143	ported
+AK::parse_hexadecimal_number<u8>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_u8	AK/StringConversions.cpp:149	ported
 AK::parse_number	luce-browser-foundation	ak	parse_number_string_view	AK/StringConversions.cpp:92	dropped
 AK::parse_number	luce-browser-foundation	ak	parse_number_utf16_view	AK/StringConversions.cpp:108	dropped
+AK::parse_number<f32>	luce-browser-foundation	ak	parse_number_string_view_f32	AK/StringConversions.cpp:98	ported
+AK::parse_number<f32>	luce-browser-foundation	ak	parse_number_utf16_view_f32	AK/StringConversions.cpp:114	ported
+AK::parse_number<f64>	luce-browser-foundation	ak	parse_number_string_view_f64	AK/StringConversions.cpp:98	ported
+AK::parse_number<f64>	luce-browser-foundation	ak	parse_number_utf16_view_f64	AK/StringConversions.cpp:114	ported
+AK::parse_number<i16>	luce-browser-foundation	ak	parse_number_string_view_i16	AK/StringConversions.cpp:98	ported
+AK::parse_number<i16>	luce-browser-foundation	ak	parse_number_utf16_view_i16	AK/StringConversions.cpp:114	ported
+AK::parse_number<i32>	luce-browser-foundation	ak	parse_number_string_view_i32	AK/StringConversions.cpp:98	ported
+AK::parse_number<i32>	luce-browser-foundation	ak	parse_number_utf16_view_i32	AK/StringConversions.cpp:114	ported
+AK::parse_number<i64>	luce-browser-foundation	ak	parse_number_string_view_i64	AK/StringConversions.cpp:98	ported
+AK::parse_number<i64>	luce-browser-foundation	ak	parse_number_utf16_view_i64	AK/StringConversions.cpp:114	ported
+AK::parse_number<i8>	luce-browser-foundation	ak	parse_number_string_view_i8	AK/StringConversions.cpp:98	ported
+AK::parse_number<i8>	luce-browser-foundation	ak	parse_number_utf16_view_i8	AK/StringConversions.cpp:114	ported
+AK::parse_number<u16>	luce-browser-foundation	ak	parse_number_string_view_u16	AK/StringConversions.cpp:98	ported
+AK::parse_number<u16>	luce-browser-foundation	ak	parse_number_utf16_view_u16	AK/StringConversions.cpp:114	ported
+AK::parse_number<u32>	luce-browser-foundation	ak	parse_number_string_view_u32	AK/StringConversions.cpp:98	ported
+AK::parse_number<u32>	luce-browser-foundation	ak	parse_number_utf16_view_u32	AK/StringConversions.cpp:114	ported
+AK::parse_number<u64>	luce-browser-foundation	ak	parse_number_string_view_u64	AK/StringConversions.cpp:98	ported
+AK::parse_number<u64>	luce-browser-foundation	ak	parse_number_utf16_view_u64	AK/StringConversions.cpp:114	ported
+AK::parse_number<u8>	luce-browser-foundation	ak	parse_number_string_view_u8	AK/StringConversions.cpp:98	ported
+AK::parse_number<u8>	luce-browser-foundation	ak	parse_number_utf16_view_u8	AK/StringConversions.cpp:114	ported
 AK::pow	luce-browser-foundation	ak	pow	AK/Math.h:996	stub
 AK::process_name_for_logging	luce-browser-foundation	ak	process_name_for_logging	AK/Format.cpp:1269	stub
 AK::process_name_helper	luce-browser-foundation	ak	process_name_helper	AK/Format.cpp:1246	stub
@@ -3242,10 +3565,15 @@ URL::ExcludeFragment	luce-browser-foundation	web_url	ExcludeFragment	Libraries/L
 URL::Host	luce-browser-foundation	web_url	Host	Libraries/LibURL/Host.h:21	struct
 URL::Host::Host	luce-browser-foundation	web_url	host_construct_host_variant_type	Libraries/LibURL/Host.cpp:15	construct
 URL::Host::Host	luce-browser-foundation	web_url	host_construct_string	Libraries/LibURL/Host.cpp:20	construct
-URL::Host::get	luce-browser-foundation	web_url	host_get	Libraries/LibURL/Host.h:34	stub
-URL::Host::has	luce-browser-foundation	web_url	host_has	Libraries/LibURL/Host.h:31	stub
+URL::Host::get<IPv4Address>	luce-browser-foundation	web_url	host_get_i_pv4_address	Libraries/LibURL/Host.h:34	ported
+URL::Host::get<IPv6Address>	luce-browser-foundation	web_url	host_get_i_pv6_address	Libraries/LibURL/Host.h:34	ported
+URL::Host::get<String>	luce-browser-foundation	web_url	host_get_string	Libraries/LibURL/Host.h:34	ported
+URL::Host::has<IPv4Address>	luce-browser-foundation	web_url	host_has_i_pv4_address	Libraries/LibURL/Host.h:31	ported
+URL::Host::has<IPv6Address>	luce-browser-foundation	web_url	host_has_i_pv6_address	Libraries/LibURL/Host.h:31	ported
+URL::Host::has<String>	luce-browser-foundation	web_url	host_has_string	Libraries/LibURL/Host.h:31	ported
 URL::Host::is_domain	luce-browser-foundation	web_url	host_is_domain	Libraries/LibURL/Host.cpp:147	stub
 URL::Host::is_empty_host	luce-browser-foundation	web_url	host_is_empty_host	Libraries/LibURL/Host.cpp:154	stub
+URL::Host::operator==	luce-browser-foundation	web_url	host_eq	Libraries/LibURL/Host.h:36	ported
 URL::Host::public_suffix	luce-browser-foundation	web_url	host_public_suffix	Libraries/LibURL/Host.cpp:183	stub
 URL::Host::registrable_domain	luce-browser-foundation	web_url	host_registrable_domain	Libraries/LibURL/Host.cpp:220	stub
 URL::Host::serialize	luce-browser-foundation	web_url	host_serialize	Libraries/LibURL/Host.cpp:161	stub
@@ -3255,6 +3583,7 @@ URL::Origin::OpaqueData	luce-browser-foundation	web_url	OriginOpaqueData	Librari
 URL::Origin::OpaqueData::Type	luce-browser-foundation	web_url	OriginOpaqueDataType	Libraries/LibURL/Origin.h:21	enum
 URL::Origin::Origin	luce-browser-foundation	web_url	origin_construct_optional_string	Libraries/LibURL/Origin.cpp:19	construct
 URL::Origin::Origin	luce-browser-foundation	web_url	origin_construct_origin_opaque_data	Libraries/LibURL/Origin.h:31	construct
+URL::Origin::Origin	luce-browser-foundation	web_url	origin_tuple	Libraries/LibURL/Origin.cpp:19	construct
 URL::Origin::Tuple	luce-browser-foundation	web_url	OriginTuple	Libraries/LibURL/Origin.h:70	struct
 URL::Origin::create_opaque	luce-browser-foundation	web_url	origin_create_opaque	Libraries/LibURL/Origin.cpp:14	stub
 URL::Origin::domain	luce-browser-foundation	web_url	origin_domain	Libraries/LibURL/Origin.h:46	stub
@@ -3279,7 +3608,7 @@ URL::Parser::percent_encode_after_encoding	luce-browser-foundation	web_url	parse
 URL::Parser::shorten_urls_path	luce-browser-foundation	web_url	parser_shorten_urls_path	Libraries/LibURL/Parser.cpp:625	stub
 URL::Parser::state_name	luce-browser-foundation	web_url	parser_state_name	Libraries/LibURL/Parser.h:48	stub
 URL::Pattern::Component	luce-browser-foundation	web_url	Component	Libraries/LibURL/Pattern/Component.h:19	struct
-URL::Pattern::Component::ExecutionResult	luce-browser-foundation	web_url	ComponentExecutionResult	Libraries/LibURL/Pattern/Component.h:28	opaque
+URL::Pattern::Component::ExecutionResult	luce-browser-foundation	web_url	ComponentExecutionResult	Libraries/LibURL/Pattern/Component.h:28	struct
 URL::Pattern::Component::Result	luce-browser-foundation	web_url	ComponentResult	Libraries/LibURL/Pattern/Component.h:23	struct
 URL::Pattern::Component::compile	luce-browser-foundation	web_url	component_compile	Libraries/LibURL/Pattern/Component.cpp:218	stub
 URL::Pattern::Component::create_match_result	luce-browser-foundation	web_url	component_create_match_result	Libraries/LibURL/Pattern/Component.cpp:304	stub
@@ -3338,7 +3667,10 @@ URL::Pattern::Pattern::port_component	luce-browser-foundation	web_url	pattern_po
 URL::Pattern::Pattern::protocol_component	luce-browser-foundation	web_url	pattern_protocol_component	Libraries/LibURL/Pattern/Pattern.h:52	stub
 URL::Pattern::Pattern::search_component	luce-browser-foundation	web_url	pattern_search_component	Libraries/LibURL/Pattern/Pattern.h:58	stub
 URL::Pattern::Pattern::username_component	luce-browser-foundation	web_url	pattern_username_component	Libraries/LibURL/Pattern/Pattern.h:53	stub
+URL::Pattern::PatternErrorOr	luce-browser-foundation	web_url	pattern_error	Libraries/LibURL/Pattern/PatternError.h:21	variable
+URL::Pattern::PatternErrorOr::release_error	luce-browser-foundation	web_url	pattern_take_error_info	Libraries/LibURL/Pattern/PatternError.h:21	helper
 URL::Pattern::PatternParser	luce-browser-foundation	web_url	PatternParser	Libraries/LibURL/Pattern/PatternParser.h:18	struct
+URL::Pattern::PatternParser::EncodingCallback	luce-browser-foundation	web_url	EncodingCallback	Libraries/LibURL/Pattern/PatternParser.h:25	type
 URL::Pattern::PatternParser::PatternParser	luce-browser-foundation	web_url	pattern_parser_construct	Libraries/LibURL/Pattern/PatternParser.cpp:13	construct
 URL::Pattern::PatternParser::add_a_part	luce-browser-foundation	web_url	pattern_parser_add_a_part	Libraries/LibURL/Pattern/PatternParser.cpp:96	stub
 URL::Pattern::PatternParser::consume_a_required_token	luce-browser-foundation	web_url	pattern_parser_consume_a_required_token	Libraries/LibURL/Pattern/PatternParser.cpp:20	stub
@@ -3403,6 +3735,7 @@ URL::PublicSuffixData	luce-browser-foundation	web_url	PublicSuffixData	Build/Lib
 URL::PublicSuffixData::PublicSuffixData	luce-browser-foundation	web_url	public_suffix_data_construct	Build/Libraries/LibURL/PublicSuffixData.h:11	construct
 URL::PublicSuffixData::get_public_suffix	luce-browser-foundation	web_url	public_suffix_data_get_public_suffix	Build/Libraries/LibURL/PublicSuffixData.h:26	stub
 URL::PublicSuffixData::is_public_suffix	luce-browser-foundation	web_url	public_suffix_data_is_public_suffix	Build/Libraries/LibURL/PublicSuffixData.h:25	stub
+URL::PublicSuffixData::s_public_suffixes	luce-browser-foundation	web_url	s_public_suffixes	Build/Libraries/LibURL/PublicSuffixData.cpp:8	variable
 URL::PublicSuffixData::the	luce-browser-foundation	web_url	public_suffix_data_the	Build/Libraries/LibURL/PublicSuffixData.h:17	stub
 URL::SchemeAndHost	luce-browser-foundation	web_url	SchemeAndHost	Libraries/LibURL/Site.h:17	struct
 URL::Site	luce-browser-foundation	web_url	Site	Libraries/LibURL/Site.h:24	struct
@@ -3412,8 +3745,9 @@ URL::Site::obtain	luce-browser-foundation	web_url	site_obtain	Libraries/LibURL/S
 URL::Site::serialize	luce-browser-foundation	web_url	site_serialize	Libraries/LibURL/Site.cpp:61	stub
 URL::SpaceAsPlus	luce-browser-foundation	web_url	SpaceAsPlus	Libraries/LibURL/URL.h:73	enum
 URL::URL	luce-browser-foundation	web_url	Url	Libraries/LibURL/URL.h:82	struct
-URL::URL::Data	luce-browser-foundation	web_url	UrlData	Libraries/LibURL/URL.h:156	opaque
+URL::URL::Data	luce-browser-foundation	web_url	UrlData	Libraries/LibURL/URL.h:156	struct
 URL::URL::Data::clone	luce-browser-foundation	web_url	url_data_clone	Libraries/LibURL/URL.h:157	stub
+URL::URL::URL	luce-browser-foundation	web_url	url_empty	Libraries/LibURL/URL.h:87	construct
 URL::URL::about	luce-browser-foundation	web_url	url_about	Libraries/LibURL/URL.cpp:469	stub
 URL::URL::append_path	luce-browser-foundation	web_url	url_append_path	Libraries/LibURL/URL.cpp:95	stub
 URL::URL::append_slash	luce-browser-foundation	web_url	url_append_slash	Libraries/LibURL/URL.h:124	stub
@@ -3675,6 +4009,7 @@ Unicode::segmenter_granularity_from_string	luce-browser-foundation	web_unicode	s
 Unicode::segmenter_granularity_to_string	luce-browser-foundation	web_unicode	segmenter_granularity_to_string	Libraries/LibUnicode/Segmenter.cpp:33	stub
 Unicode::style_from_string	luce-browser-foundation	web_unicode	style_from_string	Libraries/LibUnicode/Locale.cpp:557	stub
 Unicode::style_to_string	luce-browser-foundation	web_unicode	style_to_string	Libraries/LibUnicode/Locale.cpp:568	stub
+VERIFY_UTF16_LENGTH: due to internal optimizations,	luce-browser-foundation	ak	verify_utf16_length	AK/Utf16StringData.cpp:15	ported
 Variant<BlobUrlEntryBlob, BlobUrlEntryMediaSource>	luce-browser-foundation	web_url	BlobUrlEntryObject	generated	variant
 Variant<ByteBuffer, CoreResource>	luce-browser-foundation	ak	ByteBufferOrCoreResource	generated	variant
 Variant<Empty, String, Icu78UnicodeString>	luce-browser-foundation	ak	EmptyOrStringOrIcu78UnicodeString	generated	variant
@@ -3758,7 +4093,13 @@ optional_string_view_from_ffi	luce-browser-foundation	web_unicode	optional_strin
 pair_int_hash	luce-browser-foundation	ak	pair_int_hash	AK/HashFunctions.h:33	stub
 ptr_hash	luce-browser-foundation	ak	ptr_hash_usize	AK/HashFunctions.h:38	stub
 ptr_hash	luce-browser-foundation	ak	ptr_hash_void	AK/HashFunctions.h:46	stub
-regex::ECMAScriptRegex	luce-browser-foundation	web_url	RegexEcmaScriptRegex	Libraries/LibRegex/ECMAScriptRegex.h:41	opaque
+regex::ECMAScriptCompileFlags	luce-browser-foundation	web_url	RegexEcmaScriptCompileFlags	Libraries/LibRegex/ECMAScriptRegex.h:25	struct
+regex::ECMAScriptRegex	luce-browser-foundation	web_url	RegexEcmaScriptRegex	Libraries/LibRegex/ECMAScriptRegex.h:41	struct
+regex::ECMAScriptRegex::capture_slot	luce-browser-foundation	web_url	regex_ecma_script_regex_capture_slot	Libraries/LibRegex/ECMAScriptRegex.h:58	ported
+regex::ECMAScriptRegex::compile	luce-browser-foundation	web_url	regex_ecma_script_regex_compile	Libraries/LibRegex/ECMAScriptRegex.h:45	ported
+regex::ECMAScriptRegex::exec	luce-browser-foundation	web_url	regex_ecma_script_regex_exec	Libraries/LibRegex/ECMAScriptRegex.h:53	ported
+regex::ECMAScriptRegex::test	luce-browser-foundation	web_url	regex_ecma_script_regex_test	Libraries/LibRegex/ECMAScriptRegex.h:61	ported
+regex::MatchResult	luce-browser-foundation	web_url	RegexMatchResult	Libraries/LibRegex/ECMAScriptRegex.h:19	enum
 resolve_property	luce-browser-foundation	web_unicode	resolve_property	Libraries/LibUnicode/CharacterTypes.cpp:690	stub
 string_view_from_ffi	luce-browser-foundation	web_unicode	string_view_from_ffi	Libraries/LibUnicode/CharacterTypes.cpp:648	stub
 timespec	luce-browser-foundation	ak	Timespec	generated	opaque
@@ -3779,312 +4120,3 @@ unicode_property_matches_case_insensitive	luce-browser-foundation	web_unicode	un
 unicode_resolve_property	luce-browser-foundation	web_unicode	unicode_resolve_property	Libraries/LibUnicode/CharacterTypes.cpp:808	stub
 unicode_resolved_property_matches	luce-browser-foundation	web_unicode	unicode_resolved_property_matches	Libraries/LibUnicode/CharacterTypes.cpp:819	stub
 unicode_simple_case_fold	luce-browser-foundation	web_unicode	unicode_simple_case_fold	Libraries/LibUnicode/CharacterTypes.cpp:920	stub
-(r02: A `Function<bool(char)>`-shaped predicate over bytes (StringView::split_view_if).)	luce-browser-foundation	ak	CharPredicate	-	addition
-(r02: A `Function<bool(u32)>`-shaped predicate over code points (Utf8View::for_each_split_view's)	luce-browser-foundation	ak	CodePointPredicate	-	addition
-(r02: A code_point_to_utf8 callback that writes the bytes into a four-byte array (the C++'s `Arr)	luce-browser-foundation	ak	CodePointAsUtf8	-	addition
-(r02: A plain function (such as is_ascii_digit) used as a CharPredicate.)	luce-browser-foundation	ak	CharPredicateFunction	-	addition
-(r02: A plain function (such as is_ascii_digit) used as a CodePointPredicate.)	luce-browser-foundation	ak	CodePointPredicateFunction	-	addition
-(r02: A view of `bytes` (the value form of StringView(ReadonlyBytes)).)	luce-browser-foundation	ak	string_view_from_bytes	-	addition
-(r02: The VariadicFormatParams of `formatted("{}", value)` for one double: `storage` holds the o)	luce-browser-foundation	ak	type_erased_format_params_for_f64	-	addition
-(r02: The `Callback` of StringView::for_each_split_view: receives each part. The C++ callback ma)	luce-browser-foundation	ak	StringViewCallback	-	addition
-(r02: The `Callback` of UnicodeUtils::code_point_to_utf16: receives one UTF-16 code unit.)	luce-browser-foundation	ak	Utf16CodeUnitCallback	-	addition
-(r02: The `Callback` of UnicodeUtils::code_point_to_utf8: receives one UTF-8 byte.)	luce-browser-foundation	ak	Utf8ByteCallback	-	addition
-(r02: The `Callback` of UnicodeUtils::try_code_point_to_utf16: receives one code unit, may fail.)	luce-browser-foundation	ak	FallibleUtf16CodeUnitCallback	-	addition
-(r02: The `Callback` of UnicodeUtils::try_code_point_to_utf8: receives one UTF-8 byte, may fail.)	luce-browser-foundation	ak	FallibleUtf8ByteCallback	-	addition
-(r02: The `Callback` of Utf16View::for_each_split_view: receives each part, answers whether to g)	luce-browser-foundation	ak	Utf16ViewCallback	-	addition
-(r02: The `Callback` of Utf8View::for_each_split_view: receives each part.)	luce-browser-foundation	ak	Utf8ViewCallback	-	addition
-(r02: The `Func` of StringBase::replace_with_new_short_string: fills a short string's bytes.)	luce-browser-foundation	ak	ShortStringBytesCallback	-	addition
-(r02: The `Func` of StringBase::replace_with_new_string: fills the new string's bytes.)	luce-browser-foundation	ak	BytesCallback	-	addition
-(r02: The `[&](Bytes buffer) { bytes.copy_to(buffer); }` lambda several String functions pass to)	luce-browser-foundation	ak	CopyBytesToBuffer	-	addition
-(r02: The is_any_of lambda applied to a code unit (GenericLexer<char16_t> calls it with char16_t)	luce-browser-foundation	ak	CodePointIsAnyOf	-	addition
-(r02: The lambda of AK::is_any_of: `values.contains(c)`.)	luce-browser-foundation	ak	IsAnyOf	-	addition
-(r02: The lambda of AK::is_not_any_of: `!values.contains(c)`.)	luce-browser-foundation	ak	IsNotAnyOf	-	addition
-(r02: The same lambda for replace_with_new_short_string.)	luce-browser-foundation	ak	CopyBytesToShortString	-	addition
-(r02: The value of `StringBase {}`: the empty string.)	luce-browser-foundation	ak	string_base_new	-	addition
-(r02: Whether the iterator is at the end (`it == view.end()` for an iterator of that view).)	luce-browser-foundation	ak	utf16_code_point_iterator_done	-	addition
-(r02: `"text"_fly_string` from a `str` (DESIGN.md §2.6's generated FlyString constants are built)	luce-browser-foundation	ak	fly_string_from_str	-	addition
-(r02: `"text"_string`: a String of a literal or any other `str` (DESIGN.md §2.6's `ak.string`; a)	luce-browser-foundation	ak	string_from_str	-	addition
-(r02: `"text"sv` for UTF-16 views of ASCII: `Utf16View { "text"sv }`.)	luce-browser-foundation	ak	utf16_sv	-	addition
-(r02: `"text"sv`: a view of a string literal or any other `str` (DESIGN.md §2.6).)	luce-browser-foundation	ak	sv	-	addition
-(r02: `ByteString("text")`: a ByteString of a literal or any other `str`.)	luce-browser-foundation	ak	byte_string_from_str	-	addition
-(r02: `ByteString(impl)`: the value form of the ByteStringImpl constructors.)	luce-browser-foundation	ak	byte_string_from_impl	-	addition
-(r02: `ByteString(view)`: a ByteString of a view's bytes (the value form of the StringView const)	luce-browser-foundation	ak	byte_string_from_string_view	-	addition
-(r02: `FlyString { string }`: the value form of the String constructor (and of `operator=(String)	luce-browser-foundation	ak	fly_string_from_string	-	addition
-(r02: `FlyString {}`: the empty string.)	luce-browser-foundation	ak	fly_string_new	-	addition
-(r02: `GenericLexer lexer(input)`: the value form of the constructor.)	luce-browser-foundation	ak	generic_lexer_new	-	addition
-(r02: `IPv4Address(a, b, c, d)`: the value form of the octets constructor.)	luce-browser-foundation	ak	i_pv4_address_from_octets	-	addition
-(r02: `LexicalPath { path }`: the value form of the constructor.)	luce-browser-foundation	ak	lexical_path_new	-	addition
-(r02: `NumericLimits<size_t>::max()`: an unknown code point count.)	luce-browser-foundation	ak	usize_max_code_points	-	addition
-(r02: `ReadonlySpan<u32> { m_code_points, m_length }`: the code points as a span.)	luce-browser-foundation	ak	utf32_view_span	-	addition
-(r02: `String {}`: the empty string (a zero-initialized String is the invalid sentinel instead).)	luce-browser-foundation	ak	string_new	-	addition
-(r02: `String::operator==(String const&) = default`: compares the StringBases.)	luce-browser-foundation	ak	string_equals	-	addition
-(r02: `StringBuilder builder(initial_capacity);`)	luce-browser-foundation	ak	string_builder_new_usize	-	addition
-(r02: `StringBuilder builder(mode);`)	luce-browser-foundation	ak	string_builder_new_mode	-	addition
-(r02: `StringBuilder builder(mode, initial_capacity_in_code_units);`)	luce-browser-foundation	ak	string_builder_new_mode_usize	-	addition
-(r02: `StringBuilder builder;`: a UTF-8 builder.)	luce-browser-foundation	ak	string_builder_new	-	addition
-(r02: `Traits<ByteString>::hash`: the impl's hash.)	luce-browser-foundation	ak	byte_string_traits_hash	-	addition
-(r02: `Traits<String>::hash` (AK/String.cpp): the string's hash.)	luce-browser-foundation	ak	string_hash_value	-	addition
-(r02: `Utf16FlyString { string }`: the value form of the Utf16String constructor.)	luce-browser-foundation	ak	utf16_fly_string_from_utf16_string	-	addition
-(r02: `Utf16FlyString {}`: the empty string.)	luce-browser-foundation	ak	utf16_fly_string_new	-	addition
-(r02: `Utf16GenericLexer lexer(input)`: the value form of the constructor.)	luce-browser-foundation	ak	utf16_generic_lexer_new	-	addition
-(r02: `Utf16String {}`: the empty string.)	luce-browser-foundation	ak	utf16_string_new	-	addition
-(r02: `Utf16StringBase {}`: the empty string.)	luce-browser-foundation	ak	utf16_string_base_new	-	addition
-(r02: `Utf16View { data, length }` over ASCII bytes (the private constructor; also the ASCII Str)	luce-browser-foundation	ak	utf16_view_from_ascii	-	addition
-(r02: `Utf16View { data, length }` over UTF-16 code units.)	luce-browser-foundation	ak	utf16_view_from_utf16	-	addition
-(r02: `Utf16View {}`: the empty view.)	luce-browser-foundation	ak	utf16_view_new	-	addition
-(r02: `Utf32View { code_points }`: the value form of the span constructor.)	luce-browser-foundation	ak	utf32_view_from_span	-	addition
-(r02: `Utf8CodePointIterator::operator== = default`.)	luce-browser-foundation	ak	utf8_code_point_iterator_eq	-	addition
-(r02: `__builtin_memcmp(a, b, min(a.size(), b.size()))`: compares the common prefix of two byte )	luce-browser-foundation	ak	compare_bytes	-	addition
-(r02: `builder.append("text"sv)`: appends a string literal or any other `str`.)	luce-browser-foundation	ak	string_builder_append	-	addition
-(r02: `bytes.copy_to(buffer)`: copies `bytes` to the front of `buffer`, which must be large enou)	luce-browser-foundation	ak	copy_bytes	-	addition
-(r02: `u"text"_utf16_fly_string` from a `str`.)	luce-browser-foundation	ak	utf16_fly_string_from_str	-	addition
-(r02: `u"text"_utf16` from a `str`: a Utf16String of a literal or any other valid UTF-8 text.)	luce-browser-foundation	ak	utf16_string_from_str	-	addition
-(r02: `view == "text"`: compares with a string literal (the C++'s `sv == "text"sv`).)	luce-browser-foundation	ak	string_view_equals	-	addition
-(r02: simdutf::base64_length_from_binary.)	luce-browser-foundation	ak	simdutf_base64_length_from_binary	-	addition
-(r02: simdutf::base64_options (the values AK uses; base64_reverse_padding is 2).)	luce-browser-foundation	ak	SimdutfBase64Options	-	addition
-(r02: simdutf::base64_to_binary_safe (base64_to_binary_safe_impl): decodes `input` into the firs)	luce-browser-foundation	ak	simdutf_base64_to_binary_safe	-	addition
-(r02: simdutf::binary_to_base64 (scalar::base64::tail_encode_base64): the characters written.)	luce-browser-foundation	ak	simdutf_binary_to_base64	-	addition
-(r02: simdutf::convert_utf16_to_utf8: the UTF-8 bytes written for host-endian UTF-16, or 0 when )	luce-browser-foundation	ak	simdutf_convert_utf16_to_utf8	-	addition
-(r02: simdutf::convert_utf16_to_utf8_with_errors (scalar utf16_to_utf8::convert_with_errors): wr)	luce-browser-foundation	ak	simdutf_convert_utf16_to_utf8_with_errors	-	addition
-(r02: simdutf::convert_utf16le_to_utf8 / convert_utf16be_to_utf8 over raw bytes: the UTF-8 bytes)	luce-browser-foundation	ak	simdutf_convert_utf16_bytes_to_utf8	-	addition
-(r02: simdutf::convert_utf32_to_utf16: the host-endian code units written, or 0 for an invalid v)	luce-browser-foundation	ak	simdutf_convert_utf32_to_utf16	-	addition
-(r02: simdutf::convert_utf32_to_utf8: the UTF-8 bytes written, or 0 for an invalid value.)	luce-browser-foundation	ak	simdutf_convert_utf32_to_utf8	-	addition
-(r02: simdutf::convert_utf8_to_utf16: transcodes UTF-8 into host-endian UTF-16 and answers the c)	luce-browser-foundation	ak	simdutf_convert_utf8_to_utf16	-	addition
-(r02: simdutf::count_utf16: the number of code points of valid UTF-16.)	luce-browser-foundation	ak	simdutf_count_utf16	-	addition
-(r02: simdutf::count_utf8: the number of code points of valid UTF-8 (bytes that are not continua)	luce-browser-foundation	ak	simdutf_count_utf8	-	addition
-(r02: simdutf::error_code.)	luce-browser-foundation	ak	SimdutfErrorCode	-	addition
-(r02: simdutf::find over UTF-16 code units: the index of the first `needle`, or none.)	luce-browser-foundation	ak	simdutf_find_u16	-	addition
-(r02: simdutf::find over bytes: the index of the first `needle`, or none.)	luce-browser-foundation	ak	simdutf_find	-	addition
-(r02: simdutf::full_result: an error, the input and output positions, and whether the error was )	luce-browser-foundation	ak	SimdutfFullResult	-	addition
-(r02: simdutf::last_chunk_handling_options.)	luce-browser-foundation	ak	SimdutfLastChunkHandling	-	addition
-(r02: simdutf::maximal_binary_length_from_base64: an upper bound of the decoded length. We follo)	luce-browser-foundation	ak	simdutf_maximal_binary_length_from_base64	-	addition
-(r02: simdutf::result: an error code and the input position it concerns (or the count processed))	luce-browser-foundation	ak	SimdutfResult	-	addition
-(r02: simdutf::to_well_formed_utf16 (scalar utf16::to_well_formed_utf16): copies host-endian UTF)	luce-browser-foundation	ak	simdutf_to_well_formed_utf16	-	addition
-(r02: simdutf::to_well_formed_utf16le / to_well_formed_utf16be over raw bytes: the well-formed c)	luce-browser-foundation	ak	simdutf_to_well_formed_utf16_bytes	-	addition
-(r02: simdutf::utf16_length_from_utf32.)	luce-browser-foundation	ak	simdutf_utf16_length_from_utf32	-	addition
-(r02: simdutf::utf16_length_from_utf8: the UTF-16 code units valid UTF-8 needs.)	luce-browser-foundation	ak	simdutf_utf16_length_from_utf8	-	addition
-(r02: simdutf::utf8_length_from_utf16: the UTF-8 bytes valid UTF-16 needs.)	luce-browser-foundation	ak	simdutf_utf8_length_from_utf16	-	addition
-(r02: simdutf::utf8_length_from_utf16le / utf8_length_from_utf16be over raw bytes.)	luce-browser-foundation	ak	simdutf_utf8_length_from_utf16_bytes	-	addition
-(r02: simdutf::validate_ascii: whether every byte is below 0x80.)	luce-browser-foundation	ak	simdutf_validate_ascii	-	addition
-(r02: simdutf::validate_utf16: whether host-endian UTF-16 has no lonely surrogate.)	luce-browser-foundation	ak	simdutf_validate_utf16	-	addition
-(r02: simdutf::validate_utf16_as_ascii: whether every code unit is below 0x80.)	luce-browser-foundation	ak	simdutf_validate_utf16_as_ascii	-	addition
-(r02: simdutf::validate_utf16_with_errors (scalar utf16::validate_with_errors).)	luce-browser-foundation	ak	simdutf_validate_utf16_with_errors	-	addition
-(r02: simdutf::validate_utf16le / validate_utf16be over raw bytes (a trailing odd byte is ignore)	luce-browser-foundation	ak	simdutf_validate_utf16_bytes	-	addition
-(r02: simdutf::validate_utf32: whether every value is a Unicode scalar value.)	luce-browser-foundation	ak	simdutf_validate_utf32	-	addition
-(r02: simdutf::validate_utf8.)	luce-browser-foundation	ak	simdutf_validate_utf8	-	addition
-(r02: simdutf::validate_utf8_with_errors (scalar utf8::validate_with_errors): the first error an)	luce-browser-foundation	ak	simdutf_validate_utf8_with_errors	-	addition
-AK::ByteString::join over StringViews with the default "{}"	luce-browser-foundation	ak	byte_string_join_string_view	AK/ByteString.h:112	ported
-AK::ByteString::number for floating-point T: formatted	luce-browser-foundation	ak	byte_string_number_f64	AK/ByteString.h:123	ported
-AK::ByteString::number for signed integral T	luce-browser-foundation	ak	byte_string_number_i64	AK/ByteString.h:123	ported
-AK::ByteString::number for unsigned integral T	luce-browser-foundation	ak	byte_string_number_u64	AK/ByteString.h:123	ported
-AK::ByteString::split_view	luce-browser-foundation	ak	byte_string_split_view_if	AK/ByteString.cpp:108	ported
-AK::ByteString::to_number<f32>	luce-browser-foundation	ak	byte_string_to_number_f32	AK/ByteString.h:129	ported
-AK::ByteString::to_number<f64>	luce-browser-foundation	ak	byte_string_to_number_f64	AK/ByteString.h:129	ported
-AK::ByteString::to_number<i16>	luce-browser-foundation	ak	byte_string_to_number_i16	AK/ByteString.h:129	ported
-AK::ByteString::to_number<i32>	luce-browser-foundation	ak	byte_string_to_number_i32	AK/ByteString.h:129	ported
-AK::ByteString::to_number<i64>	luce-browser-foundation	ak	byte_string_to_number_i64	AK/ByteString.h:129	ported
-AK::ByteString::to_number<i8>	luce-browser-foundation	ak	byte_string_to_number_i8	AK/ByteString.h:129	ported
-AK::ByteString::to_number<u16>	luce-browser-foundation	ak	byte_string_to_number_u16	AK/ByteString.h:129	ported
-AK::ByteString::to_number<u32>	luce-browser-foundation	ak	byte_string_to_number_u32	AK/ByteString.h:129	ported
-AK::ByteString::to_number<u64>	luce-browser-foundation	ak	byte_string_to_number_u64	AK/ByteString.h:129	ported
-AK::ByteString::to_number<u8>	luce-browser-foundation	ak	byte_string_to_number_u8	AK/ByteString.h:129	ported
-AK::Detail::GenericLexer::GenericLexer<char16_t>	luce-browser-foundation	ak	utf16_generic_lexer_construct	AK/GenericLexer.h:47	ported
-AK::Detail::GenericLexer::code_unit_at	luce-browser-foundation	ak	utf16_generic_lexer_code_unit_at	AK/GenericLexer.h:478	ported
-AK::Detail::GenericLexer::consume	luce-browser-foundation	ak	utf16_generic_lexer_consume	AK/GenericLexer.h:113	ported
-AK::Detail::GenericLexer::consume	luce-browser-foundation	ak	utf16_generic_lexer_consume_usize	AK/GenericLexer.h:173	ported
-AK::Detail::GenericLexer::consume_all	luce-browser-foundation	ak	utf16_generic_lexer_consume_all	AK/GenericLexer.h:183	ported
-AK::Detail::GenericLexer::consume_decimal_integer<T>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_magnitude	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<T>, for	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_magnitude	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<i16>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_i16	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<i16>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_i16	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<i32>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_i32	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<i32>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_i32	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<i64>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_i64	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<i64>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_i64	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<i8>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_i8	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<i8>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_i8	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<u16>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_u16	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<u16>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_u16	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<u32>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_u32	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<u32>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_u32	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<u64>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_u64	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<u64>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_u64	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<u8>	luce-browser-foundation	ak	generic_lexer_consume_decimal_integer_u8	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_decimal_integer<u8>	luce-browser-foundation	ak	utf16_generic_lexer_consume_decimal_integer_u8	AK/GenericLexer.h:264	ported
-AK::Detail::GenericLexer::consume_escaped_character. An	luce-browser-foundation	ak	utf16_generic_lexer_consume_escaped_character	AK/GenericLexer.h:157	ported
-AK::Detail::GenericLexer::consume_escaped_code_point	luce-browser-foundation	ak	utf16_generic_lexer_consume_escaped_code_point	AK/GenericLexer.h:311	ported
-AK::Detail::GenericLexer::consume_line	luce-browser-foundation	ak	utf16_generic_lexer_consume_line	AK/GenericLexer.h:191	ported
-AK::Detail::GenericLexer::consume_quoted_string	luce-browser-foundation	ak	utf16_generic_lexer_consume_quoted_string	AK/GenericLexer.h:235	ported
-AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	utf16_generic_lexer_consume_specific_string_view	AK/GenericLexer.h:147	ported
-AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	utf16_generic_lexer_consume_specific_t_char_type	AK/GenericLexer.h:119	ported
-AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	utf16_generic_lexer_consume_specific_u8	AK/GenericLexer.h:128	ported
-AK::Detail::GenericLexer::consume_specific	luce-browser-foundation	ak	utf16_generic_lexer_consume_specific_utf16_view	AK/GenericLexer.h:134	ported
-AK::Detail::GenericLexer::consume_specific_with_predicate	luce-browser-foundation	ak	utf16_generic_lexer_consume_specific_with_predicate	AK/GenericLexer.h:379	ported
-AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	generic_lexer_consume_until_string_view	AK/GenericLexer.h:222	ported
-AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	utf16_generic_lexer_consume_until_t_char_type	AK/GenericLexer.h:205	ported
-AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	utf16_generic_lexer_consume_until_tt_predicate	AK/GenericLexer.h:368	ported
-AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	utf16_generic_lexer_consume_until_u8	AK/GenericLexer.h:215	ported
-AK::Detail::GenericLexer::consume_until	luce-browser-foundation	ak	utf16_generic_lexer_consume_until_utf16_view	AK/GenericLexer.h:222	ported
-AK::Detail::GenericLexer::consume_while	luce-browser-foundation	ak	utf16_generic_lexer_consume_while	AK/GenericLexer.h:356	ported
-AK::Detail::GenericLexer::decode_code_point	luce-browser-foundation	ak	utf16_generic_lexer_decode_code_point	AK/GenericLexer.h:405	ported
-AK::Detail::GenericLexer::decode_single_or_paired_surrogate	luce-browser-foundation	ak	utf16_generic_lexer_decode_single_or_paired_surrogate	AK/GenericLexer.h:430	ported
-AK::Detail::GenericLexer::ignore	luce-browser-foundation	ak	utf16_generic_lexer_ignore	AK/GenericLexer.h:321	ported
-AK::Detail::GenericLexer::ignore_until	luce-browser-foundation	ak	utf16_generic_lexer_ignore_until_t_char_type	AK/GenericLexer.h:327	ported
-AK::Detail::GenericLexer::ignore_until	luce-browser-foundation	ak	utf16_generic_lexer_ignore_until_tt_predicate	AK/GenericLexer.h:398	ported
-AK::Detail::GenericLexer::ignore_until	luce-browser-foundation	ak	utf16_generic_lexer_ignore_until_u8	AK/GenericLexer.h:333	ported
-AK::Detail::GenericLexer::ignore_while	luce-browser-foundation	ak	utf16_generic_lexer_ignore_while	AK/GenericLexer.h:390	ported
-AK::Detail::GenericLexer::input	luce-browser-foundation	ak	utf16_generic_lexer_input	AK/GenericLexer.h:56	ported
-AK::Detail::GenericLexer::input_length	luce-browser-foundation	ak	utf16_generic_lexer_input_length	AK/GenericLexer.h:470	ported
-AK::Detail::GenericLexer::is_eof	luce-browser-foundation	ak	utf16_generic_lexer_is_eof	AK/GenericLexer.h:58	ported
-AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	utf16_generic_lexer_next_is_string_view	AK/GenericLexer.h:95	ported
-AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	utf16_generic_lexer_next_is_t_char_type	AK/GenericLexer.h:72	ported
-AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	utf16_generic_lexer_next_is_tt_predicate	AK/GenericLexer.h:349	ported
-AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	utf16_generic_lexer_next_is_u8	AK/GenericLexer.h:77	ported
-AK::Detail::GenericLexer::next_is	luce-browser-foundation	ak	utf16_generic_lexer_next_is_utf16_view	AK/GenericLexer.h:83	ported
-AK::Detail::GenericLexer::peek	luce-browser-foundation	ak	utf16_generic_lexer_peek	AK/GenericLexer.h:60	ported
-AK::Detail::GenericLexer::peek_string	luce-browser-foundation	ak	utf16_generic_lexer_peek_string	AK/GenericLexer.h:65	ported
-AK::Detail::GenericLexer::remaining	luce-browser-foundation	ak	utf16_generic_lexer_remaining	AK/GenericLexer.h:55	ported
-AK::Detail::GenericLexer::retreat	luce-browser-foundation	ak	utf16_generic_lexer_retreat	AK/GenericLexer.h:101	ported
-AK::Detail::GenericLexer::retreat	luce-browser-foundation	ak	utf16_generic_lexer_retreat_usize	AK/GenericLexer.h:107	ported
-AK::Detail::GenericLexer::tell	luce-browser-foundation	ak	utf16_generic_lexer_tell	AK/GenericLexer.h:52	ported
-AK::Detail::GenericLexer::tell_remaining	luce-browser-foundation	ak	utf16_generic_lexer_tell_remaining	AK/GenericLexer.h:53	ported
-AK::Detail::Utf16StringBase::to_number<f32>	luce-browser-foundation	ak	utf16_string_base_to_number_f32	AK/Utf16StringBase.h:98	ported
-AK::Detail::Utf16StringBase::to_number<f64>	luce-browser-foundation	ak	utf16_string_base_to_number_f64	AK/Utf16StringBase.h:98	ported
-AK::Detail::Utf16StringBase::to_number<i16>	luce-browser-foundation	ak	utf16_string_base_to_number_i16	AK/Utf16StringBase.h:98	ported
-AK::Detail::Utf16StringBase::to_number<i32>	luce-browser-foundation	ak	utf16_string_base_to_number_i32	AK/Utf16StringBase.h:98	ported
-AK::Detail::Utf16StringBase::to_number<i64>	luce-browser-foundation	ak	utf16_string_base_to_number_i64	AK/Utf16StringBase.h:98	ported
-AK::Detail::Utf16StringBase::to_number<i8>	luce-browser-foundation	ak	utf16_string_base_to_number_i8	AK/Utf16StringBase.h:98	ported
-AK::Detail::Utf16StringBase::to_number<u16>	luce-browser-foundation	ak	utf16_string_base_to_number_u16	AK/Utf16StringBase.h:98	ported
-AK::Detail::Utf16StringBase::to_number<u32>	luce-browser-foundation	ak	utf16_string_base_to_number_u32	AK/Utf16StringBase.h:98	ported
-AK::Detail::Utf16StringBase::to_number<u64>	luce-browser-foundation	ak	utf16_string_base_to_number_u64	AK/Utf16StringBase.h:98	ported
-AK::Detail::Utf16StringBase::to_number<u8>	luce-browser-foundation	ak	utf16_string_base_to_number_u8	AK/Utf16StringBase.h:98	ported
-AK::Detail::Utf16StringData::create_from_code_point_iterable	luce-browser-foundation	ak	utf16_string_data_create_from_code_point_iterable_utf32_view	AK/Utf16StringData.cpp:28	ported
-AK::Detail::Utf16StringData::create_from_code_point_iterable	luce-browser-foundation	ak	utf16_string_data_create_from_code_point_iterable_utf8_view	AK/Utf16StringData.cpp:28	ported
-AK::Detail::bitap_bitwise: the offset of the first match, or none	luce-browser-foundation	ak	bitap_bitwise	AK/MemMem.h:19	ported
-AK::LexicalPath::join: `first` and each of `rest`, joined	luce-browser-foundation	ak	lexical_path_join	AK/LexicalPath.h:51	ported
-AK::String::join over StringViews with the default "{}" format	luce-browser-foundation	ak	string_join_string_view	AK/String.h:214	ported
-AK::String::join over Strings with the default "{}" format	luce-browser-foundation	ak	string_join_string	AK/String.h:214	ported
-AK::String::number	luce-browser-foundation	ak	string_number_f64	AK/String.h:199	ported
-AK::String::number	luce-browser-foundation	ak	string_number_i64	AK/String.h:193	ported
-AK::String::number	luce-browser-foundation	ak	string_number_u64	AK/String.h:193	ported
-AK::String::to_number<f32>	luce-browser-foundation	ak	string_to_number_f32	AK/String.h:199	ported
-AK::String::to_number<f64>	luce-browser-foundation	ak	string_to_number_f64	AK/String.h:199	ported
-AK::String::to_number<i16>	luce-browser-foundation	ak	string_to_number_i16	AK/String.h:199	ported
-AK::String::to_number<i32>	luce-browser-foundation	ak	string_to_number_i32	AK/String.h:199	ported
-AK::String::to_number<i64>	luce-browser-foundation	ak	string_to_number_i64	AK/String.h:199	ported
-AK::String::to_number<i8>	luce-browser-foundation	ak	string_to_number_i8	AK/String.h:199	ported
-AK::String::to_number<u16>	luce-browser-foundation	ak	string_to_number_u16	AK/String.h:199	ported
-AK::String::to_number<u32>	luce-browser-foundation	ak	string_to_number_u32	AK/String.h:199	ported
-AK::String::to_number<u64>	luce-browser-foundation	ak	string_to_number_u64	AK/String.h:199	ported
-AK::String::to_number<u8>	luce-browser-foundation	ak	string_to_number_u8	AK/String.h:199	ported
-AK::StringBuilder::join over FlyStrings with the default	luce-browser-foundation	ak	string_builder_join_fly_string	AK/StringBuilder.h:100	ported
-AK::StringBuilder::join over StringViews with the default	luce-browser-foundation	ak	string_builder_join_string_view	AK/StringBuilder.h:100	ported
-AK::StringBuilder::join over Strings with the default "{}"	luce-browser-foundation	ak	string_builder_join_string	AK/StringBuilder.h:100	ported
-AK::StringBuilder::join over Utf16Views with the default "{}"	luce-browser-foundation	ak	string_builder_join_utf16_view	AK/StringBuilder.h:100	ported
-AK::StringBuilder::try_join over StringViews with the	luce-browser-foundation	ak	string_builder_try_join_string_view	AK/StringBuilder.h:106	ported
-AK::StringBuilder::try_join over Strings with the default	luce-browser-foundation	ak	string_builder_try_join_string	AK/StringBuilder.h:106	ported
-AK::StringView::to_number<f32>	luce-browser-foundation	ak	string_view_to_number_f32	AK/StringView.h:348	ported
-AK::StringView::to_number<f64>	luce-browser-foundation	ak	string_view_to_number_f64	AK/StringView.h:348	ported
-AK::StringView::to_number<i16>	luce-browser-foundation	ak	string_view_to_number_i16	AK/StringView.h:348	ported
-AK::StringView::to_number<i32>	luce-browser-foundation	ak	string_view_to_number_i32	AK/StringView.h:348	ported
-AK::StringView::to_number<i64>	luce-browser-foundation	ak	string_view_to_number_i64	AK/StringView.h:348	ported
-AK::StringView::to_number<i8>	luce-browser-foundation	ak	string_view_to_number_i8	AK/StringView.h:348	ported
-AK::StringView::to_number<u16>	luce-browser-foundation	ak	string_view_to_number_u16	AK/StringView.h:348	ported
-AK::StringView::to_number<u32>	luce-browser-foundation	ak	string_view_to_number_u32	AK/StringView.h:348	ported
-AK::StringView::to_number<u64>	luce-browser-foundation	ak	string_view_to_number_u64	AK/StringView.h:348	ported
-AK::StringView::to_number<u8>	luce-browser-foundation	ak	string_view_to_number_u8	AK/StringView.h:348	ported
-AK::Utf16FlyString::create_fly_string_from_cache for a	luce-browser-foundation	ak	utf16_fly_string_create_fly_string_from_cache_string_view	AK/Utf16FlyString.cpp:35	ported
-AK::Utf16FlyString::create_fly_string_from_cache for a	luce-browser-foundation	ak	utf16_fly_string_create_fly_string_from_cache_utf16_view	AK/Utf16FlyString.cpp:35	ported
-AK::Utf16FlyString::to_number<f32>	luce-browser-foundation	ak	utf16_fly_string_to_number_f32	AK/Utf16FlyString.h:87	ported
-AK::Utf16FlyString::to_number<f64>	luce-browser-foundation	ak	utf16_fly_string_to_number_f64	AK/Utf16FlyString.h:87	ported
-AK::Utf16FlyString::to_number<i16>	luce-browser-foundation	ak	utf16_fly_string_to_number_i16	AK/Utf16FlyString.h:87	ported
-AK::Utf16FlyString::to_number<i32>	luce-browser-foundation	ak	utf16_fly_string_to_number_i32	AK/Utf16FlyString.h:87	ported
-AK::Utf16FlyString::to_number<i64>	luce-browser-foundation	ak	utf16_fly_string_to_number_i64	AK/Utf16FlyString.h:87	ported
-AK::Utf16FlyString::to_number<i8>	luce-browser-foundation	ak	utf16_fly_string_to_number_i8	AK/Utf16FlyString.h:87	ported
-AK::Utf16FlyString::to_number<u16>	luce-browser-foundation	ak	utf16_fly_string_to_number_u16	AK/Utf16FlyString.h:87	ported
-AK::Utf16FlyString::to_number<u32>	luce-browser-foundation	ak	utf16_fly_string_to_number_u32	AK/Utf16FlyString.h:87	ported
-AK::Utf16FlyString::to_number<u64>	luce-browser-foundation	ak	utf16_fly_string_to_number_u64	AK/Utf16FlyString.h:87	ported
-AK::Utf16FlyString::to_number<u8>	luce-browser-foundation	ak	utf16_fly_string_to_number_u8	AK/Utf16FlyString.h:87	ported
-AK::Utf16String::join over StringViews with the default "{}"	luce-browser-foundation	ak	utf16_string_join_string_view	AK/Utf16String.h:150	ported
-AK::Utf16String::join over Utf16Views with the default "{}"	luce-browser-foundation	ak	utf16_string_join_utf16_view	AK/Utf16String.h:150	ported
-AK::Utf16String::number	luce-browser-foundation	ak	utf16_string_number_i64	AK/Utf16String.h:141	ported
-AK::Utf16String::number	luce-browser-foundation	ak	utf16_string_number_u64	AK/Utf16String.h:141	ported
-AK::Utf16View::to_number<f32>	luce-browser-foundation	ak	utf16_view_to_number_f32	AK/Utf16View.h:208	ported
-AK::Utf16View::to_number<f64>	luce-browser-foundation	ak	utf16_view_to_number_f64	AK/Utf16View.h:208	ported
-AK::Utf16View::to_number<i16>	luce-browser-foundation	ak	utf16_view_to_number_i16	AK/Utf16View.h:208	ported
-AK::Utf16View::to_number<i32>	luce-browser-foundation	ak	utf16_view_to_number_i32	AK/Utf16View.h:208	ported
-AK::Utf16View::to_number<i64>	luce-browser-foundation	ak	utf16_view_to_number_i64	AK/Utf16View.h:208	ported
-AK::Utf16View::to_number<i8>	luce-browser-foundation	ak	utf16_view_to_number_i8	AK/Utf16View.h:208	ported
-AK::Utf16View::to_number<u16>	luce-browser-foundation	ak	utf16_view_to_number_u16	AK/Utf16View.h:208	ported
-AK::Utf16View::to_number<u32>	luce-browser-foundation	ak	utf16_view_to_number_u32	AK/Utf16View.h:208	ported
-AK::Utf16View::to_number<u64>	luce-browser-foundation	ak	utf16_view_to_number_u64	AK/Utf16View.h:208	ported
-AK::Utf16View::to_number<u8>	luce-browser-foundation	ak	utf16_view_to_number_u8	AK/Utf16View.h:208	ported
-AK::convert_to_decimal_exponential_form<double>: the	luce-browser-foundation	ak	convert_to_decimal_exponential_form_f64	AK/StringConversions.cpp:155	ported
-AK::convert_to_decimal_exponential_form<float>	luce-browser-foundation	ak	convert_to_decimal_exponential_form_f32	AK/StringConversions.cpp:155	ported
-AK::create_string_from_number: the digits of the magnitude	luce-browser-foundation	ak	create_string_from_number_digits	AK/StringNumber.h:12	ported
-AK::create_string_from_number<String, T> for signed T	luce-browser-foundation	ak	create_string_from_number_string_i64	AK/StringNumber.h:12	ported
-AK::create_string_from_number<String, T> for unsigned T	luce-browser-foundation	ak	create_string_from_number_string_u64	AK/StringNumber.h:12	ported
-AK::create_string_from_number<Utf16String, T> for signed T	luce-browser-foundation	ak	create_string_from_number_utf16_string_i64	AK/StringNumber.h:12	ported
-AK::create_string_from_number<Utf16String, T> for unsigned T	luce-browser-foundation	ak	create_string_from_number_utf16_string_u64	AK/StringNumber.h:12	ported
-AK::from_chars for ValueType double	luce-browser-foundation	ak	from_chars_f64	AK/StringConversions.cpp:40	ported
-AK::from_chars for ValueType float	luce-browser-foundation	ak	from_chars_f32	AK/StringConversions.cpp:40	ported
-AK::from_chars for an integral ValueType	luce-browser-foundation	ak	from_chars_integer	AK/StringConversions.cpp:40	ported
-AK::memmem	luce-browser-foundation	ak	memmem_kmp	AK/MemMem.h:46	ported
-AK::memmem_optional: the offset of `needle` in `haystack`	luce-browser-foundation	ak	memmem_optional	AK/MemMem.h:108	ported
-AK::parse_first_number<f32>	luce-browser-foundation	ak	parse_first_number_string_view_f32	AK/StringConversions.cpp:70	ported
-AK::parse_first_number<f32>	luce-browser-foundation	ak	parse_first_number_utf16_view_f32	AK/StringConversions.cpp:79	ported
-AK::parse_first_number<f64>	luce-browser-foundation	ak	parse_first_number_string_view_f64	AK/StringConversions.cpp:70	ported
-AK::parse_first_number<f64>	luce-browser-foundation	ak	parse_first_number_utf16_view_f64	AK/StringConversions.cpp:79	ported
-AK::parse_first_number<i16>	luce-browser-foundation	ak	parse_first_number_string_view_i16	AK/StringConversions.cpp:70	ported
-AK::parse_first_number<i16>	luce-browser-foundation	ak	parse_first_number_utf16_view_i16	AK/StringConversions.cpp:79	ported
-AK::parse_first_number<i32>	luce-browser-foundation	ak	parse_first_number_string_view_i32	AK/StringConversions.cpp:70	ported
-AK::parse_first_number<i32>	luce-browser-foundation	ak	parse_first_number_utf16_view_i32	AK/StringConversions.cpp:79	ported
-AK::parse_first_number<i64>	luce-browser-foundation	ak	parse_first_number_string_view_i64	AK/StringConversions.cpp:70	ported
-AK::parse_first_number<i64>	luce-browser-foundation	ak	parse_first_number_utf16_view_i64	AK/StringConversions.cpp:79	ported
-AK::parse_first_number<i8>	luce-browser-foundation	ak	parse_first_number_string_view_i8	AK/StringConversions.cpp:70	ported
-AK::parse_first_number<i8>	luce-browser-foundation	ak	parse_first_number_utf16_view_i8	AK/StringConversions.cpp:79	ported
-AK::parse_first_number<u16>	luce-browser-foundation	ak	parse_first_number_string_view_u16	AK/StringConversions.cpp:70	ported
-AK::parse_first_number<u16>	luce-browser-foundation	ak	parse_first_number_utf16_view_u16	AK/StringConversions.cpp:79	ported
-AK::parse_first_number<u32>	luce-browser-foundation	ak	parse_first_number_string_view_u32	AK/StringConversions.cpp:70	ported
-AK::parse_first_number<u32>	luce-browser-foundation	ak	parse_first_number_utf16_view_u32	AK/StringConversions.cpp:79	ported
-AK::parse_first_number<u64>	luce-browser-foundation	ak	parse_first_number_string_view_u64	AK/StringConversions.cpp:70	ported
-AK::parse_first_number<u64>	luce-browser-foundation	ak	parse_first_number_utf16_view_u64	AK/StringConversions.cpp:79	ported
-AK::parse_first_number<u8>	luce-browser-foundation	ak	parse_first_number_string_view_u8	AK/StringConversions.cpp:70	ported
-AK::parse_first_number<u8>	luce-browser-foundation	ak	parse_first_number_utf16_view_u8	AK/StringConversions.cpp:79	ported
-AK::parse_hexadecimal_number<i16>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_i16	AK/StringConversions.cpp:143	ported
-AK::parse_hexadecimal_number<i16>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_i16	AK/StringConversions.cpp:149	ported
-AK::parse_hexadecimal_number<i32>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_i32	AK/StringConversions.cpp:143	ported
-AK::parse_hexadecimal_number<i32>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_i32	AK/StringConversions.cpp:149	ported
-AK::parse_hexadecimal_number<i64>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_i64	AK/StringConversions.cpp:143	ported
-AK::parse_hexadecimal_number<i64>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_i64	AK/StringConversions.cpp:149	ported
-AK::parse_hexadecimal_number<i8>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_i8	AK/StringConversions.cpp:143	ported
-AK::parse_hexadecimal_number<i8>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_i8	AK/StringConversions.cpp:149	ported
-AK::parse_hexadecimal_number<u16>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_u16	AK/StringConversions.cpp:143	ported
-AK::parse_hexadecimal_number<u16>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_u16	AK/StringConversions.cpp:149	ported
-AK::parse_hexadecimal_number<u32>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_u32	AK/StringConversions.cpp:143	ported
-AK::parse_hexadecimal_number<u32>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_u32	AK/StringConversions.cpp:149	ported
-AK::parse_hexadecimal_number<u64>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_u64	AK/StringConversions.cpp:143	ported
-AK::parse_hexadecimal_number<u64>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_u64	AK/StringConversions.cpp:149	ported
-AK::parse_hexadecimal_number<u8>	luce-browser-foundation	ak	parse_hexadecimal_number_string_view_u8	AK/StringConversions.cpp:143	ported
-AK::parse_hexadecimal_number<u8>	luce-browser-foundation	ak	parse_hexadecimal_number_utf16_view_u8	AK/StringConversions.cpp:149	ported
-AK::parse_number<f32>	luce-browser-foundation	ak	parse_number_string_view_f32	AK/StringConversions.cpp:98	ported
-AK::parse_number<f32>	luce-browser-foundation	ak	parse_number_utf16_view_f32	AK/StringConversions.cpp:114	ported
-AK::parse_number<f64>	luce-browser-foundation	ak	parse_number_string_view_f64	AK/StringConversions.cpp:98	ported
-AK::parse_number<f64>	luce-browser-foundation	ak	parse_number_utf16_view_f64	AK/StringConversions.cpp:114	ported
-AK::parse_number<i16>	luce-browser-foundation	ak	parse_number_string_view_i16	AK/StringConversions.cpp:98	ported
-AK::parse_number<i16>	luce-browser-foundation	ak	parse_number_utf16_view_i16	AK/StringConversions.cpp:114	ported
-AK::parse_number<i32>	luce-browser-foundation	ak	parse_number_string_view_i32	AK/StringConversions.cpp:98	ported
-AK::parse_number<i32>	luce-browser-foundation	ak	parse_number_utf16_view_i32	AK/StringConversions.cpp:114	ported
-AK::parse_number<i64>	luce-browser-foundation	ak	parse_number_string_view_i64	AK/StringConversions.cpp:98	ported
-AK::parse_number<i64>	luce-browser-foundation	ak	parse_number_utf16_view_i64	AK/StringConversions.cpp:114	ported
-AK::parse_number<i8>	luce-browser-foundation	ak	parse_number_string_view_i8	AK/StringConversions.cpp:98	ported
-AK::parse_number<i8>	luce-browser-foundation	ak	parse_number_utf16_view_i8	AK/StringConversions.cpp:114	ported
-AK::parse_number<u16>	luce-browser-foundation	ak	parse_number_string_view_u16	AK/StringConversions.cpp:98	ported
-AK::parse_number<u16>	luce-browser-foundation	ak	parse_number_utf16_view_u16	AK/StringConversions.cpp:114	ported
-AK::parse_number<u32>	luce-browser-foundation	ak	parse_number_string_view_u32	AK/StringConversions.cpp:98	ported
-AK::parse_number<u32>	luce-browser-foundation	ak	parse_number_utf16_view_u32	AK/StringConversions.cpp:114	ported
-AK::parse_number<u64>	luce-browser-foundation	ak	parse_number_string_view_u64	AK/StringConversions.cpp:98	ported
-AK::parse_number<u64>	luce-browser-foundation	ak	parse_number_utf16_view_u64	AK/StringConversions.cpp:114	ported
-AK::parse_number<u8>	luce-browser-foundation	ak	parse_number_string_view_u8	AK/StringConversions.cpp:98	ported
-AK::parse_number<u8>	luce-browser-foundation	ak	parse_number_utf16_view_u8	AK/StringConversions.cpp:114	ported
-VERIFY_UTF16_LENGTH: due to internal optimizations,	luce-browser-foundation	ak	verify_utf16_length	AK/Utf16StringData.cpp:15	ported

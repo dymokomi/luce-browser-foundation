@@ -34,7 +34,7 @@ pub struct HeapBlockFreelistEntry: IsCell:
     pub var cell_base: Cell  # primary base
     pub var next: HeapBlockFreelistEntry*?
 
-    func cell() -> Cell*: return (Cell*)&self
+    pub func cell() -> Cell*: return (Cell*)&self
 
 ## The vtable of GC::HeapBlock::FreelistEntry (GC_CELL(FreelistEntry, Cell)).
 pub let heap_block_freelist_entry_vtable: CellVTable = CellVTable(class_info = &heap_block_freelist_entry_class, class_name = heap_block_freelist_entry_class_name_impl)

@@ -26,7 +26,11 @@ func formatted(fmtstr: str, arguments: const TypeErasedParameter[]) -> str:
     string_builder_construct(&builder)
     vformat_arguments(&builder, sv(fmtstr), arguments) else trap("MUST: vformat")
     let view = string_builder_string_view(&builder)
-    return (str)string_view_bytes(&view)
+    # A short result lives in the builder's inline buffer, in this frame: copy it out.
+    let bytes = string_view_bytes(&view)
+    let copy = alloc u8[bytes.length] else trap("out of memory")
+    memory.copy(copy, bytes, bytes.length)
+    return (str)copy
 
 ## No format arguments.
 func no_arguments() -> const TypeErasedParameter[]:

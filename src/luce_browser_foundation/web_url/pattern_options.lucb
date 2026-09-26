@@ -1,0 +1,26 @@
+#==============================================================================================
+#
+#   pattern_options - URLPattern: the options a component is compiled with
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Pattern/Options.cpp (lines 1-41).
+#
+#==============================================================================================
+
+## Ported from Libraries/LibURL/Pattern/Options.cpp:12 URL::Pattern::Options::default_.
+# https://urlpattern.spec.whatwg.org/#default-options
+pub func options_default() -> Options:
+    # The default options is an options struct with delimiter code point set to the empty string and prefix code point set to the empty string.
+    return Options(delimiter_code_point = none, prefix_code_point = none)
+
+## Ported from Libraries/LibURL/Pattern/Options.cpp:22 URL::Pattern::Options::hostname.
+# https://urlpattern.spec.whatwg.org/#hostname-options
+pub func options_hostname() -> Options:
+    # The hostname options is an options struct with delimiter code point set "." and prefix code point set to the empty string.
+    return Options(delimiter_code_point = '.', prefix_code_point = none)
+
+## Ported from Libraries/LibURL/Pattern/Options.cpp:32 URL::Pattern::Options::pathname.
+# https://urlpattern.spec.whatwg.org/#pathname-options
+pub func options_pathname() -> Options:
+    # The pathname options is an options struct with delimiter code point set "/" and prefix code point set to "/".
+    return Options(delimiter_code_point = '/', prefix_code_point = '/')

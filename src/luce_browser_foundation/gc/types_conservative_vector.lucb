@@ -19,7 +19,7 @@ pub struct ConservativeVectorBase: IsConservativeVectorBase:
     pub var m_heap: Heap*?  # C++ default: { nullptr }
     pub var m_list_node: ListNode
 
-    func conservative_vector_base() -> ConservativeVectorBase*: return (ConservativeVectorBase*)&self
+    pub func conservative_vector_base() -> ConservativeVectorBase*: return (ConservativeVectorBase*)&self
 
 ## Upcast to GC::ConservativeVectorBase (implemented by every struct in its hierarchy).
 pub interface IsConservativeVectorBase:

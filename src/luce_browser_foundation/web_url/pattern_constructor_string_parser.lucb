@@ -1,0 +1,582 @@
+#==============================================================================================
+#
+#   pattern_constructor_string_parser - URLPattern: splitting a constructor string into parts
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Pattern/ConstructorStringParser.cpp (lines 1-713) and
+#       Libraries/LibURL/Pattern/ConstructorStringParser.h (lines 1-106).
+#
+#==============================================================================================
+
+# mark: Construction and parsing ================================================================
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:15 URL::Pattern::ConstructorStringParser::state_to_string.
+pub func constructor_string_parser_state_to_string(this: const ConstructorStringParser*) -> ak.StringView:
+    match this.m_state:
+        .initial: return sv("Initial")
+        .protocol: return sv("Protocol")
+        .authority: return sv("Authority")
+        .username: return sv("Username")
+        .password: return sv("Password")
+        .hostname: return sv("Hostname")
+        .port: return sv("Port")
+        .pathname: return sv("Pathname")
+        .search: return sv("Search")
+        .hash_: return sv("Hash")
+        .done: return sv("Done")
+        _: trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:44 URL::Pattern::ConstructorStringParser::ConstructorStringParser.
+pub func constructor_string_parser_construct(this: ConstructorStringParser*, input: ak.Utf8View, token_list: ak.Vector[Token]):
+    constructor_string_parser_init_fields(this)
+    this.m_input = input
+    this.m_token_list = token_list
+
+# parser.m_token_list[parser.m_token_index].
+func constructor_string_parser_current_token(this: const ConstructorStringParser*) -> const Token*:
+    return ak.vector_at_const(&this.m_token_list, (usize)this.m_token_index)
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:51 URL::Pattern::ConstructorStringParser::parse.
+# https://urlpattern.spec.whatwg.org/#parse-a-constructor-string
+pub func constructor_string_parser_parse(input: ak.Utf8View) -> Init!:
+    # 1. Let parser be a new constructor string parser whose input is input and token list is the result of running
+    #    tokenize given input and "lenient".
+    var parser: ConstructorStringParser
+    constructor_string_parser_construct(&parser, input, try tokenizer_tokenize(input, TokenizerPolicy.lenient))
+
+    # 2. While parser’s token index is less than parser’s token list size:
+    while (usize)parser.m_token_index < ak.vector_size(&parser.m_token_list):
+        # 1. Set parser’s token increment to 1.
+        parser.m_token_increment = 1
+
+        # NOTE: On every iteration of the parse loop the parser’s token index will be incremented by its token
+        #       increment value. Typically this means incrementing by 1, but at certain times it is set to zero.
+        #       The token increment is then always reset back to 1 at the top of the loop.
+
+        # 2. If parser’s token list[parser’s token index]'s type is "end" then:
+        if constructor_string_parser_current_token(&parser).type_ == TokenType.end:
+            # 1. If parser’s state is "init":
+            if parser.m_state == ConstructorStringParserState.initial:
+                # NOTE: If we reached the end of the string in the "init" state, then we failed to find a protocol
+                #       terminator and this has to be a relative URLPattern constructor string.
+
+                # 1. Run rewind given parser.
+                constructor_string_parser_rewind(&parser)
+
+                # NOTE: We next determine at which component the relative pattern begins. Relative pathnames are
+                #       most common, but URLs and URLPattern constructor strings can begin with the search or hash
+                #       components as well.
+
+                # 2. If the result of running is a hash prefix given parser is true, then run change state given parser,
+                #    "hash" and 1.
+                if constructor_string_parser_is_a_hash_prefix(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.hash_, 1)
+                # 3. Otherwise if the result of running is a search prefix given parser is true:
+                elif constructor_string_parser_is_a_search_prefix(&parser):
+                    # 1. Run change state given parser, "search" and 1.
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.search, 1)
+                # 4. Otherwise:
+                else:
+                    # 1. Run change state given parser, "pathname" and 0.
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.pathname, 0)
+
+                # 5. Increment parser’s token index by parser’s token increment.
+                parser.m_token_index += parser.m_token_increment
+
+                # 6. Continue.
+                continue
+
+            # 2. If parser’s state is "authority":
+            if parser.m_state == ConstructorStringParserState.authority:
+                # NOTE: If we reached the end of the string in the "authority" state, then we failed to find an
+                #            "@". Therefore there is no username or password.
+
+                # 1. Run rewind and set state given parser, and "hostname".
+                constructor_string_parser_rewind_and_set_state(&parser, ConstructorStringParserState.hostname)
+
+                # 2. Increment parser’s token index by parser’s token increment.
+                parser.m_token_index += parser.m_token_increment
+
+                # 3. Continue.
+                continue
+
+            # 3. Run change state given parser, "done" and 0.
+            constructor_string_parser_change_state(&parser, ConstructorStringParserState.done, 0)
+
+            # 4. Break.
+            break
+
+        # 3. If the result of running is a group open given parser is true:
+        if constructor_string_parser_is_a_group_open(&parser):
+            # NOTE: We ignore all code points within "{ ... }" pattern groupings. It would not make sense to allow
+            #            a URL component boundary to lie within a grouping; e.g. "https://example.c{om/fo}o". While not
+            #            supported within well formed pattern strings, we handle nested groupings here to avoid parser
+            #            confusion.
+            #
+            # It is not necessary to perform this logic for regexp or named groups since those values are collapsed into
+            # individual tokens by the tokenize algorithm.
+
+            # 1. Increment parser’s group depth by 1.
+            parser.m_group_depth += 1
+
+            # 2. Increment parser’s token index by parser’s token increment.
+            parser.m_token_index += parser.m_token_increment
+
+            # 3. Continue.
+            continue
+
+        # 4. If parser’s group depth is greater than 0:
+        if parser.m_group_depth > 0:
+            # 1. If the result of running is a group close given parser is true, then decrement parser’s group depth by 1.
+            if constructor_string_parser_is_a_group_close(&parser):
+                assert(parser.m_group_depth != 0)
+                parser.m_group_depth -= 1
+            # 2. Otherwise:
+            else:
+                # 1. Increment parser’s token index by parser’s token increment.
+                parser.m_token_index += parser.m_token_increment
+
+                # 2. Continue.
+                continue
+
+        # 5. Switch on parser’s state and run the associated steps:
+        match parser.m_state:
+            # -> "init", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-init%E2%91%A2
+            .initial:
+                # 1. If the result of running is a protocol suffix given parser is true:
+                if constructor_string_parser_is_a_protocol_suffix(&parser):
+                    # 1. Run rewind and set state given parser and "protocol".
+                    constructor_string_parser_rewind_and_set_state(&parser, ConstructorStringParserState.protocol)
+            # -> "protocol", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-protocol%E2%91%A0
+            .protocol:
+                # 1. If the result of running is a protocol suffix given parser is true:
+                if constructor_string_parser_is_a_protocol_suffix(&parser):
+                    # 1. Run compute protocol matches a special scheme flag given parser.
+                    try constructor_string_parser_compute_protocol_matches_a_special_scheme_flag(&parser)
+
+                    # NOTE: We need to eagerly compile the protocol component to determine if it matches any special
+                    #       schemes. If it does then certain special rules apply. It determines if the pathname
+                    #       defaults to a "/" and also whether we will look for the username, password, hostname, and
+                    #       port components. Authority slashes can also cause us to look for these components as well.
+                    #       Otherwise we treat this as an "opaque path URL" and go straight to the pathname component.
+
+                    # 2. Let next state be "pathname".
+                    var next_state = ConstructorStringParserState.pathname
+
+                    # 3. Let skip be 1.
+                    var skip: u32 = 1
+
+                    # 4. If the result of running next is authority slashes given parser is true:
+                    if constructor_string_parser_next_is_authority_slashes(&parser):
+                        # 1. Set next state to "authority".
+                        next_state = ConstructorStringParserState.authority
+
+                        # 2. Set skip to 3.
+                        skip = 3
+                    # 5. Otherwise if parser’s protocol matches a special scheme flag is true, then set next state to "authority".
+                    elif parser.m_protocol_matches_a_special_scheme:
+                        next_state = ConstructorStringParserState.authority
+
+                    # 6. Run change state given parser, next state, and skip.
+                    constructor_string_parser_change_state(&parser, next_state, skip)
+            # -> "authority", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-authority%E2%91%A3
+            .authority:
+                # 1. If the result of running is an identity terminator given parser is true, then run rewind and set state
+                #    given parser and "username".
+                if constructor_string_parser_is_an_identity_terminator(&parser):
+                    constructor_string_parser_rewind_and_set_state(&parser, ConstructorStringParserState.username)
+                # 2. Otherwise if any of the following are true:
+                #     * the result of running is a pathname start given parser;
+                #     * the result of running is a search prefix given parser; or
+                #     * the result of running is a hash prefix given parser,
+                #    then run rewind and set state given parser and "hostname".
+                elif (constructor_string_parser_is_a_pathname_start(&parser) or constructor_string_parser_is_a_search_prefix(&parser) or constructor_string_parser_is_a_hash_prefix(&parser)):
+                    constructor_string_parser_rewind_and_set_state(&parser, ConstructorStringParserState.hostname)
+            # -> "username", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-username%E2%91%A0
+            .username:
+                # 1. If the result of running is a password prefix given parser is true, then run change state given
+                #    parser, "password", and 1.
+                if constructor_string_parser_is_a_password_prefix(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.password, 1)
+                # 2. Otherwise if the result of running is an identity terminator given parser is true, then run change
+                #    state given parser, "hostname", and 1.
+                elif constructor_string_parser_is_an_identity_terminator(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.hostname, 1)
+            # -> "password", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-password%E2%91%A0
+            .password:
+                # 1. If the result of running is an identity terminator given parser is true, then run change state
+                #    given parser, "hostname", and 1.
+                if constructor_string_parser_is_an_identity_terminator(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.hostname, 1)
+            # -> "hostname", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-hostname%E2%91%A3
+            .hostname:
+                # 1. If the result of running is an IPv6 open given parser is true, then increment parser’s hostname
+                #    IPv6 bracket depth by 1.
+                if constructor_string_parser_is_an_ipv6_open(&parser):
+                    parser.m_hostname_ipv6_bracket_depth += 1
+                # 2. Otherwise if the result of running is an IPv6 close given parser is true, then decrement parser’s
+                #    hostname IPv6 bracket depth by 1.
+                elif constructor_string_parser_is_an_ipv6_close(&parser):
+                    assert(parser.m_hostname_ipv6_bracket_depth != 0)
+                    parser.m_hostname_ipv6_bracket_depth -= 1
+                # 3. Otherwise if the result of running is a port prefix given parser is true and parser’s hostname IPv6
+                #    bracket depth is zero, then run change state given parser, "port", and 1.
+                elif constructor_string_parser_is_a_port_prefix(&parser) and parser.m_hostname_ipv6_bracket_depth == 0:
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.port, 1)
+                # 4. Otherwise if the result of running is a pathname start given parser is true, then run change state
+                #    given parser, "pathname", and 0.
+                elif constructor_string_parser_is_a_pathname_start(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.pathname, 0)
+                # 5. Otherwise if the result of running is a search prefix given parser is true, then run change state
+                #    given parser, "search", and 1.
+                elif constructor_string_parser_is_a_search_prefix(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.search, 1)
+                # 6. Otherwise if the result of running is a hash prefix given parser is true, then run change state
+                #    given parser, "hash", and 1.
+                elif constructor_string_parser_is_a_hash_prefix(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.hash_, 1)
+            # -> "port", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-port%E2%91%A0
+            .port:
+                # 1. If the result of running is a pathname start given parser is true, then run change state given
+                #    parser, "pathname", and 0.
+                if constructor_string_parser_is_a_pathname_start(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.pathname, 0)
+                # 2. Otherwise if the result of running is a search prefix given parser is true, then run change state
+                #   given parser, "search", and 1.
+                elif constructor_string_parser_is_a_search_prefix(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.search, 1)
+                # 3. Otherwise if the result of running is a hash prefix given parser is true, then run change state given
+                #    parser, "hash", and 1.
+                elif constructor_string_parser_is_a_hash_prefix(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.hash_, 1)
+            # -> "pathname", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-pathname%E2%91%A3
+            .pathname:
+                # 1. If the result of running is a search prefix given parser is true, then run change state given parser,
+                #    "search", and 1.
+                if constructor_string_parser_is_a_search_prefix(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.search, 1)
+                # 2. Otherwise if the result of running is a hash prefix given parser is true, then run change state given
+                #    parser, "hash", and 1.
+                elif constructor_string_parser_is_a_hash_prefix(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.hash_, 1)
+            # -> "search", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-search%E2%91%A3
+            .search:
+                # 1. If the result of running is a hash prefix given parser is true, then run change state given parser,
+                #   "hash", and 1.
+                if constructor_string_parser_is_a_hash_prefix(&parser):
+                    constructor_string_parser_change_state(&parser, ConstructorStringParserState.hash_, 1)
+            # -> "hash", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-hash%E2%91%A4
+            .hash_:
+                # 1. Do nothing.
+                discard(())
+            # -> "done", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-done%E2%91%A0
+            .done:
+                # 1. Assert: This step is never reached.
+                trap("VERIFY_NOT_REACHED")
+            _:
+                trap("VERIFY_NOT_REACHED")
+
+        # 6. Increment parser’s token index by parser’s token increment.
+        parser.m_token_index += parser.m_token_increment
+
+    # 3. If parser’s result contains "hostname" and not "port", then set parser’s result["port"] to the empty string.
+    if parser.m_result.hostname != none and parser.m_result.port == none:
+        parser.m_result.port = empty_string()
+
+    # NOTE: This is special-cased because when an author does not specify a port, they usually intend the default
+    #       port. If any port is acceptable, the author can specify it as a wildcard explicitly. For example,
+    #       "https://example.com/*" does not match URLs beginning with "https://example.com:8443/", which is a
+    #       different origin.
+
+    # 4. Return parser’s result.
+    return parser.m_result
+
+# mark: Components and state ====================================================================
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:359 URL::Pattern::ConstructorStringParser::make_a_component_string.
+# https://urlpattern.spec.whatwg.org/#make-a-component-string
+pub func constructor_string_parser_make_a_component_string(this: const ConstructorStringParser*) -> ak.String:
+    # 1. Assert: parser’s token index is less than parser’s token list's size.
+    assert((usize)this.m_token_index < ak.vector_size(&this.m_token_list))
+
+    # 2. Let token be parser’s token list[parser’s token index].
+    let token = constructor_string_parser_current_token(this)
+
+    # 3. Let component start token be the result of running get a safe token given parser and parser’s component start.
+    let component_start_token = constructor_string_parser_get_a_safe_token(this, this.m_component_start)
+
+    # 4. Let component start input index be component start token’s index.
+    let component_start_input_index = component_start_token.index
+
+    # 5. Let end index be token’s index.
+    let end_index = token.index
+
+    # 6. Return the code point substring from component start input index to end index within parser’s input.
+    let sub_view = ak.utf8_view_unicode_substring_view_usize(&this.m_input, (usize)component_start_input_index,
+                                                             (usize)(end_index - component_start_input_index))
+    return ak.string_from_utf8(ak.utf8_view_as_string(&sub_view)) else trap("MUST: String::from_utf8")
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:382 URL::Pattern::ConstructorStringParser::compute_protocol_matches_a_special_scheme_flag.
+# https://urlpattern.spec.whatwg.org/#compute-protocol-matches-a-special-scheme-flag
+pub func constructor_string_parser_compute_protocol_matches_a_special_scheme_flag(this: ConstructorStringParser*) -> !:
+    # 1. Let protocol string be the result of running make a component string given parser.
+    let protocol_string = constructor_string_parser_make_a_component_string(this)
+
+    # 2. Let protocol component be the result of compiling a component given protocol string, canonicalize a protocol, and default options.
+    let protocol_component = try component_compile(ak.string_code_points(&protocol_string), pattern_canonicalize_a_protocol,
+                                                   options_default())
+
+    # 3. If the result of running protocol component matches a special scheme given protocol component is true, then set parser’s protocol matches a special scheme flag to true.
+    if pattern_protocol_component_matches_a_special_scheme(protocol_component):
+        this.m_protocol_matches_a_special_scheme = true
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:397 URL::Pattern::ConstructorStringParser::result_for_active_state.
+pub func constructor_string_parser_result_for_active_state(this: const ConstructorStringParser*) -> ak.String?:
+    match this.m_state:
+        .protocol: return this.m_result.protocol
+        .username: return this.m_result.username
+        .password: return this.m_result.password
+        .hostname: return this.m_result.hostname
+        .port: return this.m_result.port
+        .pathname: return this.m_result.pathname
+        .search: return this.m_result.search
+        .hash_: return this.m_result.hash
+        _: trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:424 URL::Pattern::ConstructorStringParser::set_result_for_active_state.
+pub func constructor_string_parser_set_result_for_active_state(this: ConstructorStringParser*, value: ak.String?):
+    match this.m_state:
+        .protocol: this.m_result.protocol = value
+        .username: this.m_result.username = value
+        .password: this.m_result.password = value
+        .hostname: this.m_result.hostname = value
+        .port: this.m_result.port = value
+        .pathname: this.m_result.pathname = value
+        .search: this.m_result.search = value
+        .hash_: this.m_result.hash = value
+        _: trap("VERIFY_NOT_REACHED")
+
+# first_is_one_of(state, State::Protocol, State::Authority, State::Username, State::Password).
+func state_is_protocol_to_password(state: ConstructorStringParserState) -> bool:
+    return (state == ConstructorStringParserState.protocol or state == ConstructorStringParserState.authority or state == ConstructorStringParserState.username or state == ConstructorStringParserState.password)
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:459 URL::Pattern::ConstructorStringParser::change_state.
+# https://urlpattern.spec.whatwg.org/#change-state
+pub func constructor_string_parser_change_state(this: ConstructorStringParser*, new_state: ConstructorStringParserState, skip: u32):
+    # 1. If parser’s state is not "init", not "authority", and not "done", then set parser’s result[parser’s state] to
+    #    the result of running make a component string given parser.
+    if (this.m_state != ConstructorStringParserState.initial and this.m_state != ConstructorStringParserState.authority and this.m_state != ConstructorStringParserState.done):
+        constructor_string_parser_set_result_for_active_state(this, constructor_string_parser_make_a_component_string(this))
+
+    # 2. If parser’s state is not "init" and new state is not "done", then:
+    if this.m_state != ConstructorStringParserState.initial and new_state != ConstructorStringParserState.done:
+        # 1. If parser’s state is "protocol", "authority", "username", or "password"; new state is "port", "pathname",
+        #    "search", or "hash"; and parser’s result["hostname"] does not exist, then set parser’s result["hostname"]
+        #    to the empty string.
+        if (state_is_protocol_to_password(this.m_state) and (new_state == ConstructorStringParserState.port or new_state == ConstructorStringParserState.pathname or new_state == ConstructorStringParserState.search or new_state == ConstructorStringParserState.hash_) and this.m_result.hostname == none):
+            this.m_result.hostname = empty_string()
+
+        # 2. If parser’s state is "protocol", "authority", "username", "password", "hostname", or "port"; new state is
+        #    "search" or "hash"; and parser’s result["pathname"] does not exist, then:
+        if ((state_is_protocol_to_password(this.m_state) or this.m_state == ConstructorStringParserState.hostname or this.m_state == ConstructorStringParserState.port) and (new_state == ConstructorStringParserState.search or new_state == ConstructorStringParserState.hash_) and this.m_result.pathname == none):
+            # 1. If parser’s protocol matches a special scheme flag is true, then set parser’s result["pathname"] to "/".
+            if this.m_protocol_matches_a_special_scheme:
+                this.m_result.pathname = string_lit("/")
+            # 2. Otherwise, set parser’s result["pathname"] to the empty string.
+            else:
+                this.m_result.pathname = empty_string()
+
+        # 3. If parser’s state is "protocol", "authority", "username", "password", "hostname", "port", or "pathname";
+        #    new state is "hash"; and parser’s result["search"] does not exist, then set parser’s result["search"]
+        #    to the empty string.
+        if ((state_is_protocol_to_password(this.m_state) or this.m_state == ConstructorStringParserState.hostname or this.m_state == ConstructorStringParserState.port or this.m_state == ConstructorStringParserState.pathname) and new_state == ConstructorStringParserState.hash_ and this.m_result.search == none):
+            this.m_result.search = empty_string()
+
+    # 3. Set parser’s state to new state.
+    this.m_state = new_state
+
+    # 4. Increment parser’s token index by skip.
+    this.m_token_index += skip
+
+    # 5. Set parser’s component start to parser’s token index.
+    this.m_component_start = this.m_token_index
+
+    # 6. Set parser’s token increment to 0.
+    this.m_token_increment = 0
+
+# mark: Token predicates ========================================================================
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:516 URL::Pattern::ConstructorStringParser::next_is_authority_slashes.
+# https://urlpattern.spec.whatwg.org/#next-is-authority-slashes
+pub func constructor_string_parser_next_is_authority_slashes(this: const ConstructorStringParser*) -> bool:
+    # 1. If the result of running is a non-special pattern char given parser, parser’s token index + 1, and "/" is false,
+    #    then return false.
+    if not constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index + 1, '/'):
+        return false
+
+    # 2. If the result of running is a non-special pattern char given parser, parser’s token index + 2, and "/" is false,
+    #    then return false.
+    if not constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index + 2, '/'):
+        return false
+
+    # 3. Return true.
+    return true
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:533 URL::Pattern::ConstructorStringParser::is_an_identity_terminator.
+# https://urlpattern.spec.whatwg.org/#is-an-identity-terminator
+pub func constructor_string_parser_is_an_identity_terminator(this: const ConstructorStringParser*) -> bool:
+    # 1. Return the result of running is a non-special pattern char given parser, parser’s token index, and "@".
+    return constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index, '@')
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:540 URL::Pattern::ConstructorStringParser::is_a_password_prefix.
+# https://urlpattern.spec.whatwg.org/#is-a-password-prefix
+pub func constructor_string_parser_is_a_password_prefix(this: const ConstructorStringParser*) -> bool:
+    # 1. Return the result of running is a non-special pattern char given parser, parser’s token index, and ":".
+    return constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index, ':')
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:547 URL::Pattern::ConstructorStringParser::is_a_port_prefix.
+# https://urlpattern.spec.whatwg.org/#is-a-port-prefix
+pub func constructor_string_parser_is_a_port_prefix(this: const ConstructorStringParser*) -> bool:
+    # 1. Return the result of running is a non-special pattern char given parser, parser’s token index, and ":".
+    return constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index, ':')
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:554 URL::Pattern::ConstructorStringParser::is_a_pathname_start.
+# https://urlpattern.spec.whatwg.org/#is-a-pathname-start
+pub func constructor_string_parser_is_a_pathname_start(this: const ConstructorStringParser*) -> bool:
+    # 1. Return the result of running is a non-special pattern char given parser, parser’s token index, and "/".
+    return constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index, '/')
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:561 URL::Pattern::ConstructorStringParser::is_a_search_prefix.
+# https://urlpattern.spec.whatwg.org/#is-a-search-prefix
+pub func constructor_string_parser_is_a_search_prefix(this: const ConstructorStringParser*) -> bool:
+    # 1. If result of running is a non-special pattern char given parser, parser’s token index and "?" is true,
+    #    then return true.
+    if constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index, '?'):
+        return true
+
+    # 2. If parser’s token list[parser’s token index]'s value is not "?", then return false.
+    if not string_is(constructor_string_parser_current_token(this).value, "?"):
+        return false
+
+    # 3. Let previous index be parser’s token index − 1.
+    # 4. If previous index is less than 0, then return true.
+    if this.m_token_index == 0:
+        return true
+    let previous_index = this.m_token_index - 1
+
+    # 5. Let previous token be the result of running get a safe token given parser and previous index.
+    let previous_token = constructor_string_parser_get_a_safe_token(this, previous_index)
+
+    # 6. If any of the following are true, then return false:
+    #    * previous token’s type is "name".
+    #    * previous token’s type is "regexp".
+    #    * previous token’s type is "close".
+    #    * previous token’s type is "asterisk".
+    if (previous_token.type_ == TokenType.name or previous_token.type_ == TokenType.regexp or previous_token.type_ == TokenType.close or previous_token.type_ == TokenType.asterisk):
+        return false
+
+    # 7. Return true.
+    return true
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:598 URL::Pattern::ConstructorStringParser::is_a_protocol_suffix.
+# https://urlpattern.spec.whatwg.org/#is-a-protocol-suffix
+pub func constructor_string_parser_is_a_protocol_suffix(this: const ConstructorStringParser*) -> bool:
+    # 1. Return the result of running is a non-special pattern char given parser, parser’s token index, and ":".
+    return constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index, ':')
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:605 URL::Pattern::ConstructorStringParser::is_a_hash_prefix.
+# https://urlpattern.spec.whatwg.org/#is-a-hash-prefix
+pub func constructor_string_parser_is_a_hash_prefix(this: const ConstructorStringParser*) -> bool:
+    # 1. Return the result of running is a non-special pattern char given parser, parser’s token index and "#".
+    return constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index, '#')
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:612 URL::Pattern::ConstructorStringParser::is_a_group_open.
+# https://urlpattern.spec.whatwg.org/#is-a-group-open
+pub func constructor_string_parser_is_a_group_open(this: const ConstructorStringParser*) -> bool:
+    # 1. If parser’s token list[parser’s token index]'s type is "open", then return true.
+    if constructor_string_parser_current_token(this).type_ == TokenType.open:
+        return true
+
+    # 2. Otherwise return false.
+    return false
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:623 URL::Pattern::ConstructorStringParser::is_a_group_close.
+# https://urlpattern.spec.whatwg.org/#is-a-group-close
+pub func constructor_string_parser_is_a_group_close(this: const ConstructorStringParser*) -> bool:
+    # 1. If parser’s token list[parser’s token index]'s type is "close", then return true.
+    if constructor_string_parser_current_token(this).type_ == TokenType.close:
+        return true
+
+    # 2. Otherwise return false.
+    return false
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:634 URL::Pattern::ConstructorStringParser::is_an_ipv6_open.
+# https://urlpattern.spec.whatwg.org/#is-an-ipv6-open
+pub func constructor_string_parser_is_an_ipv6_open(this: const ConstructorStringParser*) -> bool:
+    # 1. Return the result of running is a non-special pattern char given parser, parser’s token index, and "[".
+    return constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index, '[')
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:641 URL::Pattern::ConstructorStringParser::is_an_ipv6_close.
+# https://urlpattern.spec.whatwg.org/#is-an-ipv6-close
+pub func constructor_string_parser_is_an_ipv6_close(this: const ConstructorStringParser*) -> bool:
+    # 1. Return the result of running is a non-special pattern char given parser, parser’s token index, and "]".
+    return constructor_string_parser_is_a_non_special_pattern_char(this, this.m_token_index, ']')
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:648 URL::Pattern::ConstructorStringParser::get_a_safe_token.
+# https://urlpattern.spec.whatwg.org/#get-a-safe-token
+pub func constructor_string_parser_get_a_safe_token(this: const ConstructorStringParser*, index: u32) -> const Token*:
+    # 1. If index is less than parser’s token list's size, then return parser’s token list[index].
+    if (usize)index < ak.vector_size(&this.m_token_list):
+        return ak.vector_at_const(&this.m_token_list, (usize)index)
+
+    # 2. Assert: parser’s token list's size is greater than or equal to 1.
+    assert(not ak.vector_is_empty(&this.m_token_list))
+
+    # 3. Let last index be parser’s token list's size − 1.
+    # 4. Let token be parser’s token list[last index].
+    let token = ak.vector_last_const(&this.m_token_list)
+
+    # 5. Assert: token’s type is "end".
+    assert(token.type_ == TokenType.end)
+
+    # 6. Return token.
+    return token
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:669 URL::Pattern::ConstructorStringParser::is_a_non_special_pattern_char.
+# https://urlpattern.spec.whatwg.org/#is-a-non-special-pattern-char
+pub func constructor_string_parser_is_a_non_special_pattern_char(this: const ConstructorStringParser*, index: u32, value: u8) -> bool:
+    # 1. Let token be the result of running get a safe token given parser and index.
+    let token = constructor_string_parser_get_a_safe_token(this, index)
+
+    # 2. If token’s value is not value, then return false.
+    if ak.string_is_empty(&token.value) or ak.string_base_bytes(&token.value.string_base)[0] != value:
+        return false
+
+    # 3. If any of the following are true:
+    #     * token’s type is "char";
+    #     * token’s type is "escaped-char"; or
+    #     * token’s type is "invalid-char",
+    #    then return true.
+    if (token.type_ == TokenType.char_ or token.type_ == TokenType.escaped_char or token.type_ == TokenType.invalid_char):
+        return true
+
+    # 4. Return false.
+    return false
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:694 URL::Pattern::ConstructorStringParser::rewind.
+# https://urlpattern.spec.whatwg.org/#rewind
+pub func constructor_string_parser_rewind(this: ConstructorStringParser*):
+    # 1. Set parser’s token index to parser’s component start.
+    this.m_token_index = this.m_component_start
+
+    # 2. Set parser’s token increment to 0.
+    this.m_token_increment = 0
+
+## Ported from Libraries/LibURL/Pattern/ConstructorStringParser.cpp:704 URL::Pattern::ConstructorStringParser::rewind_and_set_state.
+# https://urlpattern.spec.whatwg.org/#rewind-and-set-state
+pub func constructor_string_parser_rewind_and_set_state(this: ConstructorStringParser*, state: ConstructorStringParserState):
+    # 1. Run rewind given parser.
+    constructor_string_parser_rewind(this)
+
+    # 2. Set parser’s state to state.
+    this.m_state = state

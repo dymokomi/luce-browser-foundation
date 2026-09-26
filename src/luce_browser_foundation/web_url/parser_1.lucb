@@ -1,0 +1,431 @@
+#==============================================================================================
+#
+#   parser_1 - URL::Parser: code point classes, opaque hosts, IPv4 and IPv6 addresses
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Parser.h (lines 1-74) and Libraries/LibURL/Parser.cpp lines
+#       1-447 (end_of_file to parse_ipv6_address). Domains, hosts and the helpers of the basic
+#       URL parser are parser_2.lucb; the basic URL parser itself is parser_3.lucb.
+#       `end_of_file` and ParsedIPv4Number are in types_parser.lucb.
+#
+#==============================================================================================
+
+# mark: Code point classes ======================================================================
+
+## Ported from Libraries/LibURL/Parser.cpp:31 URL::is_forbidden_host_code_point.
+# https://url.spec.whatwg.org/#forbidden-host-code-point
+func is_forbidden_host_code_point(code_point: u32) -> bool:
+    # A forbidden host code point is U+0000 NULL, U+0009 TAB, U+000A LF, U+000D CR, U+0020 SPACE,
+    # U+0023 (#), U+002F (/), U+003A (:), U+003C (<), U+003E (>), U+003F (?), U+0040 (@), U+005B ([),
+    # U+005C (\), U+005D (]), U+005E (^), or U+007C (|).
+    return literal_contains("\0\t\n\r #/:<>?@[\\]^|", code_point)
+
+## Ported from Libraries/LibURL/Parser.cpp:40 URL::is_forbidden_domain_code_point.
+# https://url.spec.whatwg.org/#forbidden-domain-code-point
+func is_forbidden_domain_code_point(code_point: u32) -> bool:
+    # A forbidden domain code point is a forbidden host code point, a C0 control, U+0025 (%), or U+007F DELETE.
+    return (is_forbidden_host_code_point(code_point) or ak.is_ascii_c0_control(code_point) or code_point == (u32)'%' or code_point == 0x7F)
+
+## Ported from Libraries/LibURL/Parser.cpp:47 URL::is_url_code_point.
+# https://url.spec.whatwg.org/#url-code-points
+func is_url_code_point(code_point: u32) -> bool:
+    # The URL code points are ASCII alphanumeric, U+0021 (!), U+0024 ($), U+0026 (&),
+    # U+0027 ('), U+0028 LEFT PARENTHESIS, U+0029 RIGHT PARENTHESIS, U+002A (*),
+    # U+002B (+), U+002C (,), U+002D (-), U+002E (.), U+002F (/), U+003A (:),
+    # U+003B (;), U+003D (=), U+003F (?), U+0040 (@), U+005F (_), U+007E (~), and code
+    # points in the range U+00A0 to U+10FFFD, inclusive, excluding surrogates and
+    # noncharacters.
+    return (ak.is_ascii_alphanumeric(code_point) or literal_contains("!$&'()*+,-./:;=?@_~", code_point) or (code_point >= 0x00A0 and code_point <= 0x10FFFD and not ak.is_unicode_surrogate(code_point) and not ak.is_unicode_noncharacter(code_point)))
+
+## Ported from Libraries/LibURL/Parser.h:48 URL::Parser::state_name.
+pub func parser_state_name(state: ParserState) -> str:
+    match state:
+        .scheme_start: return "SchemeStart"
+        .scheme: return "Scheme"
+        .no_scheme: return "NoScheme"
+        .special_relative_or_authority: return "SpecialRelativeOrAuthority"
+        .path_or_authority: return "PathOrAuthority"
+        .relative: return "Relative"
+        .relative_slash: return "RelativeSlash"
+        .special_authority_slashes: return "SpecialAuthoritySlashes"
+        .special_authority_ignore_slashes: return "SpecialAuthorityIgnoreSlashes"
+        .authority: return "Authority"
+        .host: return "Host"
+        .hostname: return "Hostname"
+        .port: return "Port"
+        .file: return "File"
+        .file_slash: return "FileSlash"
+        .file_host: return "FileHost"
+        .path_start: return "PathStart"
+        .path: return "Path"
+        .opaque_path: return "OpaquePath"
+        .query: return "Query"
+        .fragment: return "Fragment"
+        _: trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibURL/Parser.cpp:59 URL::report_validation_error.
+# dbgln_if(URL_PARSER_DEBUG, "URL::Parser::basic_parse: Validation error! {}", location): nothing while
+# url_parser_debug is off (the SourceLocation parameter goes with the message).
+func report_validation_error():
+    return
+
+# mark: Opaque hosts and IPv4 ===================================================================
+
+## Ported from Libraries/LibURL/Parser.cpp:65 URL::parse_opaque_host.
+# https://url.spec.whatwg.org/#concept-opaque-host-parser
+func parse_opaque_host(input: ak.StringView) -> Host?:
+    # 1. If input contains a forbidden host code point, host-invalid-code-point validation error, return failure.
+    let view = utf8_view_of(input)
+    var iterator = ak.utf8_view_begin(&view)
+    while not ak.utf8_code_point_iterator_done(&iterator):
+        if is_forbidden_host_code_point(ak.utf8_code_point_iterator_deref(&iterator)):
+            report_validation_error()
+            return none
+        discard(ak.utf8_code_point_iterator_inc(&iterator))
+
+    # 2. If input contains a code point that is not a URL code point and not U+0025 (%), invalid-URL-unit validation error.
+    # 3. If input contains a U+0025 (%) and the two code points following it are not ASCII hex digits, invalid-URL-unit validation error.
+    # NOTE: These steps are not implemented because they are not cheap checks and exist just to report validation errors. With how we
+    #       currently report validation errors, they are only useful for debugging efforts in the URL parsing code.
+
+    # 4. Return the result of running UTF-8 percent-encode on input using the C0 control percent-encode set.
+    return Host(m_value = ak.HostVariantType.string(value = percent_encode(input, PercentEncodeSet.c0_control)))
+
+## Ported from Libraries/LibURL/Parser.cpp:90 URL::parse_ipv4_number.
+# https://url.spec.whatwg.org/#ipv4-number-parser
+func parse_ipv4_number(input_view: ak.StringView) -> ParsedIPv4Number?:
+    var input = input_view
+
+    # 1. If input is the empty string, then return failure.
+    if ak.string_view_is_empty(&input):
+        return none
+
+    # 2. Let validationError be false.
+    var validation_error = false
+
+    # 3. Let R be 10.
+    var radix: u8 = 10
+
+    # 4. If input contains at least two code points and the first two code points are either "0X" or "0x", then:
+    if (ak.string_view_length(&input) >= 2 and (ak.string_view_starts_with_string_view(&input, sv("0X")) or ak.string_view_starts_with_string_view(&input, sv("0x")))):
+        # 1. Set validationError to true.
+        validation_error = true
+
+        # 2. Remove the first two code points from input.
+        input = ak.string_view_substring_view(&input, 2)
+
+        # 3. Set R to 16.
+        radix = 16
+    # 5. Otherwise, if input contains at least two code points and the first code point is U+0030 (0), then:
+    elif ak.string_view_length(&input) >= 2 and ak.string_view_at(&input, 0) == '0':
+        # 1. Set validationError to true.
+        validation_error = true
+
+        # 2. Remove the first code point from input.
+        input = ak.string_view_substring_view(&input, 1)
+
+        # 3. Set R to 8.
+        radix = 8
+
+    # 6. If input is the empty string, then return (0, true).
+    if ak.string_view_is_empty(&input):
+        return ParsedIPv4Number(number = 0, validation_error = true)
+
+    # 7. If input contains a code point that is not a radix-R digit, then return failure.
+    # 8. Let output be the mathematical integer value that is represented by input in radix-R notation, using ASCII hex digits for digits with values 0 through 15.
+    let output = ak.parse_number_string_view_u32(input, ak.TrimWhitespace.no, (i32)radix) else return none
+
+    # 9. Return (output, validationError).
+    return ParsedIPv4Number(number = output, validation_error = validation_error)
+
+# AK::pow<size_t>(base, exponent) for the IPv4 parser's powers of 256.
+func pow_usize(base_value: usize, exponent: usize) -> usize:
+    var result: usize = 1
+    for _ in 0..<exponent:
+        result = result * base_value
+    return result
+
+## Ported from Libraries/LibURL/Parser.cpp:140 URL::parse_ipv4_address.
+# https://url.spec.whatwg.org/#concept-ipv4-parser
+func parse_ipv4_address(input: ak.StringView) -> ak.IPv4Address?:
+    # 1. Let parts be the result of strictly splitting input on U+002E (.).
+    var parts = ak.string_view_split_view_string_view(&input, sv("."), ak.SplitBehavior.keep_empty)
+
+    # 2. If the last item in parts is the empty string, then:
+    if ak.string_view_is_empty(ak.vector_last(&parts)):
+        # 1. IPv4-empty-part validation error.
+        report_validation_error()
+
+        # 2. If parts’s size is greater than 1, then remove the last item from parts.
+        if ak.vector_size(&parts) > 1:
+            discard(ak.vector_take_last(&parts))
+
+    # 3. If parts’s size is greater than 4, IPv4-too-many-parts validation error, return failure.
+    if ak.vector_size(&parts) > 4:
+        report_validation_error()
+        return none
+
+    # 4. Let numbers be an empty list.
+    var numbers: ak.Vector[u32]
+
+    # 5. For each part of parts:
+    for index in 0..<ak.vector_size(&parts):
+        # 1. Let result be the result of parsing part.
+        # 2. If result is failure, IPv4-non-numeric-part validation error, return failure.
+        let maybe_result = parse_ipv4_number(*ak.vector_at(&parts, index))
+        if maybe_result == none:
+            report_validation_error()
+            return none
+        let result = maybe_result else trap("unreachable")
+
+        # 3. If result[1] is true, IPv4-non-decimal-part validation error.
+        if result.validation_error:
+            report_validation_error()
+
+        # 4. Append result[0] to numbers.
+        ak.vector_append_t(&numbers, result.number)
+
+    # 6. If any item in numbers is greater than 255, IPv4-out-of-range-part validation error.
+    # 7. If any but the last item in numbers is greater than 255, then return failure.
+    for i in 0..<ak.vector_size(&numbers):
+        if *ak.vector_at(&numbers, i) > 255:
+            report_validation_error()
+            if i != ak.vector_size(&numbers) - 1:
+                return none
+
+    # 8. If the last item in numbers is greater than or equal to 256^(5 − numbers’s size), then return failure.
+    if (usize)*ak.vector_last(&numbers) >= pow_usize(256, 5 - ak.vector_size(&numbers)):
+        return none
+
+    # 9. Let ipv4 be the last item in numbers.
+    var ipv4 = *ak.vector_last(&numbers)
+
+    # 10. Remove the last item from numbers.
+    discard(ak.vector_take_last(&numbers))
+
+    # 11. Let counter be 0.
+    var counter: u8 = 0
+
+    # 12. For each n of numbers:
+    for index in 0..<ak.vector_size(&numbers):
+        let n = *ak.vector_at(&numbers, index)
+        # 1. Increment ipv4 by n × 256^(3 − counter).
+        ipv4 += (u32)((usize)n * pow_usize(256, 3 - (usize)counter))
+
+        # 2. Increment counter by 1.
+        counter += 1
+
+    # 13. Return ipv4.
+    # IPv4Address(NetworkOrdered<u32>): m_data holds the numeric value.
+    return ak.IPv4Address(m_data = ipv4)
+
+# mark: IPv6 ====================================================================================
+
+# The lambda c() of parse_ipv6_address: the code point at pointer, or EOF.
+func ipv6_c(code_points: const ak.Vector[u32]*, pointer: usize) -> u32:
+    if pointer >= ak.vector_size(code_points):
+        return end_of_file
+    return *ak.vector_at_const(code_points, pointer)
+
+# remaining().is_empty() || remaining()[0] != ':' of parse_ipv6_address: remaining is the code points after pointer.
+func ipv6_remaining_does_not_start_with_colon(code_points: const ak.Vector[u32]*, pointer: usize) -> bool:
+    if (pointer + 1) >= ak.vector_size(code_points):
+        return true
+    return *ak.vector_at_const(code_points, pointer + 1) != (u32)':'
+
+## Ported from Libraries/LibURL/Parser.cpp:220 URL::parse_ipv6_address.
+# https://url.spec.whatwg.org/#concept-ipv6-parser
+func parse_ipv6_address(input: ak.StringView) -> ak.IPv6Address?:
+    # 1. Let address be a new IPv6 address whose IPv6 pieces are all 0.
+    var address: u16[8]
+
+    # 2. Let pieceIndex be 0.
+    var piece_index: usize = 0
+
+    # 3. Let compress be null.
+    var compress: usize? = none
+
+    var code_points: ak.Vector[u32]
+    ak.vector_ensure_capacity(&code_points, ak.string_view_length(&input))
+    let view = utf8_view_of(input)
+    var iterator = ak.utf8_view_begin(&view)
+    while not ak.utf8_code_point_iterator_done(&iterator):
+        ak.vector_append_t(&code_points, ak.utf8_code_point_iterator_deref(&iterator))
+        discard(ak.utf8_code_point_iterator_inc(&iterator))
+
+    # 4. Let pointer be a pointer for input.
+    var pointer: usize = 0
+
+    # 5. If c is U+003A (:), then:
+    if ipv6_c(&code_points, pointer) == (u32)':':
+        # 1. If remaining does not start with U+003A (:), IPv6-invalid-compression validation error, return failure.
+        if ipv6_remaining_does_not_start_with_colon(&code_points, pointer):
+            report_validation_error()
+            return none
+
+        # 2. Increase pointer by 2.
+        pointer += 2
+
+        # 3. Increase pieceIndex by 1 and then set compress to pieceIndex.
+        piece_index += 1
+        compress = piece_index
+
+    # 6. While c is not the EOF code point:
+    while ipv6_c(&code_points, pointer) != end_of_file:
+        # 1. If pieceIndex is 8, IPv6-too-many-pieces validation error, return failure.
+        if piece_index == 8:
+            report_validation_error()
+            return none
+
+        # 2. If c is U+003A (:), then:
+        if ipv6_c(&code_points, pointer) == (u32)':':
+            # 1. If compress is non-null, IPv6-multiple-compression validation error, return failure.
+            if compress != none:
+                report_validation_error()
+                return none
+
+            # 2. Increase pointer and pieceIndex by 1, set compress to pieceIndex, and then continue.
+            pointer += 1
+            piece_index += 1
+            compress = piece_index
+            continue
+
+        # 3. Let value and length be 0.
+        var value: u32 = 0
+        var length: usize = 0
+
+        # 4. While length is less than 4 and c is an ASCII hex digit,
+        #    set value to value × 0x10 + c interpreted as hexadecimal number,
+        #    and increase pointer and length by 1.
+        while length < 4 and ak.is_ascii_hex_digit(ipv6_c(&code_points, pointer)):
+            value = value * 0x10 + ak.parse_ascii_hex_digit(ipv6_c(&code_points, pointer))
+            pointer += 1
+            length += 1
+
+        # 5. If c is U+002E (.), then:
+        if ipv6_c(&code_points, pointer) == (u32)'.':
+            # 1. If length is 0, IPv4-in-IPv6-invalid-code-point validation error, return failure.
+            if length == 0:
+                report_validation_error()
+                return none
+
+            # 2. Decrease pointer by length.
+            pointer -= length
+
+            # 3. If pieceIndex is greater than 6, IPv4-in-IPv6-too-many-pieces validation error, return failure.
+            if piece_index > 6:
+                report_validation_error()
+                return none
+
+            # 4. Let numbersSeen be 0.
+            var numbers_seen: usize = 0
+
+            # 5. While c is not the EOF code point:
+            while ipv6_c(&code_points, pointer) != end_of_file:
+                # 1. Let ipv4Piece be null.
+                var ipv4_piece: u32? = none
+
+                # 2. If numbersSeen is greater than 0, then:
+                if numbers_seen > 0:
+                    # 1. If c is a U+002E (.) and numbersSeen is less than 4, then increase pointer by 1.
+                    if ipv6_c(&code_points, pointer) == (u32)'.' and numbers_seen < 4:
+                        pointer += 1
+                    # 2. Otherwise, IPv4-in-IPv6-invalid-code-point validation error, return failure.
+                    else:
+                        report_validation_error()
+                        return none
+
+                # 3. If c is not an ASCII digit, IPv4-in-IPv6-invalid-code-point validation error, return failure.
+                if not ak.is_ascii_digit(ipv6_c(&code_points, pointer)):
+                    report_validation_error()
+                    return none
+
+                # 4. While c is an ASCII digit:
+                while ak.is_ascii_digit(ipv6_c(&code_points, pointer)):
+                    # 1. Let number be c interpreted as decimal number.
+                    let number = ak.parse_ascii_digit(ipv6_c(&code_points, pointer))
+
+                    # 2. If ipv4Piece is null, then set ipv4Piece to number.
+                    if let piece = ipv4_piece:
+                        # Otherwise, if ipv4Piece is 0, IPv4-in-IPv6-invalid-code-point validation error, return failure.
+                        if piece == 0:
+                            report_validation_error()
+                            return none
+                        # Otherwise, set ipv4Piece to ipv4Piece × 10 + number.
+                        else:
+                            ipv4_piece = piece * 10 + number
+                    else:
+                        ipv4_piece = number
+
+                    # 3. If ipv4Piece is greater than 255, IPv4-in-IPv6-out-of-range-part validation error, return failure.
+                    if (ipv4_piece else 0) > 255:
+                        report_validation_error()
+                        return none
+
+                    # 4. Increase pointer by 1.
+                    pointer += 1
+                # 5. Set address[pieceIndex] to address[pieceIndex] × 0x100 + ipv4Piece.
+                address[piece_index] = (u16)((u32)address[piece_index] * 0x100 + (ipv4_piece else trap("VERIFY: ipv4Piece")))
+
+                # 6. Increase numbersSeen by 1.
+                numbers_seen += 1
+
+                # 7. If numbersSeen is 2 or 4, then increase pieceIndex by 1.
+                if numbers_seen == 2 or numbers_seen == 4:
+                    piece_index += 1
+
+            # 6. If numbersSeen is not 4, IPv4-in-IPv6-too-few-parts validation error, return failure.
+            if numbers_seen != 4:
+                report_validation_error()
+                return none
+
+            # 7. Break.
+            break
+        # 6. Otherwise, if c is U+003A (:):
+        elif ipv6_c(&code_points, pointer) == (u32)':':
+            # 1. Increase pointer by 1.
+            pointer += 1
+
+            # 2. If c is the EOF code point, IPv6-invalid-code-point validation error, return failure.
+            if ipv6_c(&code_points, pointer) == end_of_file:
+                report_validation_error()
+                return none
+
+        # 7. Otherwise, if c is not the EOF code point, IPv6-invalid-code-point validation error, return failure.
+        elif ipv6_c(&code_points, pointer) != end_of_file:
+            report_validation_error()
+            return none
+
+        # 8. Set address[pieceIndex] to value.
+        address[piece_index] = (u16)value
+
+        # 9. Increase pieceIndex by 1.
+        piece_index += 1
+
+    # 7. If compress is non-null, then:
+    if let compress_index = compress:
+        # 1. Let swaps be pieceIndex − compress.
+        var swaps = piece_index - compress_index
+
+        # 2. Set pieceIndex to 7.
+        piece_index = 7
+
+        # 3. While pieceIndex is not 0 and swaps is greater than 0,
+        #    swap address[pieceIndex] with address[compress + swaps − 1],
+        #    and then decrease both pieceIndex and swaps by 1.
+        while piece_index != 0 and swaps > 0:
+            let swapped = address[piece_index]
+            address[piece_index] = address[compress_index + swaps - 1]
+            address[compress_index + swaps - 1] = swapped
+            piece_index -= 1
+            swaps -= 1
+
+    # 8. Otherwise, if compress is null and pieceIndex is not 8, IPv6-too-few-pieces validation error, return failure.
+    elif piece_index != 8:
+        report_validation_error()
+        return none
+
+    # 9. Return address.
+    var result: ak.IPv6Address
+    ak.i_pv6_address_construct_array_u16(&result, address)
+    return result

@@ -1,0 +1,256 @@
+#==============================================================================================
+#
+#   pattern_canonicalization - URLPattern: canonicalizing each component with the URL parser
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/Pattern/Canonicalization.cpp (lines 1-262). Each function is
+#       an encoding callback of the pattern parser (EncodingCallback).
+#
+#==============================================================================================
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:13 URL::Pattern::create_a_dummy_url.
+# https://urlpattern.spec.whatwg.org/#url-pattern-create-a-dummy-url
+func pattern_create_a_dummy_url() -> Url:
+    # 1. Let dummyInput be "https://dummy.invalid/".
+    # 2. Return the result of running the basic URL parser on dummyInput.
+    return parser_basic_parse(sv("https://dummy.invalid/")) else trap("VERIFY: Optional::release_value")
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:21 URL::Pattern::canonicalize_a_protocol.
+# https://urlpattern.spec.whatwg.org/#canonicalize-a-protocol
+pub func pattern_canonicalize_a_protocol(value: ak.String) -> ak.String!:
+    # 1. If value is the empty string, return value.
+    if ak.string_is_empty(&value):
+        return value
+
+    # 2. Let parseResult be the result of running the basic URL parser given value followed by "://dummy.invalid/".
+    # NOTE: Note, state override is not used here because it enforces restrictions that are only appropriate for the
+    #       protocol setter. Instead we use the protocol to parse a dummy URL using the normal parsing entry point.
+    var input: ak.StringBuilder
+    ak.string_builder_construct(&input)
+    append_string(&input, value)
+    append_literal(&input, "://dummy.invalid")
+    let parse_result = parser_basic_parse(ak.string_builder_string_view(&input))
+
+    # 4. If parseResult is failure, then throw a TypeError.
+    if parse_result == none:
+        try pattern_throw("Failed to canonicalize URL protocol string")
+    let url = parse_result else trap("unreachable")
+
+    # 5. Return parseResult’s scheme.
+    return url_scheme(&url)
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:41 URL::Pattern::canonicalize_a_username.
+# https://urlpattern.spec.whatwg.org/#canonicalize-a-username
+pub func pattern_canonicalize_a_username(value: ak.String) -> ak.String:
+    # 1. If value is the empty string, return value.
+    if ak.string_is_empty(&value):
+        return value
+
+    # 2. Let dummyURL be the result of creating a dummy URL.
+    var dummy_url = pattern_create_a_dummy_url()
+
+    # 3. Set the username given dummyURL and value.
+    url_set_username(&dummy_url, view_of(value))
+
+    # 4. Return dummyURL’s username.
+    return url_username(&dummy_url)
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:58 URL::Pattern::canonicalize_a_password.
+# https://urlpattern.spec.whatwg.org/#canonicalize-a-password
+pub func pattern_canonicalize_a_password(value: ak.String) -> ak.String:
+    # 1. If value is the empty string, return value.
+    if ak.string_is_empty(&value):
+        return value
+
+    # 2. Let dummyURL be the result of creating a dummy URL.
+    var dummy_url = pattern_create_a_dummy_url()
+
+    # 3. Set the password given dummyURL and value.
+    url_set_password(&dummy_url, view_of(value))
+
+    # 4. Return dummyURL’s password.
+    return url_password(&dummy_url)
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:75 URL::Pattern::canonicalize_a_hostname.
+# https://urlpattern.spec.whatwg.org/#canonicalize-a-hostname
+pub func pattern_canonicalize_a_hostname(value: ak.String) -> ak.String!:
+    # 1. If value is the empty string, return value.
+    if ak.string_is_empty(&value):
+        return value
+
+    # 2. Let dummyURL be the result of creating a dummy URL.
+    var dummy_url = pattern_create_a_dummy_url()
+
+    # 3. Let parseResult be the result of running the basic URL parser given value with dummyURL
+    #    as url and hostname state as state override.
+    let parse_result = parser_basic_parse(view_of(value), url = &dummy_url, state_override = ParserState.hostname)
+
+    # 4. If parseResult is failure, then throw a TypeError.
+    if parse_result == none:
+        try pattern_throw("Failed to canonicalize URL hostname string")
+
+    # 5. Return dummyURL’s host, serialized, or empty string if it is null.
+    let host = url_host(&dummy_url) else return empty_string()
+    return host_serialize(&host)
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:99 URL::Pattern::canonicalize_an_ipv6_hostname.
+# https://urlpattern.spec.whatwg.org/#canonicalize-an-ipv6-hostname
+pub func pattern_canonicalize_an_ipv6_hostname(value: ak.String) -> ak.String!:
+    # 1. Let result be the empty string.
+    var result: ak.StringBuilder
+    ak.string_builder_construct(&result)
+
+    # 2. For each code point in value interpreted as a list of code points:
+    let code_points = ak.string_code_points(&value)
+    var iterator = ak.utf8_view_begin(&code_points)
+    while not ak.utf8_code_point_iterator_done(&iterator):
+        let code_point = ak.utf8_code_point_iterator_deref(&iterator)
+        # 1. If all of the following are true:
+        #     * code point is not an ASCII hex digit;
+        #     * code point is not U+005B ([);
+        #     * code point is not U+005D (]); and
+        #     * code point is not U+003A (:),
+        #    then throw a TypeError.
+        if (not ak.is_ascii_hex_digit(code_point) and code_point != (u32)'[' and code_point != (u32)']' and code_point != (u32)':'):
+            try pattern_throw("Failed to canonicalize IPv6 hostname string")
+
+        # 2. Append the result of running ASCII lowercase given code point to the end of result.
+        ak.string_builder_append_code_point(&result, ak.to_ascii_lowercase(code_point))
+        discard(ak.utf8_code_point_iterator_inc(&iterator))
+
+    # 3. Return result.
+    return ak.string_builder_to_string_without_validation(&result)
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:128 URL::Pattern::canonicalize_a_port.
+# https://urlpattern.spec.whatwg.org/#canonicalize-a-port
+pub func pattern_canonicalize_a_port(port_value: ak.String, protocol_value: ak.String? = none) -> ak.String!:
+    # 1. If portValue is the empty string, return portValue.
+    if ak.string_is_empty(&port_value):
+        return port_value
+
+    # 2. Let dummyURL be the result of creating a dummy URL.
+    var dummy_url = pattern_create_a_dummy_url()
+
+    # 3. If protocolValue was given, then set dummyURL’s scheme to protocolValue.
+    # NOTE: Note, we set the URL record's scheme in order for the basic URL parser to
+    #       recognize and normalize default port values.
+    if let protocol = protocol_value:
+        url_set_scheme(&dummy_url, protocol)
+
+    # 4. Let parseResult be the result of running basic URL parser given portValue with dummyURL
+    #    as url and port state as state override.
+    let parse_result = parser_basic_parse(view_of(port_value), url = &dummy_url, state_override = ParserState.port)
+
+    # 4. If parseResult is failure, then throw a TypeError.
+    if parse_result == none:
+        try pattern_throw("Failed to canonicalize port string")
+
+    # 5. Return dummyURL’s port, serialized, or empty string if it is null.
+    let port = url_port(&dummy_url) else return empty_string()
+    return ak.string_number_u64(port)
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:158 URL::Pattern::canonicalize_a_pathname.
+# https://urlpattern.spec.whatwg.org/#canonicalize-a-pathname
+pub func pattern_canonicalize_a_pathname(value: ak.String) -> ak.String:
+    # 1. If value is the empty string, then return value.
+    if ak.string_is_empty(&value):
+        return value
+
+    # 2. Let leading slash be true if the first code point in value is U+002F (/) and otherwise false.
+    let leading_slash = ak.string_base_bytes(&value.string_base)[0] == '/'
+
+    # 3. Let modified value be "/-" if leading slash is false and otherwise the empty string.
+    var modified_value: ak.StringBuilder
+    ak.string_builder_construct(&modified_value)
+    if not leading_slash:
+        append_literal(&modified_value, "/-")
+
+    # 4. Append value to the end of modified value.
+    append_string(&modified_value, value)
+
+    # 5. Let dummyURL be the result of creating a dummy URL.
+    var dummy_url = pattern_create_a_dummy_url()
+
+    # 6. Empty dummyURL’s path.
+    var no_paths: ak.Vector[ak.ByteString]
+    url_set_paths(&dummy_url, no_paths)
+
+    # 7. Run basic URL parser given modified value with dummyURL as url and path start state as state override.
+    discard(parser_basic_parse(ak.string_builder_string_view(&modified_value), url = &dummy_url,
+                               state_override = ParserState.path_start))
+
+    # 8. Let result be the result of URL path serializing dummyURL.
+    var result = url_serialize_path(&dummy_url)
+
+    # 9. If leading slash is false, then set result to the code point substring from 2 to the end of the string within result.
+    if not leading_slash:
+        let code_points = ak.string_code_points(&result)
+        let substring = ak.utf8_view_unicode_substring_view(&code_points, 2)
+        result = ak.string_from_utf8(ak.utf8_view_as_string(&substring)) else trap("MUST: String::from_utf8")
+
+    # 10. Return result.
+    return result
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:196 URL::Pattern::canonicalize_an_opaque_pathname.
+# https://urlpattern.spec.whatwg.org/#canonicalize-an-opaque-pathname
+pub func pattern_canonicalize_an_opaque_pathname(value: ak.String) -> ak.String!:
+    # 1. If value is the empty string, return value.
+    if ak.string_is_empty(&value):
+        return value
+
+    # 2. Let dummyURL be the result of creating a dummy URL.
+    var dummy_url = pattern_create_a_dummy_url()
+
+    # 3. Set dummyURL’s path to the empty string.
+    var empty_path: ak.Vector[ak.ByteString]
+    ak.vector_append_t(&empty_path, empty_byte_string())
+    url_set_paths(&dummy_url, empty_path)
+    url_set_has_an_opaque_path(&dummy_url, true)
+
+    # 4. Let parseResult be the result of running URL parsing given value with dummyURL as url and opaque path state as state override.
+    let parse_result = parser_basic_parse(view_of(value), url = &dummy_url, state_override = ParserState.opaque_path)
+
+    # 5. If parseResult is failure, then throw a TypeError.
+    if parse_result == none:
+        try pattern_throw("Failed to canonicalize opaque pathname string")
+
+    # 6. Return the result of URL path serializing dummyURL.
+    return url_serialize_path(&dummy_url)
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:221 URL::Pattern::canonicalize_a_search.
+# https://urlpattern.spec.whatwg.org/#canonicalize-a-search
+pub func pattern_canonicalize_a_search(value: ak.String) -> ak.String:
+    # 1. If value is the empty string, return value.
+    if ak.string_is_empty(&value):
+        return value
+
+    # 2. Let dummyURL be the result of creating a dummy URL.
+    var dummy_url = pattern_create_a_dummy_url()
+
+    # 3. Set dummyURL’s query to the empty string.
+    url_set_query(&dummy_url, empty_string())
+
+    # 4. Run basic URL parser given value with dummyURL as url and query state as state override.
+    discard(parser_basic_parse(view_of(value), url = &dummy_url, state_override = ParserState.query))
+
+    # 5. Return dummyURL’s query.
+    return url_query(&dummy_url) else trap("VERIFY: dummy URL's query")
+
+## Ported from Libraries/LibURL/Pattern/Canonicalization.cpp:242 URL::Pattern::canonicalize_a_hash.
+# https://urlpattern.spec.whatwg.org/#canonicalize-a-hash
+pub func pattern_canonicalize_a_hash(value: ak.String) -> ak.String:
+    # 1. If value is the empty string, return value.
+    if ak.string_is_empty(&value):
+        return value
+
+    # 2. Let dummyURL be the result of creating a dummy URL.
+    var dummy_url = pattern_create_a_dummy_url()
+
+    # 3. Set dummyURL’s fragment to the empty string.
+    url_set_fragment(&dummy_url, empty_string())
+
+    # 4. Run basic URL parser given value with dummyURL as url and fragment state as state override.
+    discard(parser_basic_parse(view_of(value), url = &dummy_url, state_override = ParserState.fragment))
+
+    # 5. Return dummyURL’s fragment.
+    return url_fragment(&dummy_url) else trap("VERIFY: dummy URL's fragment")

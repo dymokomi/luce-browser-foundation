@@ -20,11 +20,11 @@ pub struct FixedMemoryStream: IsFixedMemoryStream, IsSeekableStream, IsStream:
     pub var m_offset: usize  # C++ default: { 0 }
     pub var m_writing_enabled: bool  # C++ default: { true }
 
-    func fixed_memory_stream() -> FixedMemoryStream*: return (FixedMemoryStream*)&self
+    pub func fixed_memory_stream() -> FixedMemoryStream*: return (FixedMemoryStream*)&self
 
-    func seekable_stream() -> SeekableStream*: return (SeekableStream*)&self
+    pub func seekable_stream() -> SeekableStream*: return (SeekableStream*)&self
 
-    func stream() -> Stream*: return (Stream*)&self
+    pub func stream() -> Stream*: return (Stream*)&self
 
 ## The non-zero default member initializers of AK::FixedMemoryStream; the constructor runs them first.
 pub func fixed_memory_stream_init_fields(this: FixedMemoryStream*):
@@ -74,9 +74,9 @@ pub struct AllocatingMemoryStream: IsAllocatingMemoryStream, IsStream:
     pub var m_tail_write_offset: usize  # C++ default: { 0 }
     pub var m_used_buffer_size: usize  # C++ default: { 0 }
 
-    func allocating_memory_stream() -> AllocatingMemoryStream*: return (AllocatingMemoryStream*)&self
+    pub func allocating_memory_stream() -> AllocatingMemoryStream*: return (AllocatingMemoryStream*)&self
 
-    func stream() -> Stream*: return (Stream*)&self
+    pub func stream() -> Stream*: return (Stream*)&self
 
 ## Upcast to AK::AllocatingMemoryStream (implemented by every struct in its hierarchy).
 pub interface IsAllocatingMemoryStream:

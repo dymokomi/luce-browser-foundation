@@ -1,0 +1,78 @@
+#==============================================================================================
+#
+#   test_url_pattern_constructor_string_parser - Tests/LibURL/TestURLPatternConstructorStringParser.cpp
+#
+#   DESCRIPTION:
+#       The donor's constructor string parser tests, ported one TEST_CASE to one test: each
+#       expects the nine members of the parsed URLPatternInit, none for OptionalNone {}.
+#
+#==============================================================================================
+
+# EXPECT_EQ(result.<member>, "expected"sv), or EXPECT_EQ(result.<member>, OptionalNone {}) when expected is none.
+func expect_member(actual: ak.String?, expected: str?):
+    if let expected_value = expected:
+        expect_optional_string(actual, expected_value)
+    else:
+        if actual != none:
+            print(f"expected no value, got \"{text_of(actual else trap("unreachable"))}\"")
+            trap("EXPECT_EQ failed")
+
+# MUST(URL::Pattern::ConstructorStringParser::parse(input.code_points())) and its members.
+func expect_parse(input: str, protocol: str?, username: str?, password: str?, hostname: str?, port: str?, pathname: str?,
+                  search: str?, hash_value: str?, base_url: str?):
+    let input_string = web_url.string_lit(input)
+    let result = web_url.constructor_string_parser_parse(ak.string_code_points(&input_string)) catch failure:
+        print(f"ConstructorStringParser::parse failed: {failure.message}")
+        trap("MUST: ConstructorStringParser::parse")
+    expect_member(result.protocol, protocol)
+    expect_member(result.username, username)
+    expect_member(result.password, password)
+    expect_member(result.hostname, hostname)
+    expect_member(result.port, port)
+    expect_member(result.pathname, pathname)
+    expect_member(result.search, search)
+    expect_member(result.hash, hash_value)
+    expect_member(result.base_url, base_url)
+
+test "basic_http_url_no_pattern_or_path":
+    if not web_unicode_is_ported: return
+    expect_parse("http://www.serenityos.org", "http", none, none, "www.serenityos.org", "", none, none, none, none)
+
+test "pathname_with_regexp":
+    expect_parse("/books/(\\d+)", none, none, none, none, none, "/books/(\\d+)", none, none, none)
+
+test "url_with_pathname_and_regexp":
+    if not web_unicode_is_ported: return
+    expect_parse("https://example.com/2022/feb/*", "https", none, none, "example.com", "", "/2022/feb/*", none, none, none)
+
+test "http_url_regexp_in_pathname_and_hostname":
+    if not web_unicode_is_ported: return
+    expect_parse("https://cdn-*.example.com/*.jpg", "https", none, none, "cdn-*.example.com", "", "/*.jpg", none, none, none)
+
+test "https_url_with_fragment":
+    if not web_unicode_is_ported: return
+    expect_parse("https://example.com/#foo", "https", none, none, "example.com", "", "/", "", "foo", none)
+
+test "http_url_with_query":
+    if not web_unicode_is_ported: return
+    expect_parse("https://example.com/?q=*&v=?&hmm={}&umm=()", "https", none, none, "example.com", "", "/",
+                 "q=*&v=?&hmm={}&umm=()", none, none)
+
+test "matches_on_sub_url":
+    if not web_unicode_is_ported: return
+    expect_parse("https://{sub.}?example.com/foo", "https", none, none, "{sub.}?example.com", "", "/foo", none, none, none)
+
+test "ipv6_with_port_number":
+    if not web_unicode_is_ported: return
+    expect_parse("http://[\\:\\:1]:8080", "http", none, none, "[\\:\\:1]", "8080", none, none, none, none)
+
+test "data_url":
+    expect_parse("data\\:foobar", "data", none, none, "", "", "foobar", none, none, none)
+
+test "non_special_scheme_and_arbitrary_hostname":
+    if not web_unicode_is_ported: return
+    expect_parse("foo://bar", "foo", none, none, "bar", "", none, none, none, none)
+
+test "ipv6_with_named_group":
+    if not web_unicode_is_ported: return
+    expect_parse("http://[:address]/", "http", none, none, "[:address]", "", "/", none, none, none)

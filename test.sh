@@ -18,6 +18,7 @@ for module in ak gc web_unicode text_codec web_url web_infra; do
     check "src/luce_browser_foundation/$module"
 done
 check tests/text_codec_tests
+check tests/web_url_tests
 
 # Unit tests (ported from Tests/AK, Tests/LibWeb and focused cases), module by module.
 for module in ak gc web_infra; do
@@ -31,3 +32,10 @@ echo "== luce-base test src/luce_browser_foundation/text_codec --native"
 luce-base test src/luce_browser_foundation/text_codec --native
 echo "== luce-base test tests/text_codec_tests --native"
 luce-base test tests/text_codec_tests --native
+
+# workaround: compiler-issues/interpreter_global_array_quadratic (web_url holds the public suffix
+# table), so web_url's tests run natively.
+echo "== luce-base test src/luce_browser_foundation/web_url --native"
+luce-base test src/luce_browser_foundation/web_url --native
+echo "== luce-base test tests/web_url_tests --native"
+luce-base test tests/web_url_tests --native

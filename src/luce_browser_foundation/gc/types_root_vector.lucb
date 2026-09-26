@@ -19,7 +19,7 @@ pub struct RootVectorBase: IsRootVectorBase:
     pub var m_heap: Heap*?  # C++ default: { nullptr }
     pub var m_list_node: ListNode
 
-    func root_vector_base() -> RootVectorBase*: return (RootVectorBase*)&self
+    pub func root_vector_base() -> RootVectorBase*: return (RootVectorBase*)&self
 
 ## Upcast to GC::RootVectorBase (implemented by every struct in its hierarchy).
 pub interface IsRootVectorBase:

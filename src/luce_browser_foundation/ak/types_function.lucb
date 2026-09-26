@@ -22,7 +22,7 @@ pub struct CallableWrapperBase: IsCallableWrapperBase:
     pub var vtable: const CallableWrapperBaseVTable*
     pub var class_id: u16
 
-    func callable_wrapper_base() -> CallableWrapperBase*: return (CallableWrapperBase*)&self
+    pub func callable_wrapper_base() -> CallableWrapperBase*: return (CallableWrapperBase*)&self
 
 ## Upcast to AK::Function::CallableWrapperBase (implemented by every struct in its hierarchy).
 pub interface IsCallableWrapperBase:

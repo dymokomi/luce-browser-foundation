@@ -1,0 +1,94 @@
+#==============================================================================================
+#
+#   public_suffix_data - PublicSuffixData: is a string a public suffix, and a host's suffix
+#
+#   DESCRIPTION:
+#       Port of Build/Libraries/LibURL/PublicSuffixData.h (lines 1-31) and the functions of
+#       Build/Libraries/LibURL/PublicSuffixData.cpp (lines 10345-10396), the code Ladybird's
+#       Meta/Generators/generate_public_suffix_data.py writes around the table (the table itself
+#       is generated_public_suffix_data.lucb).
+#
+#==============================================================================================
+
+# The instance PublicSuffixData::the() hands out. C++ allocates it on first use; here it is a
+# module variable (the class has no state), so no collector ever has to find it.
+var s_the: PublicSuffixData
+var s_the_constructed: bool
+
+## Ported from Build/Libraries/LibURL/PublicSuffixData.cpp:10345 URL::PublicSuffixData::PublicSuffixData.
+pub func public_suffix_data_construct(this: PublicSuffixData*):
+    this.empty_ = 0
+
+## Ported from Build/Libraries/LibURL/PublicSuffixData.h:17 URL::PublicSuffixData::the.
+pub func public_suffix_data_the() -> PublicSuffixData*:
+    if not s_the_constructed:
+        public_suffix_data_construct(&s_the)
+        s_the_constructed = true
+    return &s_the
+
+## Ported from Build/Libraries/LibURL/PublicSuffixData.cpp:10349 URL::PublicSuffixData::is_public_suffix.
+pub func public_suffix_data_is_public_suffix(this: PublicSuffixData*, host: ak.StringView) -> bool:
+    # return binary_search(s_public_suffixes, host);
+    # AK::binary_search with its DefaultComparator, written out: the generic stub takes an untyped
+    # comparator, and the haystack here is a table of `str`.
+    var low: usize = 0
+    var high: usize = s_public_suffixes.length - 1
+    while low <= high:
+        let middle = low + (high - low) // 2
+        let comparison = ak.string_view_compare(&host, sv(s_public_suffixes[middle]))
+        if comparison < 0:
+            if middle != 0:
+                high = middle - 1
+            else:
+                break
+        elif comparison > 0:
+            low = middle + 1
+        else:
+            return true
+    return false
+
+## Ported from Build/Libraries/LibURL/PublicSuffixData.cpp:10354 URL::PublicSuffixData::get_public_suffix.
+pub func public_suffix_data_get_public_suffix(this: PublicSuffixData*, string: ak.StringView) -> ak.String?:
+    var input = ak.string_view_split_view_u8(&string, '.')
+    ak.vector_reverse(&input)
+
+    var overall_search_string: ak.StringBuilder
+    ak.string_builder_construct(&overall_search_string)
+    var search_string: ak.StringBuilder
+    ak.string_builder_construct(&search_string)
+    for index in 0..<ak.vector_size(&input):
+        let part = *ak.vector_at(&input, index)
+        ak.string_builder_clear(&search_string)
+        ak.string_builder_append_string_view(&search_string, ak.string_builder_string_view(&overall_search_string))
+        ak.string_builder_append_string_view(&search_string, part)
+
+        if public_suffix_data_is_public_suffix(this, ak.string_builder_string_view(&search_string)):
+            ak.string_builder_append_string_view(&overall_search_string, part)
+            ak.string_builder_append_u8(&overall_search_string, '.')
+            continue
+
+        ak.string_builder_clear(&search_string)
+        ak.string_builder_append_string_view(&search_string, ak.string_builder_string_view(&overall_search_string))
+        ak.string_builder_append_u8(&search_string, '.')
+
+        if public_suffix_data_is_public_suffix(this, ak.string_builder_string_view(&search_string)):
+            ak.string_builder_append_string_view(&overall_search_string, part)
+            ak.string_builder_append_u8(&overall_search_string, '.')
+            continue
+
+        break
+
+    let overall_view = ak.string_builder_string_view(&overall_search_string)
+    var view = ak.string_view_split_view_u8(&overall_view, '.')
+    ak.vector_reverse(&view)
+
+    var return_string_builder: ak.StringBuilder
+    ak.string_builder_construct(&return_string_builder)
+    # return_string_builder.join('.', view);
+    for index in 0..<ak.vector_size(&view):
+        if index > 0:
+            ak.string_builder_append_u8(&return_string_builder, '.')
+        ak.string_builder_append_string_view(&return_string_builder, *ak.vector_at(&view, index))
+    if ak.string_builder_is_empty(&return_string_builder):
+        return none
+    return ak.string_builder_to_string(&return_string_builder) else trap("MUST: StringBuilder::to_string")

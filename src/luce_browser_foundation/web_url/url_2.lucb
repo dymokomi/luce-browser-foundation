@@ -1,0 +1,279 @@
+#==============================================================================================
+#
+#   url_2 - URL: origins, equality, percent-encoding and the about: URLs
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibURL/URL.cpp lines 320-542 (set_file_scheme_urls_have_tuple_origins
+#       to get_registrable_domain) and the inline free functions of Libraries/LibURL/URL.h
+#       (about_blank to is_webui_url, lines 217-230), with AK::Traits<URL::URL> in
+#       types_traits.lucb.
+#
+#==============================================================================================
+
+# mark: Origins =================================================================================
+
+## Ported from Libraries/LibURL/URL.cpp:321 URL::set_file_scheme_urls_have_tuple_origins.
+pub func set_file_scheme_urls_have_tuple_origins():
+    assert(not s_file_scheme_urls_have_tuple_origins)
+    s_file_scheme_urls_have_tuple_origins = true
+
+## Ported from Libraries/LibURL/URL.cpp:327 URL::file_scheme_urls_have_tuple_origins.
+pub func file_scheme_urls_have_tuple_origins() -> bool:
+    return s_file_scheme_urls_have_tuple_origins
+
+## Ported from Libraries/LibURL/URL.cpp:333 URL::URL::origin.
+# https://url.spec.whatwg.org/#concept-url-origin
+pub func url_origin(this: const Url*) -> Origin:
+    let scheme = url_scheme(this)
+
+    # The origin of a URL url is the origin returned by running these steps, switching on url’s scheme:
+    # -> "blob"
+    if string_is(scheme, "blob"):
+        # 1. If url’s blob URL entry is non-null, then return url’s blob URL entry’s environment’s origin.
+        if let entry = url_blob_url_entry(this):
+            return entry.environment.origin
+
+        # 2. Let pathURL be the result of parsing the result of URL path serializing url.
+        let path_url = parser_basic_parse(view_of(url_serialize_path(this)))
+
+        # 3. If pathURL is failure, then return a new opaque origin.
+        let parsed_path_url = path_url else return origin_create_opaque()
+
+        # 4. If pathURL’s scheme is "http", "https", or "file", then return pathURL’s origin.
+        let path_scheme = url_scheme(&parsed_path_url)
+        if string_is(path_scheme, "http") or string_is(path_scheme, "https") or string_is(path_scheme, "file"):
+            return url_origin(&parsed_path_url)
+
+        # 5. Return a new opaque origin.
+        return origin_create_opaque()
+
+    # -> "ftp"
+    # -> "http"
+    # -> "https"
+    # -> "ws"
+    # -> "wss"
+    if (string_is(scheme, "ftp") or string_is(scheme, "http") or string_is(scheme, "https") or string_is(scheme, "ws") or string_is(scheme, "wss")):
+        # Return the tuple origin (url’s scheme, url’s host, url’s port, null).
+        let host = url_host(this) else trap("VERIFY: Optional::value on a URL without a host")
+        return origin_tuple(scheme, host, url_port(this))
+
+    # AD-HOC: resource:// URLs are internal browser resources; give them a shared tuple origin
+    # so that same-origin checks pass between any two resource:// documents or worker scripts.
+    if string_is(scheme, "resource"):
+        return origin_tuple(scheme, Host(m_value = ak.HostVariantType.string(value = empty_string())), none)
+
+    # -> "file"
+    if string_is(scheme, "file"):
+        # Unfortunate as it is, this is left as an exercise to the reader. When in doubt, return a new opaque origin.
+
+        # Our implementation-defined behavior is to return an opaque origin for file:// URLs,
+        # tagged explicitly as a "file" opaque origin rather than a fully anonymous one.
+        #
+        # This keeps file:// URLs opaque by default while still allowing downstream code to
+        # identify and special-case them where needed - for example, to match cases where
+        # other browsers treat a file:// origin as if it were a tuple origin.
+        #
+        # A process-wide flag can opt into tuple origins for file:// URLs instead. This is
+        # intended for development/testing scenarios where web features requiring a non-opaque
+        # origin (such as localStorage) need to work with file:// pages.
+        if file_scheme_urls_have_tuple_origins():
+            return origin_tuple(scheme, Host(m_value = ak.HostVariantType.string(value = empty_string())), none)
+
+        return origin_create_opaque(OriginOpaqueDataType.file)
+
+    # -> Otherwise
+    # Return a new opaque origin.
+    return origin_create_opaque()
+
+## Ported from Libraries/LibURL/URL.cpp:397 URL::URL::equals.
+pub func url_equals(this: const Url*, other: Url, exclude_fragments: ExcludeFragment = ExcludeFragment.no) -> bool:
+    # if (this == &other) return true; (an identity shortcut: `other` is a copy here)
+    return string_equals(url_serialize(this, exclude_fragments), url_serialize(&other, exclude_fragments))
+
+# mark: Percent-encoding ========================================================================
+
+## Ported from Libraries/LibURL/URL.cpp:404 URL::append_percent_encoded.
+pub func append_percent_encoded(builder: ak.StringBuilder*, code_point: u32):
+    if code_point <= 0x7f:
+        append_percent_encoded_byte(builder, code_point)
+    elif code_point <= 0x07ff:
+        append_percent_encoded_byte(builder, ((code_point >> 6) & 0x1f) | 0xc0)
+        append_percent_encoded_byte(builder, (code_point & 0x3f) | 0x80)
+    elif code_point <= 0xffff:
+        append_percent_encoded_byte(builder, ((code_point >> 12) & 0x0f) | 0xe0)
+        append_percent_encoded_byte(builder, ((code_point >> 6) & 0x3f) | 0x80)
+        append_percent_encoded_byte(builder, (code_point & 0x3f) | 0x80)
+    elif code_point <= 0x10ffff:
+        append_percent_encoded_byte(builder, ((code_point >> 18) & 0x07) | 0xf0)
+        append_percent_encoded_byte(builder, ((code_point >> 12) & 0x3f) | 0x80)
+        append_percent_encoded_byte(builder, ((code_point >> 6) & 0x3f) | 0x80)
+        append_percent_encoded_byte(builder, (code_point & 0x3f) | 0x80)
+    else:
+        trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibURL/URL.cpp:419 URL::code_point_is_in_percent_encode_set.
+# https://url.spec.whatwg.org/#c0-control-percent-encode-set
+pub func code_point_is_in_percent_encode_set(code_point: u32, set: PercentEncodeSet) -> bool:
+    # NOTE: Once we've checked for presence in the C0Control set, we know that the code point is
+    #       a valid ASCII character in the range 0x20..0x7E, so we can safely cast it to char.
+    match set:
+        .c0_control:
+            return code_point < 0x20 or code_point > 0x7E
+        .fragment:
+            return (code_point_is_in_percent_encode_set(code_point, PercentEncodeSet.c0_control) or literal_contains(" \"<>`", code_point))
+        .query:
+            return (code_point_is_in_percent_encode_set(code_point, PercentEncodeSet.c0_control) or literal_contains(" \"#<>", code_point))
+        .special_query:
+            return code_point_is_in_percent_encode_set(code_point, PercentEncodeSet.query) or code_point == (u32)'\''
+        .path:
+            return code_point_is_in_percent_encode_set(code_point, PercentEncodeSet.query) or literal_contains("?^`{}", code_point)
+        .userinfo:
+            return (code_point_is_in_percent_encode_set(code_point, PercentEncodeSet.path) or literal_contains("/:;=@[\\]|", code_point))
+        .component:
+            return code_point_is_in_percent_encode_set(code_point, PercentEncodeSet.userinfo) or literal_contains("$%&+,", code_point)
+        .application_xwww_form_urlencoded:
+            return (code_point_is_in_percent_encode_set(code_point, PercentEncodeSet.component) or literal_contains("!'()~", code_point))
+        .encode_uri:
+            # NOTE: This is the same percent encode set that JS encodeURI() uses.
+            # https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURI
+            return (code_point > 0x7E or (not ak.is_ascii_alphanumeric(code_point) and not literal_contains(";,/?:@&=+$-_.!~*'()#", code_point)))
+        _:
+            trap("VERIFY_NOT_REACHED")
+
+## Ported from Libraries/LibURL/URL.cpp:449 URL::append_percent_encoded_if_necessary.
+pub func append_percent_encoded_if_necessary(builder: ak.StringBuilder*, code_point: u32, set: PercentEncodeSet = PercentEncodeSet.userinfo):
+    if code_point_is_in_percent_encode_set(code_point, set):
+        append_percent_encoded(builder, code_point)
+    else:
+        ak.string_builder_append_code_point(builder, code_point)
+
+## Ported from Libraries/LibURL/URL.cpp:457 URL::percent_encode.
+pub func percent_encode(input: ak.StringView, set: PercentEncodeSet = PercentEncodeSet.userinfo, space_as_plus: SpaceAsPlus = SpaceAsPlus.no) -> ak.String:
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+    let view = utf8_view_of(input)
+    var iterator = ak.utf8_view_begin(&view)
+    while not ak.utf8_code_point_iterator_done(&iterator):
+        let code_point = ak.utf8_code_point_iterator_deref(&iterator)
+        if space_as_plus == SpaceAsPlus.yes and code_point == (u32)' ':
+            ak.string_builder_append_u8(&builder, '+')
+        else:
+            append_percent_encoded_if_necessary(&builder, code_point, set)
+        discard(ak.utf8_code_point_iterator_inc(&iterator))
+    return ak.string_builder_to_string(&builder) else trap("MUST: StringBuilder::to_string")
+
+## Ported from Libraries/LibURL/URL.cpp:469 URL::URL::about.
+pub func url_about(path: ak.String) -> Url:
+    var url = url_empty()
+    let data = url_data_mutable(&url)
+    data.scheme = string_lit("about")
+    var paths: ak.Vector[ak.String]
+    ak.vector_append_t(&paths, path)
+    data.paths = paths
+    data.has_an_opaque_path = true
+    return url
+
+## Ported from Libraries/LibURL/URL.cpp:479 URL::percent_decode.
+# https://url.spec.whatwg.org/#percent-decode
+pub func percent_decode(input: ak.StringView) -> ak.ByteString:
+    if not ak.string_view_contains_u8(&input, '%'):
+        return ak.string_view_to_byte_string(&input)
+
+    # 1. Let output be an empty byte sequence.
+    var builder: ak.StringBuilder
+    ak.string_builder_construct(&builder)
+
+    # 2. For each byte byte in input:
+    let length = ak.string_view_length(&input)
+    var i: usize = 0
+    while i < length:
+        let byte = ak.string_view_at(&input, i)
+        # 1. If byte is not 0x25 (%), then append byte to output.
+        if byte != '%':
+            ak.string_builder_append_u8(&builder, byte)
+        # 2. Otherwise, if byte is 0x25 (%) and the next two bytes after byte in input are not in the ranges 0x30 (0)
+        #    to 0x39 (9), 0x41 (A) to 0x46 (F), and 0x61 (a) to 0x66 (f), all inclusive, append byte to output.
+        elif (i + 2 >= length or not ak.is_ascii_hex_digit(ak.string_view_at(&input, i + 1)) or not ak.is_ascii_hex_digit(ak.string_view_at(&input, i + 2))):
+            ak.string_builder_append_u8(&builder, byte)
+        # 3. Otherwise:
+        else:
+            # 1. Let bytePoint be the two bytes after byte in input, decoded, and then interpreted as hexadecimal number.
+            let byte_point = (u8)((ak.parse_ascii_hex_digit(ak.string_view_at(&input, i + 1)) << 4) | ak.parse_ascii_hex_digit(ak.string_view_at(&input, i + 2)))
+
+            # 2. Append a byte whose value is bytePoint to output.
+            ak.string_builder_append_u8(&builder, byte_point)
+
+            # 3. Skip the next two bytes in input.
+            i += 2
+        i += 1
+    return ak.string_builder_to_byte_string(&builder)
+
+# mark: Public suffixes =========================================================================
+
+## Ported from Libraries/LibURL/URL.cpp:513 URL::is_public_suffix.
+pub func is_public_suffix(host: ak.StringView) -> bool:
+    return public_suffix_data_is_public_suffix(public_suffix_data_the(), host)
+
+## Ported from Libraries/LibURL/URL.cpp:519 URL::get_registrable_domain.
+# https://github.com/publicsuffix/list/wiki/Format#algorithm
+pub func get_registrable_domain(host: ak.StringView) -> ak.String?:
+    # The registered or registrable domain is the public suffix plus one additional label.
+    let public_suffix = public_suffix_data_get_public_suffix(public_suffix_data_the(), host) else return none
+    if not ak.string_view_ends_with_string_view(&host, view_of(public_suffix)):
+        return none
+
+    if string_equals_view(public_suffix, host):
+        return none
+
+    let public_suffix_view = view_of(public_suffix)
+    var subhost = ak.string_view_substring_view_usize(&host, 0,
+                                                      ak.string_view_length(&host) - ak.string_view_length(&public_suffix_view))
+    subhost = ak.string_view_trim(&subhost, sv("."), ak.TrimMode.right)
+
+    if ak.string_view_is_empty(&subhost):
+        return none
+
+    var start_index: usize = 0
+    if let index = ak.string_view_find_last_u8(&subhost, '.'):
+        start_index = index + 1
+
+    return ak.string_from_utf8(ak.string_view_substring_view(&host, start_index)) else trap("MUST: String::from_utf8")
+
+# mark: The about: URLs =========================================================================
+
+## Ported from Libraries/LibURL/URL.h:217 URL::about_blank.
+pub func about_blank() -> Url:
+    return url_about(string_lit("blank"))
+
+## Ported from Libraries/LibURL/URL.h:218 URL::about_srcdoc.
+pub func about_srcdoc() -> Url:
+    return url_about(string_lit("srcdoc"))
+
+## Ported from Libraries/LibURL/URL.h:220 URL::about_error.
+pub func about_error() -> Url:
+    return url_about(string_lit("error"))
+
+## Ported from Libraries/LibURL/URL.h:221 URL::about_newtab.
+pub func about_newtab() -> Url:
+    return url_about(string_lit("newtab"))
+
+## Ported from Libraries/LibURL/URL.h:222 URL::about_bookmarks.
+pub func about_bookmarks() -> Url:
+    return url_about(string_lit("bookmarks"))
+
+## Ported from Libraries/LibURL/URL.h:223 URL::about_processes.
+pub func about_processes() -> Url:
+    return url_about(string_lit("processes"))
+
+## Ported from Libraries/LibURL/URL.h:224 URL::about_settings.
+pub func about_settings() -> Url:
+    return url_about(string_lit("settings"))
+
+## Ported from Libraries/LibURL/URL.h:225 URL::about_version.
+pub func about_version() -> Url:
+    return url_about(string_lit("version"))
+
+## Ported from Libraries/LibURL/URL.h:227 URL::is_webui_url.
+pub func is_webui_url(url: Url) -> bool:
+    # first_is_one_of(url, about_bookmarks(), about_processes(), about_settings(), about_version())
+    return (url_eq(&url, about_bookmarks()) or url_eq(&url, about_processes()) or url_eq(&url, about_settings()) or url_eq(&url, about_version()))

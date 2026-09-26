@@ -1,0 +1,50 @@
+#==============================================================================================
+#
+#   test_public_suffix - Tests/LibURL/TestPublicSuffix.cpp
+#
+#   DESCRIPTION:
+#       The donor's public suffix tests, ported one TEST_CASE to one test.
+#
+#==============================================================================================
+
+test "is_public_suffix":
+    let public_suffix_data = web_url.public_suffix_data_the()
+
+    assert(web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("com")))
+    assert(web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("com.br")))
+
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("")))
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv(".")))
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("..")))
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("/")))
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("not-a-public-suffix.com")))
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("com.")))
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("com/")))
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("/com")))
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("not-a-public-suffix")))
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv(" com")))
+    assert(not web_url.public_suffix_data_is_public_suffix(public_suffix_data, web_url.sv("com ")))
+
+# public_suffix_data->get_public_suffix("input"sv) is "expected", or null when expected is none.
+func expect_get_public_suffix(input: str, expected: str?):
+    let suffix = web_url.public_suffix_data_get_public_suffix(web_url.public_suffix_data_the(), web_url.sv(input))
+    if let expected_suffix = expected:
+        expect_optional_string(suffix, expected_suffix)
+    else:
+        assert(suffix == none)
+
+test "get_public_suffix":
+    expect_get_public_suffix("", none)
+    expect_get_public_suffix(".", none)
+    expect_get_public_suffix("..", none)
+    expect_get_public_suffix(" ", none)
+    expect_get_public_suffix("/", none)
+    expect_get_public_suffix("not-a-public-suffix", none)
+
+    expect_get_public_suffix("com", "com")
+    expect_get_public_suffix("not-a-public-suffix.com", "com")
+    expect_get_public_suffix("com.", "com")
+    expect_get_public_suffix(".com.", "com")
+    expect_get_public_suffix("..com.", "com")
+    expect_get_public_suffix("com.br", "com.br")
+    expect_get_public_suffix("not-a-public-suffix.com.br", "com.br")

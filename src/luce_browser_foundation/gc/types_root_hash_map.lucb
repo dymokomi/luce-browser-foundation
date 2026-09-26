@@ -19,7 +19,7 @@ pub struct RootHashMapBase: IsRootHashMapBase:
     pub var m_heap: Heap*?  # C++ default: { nullptr }
     pub var m_list_node: ListNode
 
-    func root_hash_map_base() -> RootHashMapBase*: return (RootHashMapBase*)&self
+    pub func root_hash_map_base() -> RootHashMapBase*: return (RootHashMapBase*)&self
 
 ## Upcast to GC::RootHashMapBase (implemented by every struct in its hierarchy).
 pub interface IsRootHashMapBase:

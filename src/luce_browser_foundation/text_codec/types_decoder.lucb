@@ -17,7 +17,7 @@ pub struct Decoder: IsDecoder:
     pub var vtable: const DecoderVTable*
     pub var class_id: u16
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::Decoder (implemented by every struct in its hierarchy).
 pub interface IsDecoder:
@@ -78,7 +78,7 @@ pub struct Utf8Decoder: IsUtf8Decoder, IsDecoder:
 
     func utf8_decoder() -> Utf8Decoder*: return (Utf8Decoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::UTF8Decoder (implemented by every struct in its hierarchy).
 pub interface IsUtf8Decoder:
@@ -116,7 +116,7 @@ pub struct Utf16BeDecoder: IsUtf16BeDecoder, IsDecoder:
 
     func utf16_be_decoder() -> Utf16BeDecoder*: return (Utf16BeDecoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::UTF16BEDecoder (implemented by every struct in its hierarchy).
 pub interface IsUtf16BeDecoder:
@@ -154,7 +154,7 @@ pub struct Utf16LeDecoder: IsUtf16LeDecoder, IsDecoder:
 
     func utf16_le_decoder() -> Utf16LeDecoder*: return (Utf16LeDecoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::UTF16LEDecoder (implemented by every struct in its hierarchy).
 pub interface IsUtf16LeDecoder:
@@ -194,7 +194,7 @@ pub struct SingleByteDecoder[TArrayType]: IsDecoder:
     pub var decoder_base: Decoder  # primary base
     pub var m_translation_table: TArrayType[128]
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Virtual functions introduced by TextCodec::SingleByteDecoder.
 pub struct SingleByteDecoderVTable:
@@ -219,7 +219,7 @@ pub struct Latin1Decoder: IsLatin1Decoder, IsDecoder:
 
     func latin1_decoder() -> Latin1Decoder*: return (Latin1Decoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::Latin1Decoder (implemented by every struct in its hierarchy).
 pub interface IsLatin1Decoder:
@@ -255,9 +255,9 @@ pub func as_latin1_decoder[P: IsDecoder](p: P*) -> Latin1Decoder*:
 pub struct PdfDocEncodingDecoder: IsPdfDocEncodingDecoder, IsDecoder:
     pub var decoder_base: Decoder  # primary base
 
-    func pdf_doc_encoding_decoder() -> PdfDocEncodingDecoder*: return (PdfDocEncodingDecoder*)&self
+    pub func pdf_doc_encoding_decoder() -> PdfDocEncodingDecoder*: return (PdfDocEncodingDecoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::PDFDocEncodingDecoder (implemented by every struct in its hierarchy).
 pub interface IsPdfDocEncodingDecoder:
@@ -293,9 +293,9 @@ pub func as_pdf_doc_encoding_decoder[P: IsDecoder](p: P*) -> PdfDocEncodingDecod
 pub struct XUserDefinedDecoder: IsXUserDefinedDecoder, IsDecoder:
     pub var decoder_base: Decoder  # primary base
 
-    func x_user_defined_decoder() -> XUserDefinedDecoder*: return (XUserDefinedDecoder*)&self
+    pub func x_user_defined_decoder() -> XUserDefinedDecoder*: return (XUserDefinedDecoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::XUserDefinedDecoder (implemented by every struct in its hierarchy).
 pub interface IsXUserDefinedDecoder:
@@ -333,7 +333,7 @@ pub struct Gb18030Decoder: IsGb18030Decoder, IsDecoder:
 
     func gb18030_decoder() -> Gb18030Decoder*: return (Gb18030Decoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::GB18030Decoder (implemented by every struct in its hierarchy).
 pub interface IsGb18030Decoder:
@@ -371,7 +371,7 @@ pub struct Big5Decoder: IsBig5Decoder, IsDecoder:
 
     func big5_decoder() -> Big5Decoder*: return (Big5Decoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::Big5Decoder (implemented by every struct in its hierarchy).
 pub interface IsBig5Decoder:
@@ -407,9 +407,9 @@ pub func as_big5_decoder[P: IsDecoder](p: P*) -> Big5Decoder*:
 pub struct EucjpDecoder: IsEucjpDecoder, IsDecoder:
     pub var decoder_base: Decoder  # primary base
 
-    func eucjp_decoder() -> EucjpDecoder*: return (EucjpDecoder*)&self
+    pub func eucjp_decoder() -> EucjpDecoder*: return (EucjpDecoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::EUCJPDecoder (implemented by every struct in its hierarchy).
 pub interface IsEucjpDecoder:
@@ -447,7 +447,7 @@ pub struct Iso2022JpDecoder: IsIso2022JpDecoder, IsDecoder:
 
     func iso2022_jp_decoder() -> Iso2022JpDecoder*: return (Iso2022JpDecoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::ISO2022JPDecoder (implemented by every struct in its hierarchy).
 pub interface IsIso2022JpDecoder:
@@ -483,9 +483,9 @@ pub func as_iso2022_jp_decoder[P: IsDecoder](p: P*) -> Iso2022JpDecoder*:
 pub struct ShiftJisDecoder: IsShiftJisDecoder, IsDecoder:
     pub var decoder_base: Decoder  # primary base
 
-    func shift_jis_decoder() -> ShiftJisDecoder*: return (ShiftJisDecoder*)&self
+    pub func shift_jis_decoder() -> ShiftJisDecoder*: return (ShiftJisDecoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::ShiftJISDecoder (implemented by every struct in its hierarchy).
 pub interface IsShiftJisDecoder:
@@ -521,9 +521,9 @@ pub func as_shift_jis_decoder[P: IsDecoder](p: P*) -> ShiftJisDecoder*:
 pub struct EuckrDecoder: IsEuckrDecoder, IsDecoder:
     pub var decoder_base: Decoder  # primary base
 
-    func euckr_decoder() -> EuckrDecoder*: return (EuckrDecoder*)&self
+    pub func euckr_decoder() -> EuckrDecoder*: return (EuckrDecoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::EUCKRDecoder (implemented by every struct in its hierarchy).
 pub interface IsEuckrDecoder:
@@ -559,9 +559,9 @@ pub func as_euckr_decoder[P: IsDecoder](p: P*) -> EuckrDecoder*:
 pub struct ReplacementDecoder: IsReplacementDecoder, IsDecoder:
     pub var decoder_base: Decoder  # primary base
 
-    func replacement_decoder() -> ReplacementDecoder*: return (ReplacementDecoder*)&self
+    pub func replacement_decoder() -> ReplacementDecoder*: return (ReplacementDecoder*)&self
 
-    func decoder() -> Decoder*: return (Decoder*)&self
+    pub func decoder() -> Decoder*: return (Decoder*)&self
 
 ## Upcast to TextCodec::ReplacementDecoder (implemented by every struct in its hierarchy).
 pub interface IsReplacementDecoder:

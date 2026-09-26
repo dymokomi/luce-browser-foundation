@@ -10,6 +10,6 @@
 #
 #==============================================================================================
 
-## URL::Pattern::full_wildcard_regexp_value (Libraries/LibURL/Pattern/String.h:16).
-# C++ initializer: ".*"sv
-pub var pattern_full_wildcard_regexp_value: ak.StringView
+## URL::Pattern::full_wildcard_regexp_value (Libraries/LibURL/Pattern/String.h:16). Filled by region r05: the
+## `".*"sv` constant as text (`sv(pattern_full_wildcard_regexp_value)` is the StringView).
+pub let pattern_full_wildcard_regexp_value: str = ".*"

@@ -32,8 +32,12 @@ func parse_json_fails_bytes(bytes: const u8[]) -> bool:
 
 ## The text of a String.
 func text_of_string(string: String) -> str:
+    # A short String keeps its bytes inline, in this frame's copy: copy them out.
     let view = string_bytes_as_string_view(&string)
-    return (str)string_view_bytes(&view)
+    let bytes = string_view_bytes(&view)
+    let copy = alloc u8[bytes.length] else trap("out of memory")
+    memory.copy(copy, bytes, bytes.length)
+    return (str)copy
 
 ## A JsonValue holding the string `text`.
 func json_string_value(text: str) -> JsonValue2:

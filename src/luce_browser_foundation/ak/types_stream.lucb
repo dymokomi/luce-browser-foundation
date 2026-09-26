@@ -16,7 +16,7 @@ pub struct Stream: IsStream:
     pub var vtable: const StreamVTable*
     pub var class_id: u16
 
-    func stream() -> Stream*: return (Stream*)&self
+    pub func stream() -> Stream*: return (Stream*)&self
 
 ## Upcast to AK::Stream (implemented by every struct in its hierarchy).
 pub interface IsStream:
@@ -103,9 +103,9 @@ pub enum SeekMode as i32:
 pub struct SeekableStream: IsSeekableStream, IsStream:
     pub var stream_base: Stream  # primary base
 
-    func seekable_stream() -> SeekableStream*: return (SeekableStream*)&self
+    pub func seekable_stream() -> SeekableStream*: return (SeekableStream*)&self
 
-    func stream() -> Stream*: return (Stream*)&self
+    pub func stream() -> Stream*: return (Stream*)&self
 
 ## Upcast to AK::SeekableStream (implemented by every struct in its hierarchy).
 pub interface IsSeekableStream:

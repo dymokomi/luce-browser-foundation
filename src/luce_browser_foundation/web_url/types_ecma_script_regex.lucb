@@ -10,6 +10,10 @@
 #
 #==============================================================================================
 
-## regex::ECMAScriptRegex (Libraries/LibRegex/ECMAScriptRegex.h:41): opaque in this phase (not in the phase-1 closure).
+## regex::ECMAScriptRegex (Libraries/LibRegex/ECMAScriptRegex.h:41). Filled by region r05: LibRegex is replaced
+## by luce-regex's ECMAScript dialect (DESIGN.md §7.1), so the class holds that program and its capture buffer.
 pub struct RegexEcmaScriptRegex:
-    pub var opaque_: u8
+    ## The compiled luce-regex program (C++: the Rust-backed Impl).
+    pub var m_program: regex.Regex*
+    ## The capture slots of the last exec: start and end code unit index of each group, -1 if unset.
+    pub var m_captures: i32[]

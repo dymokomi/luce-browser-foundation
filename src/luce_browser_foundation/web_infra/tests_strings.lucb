@@ -14,8 +14,13 @@ func sv_bytes(bytes: const u8[]) -> ak.StringView:
 
 ## The text of a String.
 func text_of(string: ak.String) -> str:
+    # A short String keeps its bytes inline, in this frame's copy: copy them out.
     let view = ak.string_bytes_as_string_view(&string)
-    return (str)ak.string_view_bytes(&view)
+    let bytes = ak.string_view_bytes(&view)
+    let copy = alloc u8[bytes.length] else trap("out of memory")
+    for i in 0..<bytes.length:
+        copy[i] = bytes[i]
+    return (str)copy
 
 ## The text of a Utf16String, converted to UTF-8.
 func text_of_utf16(string: ak.Utf16String) -> str:
