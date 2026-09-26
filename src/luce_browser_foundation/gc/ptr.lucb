@@ -1,0 +1,27 @@
+#==============================================================================================
+#
+#   ptr - GC::Ptr and GC::Ref comparisons
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/Ptr.h (lines 1-277). GC::Ref<T> is `T*` and GC::Ptr<T> is `T*?`
+#       (DESIGN.md §2.6), so the classes themselves vanish; their operator== overloads compare
+#       the addresses, which is what `==` on two pointers does. The Traits and Formatter
+#       specializations are AK's pointer traits and formatter.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/Ptr.h:208 GC::operator== (Ptr<T>, Ptr<U>).
+pub func eq_t_u[T, U](a: T*?, b: U*?) -> bool:
+    return (void*?)a == (void*?)b
+
+## Ported from Libraries/LibGC/Ptr.h:214 GC::operator== (Ptr<T>, Ref<U>).
+pub func eq_t_u_2[T, U](a: T*?, b: U*) -> bool:
+    return (void*?)a == (void*?)b
+
+## Ported from Libraries/LibGC/Ptr.h:220 GC::operator== (Ref<T>, Ref<U>).
+pub func eq_t_u_3[T, U](a: T*, b: U*) -> bool:
+    return (void*)a == (void*)b
+
+## Ported from Libraries/LibGC/Ptr.h:226 GC::operator== (Ref<T>, Ptr<U>).
+pub func eq_t_u_4[T, U](a: T*, b: U*?) -> bool:
+    return (void*?)a == (void*?)b

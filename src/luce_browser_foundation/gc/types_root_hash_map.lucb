@@ -17,7 +17,7 @@ pub struct RootHashMapBase: IsRootHashMapBase:
     pub var vtable: const RootHashMapBaseVTable*
     pub var class_id: u16
     pub var m_heap: Heap*?  # C++ default: { nullptr }
-    pub var m_list_node: ak.IntrusiveListNode[RootHashMapBase, RootHashMapBase*?]
+    pub var m_list_node: ListNode
 
     func root_hash_map_base() -> RootHashMapBase*: return (RootHashMapBase*)&self
 
@@ -28,10 +28,10 @@ pub interface IsRootHashMapBase:
 ## Virtual functions introduced by GC::RootHashMapBase.
 pub struct RootHashMapBaseVTable:
     pub let class_info: const ak.ClassInfo*
-    pub let gather_roots: func(RootHashMapBase*, ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*) -> unit = root_hash_map_base_gather_roots_impl
+    pub let gather_roots: func(RootHashMapBase*, GcHashMap[HeapRoot]*) -> unit = root_hash_map_base_gather_roots_impl
 
 ## Virtual: GC::RootHashMapBase::gather_roots.
-pub func root_hash_map_base_gather_roots(this: RootHashMapBase*, arg0: ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*):
+pub func root_hash_map_base_gather_roots(this: RootHashMapBase*, arg0: GcHashMap[HeapRoot]*):
     ((const RootHashMapBaseVTable*)this.vtable).gather_roots(this, arg0)
 
 ## The vtable of GC::RootHashMapBase.

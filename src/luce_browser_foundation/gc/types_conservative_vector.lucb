@@ -17,7 +17,7 @@ pub struct ConservativeVectorBase: IsConservativeVectorBase:
     pub var vtable: const ConservativeVectorBaseVTable*
     pub var class_id: u16
     pub var m_heap: Heap*?  # C++ default: { nullptr }
-    pub var m_list_node: ak.IntrusiveListNode[ConservativeVectorBase, ConservativeVectorBase*?]
+    pub var m_list_node: ListNode
 
     func conservative_vector_base() -> ConservativeVectorBase*: return (ConservativeVectorBase*)&self
 

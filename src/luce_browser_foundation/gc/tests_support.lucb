@@ -1,0 +1,162 @@
+#==============================================================================================
+#
+#   tests_support - the cells, heaps and helpers the gc tests share
+#
+#   DESCRIPTION:
+#       A test cell class with precise edges (left, right), an edge it does not visit
+#       (hidden), a blob it owns (buffer) and a Weak; its allocator overrides finalize and
+#       must_survive_garbage_collection, as a GC_DECLARE_ALLOCATOR class with both flags does.
+#       The scans are conservative, so a test that expects a cell to die must leave no copy of its
+#       address in a live frame: cells meant to become garbage are made and inspected in noinline
+#       helpers, each test runs its body in a noinline function called right after the stack
+#       was clobbered (a frame's unwritten slots keep what earlier, deeper calls left there), and
+#       every collection is preceded by clobber_stack() from the same frame.
+#
+#==============================================================================================
+
+## A cell for the tests.
+struct TestCell: IsCell:
+    var cell_base: Cell
+    var id: i64
+    var left: TestCell*?
+    var right: TestCell*?
+    var hidden: TestCell*?
+    var buffer: u8[]
+    var weak: Weak[TestCell]
+
+    func cell() -> Cell*: return (Cell*)&self
+
+let test_cell_vtable: CellVTable = CellVTable(class_info = &test_cell_class, class_name = test_cell_class_name_impl, visit_edges = test_cell_visit_edges_impl, finalize = test_cell_finalize_impl, must_survive_garbage_collection = test_cell_must_survive_garbage_collection_impl)
+
+let test_cell_class: ak.ClassInfo = ak.ClassInfo(name = "TestCell", first_id = 0, last_id = 0, size = sizeof(TestCell), vtable = (const void*)&test_cell_vtable)
+
+## GC_DECLARE_ALLOCATOR(TestCell) with OVERRIDES_FINALIZE and OVERRIDES_MUST_SURVIVE_GARBAGE_COLLECTION.
+var test_cell_allocator: TypeIsolatingCellAllocator[TestCell]
+
+## How many TestCells were finalized, and the sum of their ids.
+var finalized_count: usize
+var finalized_id_sum: i64
+
+## Cells the embedder's gather_embedder_roots reports.
+var embedder_roots: (TestCell*?)[4]
+
+func test_cell_class_name_impl(this: Cell*) -> ak.StringView:
+    return ak.sv("TestCell")
+
+func test_cell_visit_edges_impl(this: Cell*, visitor: CellVisitor*):
+    cell_visit_edges_impl(this, visitor)
+    let test_cell = (TestCell*)this
+    cell_visitor_visit_t(visitor, test_cell.left)
+    cell_visitor_visit_t(visitor, test_cell.right)
+
+func test_cell_finalize_impl(this: Cell*):
+    cell_finalize_impl(this)
+    finalized_count += 1
+    finalized_id_sum += ((TestCell*)this).id
+
+## Negative ids must survive garbage collection.
+func test_cell_must_survive_garbage_collection_impl(this: Cell*) -> bool:
+    return ((TestCell*)this).id < 0
+
+func test_gather_embedder_roots(context: void*?, roots: GcHashMap[HeapRoot]*):
+    for root in embedder_roots:
+        if let cell = root:
+            gc_hash_map_set(roots, (usize)cell, HeapRoot(type_ = HeapRootType.vm))
+
+## A heap for one test, on the C heap.
+func create_test_heap() -> Heap*:
+    if test_cell_allocator.allocator.m_cell_size == 0:
+        type_isolating_cell_allocator_construct(&test_cell_allocator, ak.sv("TestCell"), true, true)
+    for i in 0..<embedder_roots.length:
+        embedder_roots[i] = none
+    finalized_count = 0
+    finalized_id_sum = 0
+    let heap = (new Heap in memory.heap) else trap("out of memory")
+    heap_construct(heap, ak.Function1[GcHashMap[HeapRoot]*, unit](call = test_gather_embedder_roots, context = none))
+    # The stack is scanned up to the frame of the test that made the heap, not to the thread's
+    # top: the test runner's frames above keep stale words of their own, which may point into a
+    # block a later test maps at the same address, and would keep its cells alive.
+    let top = frame_top_of_caller_of_caller()
+    assert(top > current_stack_pointer() and top <= heap.m_stack_info.m_top)
+    heap.m_stack_info.m_top = top
+    return heap
+
+## The address just above the frame of the function that called our caller (the frame record's
+## end): the frame-pointer chain two links up.
+noinline func frame_top_of_caller_of_caller() -> usize:
+    var frame_pointer: usize = 0
+    asm arm64 (out("x0") frame_pointer):
+        ldr x0, [x29]
+        ldr x0, [x0]
+    asm x86_64 (out("rax") frame_pointer):
+        mov (%rbp), %rax
+        mov (%rax), %rax
+    return frame_pointer + 16
+
+## The test's heap destroyed and given back.
+func destroy_test_heap(heap: Heap*):
+    heap_destroy(heap)
+    free(heap) in memory.heap
+
+## heap.allocate<TestCell>(id): the cell allocated, then constructed under DeferGC.
+func new_test_cell(heap: Heap*, id: i64) -> TestCell*:
+    let cell = heap_allocate_cell[TestCell](heap, &test_cell_allocator.allocator)
+    heap_defer_gc(heap)
+    let this = (TestCell*)cell
+    this.cell_base.vtable = &test_cell_vtable
+    this.id = id
+    heap_undefer_gc(heap)
+    return this
+
+## A cell only a Weak refers to once this returns.
+noinline func make_unreferenced_cell(heap: Heap*, id: i64) -> Weak[TestCell]:
+    return make_weak[TestCell](new_test_cell(heap, id))
+
+## Whether the cell of `weak` lives, without leaving its address in the caller's frame.
+noinline func alive(weak: const Weak[TestCell]*) -> bool:
+    return weak_ptr(weak) != none
+
+## A Root of the cell of `weak`, without leaving its address in the caller's frame.
+noinline func root_of_weak[T: IsCell](weak: const Weak[T]*) -> Root[T]:
+    return root_create[T](weak_ptr(weak))
+
+## parent.left = child, with neither address left in the caller's frame.
+noinline func link_left(parent: const Weak[TestCell]*, child: const Weak[TestCell]*):
+    let cell = weak_ptr(parent) else trap("dead parent")
+    cell.left = weak_ptr(child)
+
+## The id of a cell, set without leaving its address in the caller's frame.
+noinline func set_id(weak: const Weak[TestCell]*, id: i64):
+    let cell = weak_ptr(weak) else trap("dead cell")
+    cell.id = id
+
+## `count` cells nothing refers to once this returns.
+noinline func make_garbage(heap: Heap*, count: i64):
+    for i in 0..<count:
+        discard(new_test_cell(heap, i))
+
+## Overwrite the stack below the caller, so that dead frames hold no stale cell addresses.
+noinline func clobber_stack():
+    var junk: usize[8192]
+    for i in 0..<junk.length:
+        junk[i] = i
+    assert(junk[8191] == 8191)
+
+## How many live cells the heap's blocks and large objects hold, whatever their class.
+func live_cell_count(heap: Heap*) -> usize:
+    var count: usize = 0
+    for block in heap_for_each_block(heap):
+        for _ in heap_block_for_each_cell_in_state(block, CellState.live):
+            count += 1
+    for object in gc_vector_span(&heap.m_large_objects):
+        if cell_state(large_object_cell(object)) == CellState.live:
+            count += 1
+    return count
+
+## How many live TestCells the heap holds.
+func live_test_cell_count(heap: Heap*) -> usize:
+    var count: usize = 0
+    for block in cell_allocator_for_each_block(&test_cell_allocator.allocator):
+        for _ in heap_block_for_each_cell_in_state(block, CellState.live):
+            count += 1
+    return count

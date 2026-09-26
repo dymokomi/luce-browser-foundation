@@ -1,0 +1,73 @@
+#==============================================================================================
+#
+#   weak_hash_set - WeakHashSet<T>: a set of weak references to cells
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/WeakHashSet.h (lines 1-156). The set is an AK::HashTable of
+#       Weak<T> hashed and compared by the pointer each refers to. C++ looks an entry up with
+#       find(hash, predicate) to avoid making a WeakImpl for the probe; the port probes with a
+#       Weak whose impl is a WeakImpl on the stack, which hashes and compares the same.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/WeakHashSet.h:28 GC::WeakHashSet::set.
+pub func weak_hash_set_set[T: IsCell](this: WeakHashSet[T]*, value: T*):
+    weak_hash_set_maybe_prune(this)
+    discard(ak.hash_table_set(&this.m_table, make_weak[T](value)))
+
+## Ported from Libraries/LibGC/WeakHashSet.h:34 GC::WeakHashSet::remove.
+pub func weak_hash_set_remove[T](this: WeakHashSet[T]*, value: T*) -> bool:
+    weak_hash_set_maybe_prune(this)
+    var probe_impl = WeakImpl(m_ref_count = 0, m_state = WeakImplState.allocated, m_ptr = value)
+    return ak.hash_table_remove_t(&this.m_table, Weak[T](m_impl = &probe_impl))
+
+## Ported from Libraries/LibGC/WeakHashSet.h:44 GC::WeakHashSet::contains.
+pub func weak_hash_set_contains[T](this: const WeakHashSet[T]*, value: T*) -> bool:
+    var probe_impl = WeakImpl(m_ref_count = 0, m_state = WeakImplState.allocated, m_ptr = value)
+    return ak.hash_table_contains_t(&this.m_table, Weak[T](m_impl = &probe_impl))
+
+## Ported from Libraries/LibGC/WeakHashSet.h:50 GC::WeakHashSet::is_empty.
+pub func weak_hash_set_is_empty[T](this: const WeakHashSet[T]*) -> bool:
+    for _ in weak_hash_set_begin_const(this):
+        return false
+    return true
+
+## Ported from Libraries/LibGC/WeakHashSet.h:59 GC::WeakHashSet::clear.
+pub func weak_hash_set_clear[T](this: WeakHashSet[T]*):
+    ak.hash_table_clear(&this.m_table)
+
+## Ported from Libraries/LibGC/WeakHashSet.h:135 GC::WeakHashSet::begin/end: the live cells of the
+## set (`for value in weak_hash_set_begin(&set)`).
+pub func weak_hash_set_begin[T](this: WeakHashSet[T]*) -> WeakHashSetValues[T]:
+    return WeakHashSetValues[T](m_set = this)
+
+## Ported from Libraries/LibGC/WeakHashSet.h:138 GC::WeakHashSet::begin/end (const).
+pub func weak_hash_set_begin_const[T](this: const WeakHashSet[T]*) -> WeakHashSetValues[T]:
+    return WeakHashSetValues[T](m_set = this)
+
+## Ported from Libraries/LibGC/WeakHashSet.h:74 GC::WeakHashSet::Iterator::operator++ with
+## skip_dead: the next entry whose cell lives.
+func weak_hash_set_iterator_next[T](this: WeakHashSetIterator[T]*) -> T*?:
+    while let entry = this.m_iterator.next():
+        if let value = weak_ptr(entry):
+            return value
+    return none
+
+# The predicate of maybe_prune's remove_all_matching: `[](Weak<T> const& entry) { return !entry.ptr(); }`.
+# workaround: compiler-issues/generic_function_value (the callback is a static method)
+struct WeakHashSetEntryIsDead[T]:
+    var unused: u8
+
+    static func call(context: void*?, entry: const Weak[T]*) -> bool:
+        discard(context)
+        return weak_ptr(entry) == none
+
+## Ported from Libraries/LibGC/WeakHashSet.h:142 GC::WeakHashSet::maybe_prune.
+pub func weak_hash_set_maybe_prune[T](this: WeakHashSet[T]*):
+    this.m_mutations_since_last_prune += 1
+    let size = ak.hash_table_size(&this.m_table)
+    if this.m_mutations_since_last_prune < (size if size > 64 else 64):
+        return
+    let is_dead: func(void*?, const Weak[T]*) -> bool = WeakHashSetEntryIsDead[T].call
+    discard(ak.hash_table_remove_all_matching(&this.m_table, ak.Function1[const Weak[T]*, bool](call = is_dead, context = none)))
+    this.m_mutations_since_last_prune = 0

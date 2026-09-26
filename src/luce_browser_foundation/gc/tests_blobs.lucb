@@ -1,0 +1,291 @@
+#==============================================================================================
+#
+#   tests_blobs - the heap as the allocator: blobs, atomic blobs, large objects, GC::Function
+#
+#   DESCRIPTION:
+#       The additions of DESIGN.md §3.1-§3.3: `new` and `alloc` under `with heap` make blobs; a
+#       blob lives while a scanned word points into it (the stack, another blob, the bytes of a
+#       marked cell) and its own words keep what they point to; atomic blobs are not scanned;
+#       large blobs and cells live in the large-object space; GC::Function scans its captures.
+#
+#==============================================================================================
+
+# mark: Blobs ===================================================================================
+
+## How many live blobs (scanned and atomic) the heap holds, large ones included.
+func live_blob_count(heap: Heap*) -> usize:
+    var count: usize = 0
+    for block in heap_for_each_block(heap):
+        for cell in heap_block_for_each_cell_in_state(block, CellState.live):
+            if cell_is_blob(cell):
+                count += 1
+    for object in gc_vector_span(&heap.m_large_objects):
+        let cell = large_object_cell(object)
+        if cell_state(cell) == CellState.live and cell_is_blob(cell):
+            count += 1
+    return count
+
+## A blob of `size` bytes nothing refers to once this returns.
+noinline func make_garbage_blob(heap: Heap*, size: usize, atomic: bool):
+    discard(heap_allocate_blob(heap, size, 16, atomic) else trap("no blob"))
+
+test "new and alloc under `with heap` make zeroed blobs in the size classes":
+    clobber_stack()
+    run_allocator_conformance()
+
+struct Pair:
+    var first: i64
+    var second: Pair*?
+
+noinline func run_allocator_conformance():
+    let heap = create_test_heap()
+    let view: memory.Allocator = heap
+    with view:
+        let pair = new Pair(first = 7, second = none) else trap("no pair")
+        let bytes = new u8[100] else trap("no bytes")
+        let raw = alloc(40, 16) else trap("no raw")
+        let empty = new u8[0] else trap("no empty")
+        assert(pair.first == 7)
+        for b in bytes:
+            assert(b == 0)
+        assert(bytes.length == 100 and raw.length == 40 and empty.length == 0)
+        assert((usize)bytes.data % 16 == 0)
+        let cell = (Cell*)((u8*)bytes.data - blob_header_size)
+        assert(cell_is_blob(cell))
+        assert(heap_block_cell_size(heap_block_from_cell(cell)) == 128)
+        assert(heap_block_cell_size(heap_block_from_cell((Cell*)((u8*)pair - blob_header_size))) == 64)
+        assert(view.resize(bytes, 112))
+        assert(not view.resize(bytes, 113))
+        let grown = memory.grow(bytes, 1000) else trap("no growth")
+        assert(grown.length == 1000 and grown.data != bytes.data)
+        free(pair)  # a no-op: the sweep reclaims
+    destroy_test_heap(heap)
+
+test "unreferenced blobs are collected; referenced ones survive":
+    clobber_stack()
+    run_blob_liveness()
+
+noinline func run_blob_liveness():
+    let heap = create_test_heap()
+    let kept = heap_allocate_blob(heap, 200, 16, false) else trap("no blob")
+    kept[0] = 42
+    for _ in 0..<100:
+        make_garbage_blob(heap, 50, false)
+        make_garbage_blob(heap, 500, true)
+    assert(live_blob_count(heap) == 201)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(live_blob_count(heap) == 1)
+    assert(kept[0] == 42)
+    destroy_test_heap(heap)
+
+## A cell rooted by a Root whose `buffer` is a blob holding `count` bytes and, in its first word,
+## a pointer to a second blob, which points to a TestCell: all only reachable through the cell's
+## bytes and the blobs' words.
+noinline func make_owner(heap: Heap*, weak_leaf: Weak[TestCell]*) -> Root[TestCell]:
+    let owner = new_test_cell(heap, 1)
+    let root = root_create[TestCell](owner)
+    owner.buffer = heap_allocate_blob(heap, 64, 16, false) else trap("no blob")
+    let second = heap_allocate_blob(heap, 24, 16, false) else trap("no blob")
+    let leaf = new_test_cell(heap, 99)
+    *weak_leaf = make_weak[TestCell](leaf)
+    memory.write[usize](owner.buffer.data, (usize)second.data)
+    memory.write[usize](second.data + 8, (usize)leaf)
+    for i in 8..<64:
+        owner.buffer[i] = (u8)i
+    return root
+
+## Whether the owner's blobs are intact.
+noinline func owner_blobs_intact(root: const Root[TestCell]*) -> bool:
+    let owner = root_cell(root) else return false
+    for i in 8..<64:
+        if owner.buffer[i] != (u8)i:
+            return false
+    return true
+
+test "a cell's own bytes keep its blobs, and blobs keep what their words point to":
+    clobber_stack()
+    run_owned_blobs()
+
+noinline func run_owned_blobs():
+    let heap = create_test_heap()
+    var weak_leaf: Weak[TestCell]
+    var root = make_owner(heap, &weak_leaf)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(alive(&weak_leaf))
+    assert(live_blob_count(heap) == 2)
+    assert(owner_blobs_intact(&root))
+    # the blobs must not have been reused by new allocations
+    for _ in 0..<200:
+        make_garbage_blob(heap, 50, false)
+    assert(owner_blobs_intact(&root))
+
+    root_release(&root)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not alive(&weak_leaf))
+    assert(live_blob_count(heap) == 0)
+    destroy_test_heap(heap)
+
+## An atomic blob whose first word points at a new cell; answers the blob.
+noinline func make_atomic_pointing_blob(heap: Heap*, weak: Weak[TestCell]*) -> u8[]:
+    let blob = heap_allocate_blob(heap, 32, 16, true) else trap("no blob")
+    let cell = new_test_cell(heap, 5)
+    *weak = make_weak[TestCell](cell)
+    memory.write[usize](blob.data, (usize)cell)
+    return blob
+
+test "an atomic blob is not scanned":
+    clobber_stack()
+    run_atomic_blob()
+
+noinline func run_atomic_blob():
+    let heap = create_test_heap()
+    var weak: Weak[TestCell]
+    let blob = make_atomic_pointing_blob(heap, &weak)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not alive(&weak))
+    assert(live_blob_count(heap) == 1)
+    assert(blob.length == 32)
+    destroy_test_heap(heap)
+
+test "the atomic allocator view makes atomic blobs":
+    let heap = create_test_heap()
+    let atomic = heap_atomic_allocator(heap)
+    with atomic:
+        let bytes = new u8[64] else trap("no bytes")
+        let cell = (Cell*)((u8*)bytes.data - blob_header_size)
+        assert(cell.vtable == &atomic_blob_vtable)
+    destroy_test_heap(heap)
+
+# mark: The large-object space ==================================================================
+
+test "large blobs live in the large-object space":
+    clobber_stack()
+    run_large_blobs()
+
+noinline func run_large_blobs():
+    let heap = create_test_heap()
+    let big = heap_allocate_blob(heap, 100000, 16, false) else trap("no blob")
+    assert(gc_vector_size(&heap.m_large_objects) == 1)
+    big[99999] = 7
+    let aligned = heap_allocate_blob(heap, 10, 4096, true) else trap("no blob")
+    assert((usize)aligned.data % 4096 == 0)
+    for _ in 0..<5:
+        make_garbage_blob(heap, 40000, false)
+    make_garbage_blob(heap, 5000, true)
+    assert(gc_vector_size(&heap.m_large_objects) == 8)
+    let middle = (usize)big.data + 50000  # an interior pointer keeps the whole object
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(gc_vector_size(&heap.m_large_objects) == 2)
+    assert(big[99999] == 7)
+    assert(heap_resize_blob(heap, big, 100000))
+    assert(middle != 0)
+    assert(heap_cell_storage_size(heap, (Cell*)((u8*)big.data - blob_header_size)) == blob_header_size + 100000)
+    destroy_test_heap(heap)
+
+## A cell type too large for a heap block.
+struct LargeTestCell: IsCell:
+    var cell_base: Cell
+    var id: i64
+    var child: TestCell*?
+    var payload: u8[20000]
+
+    func cell() -> Cell*: return (Cell*)&self
+
+let large_test_cell_vtable: CellVTable = CellVTable(class_info = &test_cell_class, class_name = test_cell_class_name_impl, visit_edges = large_test_cell_visit_edges_impl, finalize = test_cell_finalize_impl)
+
+func large_test_cell_visit_edges_impl(this: Cell*, visitor: CellVisitor*):
+    cell_visit_edges_impl(this, visitor)
+    cell_visitor_visit_t(visitor, ((LargeTestCell*)this).child)
+
+## A large cell with a child, nothing referring to either once this returns but the weaks.
+noinline func make_large_cell(heap: Heap*, weak_child: Weak[TestCell]*) -> Weak[LargeTestCell]:
+    let cell = (LargeTestCell*)heap_allocate_cell_of_size(heap, sizeof(LargeTestCell), &test_cell_allocator.allocator)
+    cell.cell_base.vtable = &large_test_cell_vtable
+    cell.id = 1000
+    let child = new_test_cell(heap, 1)
+    cell.child = child
+    *weak_child = make_weak[TestCell](child)
+    assert(cell_heap(cell.cell()) == heap)
+    return make_weak[LargeTestCell](cell)
+
+## Whether a large cell lives.
+noinline func large_alive(weak: const Weak[LargeTestCell]*) -> bool:
+    return weak_ptr(weak) != none
+
+test "a cell too large for a heap block is a large object, marked and finalized as any cell":
+    clobber_stack()
+    run_large_cell()
+
+noinline func run_large_cell():
+    let heap = create_test_heap()
+    var weak_child: Weak[TestCell]
+    let weak = make_large_cell(heap, &weak_child)
+    var root = root_of_weak[LargeTestCell](&weak)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(large_alive(&weak) and alive(&weak_child))
+    root_release(&root)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not large_alive(&weak) and not alive(&weak_child))
+    assert(finalized_id_sum == 1001)  # the large cell's class overrides finalize, as TestCell's
+    assert(gc_vector_is_empty(&heap.m_large_objects))
+    destroy_test_heap(heap)
+
+# mark: GC::Function ============================================================================
+
+## A capture struct of a GC::Function callback.
+struct CounterCaptures:
+    var cell: TestCell*
+    var calls: i64
+
+func counter_call(context: void*?):
+    let captures = (CounterCaptures*)(context else trap("no captures"))
+    captures.calls += captures.cell.id
+
+## A Function cell whose captures (a blob) hold the only reference to a new cell.
+noinline func make_function(heap: Heap*, weak_captured: Weak[TestCell]*) -> Weak[Function0[unit]]:
+    let cell = new_test_cell(heap, 3)
+    *weak_captured = make_weak[TestCell](cell)
+    let view: memory.Allocator = heap
+    var captures: CounterCaptures*? = none
+    with view:
+        captures = new CounterCaptures(cell = cell, calls = 0) else trap("no captures")
+    let function = create_function0[unit](heap, ak.Function0[unit](call = counter_call, context = captures))
+    return make_weak[Function0[unit]](function)
+
+## Call the function of `weak` and answer its capture's call count.
+noinline func call_function_cell(weak: const Weak[Function0[unit]]*) -> i64:
+    let function = weak_ptr(weak) else trap("dead function")
+    ak.function0_call(&function.function)
+    return ((CounterCaptures*)(function.function.context else trap("no captures"))).calls
+
+## Whether a function cell lives.
+noinline func function_alive(weak: const Weak[Function0[unit]]*) -> bool:
+    return weak_ptr(weak) != none
+
+test "GC::Function keeps its captures and what they point to":
+    clobber_stack()
+    run_function_captures()
+
+noinline func run_function_captures():
+    let heap = create_test_heap()
+    var weak_captured: Weak[TestCell]
+    let weak_function = make_function(heap, &weak_captured)
+    var root = root_of_weak[Function0[unit]](&weak_function)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(alive(&weak_captured))
+    assert(call_function_cell(&weak_function) == 3)
+    assert(call_function_cell(&weak_function) == 6)
+    root_release(&root)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not function_alive(&weak_function))
+    assert(not alive(&weak_captured))
+    destroy_test_heap(heap)

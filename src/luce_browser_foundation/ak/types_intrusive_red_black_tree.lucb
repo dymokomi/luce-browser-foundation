@@ -29,9 +29,9 @@ pub struct BaseIterator[K, V, TContainer]: luce.Iterable[V*, BaseIterator[K, V, 
     pub var m_prev: IntrusiveRedBlackTreeNode[K, V, TContainer]*?  # C++ default: { nullptr }
     pub var m_member: usize
 
-    func iterator() -> BaseIterator[K, V, TContainer]: return self
+    pub func iterator() -> BaseIterator[K, V, TContainer]: return self
 
-    mutating func next() -> V*?: return base_iterator_next(&self)
+    pub mutating func next() -> V*?: return base_iterator_next(&self)
 
 # mark: IntrusiveRedBlackTreeNode ===============================================================
 

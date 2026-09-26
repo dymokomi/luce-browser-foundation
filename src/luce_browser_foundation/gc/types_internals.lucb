@@ -17,5 +17,4 @@ pub struct HeapBlockBase:
     pub var m_heap: Heap*
 
 ## GC::HeapBlockBase::BLOCK_SIZE (Libraries/LibGC/Internals.h:21).
-# C++ initializer: 16 * KiB
-pub var heap_block_base_block_size: usize
+pub let heap_block_base_block_size: usize = 16 * 1024

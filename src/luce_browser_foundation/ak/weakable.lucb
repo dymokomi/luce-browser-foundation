@@ -7,8 +7,7 @@
 #       created on the first make_weak_ptr and revoked when the object revokes its weak
 #       pointers (the donor also does it in ~Weakable; in managed memory a revoking owner
 #       calls weakable_revoke_weak_ptrs, or the cell's finalizer does, DESIGN.md §3.3).
-#       make_weak_ptr returns a gc.Weak (DESIGN.md §2.6) and so lives in the gc module
-#       (gc/weakable.lucb); weakable_ensure_link is its AK half.
+#       make_weak_ptr returns an ak.WeakPtr holding the link, as AK's does (weak_ptr.lucb).
 #
 #==============================================================================================
 
@@ -45,6 +44,11 @@ pub func weakable_ensure_link[T](this: const Weakable[T]*) -> WeakLink*:
     weak_link_weak_link(link, (T*)(void*)that)
     that.m_link = link
     return link
+
+## Ported from AK/Weakable.h:60 AK::Weakable::make_weak_ptr: a WeakPtr to the object (a U that
+## derives from the Weakable).
+pub func weakable_make_weak_ptr[T, U](this: const Weakable[T]*) -> WeakPtr[U]:
+    return WeakPtr[U](m_link = weakable_ensure_link(this))
 
 ## Ported from AK/Weakable.h:76 AK::Weakable::revoke_weak_ptrs.
 pub func weakable_revoke_weak_ptrs[T](this: const Weakable[T]*):

@@ -19,33 +19,67 @@ pub struct StackFrameInfo:
 
 # mark: Heap ====================================================================================
 
-## GC::Heap (Libraries/LibGC/Heap.h:36).
-pub struct Heap:
+## The collector's own containers are gc's C-heap shapes (containers.lucb) and the root set is
+## a GcHashMap keyed by cell address (fixed by hand). The fields after `m_full_weak_blocks` are
+## additions (DESIGN.md §3.2): the blob allocators, the large-object space, the allocator view
+## for atomic blobs, and the weak-block index used to trace WeakImpl references.
+pub struct Heap: memory.Allocator:
     pub var m_gc_bytes_threshold: usize  # C++ default: { GC_MIN_BYTES_THRESHOLD }
     pub var m_allocated_bytes_since_last_gc: usize  # C++ default: { 0 }
     pub var m_should_collect_on_every_allocation: bool  # C++ default: { false }
-    pub var m_size_based_cell_allocators: ak.Vector[CellAllocator*]
-    pub var m_all_cell_allocators: ak.IntrusiveList[CellAllocator, CellAllocator*?]
-    pub var m_roots: ak.IntrusiveList[RootImpl, RootImpl*?]
-    pub var m_root_vectors: ak.IntrusiveList[RootVectorBase, RootVectorBase*?]
-    pub var m_root_hash_maps: ak.IntrusiveList[RootHashMapBase, RootHashMapBase*?]
-    pub var m_conservative_vectors: ak.IntrusiveList[ConservativeVectorBase, ConservativeVectorBase*?]
-    pub var m_weak_containers: ak.IntrusiveList[WeakContainer, WeakContainer*?]
-    pub var m_uprooted_cells: ak.Vector[Cell*?]
+    pub var m_size_based_cell_allocators: GcVector[CellAllocator*]
+    pub var m_all_cell_allocators: List
+    pub var m_roots: List
+    pub var m_root_vectors: List
+    pub var m_root_hash_maps: List
+    pub var m_conservative_vectors: List
+    pub var m_weak_containers: List
+    pub var m_uprooted_cells: GcVector[Cell*?]
     pub var m_gc_deferrals: usize  # C++ default: { 0 }
     pub var m_should_gc_when_deferral_ends: bool  # C++ default: { false }
     pub var m_collecting_garbage: bool  # C++ default: { false }
     pub var m_stack_info: ak.StackInfo
-    pub var m_gather_embedder_roots: ak.Function1[ak.HashMap[Cell*?, HeapRoot, ak.PtrTraits[Cell]]*, unit]
-    pub var m_post_gc_tasks: ak.Vector[ak.Function0[unit]]
-    pub var m_sweep_callbacks: ak.Vector[ak.Function0[unit]]
-    pub var m_usable_weak_blocks: ak.IntrusiveList[WeakBlock, WeakBlock*?]
-    pub var m_full_weak_blocks: ak.IntrusiveList[WeakBlock, WeakBlock*?]
+    pub var m_gather_embedder_roots: ak.Function1[GcHashMap[HeapRoot]*, unit]
+    pub var m_post_gc_tasks: GcVector[ak.Function0[unit]]
+    pub var m_sweep_callbacks: GcVector[ak.Function0[unit]]
+    pub var m_usable_weak_blocks: List
+    pub var m_full_weak_blocks: List
+    pub var m_blob_allocators: GcVector[CellAllocator*]  # addition: scanned blobs, per size class
+    pub var m_atomic_blob_allocators: GcVector[CellAllocator*]  # addition: atomic blobs, per size class
+    pub var m_large_objects: GcVector[LargeObject*]  # addition: the large-object space, by address
+    pub var m_atomic_allocator: HeapAtomicAllocator  # addition: the allocator view for atomic blobs
+    pub var m_weak_blocks: GcHashMap[u8]  # addition: every WeakBlock, by address
+    pub var m_min_weak_block_address: usize  # addition: the range of the weak blocks
+    pub var m_max_weak_block_address: usize  # addition
+    pub var m_stack_scan_start: usize  # addition: where gather_conservative_roots starts (heap_2.lucb)
+    pub var m_mutator_registers: usize[16]  # addition: the registers when the collection began
+
+    ## Allocator: a scanned blob of `size` bytes (DESIGN.md §3.3); `new` and `alloc` under `with heap`.
+    pub mutating func allocate(size: usize, alignment: usize) -> u8[]?: return heap_allocate_blob(&self, size, alignment, false)
+
+    ## Allocator: whether `block` can hold `size` bytes where it is.
+    pub mutating func resize(block: u8[], size: usize) -> bool: return heap_resize_blob(&self, block, size)
+
+    ## Allocator: nothing; the collector reclaims blobs nothing refers to (DESIGN.md §3.3 rule 3).
+    pub mutating func release(block: u8[]): heap_release_blob(&self, block)
+
+## The allocator view for atomic blobs (DESIGN.md §3.3 rule 5): memory the collector never scans
+## (string bytes, pixels), made current where AK allocates atomic storage. Addition.
+pub struct HeapAtomicAllocator: memory.Allocator:
+    pub var m_heap: Heap*?
+
+    ## Allocator: an atomic blob of `size` bytes.
+    pub mutating func allocate(size: usize, alignment: usize) -> u8[]?: return heap_allocate_blob(self.m_heap else trap("atomic allocator without a heap"), size, alignment, true)
+
+    ## Allocator: whether `block` can hold `size` bytes where it is.
+    pub mutating func resize(block: u8[], size: usize) -> bool: return heap_resize_blob(self.m_heap else trap("atomic allocator without a heap"), block, size)
+
+    ## Allocator: nothing; the collector reclaims blobs nothing refers to.
+    pub mutating func release(block: u8[]): return
 
 ## The non-zero default member initializers of GC::Heap; the constructor runs them first.
 pub func heap_init_fields(this: Heap*):
-    # m_gc_bytes_threshold: C++ default GC_MIN_BYTES_THRESHOLD (not translated by the generator)
-    return
+    this.m_gc_bytes_threshold = heap_gc_min_bytes_threshold
 
 ## GC::s_the (Libraries/LibGC/Heap.cpp:41).
 pub var s_the: Heap*?
@@ -61,10 +95,10 @@ pub enum HeapCollectionType as i32:
 pub struct GraphConstructorVisitor: IsGraphConstructorVisitor, IsCellVisitor:
     pub var visitor: CellVisitor  # primary base
     pub var m_node_being_visited: GraphConstructorVisitorGraphNode*?  # C++ default: { nullptr }
-    pub var m_work_queue: ak.Vector[Cell*]
-    pub var m_graph: ak.HashMap[u64, GraphConstructorVisitorGraphNode, ak.U64Traits]
+    pub var m_work_queue: GcVector[Cell*]
+    pub var m_graph: GcHashMap[GraphConstructorVisitorGraphNode]
     pub var m_heap: Heap*
-    pub var m_all_live_heap_blocks: ak.HashTable[HeapBlock*?, ak.PtrTraits[HeapBlock]]
+    pub var m_all_live_heap_blocks: GcHashMap[u8]
     pub var m_min_block_address: usize
     pub var m_max_block_address: usize
 
@@ -101,12 +135,13 @@ pub func as_graph_constructor_visitor[P: IsCellVisitor](p: P*) -> GraphConstruct
     return as_if_graph_constructor_visitor(p) else trap("as<GC::GraphConstructorVisitor> failed")
 
 ## GC::Heap::GC_MIN_BYTES_THRESHOLD (Libraries/LibGC/Heap.h:158).
-# C++ initializer: { 4 * 1024 * 1024 }
-pub var heap_gc_min_bytes_threshold: usize
+pub let heap_gc_min_bytes_threshold: usize = 4 * 1024 * 1024
 
-## GC::GraphConstructorVisitor::GraphNode (Libraries/LibGC/Heap.cpp:256): opaque in this phase (not in the phase-1 closure).
+## GC::GraphConstructorVisitor::GraphNode (Libraries/LibGC/Heap.cpp:256).
 pub struct GraphConstructorVisitorGraphNode:
-    pub var opaque_: u8
+    pub var root_origin: HeapRoot?
+    pub var class_name: ak.StringView
+    pub var edges: GcHashMap[u8]  # HashTable<FlatPtr>
 
 # mark: MarkingVisitor ==========================================================================
 
@@ -114,8 +149,8 @@ pub struct GraphConstructorVisitorGraphNode:
 pub struct MarkingVisitor: IsMarkingVisitor, IsCellVisitor:
     pub var visitor: CellVisitor  # primary base
     pub var m_heap: Heap*
-    pub var m_work_queue: ak.Vector[Cell*]
-    pub var m_all_live_heap_blocks: const ak.HashTable[HeapBlock*?, ak.PtrTraits[HeapBlock]]*
+    pub var m_work_queue: GcVector[Cell*]
+    pub var m_all_live_heap_blocks: const GcHashMap[u8]*
     pub var m_min_block_address: usize
     pub var m_max_block_address: usize
 

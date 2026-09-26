@@ -44,9 +44,9 @@ pub struct RedBlackTreeIterator[K, V]: luce.Iterable[V*, RedBlackTreeIterator[K,
     pub var m_node: RedBlackTreeNode[K, V]*?  # C++ default: { nullptr }
     pub var m_prev: RedBlackTreeNode[K, V]*?  # C++ default: { nullptr }
 
-    func iterator() -> RedBlackTreeIterator[K, V]: return self
+    pub func iterator() -> RedBlackTreeIterator[K, V]: return self
 
-    mutating func next() -> V*?: return red_black_tree_iterator_next(&self)
+    pub mutating func next() -> V*?: return red_black_tree_iterator_next(&self)
 
 # mark: RedBlackTree ============================================================================
 

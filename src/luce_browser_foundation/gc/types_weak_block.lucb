@@ -14,14 +14,14 @@
 
 ## GC::WeakBlock (Libraries/LibGC/WeakBlock.h:15).
 pub struct WeakBlock:
-    pub var m_list_node: ak.IntrusiveListNode[WeakBlock, WeakBlock*?]
+    pub var m_list_node: ListNode
     pub var m_freelist: WeakImpl*?  # C++ default: { nullptr }
-    pub var m_impls: WeakImpl[681]
+    pub var m_impls: WeakImpl[weak_block_impl_count]
 
 ## GC::WeakBlock::BLOCK_SIZE (Libraries/LibGC/WeakBlock.h:17).
-# C++ initializer: 16 * KiB
-pub var weak_block_block_size: usize
+pub let weak_block_block_size: usize = 16 * 1024
 
-## GC::WeakBlock::IMPL_COUNT (Libraries/LibGC/WeakBlock.h:39).
-# C++ initializer: ( BLOCK_SIZE - sizeof ( m_list_node ) - sizeof ( WeakImpl * ) ) / sizeof ( WeakImpl )
-pub var weak_block_impl_count: usize
+## GC::WeakBlock::IMPL_COUNT (Libraries/LibGC/WeakBlock.h:39): 681 on 64-bit targets.
+pub let weak_block_impl_count: usize = (weak_block_block_size - sizeof(ListNode) - sizeof(WeakImpl*)) // sizeof(WeakImpl)
+
+assert(sizeof(WeakBlock) <= weak_block_block_size)

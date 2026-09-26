@@ -1,0 +1,259 @@
+#==============================================================================================
+#
+#   heap_3 - Heap: marking, finalization, sweeping, deferral and weak references
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/Heap.cpp (lines 611-842): MarkingVisitor, mark_live_cells,
+#       finalize_unmarked_cells, sweep_weak_blocks, sweep_dead_cells, defer_gc and undefer_gc,
+#       uproot_cell and create_weak_impl. The additions of DESIGN.md §3.1-§3.2 hook in where
+#       marked: a marked cell's own bytes are scanned for blob pointers after its visit_edges
+#       (so AK storage a cell owns survives), and the large-object space is finalized and swept
+#       beside the heap blocks.
+#
+#==============================================================================================
+
+# mark: MarkingVisitor ==========================================================================
+
+## Ported from Libraries/LibGC/Heap.cpp:613 GC::MarkingVisitor::MarkingVisitor.
+pub func marking_visitor_construct(this: MarkingVisitor*, heap: Heap*, roots: const GcHashMap[HeapRoot]*, all_live_heap_blocks: const GcHashMap[u8]*):
+    this.visitor.vtable = (const CellVisitorVTable*)&marking_visitor_vtable
+    this.visitor.class_id = marking_visitor_class.first_id
+    this.m_heap = heap
+    this.m_all_live_heap_blocks = all_live_heap_blocks
+    heap_find_min_and_max_block_addresses(this.m_heap, &this.m_min_block_address, &this.m_max_block_address)
+    for root in gc_hash_map_keys(roots):
+        cell_visitor_visit_cell(&this.visitor, (Cell*?)root)
+
+## Ported from Libraries/LibGC/Heap.cpp:623 GC::MarkingVisitor::visit_impl (override).
+pub func marking_visitor_visit_impl_cell_impl(base: CellVisitor*, cell: Cell*):
+    let this = (MarkingVisitor*)base
+    if cell_is_marked(cell):
+        return
+    if heap_debug:
+        ak.dbgln(f"  ! 0x{hex((usize)cell)}")
+
+    cell_set_marked(cell, true)
+    gc_vector_append(&this.m_work_queue, cell)
+
+## Ported from Libraries/LibGC/Heap.cpp:633 GC::MarkingVisitor::visit_impl (override).
+pub func marking_visitor_visit_impl_span_nan_boxed_value_impl(base: CellVisitor*, values: const NanBoxedValue[]):
+    let this = (MarkingVisitor*)base
+    gc_vector_ensure_capacity(&this.m_work_queue, gc_vector_size(&this.m_work_queue) + values.length)
+
+    for value in values:
+        if not nan_boxed_value_is_cell(&value):
+            continue
+        let cell = nan_boxed_value_as_cell_const(&value)
+        if cell_is_marked(cell):
+            continue
+        if heap_debug:
+            ak.dbgln(f"  ! 0x{hex((usize)cell)}")
+
+        cell_set_marked(cell, true)
+        gc_vector_append(&this.m_work_queue, cell)
+
+## Ported from Libraries/LibGC/Heap.cpp:650 GC::MarkingVisitor::visit_possible_values (override).
+pub func marking_visitor_visit_possible_values_impl(base: CellVisitor*, bytes: const u8[]):
+    let this = (MarkingVisitor*)base
+    var possible_pointers: GcHashMap[HeapRoot]
+    defer gc_hash_map_clear(&possible_pointers)
+
+    let raw_pointer_sized_values = (const usize*)bytes.data
+    for i in 0..<(bytes.length // sizeof(usize)):
+        heap_note_possible_weak_reference(this.m_heap, raw_pointer_sized_values[i])
+        add_possible_value(&possible_pointers, raw_pointer_sized_values[i], HeapRoot(type_ = HeapRootType.heap_function_captured_pointer), this.m_min_block_address, this.m_max_block_address)
+
+    for found in for_each_cell_among_possible_pointers(this.m_heap, this.m_all_live_heap_blocks, &possible_pointers):
+        let cell = found.0
+        if cell_is_marked(cell):
+            continue
+        if cell_state(cell) != CellState.live:
+            continue
+        cell_set_marked(cell, true)
+        gc_vector_append(&this.m_work_queue, cell)
+
+## Ported from Libraries/LibGC/Heap.cpp:668 GC::MarkingVisitor::mark_all_live_cells.
+pub func marking_visitor_mark_all_live_cells(this: MarkingVisitor*):
+    while not gc_vector_is_empty(&this.m_work_queue):
+        let cell = gc_vector_take_last(&this.m_work_queue)
+        cell_visit_edges(cell, &this.visitor)
+        # Addition (DESIGN.md §3.1): the AK storage a cell owns (Strings, Vectors, captures) is
+        # found by scanning the cell's own bytes for blob pointers, never for cell pointers.
+        if not cell_is_blob(cell):
+            marking_visitor_visit_blob_pointers(this, cell)
+
+## Addition: mark the blobs the words of `cell` point into (a blob is marked and queued, so its
+## words are scanned in turn; cells the words point to are left to the precise visit_edges), and
+## note the WeakImpls the words refer to (heap_blobs.lucb).
+func marking_visitor_visit_blob_pointers(this: MarkingVisitor*, cell: Cell*):
+    let words = (const usize*)cell
+    for i in 0..<(heap_cell_storage_size(this.m_heap, cell) // sizeof(usize)):
+        let word = words[i]
+        heap_note_possible_weak_reference(this.m_heap, word)
+        if word < this.m_min_block_address or word > this.m_max_block_address:
+            continue
+        let target = heap_cell_from_possible_pointer(this.m_heap, this.m_all_live_heap_blocks, word) else continue
+        if not cell_is_blob(target) or cell_is_marked(target) or cell_state(target) != CellState.live:
+            continue
+        cell_set_marked(target, true)
+        gc_vector_append(&this.m_work_queue, target)
+
+## Ported from Libraries/LibGC/Heap.cpp:683 GC::Heap::mark_live_cells.
+pub func heap_mark_live_cells(this: Heap*, roots: const GcHashMap[HeapRoot]*, all_live_heap_blocks: const GcHashMap[u8]*):
+    if heap_debug:
+        ak.dbgln("mark_live_cells:")
+
+    var visitor: MarkingVisitor = ---
+    memory.set(u8[]((u8*)&visitor, sizeof(MarkingVisitor)), 0)
+    marking_visitor_construct(&visitor, this, roots, all_live_heap_blocks)
+    marking_visitor_mark_all_live_cells(&visitor)
+    gc_vector_clear(&visitor.m_work_queue)
+
+    for inverse_root in gc_vector_span(&this.m_uprooted_cells):
+        cell_set_marked(inverse_root else trap("uprooted a null cell"), false)
+
+    gc_vector_clear(&this.m_uprooted_cells)
+
+# mark: Finalization and sweeping ===============================================================
+
+## Ported from Libraries/LibGC/Heap.cpp:696 GC::Heap::finalize_unmarked_cells.
+pub func heap_finalize_unmarked_cells(this: Heap*):
+    for block in heap_for_each_block(this):
+        if not heap_block_overrides_finalize(block):
+            continue
+        for cell in heap_block_for_each_cell_in_state(block, CellState.live):
+            if not cell_is_marked(cell):
+                cell_finalize(cell)
+    heap_finalize_unmarked_large_cells(this)
+
+## Ported from Libraries/LibGC/Heap.cpp:709 GC::Heap::sweep_weak_blocks.
+pub func heap_sweep_weak_blocks(this: Heap*):
+    for node in list_nodes(&this.m_usable_weak_blocks):
+        weak_block_sweep(weak_block_from_list_node(node))
+    var now_usable_weak_blocks: GcVector[WeakBlock*]
+    defer gc_vector_clear(&now_usable_weak_blocks)
+    for node in list_nodes(&this.m_full_weak_blocks):
+        let weak_block = weak_block_from_list_node(node)
+        weak_block_sweep(weak_block)
+        if weak_block_can_allocate(weak_block):
+            gc_vector_append(&now_usable_weak_blocks, weak_block)
+    for weak_block in gc_vector_span(&now_usable_weak_blocks):
+        list_append(&this.m_usable_weak_blocks, &weak_block.m_list_node)
+
+## Ported from Libraries/LibGC/Heap.cpp:725 GC::Heap::sweep_dead_cells. `measurement_start` is
+## the time.now() the collection began at (Core::ElapsedTimer).
+pub func heap_sweep_dead_cells(this: Heap*, print_report: bool, measurement_start: u64):
+    if heap_debug:
+        ak.dbgln("sweep_dead_cells:")
+    var empty_blocks: GcVector[HeapBlock*]
+    defer gc_vector_clear(&empty_blocks)
+    var full_blocks_that_became_usable: GcVector[HeapBlock*]
+    defer gc_vector_clear(&full_blocks_that_became_usable)
+
+    var collected_cells: usize = 0
+    var live_cells: usize = 0
+    var collected_cell_bytes: usize = 0
+    var live_cell_bytes: usize = 0
+
+    for block in heap_for_each_block(this):
+        var block_has_live_cells = false
+        let block_was_full = heap_block_is_full(block)
+        for cell in heap_block_for_each_cell_in_state(block, CellState.live):
+            if not cell_is_marked(cell):
+                if heap_debug:
+                    ak.dbgln(f"  ~ 0x{hex((usize)cell)}")
+                heap_block_deallocate(block, cell)
+                collected_cells += 1
+                collected_cell_bytes += heap_block_cell_size(block)
+            else:
+                cell_set_marked(cell, false)
+                block_has_live_cells = true
+                live_cells += 1
+                live_cell_bytes += heap_block_cell_size(block)
+        if not block_has_live_cells:
+            gc_vector_append(&empty_blocks, block)
+        elif block_was_full != heap_block_is_full(block):
+            gc_vector_append(&full_blocks_that_became_usable, block)
+
+    # Addition: the large objects die here too; their mappings go back after the weak containers
+    # and sweep callbacks have looked at them, as empty blocks do.
+    let (large_collected, large_collected_bytes, large_live, large_live_bytes) = heap_sweep_dead_large_cells(this)
+    collected_cells += large_collected
+    collected_cell_bytes += large_collected_bytes
+    live_cells += large_live
+    live_cell_bytes += large_live_bytes
+
+    for node in list_nodes(&this.m_weak_containers):
+        weak_container_remove_dead_cells(weak_container_from_list_node(node))
+
+    for callback in gc_vector_span(&this.m_sweep_callbacks):
+        ak.function0_call(&callback)
+
+    for block in gc_vector_span(&empty_blocks):
+        if heap_debug:
+            ak.dbgln(f" - HeapBlock empty @ 0x{hex((usize)block)}: cell_size={heap_block_cell_size(block)}")
+        cell_allocator_block_did_become_empty(heap_block_cell_allocator(block), block)
+
+    for block in gc_vector_span(&full_blocks_that_became_usable):
+        if heap_debug:
+            ak.dbgln(f" - HeapBlock usable again @ 0x{hex((usize)block)}: cell_size={heap_block_cell_size(block)}")
+        cell_allocator_block_did_become_usable(heap_block_cell_allocator(block), block)
+
+    let freed_large_objects = heap_release_dead_large_objects(this)
+
+    if heap_debug:
+        for block in heap_for_each_block(this):
+            ak.dbgln(f" > Live HeapBlock @ 0x{hex((usize)block)}: cell_size={heap_block_cell_size(block)}")
+
+    this.m_gc_bytes_threshold = live_cell_bytes if live_cell_bytes > heap_gc_min_bytes_threshold else heap_gc_min_bytes_threshold
+
+    if print_report:
+        let time_spent = time.since(measurement_start)
+        var live_block_count: usize = 0
+        for _ in heap_for_each_block(this):
+            live_block_count += 1
+
+        ak.dbgln("Garbage collection report")
+        ak.dbgln("=============================================")
+        ak.dbgln(f"     Time spent: {time_spent // 1000000} ms")
+        ak.dbgln(f"     Live cells: {live_cells} ({live_cell_bytes} bytes)")
+        ak.dbgln(f"Collected cells: {collected_cells} ({collected_cell_bytes} bytes)")
+        ak.dbgln(f"    Live blocks: {live_block_count} ({live_block_count * heap_block_base_block_size} bytes)")
+        ak.dbgln(f"   Freed blocks: {gc_vector_size(&empty_blocks)} ({gc_vector_size(&empty_blocks) * heap_block_base_block_size} bytes)")
+        ak.dbgln(f"  Freed objects: {freed_large_objects} (large-object space)")
+        ak.dbgln("=============================================")
+
+# mark: Deferral, uprooting, weak references ====================================================
+
+## Ported from Libraries/LibGC/Heap.cpp:803 GC::Heap::defer_gc.
+pub func heap_defer_gc(this: Heap*):
+    this.m_gc_deferrals += 1
+
+## Ported from Libraries/LibGC/Heap.cpp:808 GC::Heap::undefer_gc.
+pub func heap_undefer_gc(this: Heap*):
+    assert(this.m_gc_deferrals > 0)
+    this.m_gc_deferrals -= 1
+
+    if this.m_gc_deferrals == 0:
+        if this.m_should_gc_when_deferral_ends:
+            heap_collect_garbage(this)
+        this.m_should_gc_when_deferral_ends = false
+
+## Ported from Libraries/LibGC/Heap.cpp:820 GC::Heap::uproot_cell.
+pub func heap_uproot_cell(this: Heap*, cell: Cell*?):
+    gc_vector_append(&this.m_uprooted_cells, cell)
+
+## Ported from Libraries/LibGC/Heap.cpp:825 GC::Heap::create_weak_impl.
+pub func heap_create_weak_impl(this: Heap*, ptr: void*?) -> WeakImpl*:
+    if list_is_empty(&this.m_usable_weak_blocks):
+        # NOTE: These are leaked on Heap destruction, but that's fine since Heap is tied to process lifetime.
+        let weak_block = weak_block_create()
+        list_append(&this.m_usable_weak_blocks, &weak_block.m_list_node)
+        heap_register_weak_block(this, weak_block)  # addition: the weak-block index (heap_blobs.lucb)
+
+    let weak_block = weak_block_from_list_node(list_first(&this.m_usable_weak_blocks) else trap("no usable weak block"))
+    let new_weak_impl = weak_block_allocate(weak_block, (Cell*?)ptr) else trap("VERIFY: a usable weak block allocates")
+    if not weak_block_can_allocate(weak_block):
+        list_append(&this.m_full_weak_blocks, &weak_block.m_list_node)
+
+    return new_weak_impl

@@ -2655,6 +2655,7 @@ GC::BlockAllocator	luce-browser-foundation	gc	BlockAllocator	Libraries/LibGC/Blo
 GC::BlockAllocator::allocate_block	luce-browser-foundation	gc	block_allocator_allocate_block	Libraries/LibGC/BlockAllocator.cpp:51	stub
 GC::BlockAllocator::blocks	luce-browser-foundation	gc	block_allocator_blocks	Libraries/LibGC/BlockAllocator.h:22	stub
 GC::BlockAllocator::deallocate_block	luce-browser-foundation	gc	block_allocator_deallocate_block	Libraries/LibGC/BlockAllocator.cpp:96	stub
+GC::BlockAllocator::~BlockAllocator	luce-browser-foundation	gc	block_allocator_destroy	Libraries/LibGC/BlockAllocator.cpp:32	destructor
 GC::CANON_NAN_BITS	luce-browser-foundation	gc	canon_nan_bits	Libraries/LibGC/NanBoxedValue.h:21	variable
 GC::Cell	luce-browser-foundation	gc	Cell	Libraries/LibGC/Cell.h:41	struct
 GC::Cell::OVERRIDES_FINALIZE	luce-browser-foundation	gc	cell_overrides_finalize	Libraries/LibGC/Cell.h:47	variable
@@ -2667,15 +2668,22 @@ GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_cell_2	Li
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_cell_3	Libraries/LibGC/Cell.h:77	stub
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_cell_4	Libraries/LibGC/Cell.h:82	stub
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_hash_map	Libraries/LibGC/Cell.h:157	stub
+GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_hash_map_keys	Libraries/LibGC/Cell.h:157	ported
+GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_hash_map_keys_and_values	Libraries/LibGC/Cell.h:157	ported
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_hash_table	Libraries/LibGC/Cell.h:143	stub
+GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_hash_table_nullable	Libraries/LibGC/Cell.h:143	ported
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_nan_boxed_value	Libraries/LibGC/Cell.cpp:12	stub
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_opaque	Libraries/LibGC/Cell.h:101	stub
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_opaque_2	Libraries/LibGC/Cell.h:150	stub
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_opaque_3	Libraries/LibGC/Cell.h:168	stub
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_opaque_4	Libraries/LibGC/Cell.h:179	stub
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_span	Libraries/LibGC/Cell.h:115	stub
+GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_span_nan_boxed_value	Libraries/LibGC/Cell.h:108	ported
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_t	Libraries/LibGC/Cell.h:88	stub
 GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_t_2	Libraries/LibGC/Cell.h:95	stub
+GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_vector	Libraries/LibGC/Cell.h:129	ported
+GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_vector_nan_boxed_value	Libraries/LibGC/Cell.h:136	ported
+GC::Cell::Visitor::visit	luce-browser-foundation	gc	cell_visitor_visit_vector_nullable	Libraries/LibGC/Cell.h:129	ported
 GC::Cell::Visitor::visit_impl	luce-browser-foundation	gc	cell_visitor_visit_impl_cell_impl	Libraries/LibGC/Cell.h:197	impl
 GC::Cell::Visitor::visit_impl	luce-browser-foundation	gc	cell_visitor_visit_impl_span_nan_boxed_value_impl	Libraries/LibGC/Cell.h:198	impl
 GC::Cell::Visitor::visit_impl [dispatch]	luce-browser-foundation	gc	cell_visitor_visit_impl_cell	Libraries/LibGC/Cell.h:64	dispatcher
@@ -2711,8 +2719,10 @@ GC::ConservativeVectorBase	luce-browser-foundation	gc	ConservativeVectorBase	Lib
 GC::ConservativeVectorBase::ConservativeVectorBase	luce-browser-foundation	gc	conservative_vector_base_construct	Libraries/LibGC/ConservativeVector.cpp:12	construct
 GC::ConservativeVectorBase::possible_values	luce-browser-foundation	gc	conservative_vector_base_possible_values_impl	Libraries/LibGC/ConservativeVector.h:19	impl
 GC::ConservativeVectorBase::possible_values [dispatch]	luce-browser-foundation	gc	conservative_vector_base_possible_values	Libraries/LibGC/ConservativeVector.h:15	dispatcher
+GC::ConservativeVectorBase::~ConservativeVectorBase	luce-browser-foundation	gc	conservative_vector_base_destroy	Libraries/LibGC/ConservativeVector.cpp:18	destructor
 GC::DeferGC	luce-browser-foundation	gc	DeferGc	Libraries/LibGC/DeferGC.h:13	struct
 GC::DeferGC::DeferGC	luce-browser-foundation	gc	defer_gc_construct	Libraries/LibGC/DeferGC.h:15	construct
+GC::DeferGC::~DeferGC	luce-browser-foundation	gc	defer_gc_destroy	Libraries/LibGC/DeferGC.h:21	destructor
 GC::GraphConstructorVisitor	luce-browser-foundation	gc	GraphConstructorVisitor	Libraries/LibGC/Heap.cpp:129	struct
 GC::GraphConstructorVisitor::GraphConstructorVisitor	luce-browser-foundation	gc	graph_constructor_visitor_construct	Libraries/LibGC/Heap.cpp:131	construct
 GC::GraphConstructorVisitor::GraphNode	luce-browser-foundation	gc	GraphConstructorVisitorGraphNode	Libraries/LibGC/Heap.cpp:256	opaque
@@ -2722,11 +2732,15 @@ GC::GraphConstructorVisitor::visit_impl	luce-browser-foundation	gc	graph_constru
 GC::GraphConstructorVisitor::visit_impl	luce-browser-foundation	gc	graph_constructor_visitor_visit_impl_span_nan_boxed_value_impl	Libraries/LibGC/Heap.cpp:161	impl
 GC::GraphConstructorVisitor::visit_possible_values	luce-browser-foundation	gc	graph_constructor_visitor_visit_possible_values_impl	Libraries/LibGC/Heap.cpp:167	impl
 GC::Heap	luce-browser-foundation	gc	Heap	Libraries/LibGC/Heap.h:36	struct
+GC::Heap (Allocator view for atomic blobs)	luce-browser-foundation	gc	heap_atomic_allocator	-	addition
+GC::Heap (blob allocation)	luce-browser-foundation	gc	heap_allocate_blob	-	addition
+GC::Heap (blob resize)	luce-browser-foundation	gc	heap_resize_blob	-	addition
 GC::Heap [default member initializers]	luce-browser-foundation	gc	heap_init_fields	Libraries/LibGC/Heap.h:36	init fields
 GC::Heap::CollectionType	luce-browser-foundation	gc	HeapCollectionType	Libraries/LibGC/Heap.h:56	enum
 GC::Heap::GC_MIN_BYTES_THRESHOLD	luce-browser-foundation	gc	heap_gc_min_bytes_threshold	Libraries/LibGC/Heap.h:158	variable
 GC::Heap::Heap	luce-browser-foundation	gc	heap_construct	Libraries/LibGC/Heap.cpp:48	construct
 GC::Heap::allocate_cell	luce-browser-foundation	gc	heap_allocate_cell	Libraries/LibGC/Heap.h:113	stub
+GC::Heap::allocate_cell	luce-browser-foundation	gc	heap_allocate_cell_of_size	Libraries/LibGC/Heap.h:113	addition
 GC::Heap::allocator_for_size	luce-browser-foundation	gc	heap_allocator_for_size	Libraries/LibGC/Heap.h:138	stub
 GC::Heap::collect_garbage	luce-browser-foundation	gc	heap_collect_garbage	Libraries/LibGC/Heap.cpp:296	stub
 GC::Heap::create_weak_impl	luce-browser-foundation	gc	heap_create_weak_impl	Libraries/LibGC/Heap.cpp:825	stub
@@ -2750,7 +2764,7 @@ GC::Heap::for_each_block	luce-browser-foundation	gc	heap_for_each_block	Librarie
 GC::Heap::gather_asan_fake_stack_roots	luce-browser-foundation	gc	heap_gather_asan_fake_stack_roots	Libraries/LibGC/Heap.cpp:472	stub
 GC::Heap::gather_conservative_roots	luce-browser-foundation	gc	heap_gather_conservative_roots	Libraries/LibGC/Heap.cpp:477	stub
 GC::Heap::gather_roots	luce-browser-foundation	gc	heap_gather_roots	Libraries/LibGC/Heap.cpp:413	stub
-GC::Heap::has_own_gc_allocator_marker	luce-browser-foundation	gc	heap_has_own_gc_allocator_marker	Libraries/LibGC/Heap.h:105	stub
+GC::Heap::has_own_gc_allocator_marker	luce-browser-foundation	gc	heap_has_own_gc_allocator_marker	Libraries/LibGC/Heap.h:105	dropped
 GC::Heap::is_gc_deferred	luce-browser-foundation	gc	heap_is_gc_deferred	Libraries/LibGC/Heap.h:88	stub
 GC::Heap::mark_live_cells	luce-browser-foundation	gc	heap_mark_live_cells	Libraries/LibGC/Heap.cpp:683	stub
 GC::Heap::register_cell_allocator	luce-browser-foundation	gc	heap_register_cell_allocator	Libraries/LibGC/Heap.h:249	stub
@@ -2764,6 +2778,7 @@ GC::Heap::the	luce-browser-foundation	gc	heap_the	Libraries/LibGC/Heap.cpp:43	st
 GC::Heap::undefer_gc	luce-browser-foundation	gc	heap_undefer_gc	Libraries/LibGC/Heap.cpp:808	stub
 GC::Heap::uproot_cell	luce-browser-foundation	gc	heap_uproot_cell	Libraries/LibGC/Heap.cpp:820	stub
 GC::Heap::will_allocate	luce-browser-foundation	gc	heap_will_allocate	Libraries/LibGC/Heap.cpp:67	stub
+GC::Heap::~Heap	luce-browser-foundation	gc	heap_destroy	Libraries/LibGC/Heap.cpp:62	destructor
 GC::HeapBlock	luce-browser-foundation	gc	HeapBlock	Libraries/LibGC/HeapBlock.h:23	struct
 GC::HeapBlock::FreelistEntry	luce-browser-foundation	gc	HeapBlockFreelistEntry	Libraries/LibGC/HeapBlock.h:103	opaque
 GC::HeapBlock::HeapBlock	luce-browser-foundation	gc	heap_block_construct	Libraries/LibGC/HeapBlock.cpp:28	construct
@@ -2780,6 +2795,7 @@ GC::HeapBlock::from_cell	luce-browser-foundation	gc	heap_block_from_cell	Librari
 GC::HeapBlock::has_lazy_freelist	luce-browser-foundation	gc	heap_block_has_lazy_freelist	Libraries/LibGC/HeapBlock.h:101	stub
 GC::HeapBlock::is_full	luce-browser-foundation	gc	heap_block_is_full	Libraries/LibGC/HeapBlock.h:33	stub
 GC::HeapBlock::is_valid_cell_pointer	luce-browser-foundation	gc	heap_block_is_valid_cell_pointer	Libraries/LibGC/HeapBlock.h:86	stub
+GC::HeapBlock::m_storage	luce-browser-foundation	gc	heap_block_storage	Libraries/LibGC/HeapBlock.h:120	ported
 GC::HeapBlock::min_possible_cell_size	luce-browser-foundation	gc	heap_block_min_possible_cell_size	Libraries/LibGC/HeapBlock.h:125	variable
 GC::HeapBlock::overrides_finalize	luce-browser-foundation	gc	heap_block_overrides_finalize	Libraries/LibGC/HeapBlock.h:96	stub
 GC::HeapBlock::overrides_must_survive_garbage_collection	luce-browser-foundation	gc	heap_block_overrides_must_survive_garbage_collection	Libraries/LibGC/HeapBlock.h:95	stub
@@ -2810,27 +2826,41 @@ GC::NanBoxedValue::extract_pointer_bits	luce-browser-foundation	gc	nan_boxed_val
 GC::NanBoxedValue::is_cell	luce-browser-foundation	gc	nan_boxed_value_is_cell	Libraries/LibGC/NanBoxedValue.h:60	stub
 GC::NanBoxedValue::is_nan	luce-browser-foundation	gc	nan_boxed_value_is_nan	Libraries/LibGC/NanBoxedValue.h:102	stub
 GC::POSITIVE_INFINITY_BITS	luce-browser-foundation	gc	positive_infinity_bits	Libraries/LibGC/NanBoxedValue.h:28	variable
+GC::Root	luce-browser-foundation	gc	Root	Libraries/LibGC/Root.h:47	generic struct
+GC::Root::cell	luce-browser-foundation	gc	root_cell	Libraries/LibGC/Root.h:79	ported
+GC::Root::create	luce-browser-foundation	gc	root_create	Libraries/LibGC/Root.h:52	ported
+GC::Root::is_null	luce-browser-foundation	gc	root_is_null	Libraries/LibGC/Root.h:91	ported
+GC::Root::ptr	luce-browser-foundation	gc	root_ptr	Libraries/LibGC/Root.h:86	ported
+GC::Root::~Root	luce-browser-foundation	gc	root_release	Libraries/LibGC/Root.h:47	destructor
 GC::RootHashMapBase	luce-browser-foundation	gc	RootHashMapBase	Libraries/LibGC/RootHashMap.h:17	struct
 GC::RootHashMapBase::RootHashMapBase	luce-browser-foundation	gc	root_hash_map_base_construct	Libraries/LibGC/RootHashMap.cpp:12	construct
 GC::RootHashMapBase::assign_heap	luce-browser-foundation	gc	root_hash_map_base_assign_heap	Libraries/LibGC/RootHashMap.cpp:23	stub
 GC::RootHashMapBase::gather_roots	luce-browser-foundation	gc	root_hash_map_base_gather_roots_impl	Libraries/LibGC/RootHashMap.h:19	impl
 GC::RootHashMapBase::gather_roots [dispatch]	luce-browser-foundation	gc	root_hash_map_base_gather_roots	Libraries/LibGC/RootHashMap.h:17	dispatcher
+GC::RootHashMapBase::~RootHashMapBase	luce-browser-foundation	gc	root_hash_map_base_destroy	Libraries/LibGC/RootHashMap.cpp:18	destructor
 GC::RootImpl	luce-browser-foundation	gc	RootImpl	Libraries/LibGC/Root.h:19	struct
 GC::RootImpl::RootImpl	luce-browser-foundation	gc	root_impl_construct	Libraries/LibGC/Root.cpp:13	construct
 GC::RootImpl::cell	luce-browser-foundation	gc	root_impl_cell	Libraries/LibGC/Root.h:26	stub
 GC::RootImpl::cell	luce-browser-foundation	gc	root_impl_cell_const	Libraries/LibGC/Root.h:27	stub
 GC::RootImpl::source_location	luce-browser-foundation	gc	root_impl_source_location	Libraries/LibGC/Root.h:29	stub
+GC::RootImpl::~RootImpl	luce-browser-foundation	gc	root_impl_destroy	Libraries/LibGC/Root.cpp:19	destructor
 GC::RootVectorBase	luce-browser-foundation	gc	RootVectorBase	Libraries/LibGC/RootVector.h:19	struct
 GC::RootVectorBase::RootVectorBase	luce-browser-foundation	gc	root_vector_base_construct	Libraries/LibGC/RootVector.cpp:13	construct
 GC::RootVectorBase::assign_heap	luce-browser-foundation	gc	root_vector_base_assign_heap	Libraries/LibGC/RootVector.cpp:24	stub
 GC::RootVectorBase::gather_roots	luce-browser-foundation	gc	root_vector_base_gather_roots_impl	Libraries/LibGC/RootVector.h:21	impl
 GC::RootVectorBase::gather_roots [dispatch]	luce-browser-foundation	gc	root_vector_base_gather_roots	Libraries/LibGC/RootVector.h:19	dispatcher
+GC::RootVectorBase::~RootVectorBase	luce-browser-foundation	gc	root_vector_base_destroy	Libraries/LibGC/RootVector.cpp:19	destructor
 GC::SHIFTED_IS_CELL_PATTERN	luce-browser-foundation	gc	shifted_is_cell_pattern	Libraries/LibGC/NanBoxedValue.h:56	variable
 GC::StackFrameInfo	luce-browser-foundation	gc	StackFrameInfo	Libraries/LibGC/Heap.h:31	struct
 GC::TAG_EXTRACTION	luce-browser-foundation	gc	tag_extraction	Libraries/LibGC/NanBoxedValue.h:55	variable
 GC::TAG_SHIFT	luce-browser-foundation	gc	tag_shift	Libraries/LibGC/NanBoxedValue.h:54	variable
 GC::TypeIsolatingCellAllocator	luce-browser-foundation	gc	TypeIsolatingCellAllocator	Libraries/LibGC/CellAllocator.h:82	generic struct
 GC::TypeIsolatingCellAllocator::TypeIsolatingCellAllocator<T>	luce-browser-foundation	gc	type_isolating_cell_allocator_construct	Libraries/LibGC/CellAllocator.h:86	construct
+GC::Weak::Weak	luce-browser-foundation	gc	make_weak	Libraries/LibGC/WeakInlines.h:15	ported
+GC::Weak::Weak	luce-browser-foundation	gc	weak_construct	Libraries/LibGC/WeakInlines.h:15	construct
+GC::Weak::impl	luce-browser-foundation	gc	weak_impl	Libraries/LibGC/Weak.h:131	ported
+GC::Weak::operator=	luce-browser-foundation	gc	weak_assign	Libraries/LibGC/WeakInlines.h:96	ported
+GC::Weak::ptr	luce-browser-foundation	gc	weak_ptr	Libraries/LibGC/Weak.h:118	ported
 GC::WeakBlock	luce-browser-foundation	gc	WeakBlock	Libraries/LibGC/WeakBlock.h:15	struct
 GC::WeakBlock::BLOCK_SIZE	luce-browser-foundation	gc	weak_block_block_size	Libraries/LibGC/WeakBlock.h:17	variable
 GC::WeakBlock::IMPL_COUNT	luce-browser-foundation	gc	weak_block_impl_count	Libraries/LibGC/WeakBlock.h:39	variable
@@ -2846,15 +2876,19 @@ GC::WeakContainer::WeakContainer	luce-browser-foundation	gc	weak_container_const
 GC::WeakContainer::deregister	luce-browser-foundation	gc	weak_container_deregister	Libraries/LibGC/WeakContainer.cpp:23	stub
 GC::WeakContainer::remove_dead_cells	luce-browser-foundation	gc	weak_container_remove_dead_cells_impl	Libraries/LibGC/WeakContainer.h:19	impl
 GC::WeakContainer::remove_dead_cells [dispatch]	luce-browser-foundation	gc	weak_container_remove_dead_cells	Libraries/LibGC/WeakContainer.h:14	dispatcher
+GC::WeakContainer::~WeakContainer	luce-browser-foundation	gc	weak_container_destroy	Libraries/LibGC/WeakContainer.cpp:18	destructor
 GC::WeakHashSet	luce-browser-foundation	gc	WeakHashSet	Libraries/LibGC/WeakHashSet.h:15	generic struct
 GC::WeakHashSet::ConstIterator	luce-browser-foundation	gc	ConstIterator	Libraries/LibGC/WeakHashSet.h:98	opaque
+GC::WeakHashSet::InternalTraits	luce-browser-foundation	gc	WeakHashSetInternalTraits	Libraries/LibGC/WeakHashSet.h:16	generic struct
 GC::WeakHashSet::Iterator	luce-browser-foundation	gc	Iterator	Libraries/LibGC/WeakHashSet.h:61	opaque
+GC::WeakHashSet::Iterator	luce-browser-foundation	gc	WeakHashSetIterator	Libraries/LibGC/WeakHashSet.h:61	generic struct
 GC::WeakHashSet::begin	luce-browser-foundation	gc	weak_hash_set_begin	Libraries/LibGC/WeakHashSet.h:135	stub
 GC::WeakHashSet::begin	luce-browser-foundation	gc	weak_hash_set_begin_const	Libraries/LibGC/WeakHashSet.h:138	stub
+GC::WeakHashSet::begin/end	luce-browser-foundation	gc	WeakHashSetValues	Libraries/LibGC/WeakHashSet.h:135	generic struct
 GC::WeakHashSet::clear	luce-browser-foundation	gc	weak_hash_set_clear	Libraries/LibGC/WeakHashSet.h:59	stub
 GC::WeakHashSet::contains	luce-browser-foundation	gc	weak_hash_set_contains	Libraries/LibGC/WeakHashSet.h:44	stub
-GC::WeakHashSet::end	luce-browser-foundation	gc	weak_hash_set_end	Libraries/LibGC/WeakHashSet.h:136	stub
-GC::WeakHashSet::end	luce-browser-foundation	gc	weak_hash_set_end_const	Libraries/LibGC/WeakHashSet.h:139	stub
+GC::WeakHashSet::end	luce-browser-foundation	gc	weak_hash_set_end	Libraries/LibGC/WeakHashSet.h:136	dropped
+GC::WeakHashSet::end	luce-browser-foundation	gc	weak_hash_set_end_const	Libraries/LibGC/WeakHashSet.h:139	dropped
 GC::WeakHashSet::is_empty	luce-browser-foundation	gc	weak_hash_set_is_empty	Libraries/LibGC/WeakHashSet.h:50	stub
 GC::WeakHashSet::maybe_prune	luce-browser-foundation	gc	weak_hash_set_maybe_prune	Libraries/LibGC/WeakHashSet.h:142	stub
 GC::WeakHashSet::remove	luce-browser-foundation	gc	weak_hash_set_remove	Libraries/LibGC/WeakHashSet.h:34	stub
@@ -2873,7 +2907,15 @@ GC::WeakImpl::state	luce-browser-foundation	gc	weak_impl_state	Libraries/LibGC/W
 GC::WeakImpl::the_null_weak_impl	luce-browser-foundation	gc	weak_impl_the_null_weak_impl	Libraries/LibGC/Weak.h:21	variable
 GC::WeakImpl::unref	luce-browser-foundation	gc	weak_impl_unref	Libraries/LibGC/Weak.h:36	stub
 GC::add_possible_value	luce-browser-foundation	gc	add_possible_value	Libraries/LibGC/Heap.cpp:80	stub
-GC::create_function	luce-browser-foundation	gc	create_function	Libraries/LibGC/Function.h:46	stub
+GC::create_function	luce-browser-foundation	gc	create_function0	Libraries/LibGC/Function.h:46	ported
+GC::create_function	luce-browser-foundation	gc	create_function1	Libraries/LibGC/Function.h:46	ported
+GC::create_function	luce-browser-foundation	gc	create_function2	Libraries/LibGC/Function.h:46	ported
+GC::create_function	luce-browser-foundation	gc	create_function3	Libraries/LibGC/Function.h:46	ported
+GC::create_function	luce-browser-foundation	gc	create_function4	Libraries/LibGC/Function.h:46	ported
+GC::create_function	luce-browser-foundation	gc	create_function5	Libraries/LibGC/Function.h:46	ported
+GC::create_function	luce-browser-foundation	gc	create_function6	Libraries/LibGC/Function.h:46	ported
+GC::create_function	luce-browser-foundation	gc	create_function7	Libraries/LibGC/Function.h:46	ported
+GC::create_function	luce-browser-foundation	gc	create_function8	Libraries/LibGC/Function.h:46	ported
 GC::for_each_cell_among_possible_pointers	luce-browser-foundation	gc	for_each_cell_among_possible_pointers	Libraries/LibGC/Heap.cpp:115	stub
 GC::make_root	luce-browser-foundation	gc	make_root	Libraries/LibGC/Root.h:136	stub
 GC::make_root	luce-browser-foundation	gc	make_root_2	Libraries/LibGC/Root.h:144	stub
@@ -2889,6 +2931,8 @@ GC::operator==	luce-browser-foundation	gc	eq_weak_u	Libraries/LibGC/Weak.h:163	s
 GC::operator==	luce-browser-foundation	gc	eq_weak_u_2	Libraries/LibGC/Weak.h:169	stub
 GC::s_the	luce-browser-foundation	gc	s_the	Libraries/LibGC/Heap.cpp:41	variable
 GC::weak_callback	luce-browser-foundation	gc	weak_callback	Libraries/LibGC/Weak.h:154	stub
+GC::weak_callback::(lambda)	luce-browser-foundation	gc	WeakCallback	Libraries/LibGC/Weak.h:154	struct
+GC::weak_callback::(lambda)::operator()	luce-browser-foundation	gc	weak_callback_call	Libraries/LibGC/Weak.h:154	ported
 GiB	luce-browser-foundation	ak	gi_b	AK/Types.h:148	variable
 KiB	luce-browser-foundation	ak	ki_b	AK/Types.h:146	variable
 MiB	luce-browser-foundation	ak	mi_b	AK/Types.h:147	variable

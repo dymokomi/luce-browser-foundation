@@ -28,8 +28,10 @@ of this repository.
 
 ## Testing
 
-`./test.sh` type-checks every module (failing on any `-W` warning) and runs the unit tests of the
-modules that have them (`ak`: region r01, ported from `Tests/AK`).
+`./test.sh` type-checks every module (failing on any `-W` warning) and runs the unit tests of
+every module and of the `tests` package (ported from `Tests/AK`, `Tests/LibGC`, `Tests/LibURL`,
+`Tests/LibTextCodec`, `Tests/LibUnicode` and `Tests/LibWeb`, and focused cases pinned to the
+reference build).
 
 ## License
 

@@ -1,0 +1,186 @@
+#==============================================================================================
+#
+#   tests_weak - Weak<T>, WeakImpl and WeakBlock sweeping under the traced reference counts
+#
+#   DESCRIPTION:
+#       A Weak follows its cell and reads none once the cell died (WeakBlock::sweep clears the
+#       impl); a WeakImpl stays allocated while a scanned word refers to it (the stack, a blob,
+#       the bytes of a live cell) and goes back to its block's freelist once nothing does.
+#
+#==============================================================================================
+
+## How many WeakImpls of the heap are allocated.
+func allocated_weak_impl_count(heap: Heap*) -> usize:
+    var count: usize = 0
+    for key in gc_hash_map_keys(&heap.m_weak_blocks):
+        let block = (WeakBlock*?)key else continue
+        for impl in &block.m_impls:
+            if impl.m_state == WeakImplState.allocated:
+                count += 1
+    return count
+
+## Weaks to `cell` that nothing keeps once this returns.
+noinline func drop_weaks(cell_weak: const Weak[TestCell]*, count: usize):
+    let cell = weak_ptr(cell_weak) else trap("dead")
+    for _ in 0..<count:
+        discard(make_weak[TestCell](cell))
+
+test "WeakImpls nothing refers to go back to the freelist":
+    clobber_stack()
+    run_weak_impl_reclaimed()
+
+noinline func run_weak_impl_reclaimed():
+    let heap = create_test_heap()
+    var root = root_create[TestCell](new_test_cell(heap, 1))
+    let kept = make_weak[TestCell](root_cell(&root))
+    drop_weaks(&kept, 100)
+    assert(allocated_weak_impl_count(heap) == 101)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(allocated_weak_impl_count(heap) == 1)
+    assert(alive(&kept))
+    # the freed impls are handed out again
+    drop_weaks(&kept, 100)
+    assert(allocated_weak_impl_count(heap) == 101)
+    assert(gc_hash_map_size(&heap.m_weak_blocks) == 1)
+    root_release(&root)
+    destroy_test_heap(heap)
+
+## owner.weak = Weak(target), for cells known by their weaks.
+noinline func store_weak_in_cell(owner: const Weak[TestCell]*, target: const Weak[TestCell]*):
+    let owner_cell = weak_ptr(owner) else trap("dead owner")
+    weak_assign(&owner_cell.weak, weak_ptr(target))
+
+## Whether owner.weak still refers to a live cell.
+noinline func stored_weak_alive(owner: const Weak[TestCell]*) -> bool:
+    let owner_cell = weak_ptr(owner) else trap("dead owner")
+    return weak_ptr(&owner_cell.weak) != none
+
+## A blob holding a Weak to the cell of `target`.
+noinline func store_weak_in_blob(heap: Heap*, target: const Weak[TestCell]*) -> u8[]:
+    let blob = heap_allocate_blob(heap, sizeof(Weak[TestCell]), 16, false) else trap("no blob")
+    memory.write[Weak[TestCell]](blob.data, make_weak[TestCell](weak_ptr(target)))
+    return blob
+
+test "a Weak kept in a cell or a blob is traced and cleared when its cell dies":
+    clobber_stack()
+    run_weak_in_cell_and_blob()
+
+noinline func run_weak_in_cell_and_blob():
+    let heap = create_test_heap()
+    let owner = make_unreferenced_cell(heap, 1)
+    var root = root_of_weak[TestCell](&owner)
+    let target = make_unreferenced_cell(heap, 2)
+    store_weak_in_cell(&owner, &target)
+    let blob = store_weak_in_blob(heap, &target)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(not alive(&target))
+    assert(not stored_weak_alive(&owner))
+    let in_blob = memory.read[Weak[TestCell]](blob.data)
+    assert(weak_ptr(&in_blob) == none)
+    # owner's impl, target's impl, the impl in owner.weak and the one in the blob all stay
+    assert(allocated_weak_impl_count(heap) == 4)
+    root_release(&root)
+    destroy_test_heap(heap)
+
+test "weak_assign replaces the impl only for another cell":
+    clobber_stack()
+    run_weak_assign()
+
+noinline func run_weak_assign():
+    let heap = create_test_heap()
+    let first = new_test_cell(heap, 1)
+    let second = new_test_cell(heap, 2)
+    var weak = make_weak[TestCell](first)
+    let impl = weak_impl(&weak)
+    weak_assign(&weak, first)
+    assert(weak_impl(&weak) == impl)
+    weak_assign(&weak, second)
+    assert(weak_impl(&weak) != impl)
+    assert(weak_ptr(&weak) == second)
+    weak_assign(&weak, none)
+    assert(weak_impl(&weak) == none and weak_ptr(&weak) == none)
+    assert(eq_weak_u[TestCell, TestCell](weak, none))
+    weak_assign(&weak, first)
+    assert(eq_weak_u_2[TestCell, TestCell](weak, first))
+    destroy_test_heap(heap)
+
+var weak_callback_sum: i64
+
+func add_id(context: void*?, cell: TestCell*):
+    weak_callback_sum += cell.id
+
+## A weak_callback on a cell that nothing else keeps.
+noinline func make_weak_callback(heap: Heap*) -> WeakCallback[TestCell]:
+    return weak_callback[TestCell](new_test_cell(heap, 5), ak.Function1[TestCell*, unit](call = add_id, context = none))
+
+test "weak_callback runs while its object lives":
+    clobber_stack()
+    run_weak_callback()
+
+noinline func run_weak_callback():
+    let heap = create_test_heap()
+    weak_callback_sum = 0
+    let callback = make_weak_callback(heap)
+    weak_callback_call(&callback)
+    assert(weak_callback_sum == 5)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    weak_callback_call(&callback)
+    assert(weak_callback_sum == 5)
+    destroy_test_heap(heap)
+
+# mark: WeakHashSet =============================================================================
+
+## set.set(cell of `weak`), without leaving the cell's address in the caller's frame.
+noinline func weak_hash_set_add(set: WeakHashSet[TestCell]*, weak: const Weak[TestCell]*):
+    weak_hash_set_set(set, weak_ptr(weak) else trap("dead"))
+
+## Whether the set holds the cell of `weak`.
+noinline func weak_hash_set_has(set: const WeakHashSet[TestCell]*, weak: const Weak[TestCell]*) -> bool:
+    return weak_hash_set_contains(set, weak_ptr(weak) else trap("dead"))
+
+## The number of live cells the set walks.
+noinline func weak_hash_set_live_count(set: const WeakHashSet[TestCell]*) -> usize:
+    var count: usize = 0
+    for _ in weak_hash_set_begin_const(set):
+        count += 1
+    return count
+
+test "a WeakHashSet walks its live cells and forgets the dead ones":
+    clobber_stack()
+    run_weak_hash_set()
+
+noinline func run_weak_hash_set():
+    let heap = create_test_heap()
+    # The set's Weaks must live in scanned memory (its buckets are blobs of the heap).
+    let view: memory.Allocator = heap
+    with view:
+        run_weak_hash_set_in(heap)
+    destroy_test_heap(heap)
+
+noinline func run_weak_hash_set_in(heap: Heap*):
+    let kept = make_unreferenced_cell(heap, 1)
+    var root = root_of_weak[TestCell](&kept)
+    let dropped = make_unreferenced_cell(heap, 2)
+    let removed = make_unreferenced_cell(heap, 3)
+    var set: WeakHashSet[TestCell]
+    assert(weak_hash_set_is_empty(&set))
+    weak_hash_set_add(&set, &kept)
+    weak_hash_set_add(&set, &dropped)
+    weak_hash_set_add(&set, &removed)
+    weak_hash_set_add(&set, &kept)
+    assert(ak.hash_table_size(&set.m_table) == 3)
+    assert(weak_hash_set_has(&set, &removed))
+    assert(weak_hash_set_remove(&set, weak_ptr(&removed) else trap("dead")))
+    assert(not weak_hash_set_has(&set, &removed))
+    assert(weak_hash_set_live_count(&set) == 2)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    assert(alive(&kept) and not alive(&dropped))
+    assert(weak_hash_set_live_count(&set) == 1)
+    assert(not weak_hash_set_is_empty(&set))
+    weak_hash_set_clear(&set)
+    assert(weak_hash_set_is_empty(&set))
+    root_release(&root)

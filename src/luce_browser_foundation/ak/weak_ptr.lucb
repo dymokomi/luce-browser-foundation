@@ -1,26 +1,88 @@
 #==============================================================================================
 #
-#   weak_ptr - weak_callback
+#   weak_ptr - WeakPtr<T> and weak_callback
 #
 #   DESCRIPTION:
-#       Port of AK/WeakPtr.h's weak_callback (lines 178-186). WeakPtr<T> itself is gc.Weak
-#       (DESIGN.md §2.6). The donor returns a lambda capturing the weak pointer and the
-#       callback; here that capture is a WeakCallback, called with weak_callback_call.
+#       Port of AK/WeakPtr.h (lines 1-186). A WeakPtr holds the object's WeakLink, as in AK.
+#       The objects AK::WeakPtr points at are ref-counted AK objects, which live in managed
+#       blobs in the port; gc.Weak's WeakImpls track cells only (LibGC's weak blocks), so the
+#       AK pair stays AK's own. The link is scanned, so the object stays alive while a WeakPtr
+#       to it lives; revoke_weak_ptrs (the donor's ~Weakable) nulls every WeakPtr to it. The
+#       donor's weak_callback returns a lambda capturing the weak pointer and the callback;
+#       here that capture is a WeakCallback, called with weak_callback_call.
 #
 #==============================================================================================
+
+# mark: WeakPtr =================================================================================
+
+## AK::WeakPtr (AK/WeakPtr.h:15): a pointer to a Weakable object that reads as null once the
+## object revoked its weak pointers. A zero WeakPtr is null (`WeakPtr() = default`).
+pub struct WeakPtr[T]:
+    pub var m_link: WeakLink*?  # RefPtr<WeakLink>
+
+## Ported from AK/WeakPtr.h:77 AK::WeakPtr::WeakPtr(U const*): a WeakPtr to `object`, or a null
+## one.
+pub func weak_ptr_from_object[T](object: const Weakable[T]*?) -> WeakPtr[T]:
+    let weakable = object else return WeakPtr[T](m_link = none)
+    return weakable_make_weak_ptr[T, T](weakable)
+
+## Ported from AK/WeakPtr.h:137 AK::WeakPtr::strong_ref (RefPtr<T> is `T*?`).
+pub func weak_ptr_strong_ref[T](this: const WeakPtr[T]*) -> T*?:
+    return weak_ptr_ptr(this)
+
+## Ported from AK/WeakPtr.h:142 AK::WeakPtr::ptr.
+pub func weak_ptr_ptr[T](this: const WeakPtr[T]*) -> T*?:
+    return weak_ptr_unsafe_ptr(this)
+
+## Ported from AK/WeakPtr.h:146 AK::WeakPtr::unsafe_ptr.
+pub func weak_ptr_unsafe_ptr[T](this: const WeakPtr[T]*) -> T*?:
+    if let link = this.m_link:
+        return weak_link_unsafe_ptr[T](link)
+    return none
+
+## Ported from AK/WeakPtr.h:153 AK::WeakPtr::value.
+pub func weak_ptr_value[T](this: const WeakPtr[T]*) -> T*:
+    assert(weak_ptr_has_value(this))
+    return weak_ptr_unsafe_ptr(this) else trap("VERIFY: WeakPtr::value")
+
+## Ported from AK/WeakPtr.h:160 AK::WeakPtr::operator bool.
+pub func weak_ptr_to_bool[T](this: const WeakPtr[T]*) -> bool:
+    if let link = this.m_link:
+        return not weak_link_is_null(link)
+    return false
+
+## Ported from AK/WeakPtr.h:161 AK::WeakPtr::is_null.
+pub func weak_ptr_is_null[T](this: const WeakPtr[T]*) -> bool:
+    let link = this.m_link else return true
+    return weak_link_is_null(link)
+
+## Ported from AK/WeakPtr.h:162 AK::WeakPtr::has_value.
+pub func weak_ptr_has_value[T](this: const WeakPtr[T]*) -> bool:
+    return not weak_ptr_is_null(this)
+
+## Ported from AK/WeakPtr.h:164 AK::WeakPtr::clear.
+pub func weak_ptr_clear[T](this: WeakPtr[T]*):
+    this.m_link = none
+
+## Ported from AK/WeakPtr.h:166 AK::WeakPtr::take_link.
+pub func weak_ptr_take_link[T](this: WeakPtr[T]*) -> WeakLink*?:
+    let link = this.m_link
+    this.m_link = none
+    return link
+
+# mark: weak_callback ===========================================================================
 
 ## The lambda weak_callback returns: the object's WeakLink and the callback to run on the
 ## object while it is still alive.
 pub struct WeakCallback[T]:
-    pub var weak: WeakLink*
+    pub var weak: WeakPtr[T]
     pub var cb: Function1[T*, unit]
 
 ## Ported from AK/WeakPtr.h:178 AK::weak_callback.
 pub func weak_callback[T](obj: Weakable[T]*, callback: Function1[T*, unit]) -> WeakCallback[T]:
-    return WeakCallback[T](weak = weakable_ensure_link(obj), cb = callback)
+    return WeakCallback[T](weak = weakable_make_weak_ptr[T, T](obj), cb = callback)
 
 ## Calls the lambda of weak_callback: `if (weak) cb(*weak, args...)`.
 pub func weak_callback_call[T](this: const WeakCallback[T]*):
-    let object = weak_link_unsafe_ptr[T](this.weak) else return
-    let call = this.cb.call else trap("VERIFY: empty Function")
-    call(this.cb.context, object)
+    if weak_ptr_to_bool(&this.weak):
+        function1_call(&this.cb, weak_ptr_value(&this.weak))

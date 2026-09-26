@@ -1,0 +1,43 @@
+#==============================================================================================
+#
+#   nan_boxed_value - NanBoxedValue: a double whose NaN space also holds cell pointers
+#
+#   DESCRIPTION:
+#       Port of Libraries/LibGC/NanBoxedValue.h (lines 1-120). The union's bit-field view
+#       (`payload : 48`, `tag : 16`) is read as `encoded >> TAG_SHIFT`, the same bits. The
+#       constants are in types_nan_boxed_value.lucb.
+#
+#==============================================================================================
+
+## Ported from Libraries/LibGC/NanBoxedValue.h:60 GC::NanBoxedValue::is_cell.
+pub func nan_boxed_value_is_cell(this: const NanBoxedValue*) -> bool:
+    let tag = this.m_value.encoded >> tag_shift
+    return (tag & is_cell_pattern) == is_cell_pattern
+
+## Ported from Libraries/LibGC/NanBoxedValue.h:62 GC::NanBoxedValue::extract_pointer_bits.
+pub func nan_boxed_value_extract_pointer_bits(encoded: u64) -> usize:
+    if os.x86_64:
+        # For x86_64 and riscv64 the top 16 bits should be sign extending the "real" top bit (47th).
+        # So first shift the top 16 bits away then using the right shift it sign extends the top 16 bits.
+        return (usize)(((i64)(encoded << 16)) >> 16)
+    # For AArch64 the top 16 bits of the pointer should be zero.
+    return (usize)(encoded & 0xffff_ffff_ffff)
+
+## Ported from Libraries/LibGC/NanBoxedValue.h:84 GC::NanBoxedValue::extract_pointer.
+pub func nan_boxed_value_extract_pointer[TPointerType](this: const NanBoxedValue*) -> TPointerType*:
+    assert(nan_boxed_value_is_cell(this))
+    return (TPointerType*?)nan_boxed_value_extract_pointer_bits(this.m_value.encoded) else trap("a null cell in a NanBoxedValue")
+
+## Ported from Libraries/LibGC/NanBoxedValue.h:90 GC::NanBoxedValue::as_cell.
+pub func nan_boxed_value_as_cell(this: NanBoxedValue*) -> Cell*:
+    assert(nan_boxed_value_is_cell(this))
+    return nan_boxed_value_extract_pointer[Cell](this)
+
+## Ported from Libraries/LibGC/NanBoxedValue.h:96 GC::NanBoxedValue::as_cell (const).
+pub func nan_boxed_value_as_cell_const(this: const NanBoxedValue*) -> Cell*:
+    assert(nan_boxed_value_is_cell(this))
+    return nan_boxed_value_extract_pointer[Cell](this)
+
+## Ported from Libraries/LibGC/NanBoxedValue.h:102 GC::NanBoxedValue::is_nan.
+pub func nan_boxed_value_is_nan(this: const NanBoxedValue*) -> bool:
+    return this.m_value.encoded == canon_nan_bits

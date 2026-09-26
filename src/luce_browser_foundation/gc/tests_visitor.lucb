@@ -1,0 +1,169 @@
+#==============================================================================================
+#
+#   tests_visitor - Cell::Visitor's overloads, the graph visitor, the dumps
+#
+#   DESCRIPTION:
+#       A visitor that records what it is shown checks each `visit` overload over cells, nullable
+#       cells, spans, AK vectors, hash tables and hash maps, NaN-boxed values and optionals;
+#       then the GraphConstructorVisitor builds the graph dump_graph serializes, and the
+#       reports of collect_garbage and dump_allocators run.
+#
+#==============================================================================================
+
+# mark: Visitors ================================================================================
+
+## A Cell::Visitor that records every cell visit_impl receives.
+struct RecordingVisitor:
+    var visitor: CellVisitor
+    var seen: GcHashMap[i64]  # cell address -> times visited
+    var possible_bytes: usize
+
+let recording_visitor_vtable: CellVisitorVTable = CellVisitorVTable(class_info = &cell_visitor_class, visit_possible_values = recording_visitor_visit_possible_values_impl, visit_impl_cell = recording_visitor_visit_impl_cell_impl, visit_impl_span_nan_boxed_value = recording_visitor_visit_impl_span_nan_boxed_value_impl)
+
+func recording_visitor_visit_impl_cell_impl(base: CellVisitor*, cell: Cell*):
+    let this = (RecordingVisitor*)base
+    if let count = gc_hash_map_get(&this.seen, (usize)cell):
+        *count += 1
+    else:
+        gc_hash_map_set(&this.seen, (usize)cell, 1)
+
+func recording_visitor_visit_impl_span_nan_boxed_value_impl(base: CellVisitor*, values: const NanBoxedValue[]):
+    for value in values:
+        cell_visitor_visit_nan_boxed_value(base, value)
+
+func recording_visitor_visit_possible_values_impl(base: CellVisitor*, bytes: const u8[]):
+    let this = (RecordingVisitor*)base
+    this.possible_bytes += bytes.length
+
+## How often `cell` was visited.
+func times_seen(visitor: const RecordingVisitor*, cell: const TestCell*) -> i64:
+    let count = gc_hash_map_get(&visitor.seen, (usize)cell) else return 0
+    return *count
+
+test "the visit overloads reach every cell of every shape":
+    let heap = create_test_heap()
+    var cells: (TestCell*)[4] = [new_test_cell(heap, 1), new_test_cell(heap, 2), new_test_cell(heap, 3), new_test_cell(heap, 4)]
+    var recorder = RecordingVisitor(visitor = CellVisitor(vtable = &recording_visitor_vtable, class_id = 0), seen = GcHashMap[i64](), possible_bytes = 0)
+    let visitor = &recorder.visitor
+
+    cell_visitor_visit_cell(visitor, cells[0].cell())
+    cell_visitor_visit_cell(visitor, none)
+    cell_visitor_visit_cell_2(visitor, cells[0].cell())
+    cell_visitor_visit_cell_3(visitor, cells[0].cell())
+    cell_visitor_visit_cell_4(visitor, cells[0].cell())
+    cell_visitor_visit_t[TestCell](visitor, cells[0])
+    cell_visitor_visit_t[TestCell](visitor, none)
+    cell_visitor_visit_t_2(visitor, cells[0])
+    cell_visitor_visit_opaque_4[TestCell](visitor, cells[0])
+    assert(times_seen(&recorder, cells[0]) == 7)
+
+    cell_visitor_visit_opaque[TestCell](visitor, cells)
+    var nullable: (TestCell*?)[3] = [cells[1], none, cells[1]]
+    cell_visitor_visit_span[TestCell](visitor, nullable)
+    assert(times_seen(&recorder, cells[1]) == 3)
+
+    let vector = ak.Vector[TestCell*](m_size = 2, m_capacity = 4, m_outline_buffer = &cells[2])
+    cell_visitor_visit_vector(visitor, &vector)
+    let nullable_vector = ak.Vector[TestCell*?](m_size = 3, m_capacity = 3, m_outline_buffer = &nullable[0])
+    cell_visitor_visit_vector_nullable(visitor, &nullable_vector)
+    assert(times_seen(&recorder, cells[2]) == 2 and times_seen(&recorder, cells[3]) == 2)
+    assert(times_seen(&recorder, cells[1]) == 5)
+
+    # AK's HashTable: every value in the table is visited once per visit.
+    var table: ak.HashTable[TestCell*, ak.PtrTraits[TestCell]]
+    discard(ak.hash_table_set(&table, cells[3]))
+    cell_visitor_visit_hash_table(visitor, &table)
+    assert(times_seen(&recorder, cells[3]) == 3)
+    assert(times_seen(&recorder, cells[0]) == 8)
+    var ordered: ak.OrderedHashTable[TestCell*, ak.PtrTraits[TestCell]]
+    discard(ak.ordered_hash_table_set(&ordered, cells[3]))
+    cell_visitor_visit_opaque_2(visitor, &ordered)
+    assert(times_seen(&recorder, cells[3]) == 4)
+
+    var map: ak.HashMap[TestCell*, TestCell*, ak.PtrTraits[TestCell]]
+    discard(ak.hash_map_set(&map, cells[1], cells[2]))
+    cell_visitor_visit_hash_map(visitor, &map)
+    assert(times_seen(&recorder, cells[2]) == 3 and times_seen(&recorder, cells[1]) == 5)
+    cell_visitor_visit_hash_map_keys(visitor, &map)
+    assert(times_seen(&recorder, cells[1]) == 6)
+    cell_visitor_visit_hash_map_keys_and_values(visitor, &map)
+    assert(times_seen(&recorder, cells[1]) == 7 and times_seen(&recorder, cells[2]) == 4)
+    assert(times_seen(&recorder, cells[0]) == 8)
+
+    var boxed: NanBoxedValue[3]
+    boxed[0].m_value.encoded = (u64)(usize)cells[0] | shifted_is_cell_pattern
+    boxed[1].m_value.encoded = canon_nan_bits
+    boxed[2].m_value.encoded = 0x4000000000000000
+    cell_visitor_visit_nan_boxed_value(visitor, boxed[0])
+    cell_visitor_visit_nan_boxed_value(visitor, boxed[1])
+    cell_visitor_visit_span_nan_boxed_value(visitor, boxed)
+    let boxed_vector = ak.Vector[NanBoxedValue](m_size = 3, m_capacity = 3, m_outline_buffer = &boxed[0])
+    cell_visitor_visit_vector_nan_boxed_value(visitor, &boxed_vector)
+    assert(times_seen(&recorder, cells[0]) == 11)
+
+    cell_visitor_ignore(visitor, cells[0])
+    cell_visitor_visit_possible_values(visitor, u8[]((u8*)cells[0], 16))
+    assert(recorder.possible_bytes == 16)
+    gc_hash_map_clear(&recorder.seen)
+    destroy_test_heap(heap)
+
+test "the graph visitor follows the edges from the roots":
+    let heap = create_test_heap()
+    var root = root_create[TestCell](new_test_cell(heap, 1))
+    let first = root_cell(&root) else trap("no cell")
+    first.left = new_test_cell(heap, 2)
+    first.right = new_test_cell(heap, 3)
+    (first.left else trap("no left")).left = first  # a cycle
+    var roots: GcHashMap[HeapRoot]
+    gc_hash_map_set(&roots, (usize)first, HeapRoot(type_ = HeapRootType.root))
+    var visitor: GraphConstructorVisitor = ---
+    memory.set(u8[]((u8*)&visitor, sizeof(GraphConstructorVisitor)), 0)
+    graph_constructor_visitor_construct(&visitor, heap, &roots)
+    graph_constructor_visitor_visit_all_cells(&visitor)
+    assert(gc_hash_map_size(&visitor.m_graph) == 3)
+    let node = gc_hash_map_get(&visitor.m_graph, (usize)first) else trap("no node")
+    assert(gc_hash_map_size(&node.edges) == 2)
+    assert(ak.string_view_text(node.class_name) == "TestCell")
+    let root_origin = node.root_origin else trap("no origin")
+    assert(root_origin.type_ == HeapRootType.root)
+    let left = gc_hash_map_get(&visitor.m_graph, (usize)(first.left else trap("no left"))) else trap("no node")
+    assert(gc_hash_map_contains(&left.edges, (usize)first))
+    assert(left.root_origin == none)
+    graph_constructor_visitor_destroy(&visitor)
+    gc_hash_map_clear(&roots)
+    root_release(&root)
+    destroy_test_heap(heap)
+
+test "dump_graph serializes the graph as JSON":
+    let heap = create_test_heap()
+    var root = root_create[TestCell](new_test_cell(heap, 1))
+    let first = root_cell(&root) else trap("no cell")
+    first.left = new_test_cell(heap, 2)
+    var graph = heap_dump_graph(heap)
+    let key = ak.byte_string_number_u64((u64)(usize)first)
+    let node = ak.json_object_get_object(&graph, ak.byte_string_view(&key)) else trap("no node for the root cell")
+    let class_name = ak.json_object_get_string(node, ak.sv("class_name")) else trap("no class_name")
+    assert(ak.string_view_text(ak.string_bytes_as_string_view(&class_name)) == "TestCell")
+    let edges = ak.json_object_get_array(node, ak.sv("edges")) else trap("no edges")
+    assert(ak.json_array_size(edges) == 1)
+    let serialized = ak.json_object_serialized(&graph)
+    let text = ak.string_bytes_as_string_view(&serialized)
+    assert(ak.string_view_contains_string_view(&text, ak.sv("\"class_name\":\"TestCell\"")))
+    root_release(&root)
+    destroy_test_heap(heap)
+
+# mark: Reports =================================================================================
+
+test "the collection report and the allocator dump run":
+    let heap = create_test_heap()
+    var root = root_create[TestCell](new_test_cell(heap, 1))
+    make_garbage(heap, 300)
+    discard(heap_allocate_blob(heap, 100, 16, false))
+    discard(heap_allocate_blob(heap, 50000, 16, true))
+    let view: memory.Allocator = heap
+    with view:
+        # the reports allocate nothing: printing them while the heap is current is fine
+        heap_collect_garbage(heap, HeapCollectionType.collect_garbage, true)
+        heap_dump_allocators(heap)
+    root_release(&root)
+    destroy_test_heap(heap)

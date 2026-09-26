@@ -25,3 +25,11 @@ pub var weak_impl_the_null_weak_impl: WeakImpl
 pub enum WeakImplState as i32:
     allocated = 0
     freelist = 1
+
+# mark: WeakCallback ============================================================================
+
+## The lambda GC::weak_callback returns (Libraries/LibGC/Weak.h:154): a Weak to the object and the
+## callback it runs while the object lives.
+pub struct WeakCallback[T]:
+    pub var weak: Weak[T]
+    pub var cb: ak.Function1[T*, unit]

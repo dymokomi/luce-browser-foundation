@@ -20,9 +20,9 @@ pub struct EnumeratorCursor[T, TContainer: IndexedContainer[T]]: luce.Iterable[E
     pub var index: usize
     pub var container: TContainer*
 
-    func iterator() -> EnumeratorCursor[T, TContainer]: return self
+    pub func iterator() -> EnumeratorCursor[T, TContainer]: return self
 
-    mutating func next() -> EnumeratorItem[T]?: return enumerator_cursor_next(&self)
+    pub mutating func next() -> EnumeratorItem[T]?: return enumerator_cursor_next(&self)
 
 ## Enumerator::Iterator::operator* and operator++: the current pair, and the cursor advanced;
 ## none past the end.

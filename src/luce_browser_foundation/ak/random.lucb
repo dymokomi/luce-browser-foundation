@@ -4,7 +4,8 @@
 #
 #   DESCRIPTION:
 #       Port of AK/Random.h (lines 1-68) and AK/Random.cpp (lines 1-176). csprng takes the
-#       arc4random_buf branch, which covers macOS and glibc 2.36 and later.
+#       arc4random_buf branch, which covers macOS and glibc 2.36 and later, and the Windows
+#       branch through the os module's random_bytes.
 #
 #==============================================================================================
 
@@ -14,9 +15,13 @@ extern func arc4random_buf(buf: void*, nbytes: usize)
 # We shouldn't use OpenSSL's RAND_bytes function here, because we want to avoid adding dependencies to AK.
 # Therefore, we will use the best platform-specific CSPRNG.
 pub func csprng(buf: void*?, size: usize) -> !:
+    let pointer = buf else return
+    if os.windows:
+        # Documented to always return TRUE (ProcessPrng, reached through the os module)
+        try os.random_bytes(u8[]((u8*)pointer, size))
+        return
     # This target also covers MacOS and iOS and they both seem to support arc4random_buf
-    if let pointer = buf:
-        arc4random_buf(pointer, size)
+    arc4random_buf(pointer, size)
 
 ## Ported from AK/Random.cpp:56 AK::fill_with_random.
 pub func fill_with_random(bytes: u8[]):

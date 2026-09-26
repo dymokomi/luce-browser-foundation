@@ -18,6 +18,7 @@
 
 ## Ported from AK/JsonArray.h:25 AK::JsonArray::JsonArray(size_t): `initial_size` nulls.
 pub func json_array_construct(this: JsonArray*, initial_size: usize):
+    this.m_values = Vector[JsonValue2]()  # the member's default construction
     json_array_resize(this, initial_size)
 
 ## AK::JsonArray::JsonArray(JsonArray const&) (AK/JsonArray.h:30): a copy whose elements are

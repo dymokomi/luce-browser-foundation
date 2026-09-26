@@ -19,6 +19,7 @@ pub struct StringBuilder:
 
 ## The non-zero default member initializers of AK::StringBuilder; the constructor runs them first.
 pub func string_builder_init_fields(this: StringBuilder*):
+    this.m_buffer = ByteBuffer()  # the member's default construction (fixed at integration)
     # m_mode: C++ default DEFAULT_MODE (not translated by the generator)
     this.m_utf16_builder_is_ascii = true
 

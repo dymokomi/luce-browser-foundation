@@ -25,6 +25,32 @@ test "weak_ptr: basic_weak":
     assert(weak_link_strong_ref[TestWeakable](link1) == none)
     assert(simple.weakable.m_link == none)
 
+test "weak_ptr: basic_weak (WeakPtr)":
+    var simple = TestWeakable(m_member = 123)
+    var weak1 = weak_ptr_from_object[TestWeakable](&simple.weakable)
+    let weak2 = weakable_make_weak_ptr[TestWeakable, TestWeakable](&simple.weakable)
+    assert(not weak_ptr_is_null(&weak1))
+    assert(not weak_ptr_is_null(&weak2))
+    assert(weak_ptr_strong_ref(&weak1) == (TestWeakable*?)&simple)
+    assert(weak_ptr_strong_ref(&weak1) == weak_ptr_strong_ref(&weak2))
+    # ~Weakable
+    weakable_revoke_weak_ptrs(&simple.weakable)
+    assert(weak_ptr_is_null(&weak1))
+    assert(weak_ptr_strong_ref(&weak1) == none)
+    assert(weak_ptr_strong_ref(&weak1) == weak_ptr_strong_ref(&weak2))
+    weak_ptr_clear(&weak1)
+    assert(weak1.m_link == none)
+
+test "weak_ptr: weakptr_move":
+    var simple = TestWeakable(m_member = 123)
+    var weak1 = weak_ptr_from_object[TestWeakable](&simple.weakable)
+    let weak2 = WeakPtr[TestWeakable](m_link = weak_ptr_take_link(&weak1))  # move(weak1)
+    assert(weak_ptr_is_null(&weak1))
+    assert(not weak_ptr_is_null(&weak2))
+    assert(weak_ptr_strong_ref(&weak2) == (TestWeakable*?)&simple)
+    weakable_revoke_weak_ptrs(&simple.weakable)
+    assert(weak_ptr_is_null(&weak2))
+
 struct TestWeakCallbackContext:
     var was_called: bool
 

@@ -75,10 +75,11 @@ pub let cell_overrides_must_survive_garbage_collection: bool = false
 ## GC::Cell::OVERRIDES_FINALIZE (Libraries/LibGC/Cell.h:47).
 pub let cell_overrides_finalize: bool = false
 
-## GC::Cell::State (Libraries/LibGC/Cell.h:54).
-pub enum CellState as i64:
+## GC::Cell::State (Libraries/LibGC/Cell.h:54): `enum class State : bool`, so Dead is 1 (fixed by
+## hand: the generator read the bool enumerator as -1).
+pub enum CellState as u8:
     live = 0
-    dead = -1
+    dead = 1
 
 # mark: CellVisitor =============================================================================
 

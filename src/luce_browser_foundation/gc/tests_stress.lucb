@@ -1,0 +1,175 @@
+#==============================================================================================
+#
+#   tests_stress - a mutating graph of cells and blobs under many collections
+#
+#   DESCRIPTION:
+#       A root vector of slots holds cells; each cell owns a blob of bytes derived from its id
+#       and links to other cells. Random steps allocate, relink and drop cells, and every cell
+#       reachable from the slots is checked after each collection (live state, id, the bytes of
+#       its blob, its edges). The collect-on-every-allocation mode (DESIGN.md §3.4) runs the
+#       same steps with a collection before every allocation, cell and blob alike.
+#
+#==============================================================================================
+
+# mark: The stress graph ========================================================================
+
+## The slots of the stress graph: a RootVector on the C heap.
+struct StressRoots:
+    var base: RootVectorBase
+    var slots: GcVector[TestCell*?]
+
+let stress_roots_vtable: RootVectorBaseVTable = RootVectorBaseVTable(class_info = &root_vector_base_class, gather_roots = stress_roots_gather_roots_impl)
+
+func stress_roots_gather_roots_impl(this: RootVectorBase*, roots: GcHashMap[HeapRoot]*):
+    let stress_roots = (StressRoots*)this
+    for slot in gc_vector_span(&stress_roots.slots):
+        if let cell = slot:
+            gc_hash_map_set(roots, (usize)cell, HeapRoot(type_ = HeapRootType.root_vector))
+
+## The next value of a xorshift generator.
+func next_random(state: u64*) -> u64:
+    var x = *state
+    x = x ^ (x << 13)
+    x = x ^ (x >> 7)
+    x = x ^ (x << 17)
+    *state = x
+    return x
+
+## A cell with id `id` owning a blob of `size` bytes, byte i being (id + i) mod 256.
+func new_stress_cell(heap: Heap*, id: i64, size: usize, atomic: bool) -> TestCell*:
+    let cell = new_test_cell(heap, id)
+    let blob = heap_allocate_blob(heap, size, 16, atomic) else trap("no blob")
+    for i in 0..<size:
+        blob[i] = (u8)((u64)id +% (u64)i)
+    cell.buffer = blob
+    return cell
+
+## Check every cell reachable from the slots; answers how many there are.
+noinline func check_stress_graph(roots: StressRoots*) -> usize:
+    var seen: GcHashMap[u8]
+    defer gc_hash_map_clear(&seen)
+    var work: GcVector[TestCell*]
+    defer gc_vector_clear(&work)
+    for slot in gc_vector_span(&roots.slots):
+        if let cell = slot:
+            gc_vector_append(&work, cell)
+    while not gc_vector_is_empty(&work):
+        let cell = gc_vector_take_last(&work)
+        if gc_hash_map_contains(&seen, (usize)cell):
+            continue
+        gc_hash_map_set(&seen, (usize)cell, 1)
+        assert(cell_state(cell.cell()) == CellState.live)
+        assert(cell.cell_base.vtable == &test_cell_vtable)
+        assert(cell.id > 0)
+        for i in 0..<cell.buffer.length:
+            assert(cell.buffer[i] == (u8)((u64)cell.id +% (u64)i))
+        if let left = cell.left:
+            gc_vector_append(&work, left)
+        if let right = cell.right:
+            gc_vector_append(&work, right)
+    return gc_hash_map_size(&seen)
+
+## `steps` random steps over `slot_count` slots, collecting every `collect_every` steps. (The
+## reference run: 60000 steps from seed 0x9E3779B97F4A7C15 make 35720 cells, 405 reachable at the
+## end and the other 35315 finalized.)
+noinline func run_stress(heap: Heap*, seed: u64, steps: usize, slot_count: usize, collect_every: usize):
+    let roots = (new StressRoots(base = RootVectorBase(vtable = &stress_roots_vtable, class_id = 0, m_heap = none, m_list_node = ListNode()), slots = GcVector[TestCell*?]()) in memory.heap) else trap("out of memory")
+    root_vector_base_construct(&roots.base, heap)
+    for _ in 0..<slot_count:
+        gc_vector_append(&roots.slots, none)
+    var state = seed
+    var next_id: i64 = 1
+    for step in 0..<steps:
+        let r = next_random(&state)
+        let slot = (usize)(r % (u64)slot_count)
+        let other = (usize)((r >> 20) % (u64)slot_count)
+        let slots = gc_vector_span(&roots.slots)
+        match (r >> 40) % 8:
+            0, 1, 2:
+                # a new cell in a slot, its blob small, medium or large
+                let size = (usize)(16 + (r >> 44) % 200) if (r >> 50) % 16 != 0 else (usize)(4000 + (r >> 44) % 30000)
+                let cell = new_stress_cell(heap, next_id, size, (r >> 55) % 2 == 0)
+                next_id += 1
+                cell.left = slots[other]
+                slots[slot] = cell
+            3:
+                # a new cell hung under an existing one
+                if let parent = slots[slot]:
+                    let child = new_stress_cell(heap, next_id, (usize)(8 + (r >> 44) % 64), false)
+                    next_id += 1
+                    child.right = parent.right
+                    parent.right = child
+            4:
+                # relink
+                if let cell = slots[slot]:
+                    cell.left = slots[other]
+            5:
+                # drop a slot
+                slots[slot] = none
+            6:
+                # drop an edge
+                if let cell = slots[slot]:
+                    cell.right = none
+            _:
+                # garbage: cells and blobs nothing keeps
+                discard(new_stress_cell(heap, next_id, (usize)(r >> 44) % 3000, true))
+                next_id += 1
+        if collect_every != 0 and step % collect_every == collect_every - 1:
+            heap_collect_garbage(heap)
+            discard(check_stress_graph(roots))
+    heap_collect_garbage(heap)
+    let reachable = check_stress_graph(roots)
+    # everything unreachable was collected, but for the odd stale word the stack may still hold
+    let made = (usize)(next_id - 1)
+    assert(finalized_count <= made - reachable)
+    assert(finalized_count + 8 >= made - reachable)
+    root_vector_base_destroy(&roots.base)
+    gc_vector_clear(&roots.slots)
+    free(roots) in memory.heap
+
+# mark: Stress tests ============================================================================
+
+test "stress: a mutating graph of cells and blobs survives many collections":
+    let heap = create_test_heap()
+    run_stress(heap, 0x9E3779B97F4A7C15, 60000, 256, 997)
+    destroy_test_heap(heap)
+
+test "stress: collect on every allocation":
+    let heap = create_test_heap()
+    heap_set_should_collect_on_every_allocation(heap, true)
+    run_stress(heap, 12345, 1500, 32, 0)
+    heap_set_should_collect_on_every_allocation(heap, false)
+    destroy_test_heap(heap)
+
+## A list of `count` Pairs made with `new` under `with heap`, collecting on every allocation;
+## answers its head.
+noinline func build_pair_list(heap: Heap*, count: i64) -> Pair*?:
+    var head: Pair*? = none
+    let view: memory.Allocator = heap
+    with view:
+        for i in 0..<count:
+            head = new Pair(first = i, second = head) else trap("no pair")
+            if i % 10 == 0:
+                var bytes = new u8[8] else trap("no bytes")
+                let sizes: usize[4] = [16, 100, 1000, 5000]
+                for size in sizes:
+                    bytes = memory.grow(bytes, size) else trap("no growth")
+                    bytes[size - 1] = (u8)(size % 256)
+                assert(bytes[4999] == (u8)(5000 % 256))
+    return head
+
+test "stress: AK-style storage made with new and memory.grow under collections":
+    clobber_stack()
+    let heap = create_test_heap()
+    heap_set_should_collect_on_every_allocation(heap, true)
+    let head = build_pair_list(heap, 400)
+    heap_set_should_collect_on_every_allocation(heap, false)
+    heap_collect_garbage(heap)
+    var expected: i64 = 399
+    var node = head
+    while let pair = node:
+        assert(pair.first == expected)
+        expected -= 1
+        node = pair.second
+    assert(expected == -1)
+    destroy_test_heap(heap)

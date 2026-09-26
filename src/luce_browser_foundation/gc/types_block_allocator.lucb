@@ -12,6 +12,7 @@
 
 # mark: BlockAllocator ==========================================================================
 
-## GC::BlockAllocator (Libraries/LibGC/BlockAllocator.h:14).
+## GC::BlockAllocator (Libraries/LibGC/BlockAllocator.h:14). The cache of free blocks is a
+## GcVector on the C heap (fixed by hand: the collector's own data is not managed, containers.lucb).
 pub struct BlockAllocator:
-    pub var m_blocks: ak.Vector[void*?]
+    pub var m_blocks: GcVector[void*]

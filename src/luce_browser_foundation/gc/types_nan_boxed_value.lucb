@@ -10,24 +10,20 @@
 #
 #==============================================================================================
 
-## GC::CANON_NAN_BITS (Libraries/LibGC/NanBoxedValue.h:21).
-# C++ initializer: bit_cast < u64 > ( __builtin_nan ( "" ) )
-pub var canon_nan_bits: u64
+## GC::CANON_NAN_BITS (Libraries/LibGC/NanBoxedValue.h:21): bit_cast<u64>(__builtin_nan("")).
+pub let canon_nan_bits: u64 = 0x7FF8000000000000
 
-## GC::POSITIVE_INFINITY_BITS (Libraries/LibGC/NanBoxedValue.h:28).
-# C++ initializer: bit_cast < u64 > ( __builtin_huge_val ( ) )
-pub var positive_infinity_bits: u64
+## GC::POSITIVE_INFINITY_BITS (Libraries/LibGC/NanBoxedValue.h:28): bit_cast<u64>(__builtin_huge_val()).
+pub let positive_infinity_bits: u64 = 0x7FF0000000000000
 
-## GC::NEGATIVE_INFINITY_BITS (Libraries/LibGC/NanBoxedValue.h:29).
-# C++ initializer: bit_cast < u64 > ( - __builtin_huge_val ( ) )
-pub var negative_infinity_bits: u64
+## GC::NEGATIVE_INFINITY_BITS (Libraries/LibGC/NanBoxedValue.h:29): bit_cast<u64>(-__builtin_huge_val()).
+pub let negative_infinity_bits: u64 = 0xFFF0000000000000
 
 ## GC::BASE_TAG (Libraries/LibGC/NanBoxedValue.h:40).
 pub let base_tag: u64 = 0x7ff8
 
 ## GC::IS_CELL_BIT (Libraries/LibGC/NanBoxedValue.h:46).
-# C++ initializer: 0x8000 | BASE_TAG
-pub var is_cell_bit: u64
+pub let is_cell_bit: u64 = 0x8000 | base_tag
 
 ## GC::IS_CELL_PATTERN (Libraries/LibGC/NanBoxedValue.h:53).
 pub let is_cell_pattern: u64 = 0xfff8
@@ -39,8 +35,7 @@ pub let tag_shift: u64 = 48
 pub let tag_extraction: u64 = 0xffff000000000000
 
 ## GC::SHIFTED_IS_CELL_PATTERN (Libraries/LibGC/NanBoxedValue.h:56).
-# C++ initializer: IS_CELL_PATTERN << TAG_SHIFT
-pub var shifted_is_cell_pattern: u64
+pub let shifted_is_cell_pattern: u64 = is_cell_pattern << tag_shift
 
 # mark: NanBoxedValue ===========================================================================
 
@@ -50,8 +45,7 @@ pub struct NanBoxedValue:
 
 ## The non-zero default member initializers of GC::NanBoxedValue; the constructor runs them first.
 pub func nan_boxed_value_init_fields(this: NanBoxedValue*):
-    # m_value: C++ default . encoded = 0 (not translated by the generator)
-    return
+    this.m_value.encoded = 0
 
 # mark: NanBoxedValueUnion ======================================================================
 

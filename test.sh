@@ -20,7 +20,7 @@ done
 check tests/text_codec_tests
 
 # Unit tests (ported from Tests/AK, Tests/LibWeb and focused cases), module by module.
-for module in ak web_infra; do
+for module in ak gc web_infra; do
     echo "== luce-base test src/luce_browser_foundation/$module"
     luce-base test "src/luce_browser_foundation/$module"
 done
