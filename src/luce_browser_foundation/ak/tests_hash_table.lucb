@@ -9,10 +9,6 @@
 #       plain data here). Iteration orders are pinned against the donor's HashTable and
 #       HashMap (a C++ program over the reference build's AK, run while porting).
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # Traits<ByteString> for the `str` keys of these tests: string_hash of the bytes.
@@ -80,17 +76,11 @@ type OrderedIntTable = OrderedHashTable[i32, I32Traits]
 # mark: TestHashTable ===========================================================================
 
 test "hash_table: construct":
-    test_hash_table_construct()
-
-noinline func test_hash_table_construct():
     var table: IntTable
     assert(hash_table_is_empty(&table))
     assert(hash_table_size(&table) == 0)
 
 test "hash_table: basic_move and move_is_not_swap":
-    test_hash_table_basic_move_and_move_is_not_swap()
-
-noinline func test_hash_table_basic_move_and_move_is_not_swap():
     var foo: IntTable
     discard(hash_table_set(&foo, 1))
     assert(hash_table_size(&foo) == 1)
@@ -107,9 +97,6 @@ noinline func test_hash_table_basic_move_and_move_is_not_swap():
     assert(hash_table_size(&baz) == 0)
 
 test "hash_table: populate, range_loop and table_remove":
-    test_hash_table_populate_range_loop_and_table_remove()
-
-noinline func test_hash_table_populate_range_loop_and_table_remove():
     var strings: HashTable[str, TestStrTraits]
     assert(hash_table_set(&strings, "One") == HashSetResult.inserted_new_entry)
     assert(hash_table_set(&strings, "Two") == HashSetResult.inserted_new_entry)
@@ -131,9 +118,6 @@ noinline func test_hash_table_populate_range_loop_and_table_remove():
     assert(hash_table_find_t(&strings, "Two").m_bucket != none)
 
 test "hash_table: range_loop_reverse":
-    test_hash_table_range_loop_reverse()
-
-noinline func test_hash_table_range_loop_reverse():
     let strings: str[3] = ["One", "Two", "Three"]
     var table: OrderedHashTable[str, TestStrTraits]
     for s in strings:
@@ -147,9 +131,6 @@ noinline func test_hash_table_range_loop_reverse():
     assert(loop_counter == 3)
 
 test "hash_table: remove_all_matching and take_all_matching":
-    test_hash_table_remove_all_matching_and_take_all_matching()
-
-noinline func test_hash_table_remove_all_matching_and_take_all_matching():
     var ints: IntTable
     for i: i32 in 1..=4:
         discard(hash_table_set(&ints, i))
@@ -179,18 +160,12 @@ noinline func test_hash_table_remove_all_matching_and_take_all_matching():
     assert(hash_table_is_empty(&ints))
 
 test "hash_table: case_insensitive":
-    test_hash_table_case_insensitive()
-
-noinline func test_hash_table_case_insensitive():
     var casetable: HashTable[str, TestCaseInsensitiveStrTraits]
     assert(hash_table_set(&casetable, "nickserv") == HashSetResult.inserted_new_entry)
     assert(hash_table_set(&casetable, "NickServ") == HashSetResult.replaced_existing_entry)
     assert(hash_table_size(&casetable) == 1)
 
 test "hash_table: many_ints":
-    test_hash_table_many_ints()
-
-noinline func test_hash_table_many_ints():
     with memory.heap:
         var ints: IntTable
         for i: i32 in 0..<999:
@@ -201,9 +176,6 @@ noinline func test_hash_table_many_ints():
         assert(hash_table_is_empty(&ints))
 
 test "hash_table: many_collisions and space_reuse":
-    test_hash_table_many_collisions_and_space_reuse()
-
-noinline func test_hash_table_many_collisions_and_space_reuse():
     with memory.heap:
         var strings: HashTable[str, TestCollisionStrTraits]
         for text in test_number_texts:
@@ -226,9 +198,6 @@ noinline func test_hash_table_many_collisions_and_space_reuse():
         assert(hash_table_capacity(&reuse) == capacity)
 
 test "hash_table: basic_remove and basic_contains":
-    test_hash_table_basic_remove_and_basic_contains()
-
-noinline func test_hash_table_basic_remove_and_basic_contains():
     var table: IntTable
     discard(hash_table_set(&table, 1))
     discard(hash_table_set(&table, 2))
@@ -248,9 +217,6 @@ noinline func test_hash_table_basic_remove_and_basic_contains():
     assert(hash_table_size(&table) == 0)
 
 test "hash_table: capacity_leak":
-    test_hash_table_capacity_leak()
-
-noinline func test_hash_table_capacity_leak():
     with memory.heap:
         var table: IntTable
         for i: i32 in 0..<10000:
@@ -259,9 +225,6 @@ noinline func test_hash_table_capacity_leak():
         assert(hash_table_capacity(&table) < 100)
 
 test "hash_table: floats and doubles":
-    test_hash_table_floats_and_doubles()
-
-noinline func test_hash_table_floats_and_doubles():
     var floats: HashTable[f32, F32Traits]
     discard(hash_table_set(&floats, 0.0))
     discard(hash_table_set(&floats, 1.0))
@@ -277,9 +240,6 @@ noinline func test_hash_table_floats_and_doubles():
     assert(hash_table_contains_t(&doubles, 1.0))
 
 test "hash_table: reinsertion and clear_with_capacity":
-    test_hash_table_reinsertion_and_clear_with_capacity()
-
-noinline func test_hash_table_reinsertion_and_clear_with_capacity():
     var map: OrderedHashTable[str, TestStrTraits]
     discard(ordered_hash_table_set(&map, "ytidb::LAST_RESULT_ENTRY_KEY"))
     discard(ordered_hash_table_set(&map, "__sak"))
@@ -296,9 +256,6 @@ noinline func test_hash_table_reinsertion_and_clear_with_capacity():
     assert(not hash_table_contains_t(&ints, 1))
 
 test "hash_table: iterator_removal":
-    test_hash_table_iterator_removal()
-
-noinline func test_hash_table_iterator_removal():
     var map: IntTable
     discard(hash_table_set(&map, 0))
     discard(hash_table_set(&map, 1))
@@ -325,9 +282,6 @@ func test_expect_ordered(table: OrderedIntTable*, values: const i32[]):
     assert(index == 0)
 
 test "hash_table: ordered_insertion_and_deletion":
-    test_hash_table_ordered_insertion_and_deletion()
-
-noinline func test_hash_table_ordered_insertion_and_deletion():
     var table: OrderedIntTable
     for i: i32 in 0..<4:
         assert(ordered_hash_table_set(&table, i) == HashSetResult.inserted_new_entry)
@@ -342,9 +296,6 @@ noinline func test_hash_table_ordered_insertion_and_deletion():
     test_expect_ordered(&table, rest)
 
 test "hash_table: ordered_deletion_and_reinsertion":
-    test_hash_table_ordered_deletion_and_reinsertion()
-
-noinline func test_hash_table_ordered_deletion_and_reinsertion():
     var table: OrderedIntTable
     discard(ordered_hash_table_set(&table, 1))
     discard(ordered_hash_table_set(&table, 3))
@@ -358,9 +309,6 @@ noinline func test_hash_table_ordered_deletion_and_reinsertion():
     test_expect_ordered(&table, expected)
 
 test "hash_table: ordered take_last, iterator_removal, remove_from_head":
-    test_hash_table_ordered_take_last_iterator_removal_remove_from_head()
-
-noinline func test_hash_table_ordered_take_last_iterator_removal_remove_from_head():
     var table: OrderedIntTable
     discard(ordered_hash_table_set(&table, 1))
     discard(ordered_hash_table_set(&table, 2))
@@ -386,9 +334,6 @@ noinline func test_hash_table_ordered_take_last_iterator_removal_remove_from_hea
     assert(ordered_hash_table_size(&map) == 0)
 
 test "hash_table: ordered_infinite_loop_clang_regression":
-    test_hash_table_ordered_infinite_loop_clang_regression()
-
-noinline func test_hash_table_ordered_infinite_loop_clang_regression():
     var map: OrderedHashTable[str, TestStrTraits]
     let keys: str[7] = ["", "1", "_cb", "2", "3", "_cb_svref", "_cb_svref_expires"]
     for key in keys:
@@ -405,9 +350,6 @@ noinline func test_hash_table_ordered_infinite_loop_clang_regression():
     assert(iterations == 6)
 
 test "hash_table: values":
-    test_hash_table_values()
-
-noinline func test_hash_table_values():
     var table: OrderedIntTable
     discard(ordered_hash_table_set(&table, 10))
     discard(ordered_hash_table_set(&table, 30))
@@ -419,9 +361,6 @@ noinline func test_hash_table_values():
     assert(*vector_at_const(&values, 2) == 20)
 
 test "hash_table: iteration order matches the donor":
-    test_hash_table_iteration_order_matches_the_donor()
-
-noinline func test_hash_table_iteration_order_matches_the_donor():
     with memory.heap:
         var t: IntTable
         for i: i32 in 0..<40:
@@ -448,9 +387,6 @@ noinline func test_hash_table_iteration_order_matches_the_donor():
         assert(index == 30)
 
 test "hash_table: clone":
-    test_hash_table_clone()
-
-noinline func test_hash_table_clone():
     var table: IntTable
     discard(hash_table_set(&table, 5))
     discard(hash_table_set(&table, 6))

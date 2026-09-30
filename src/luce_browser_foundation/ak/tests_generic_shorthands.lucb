@@ -8,18 +8,11 @@
 #       calls, so each is checked once. The values after the first are an array; an empty
 #       pack is an empty span.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # mark: TestGenericShorthands.cpp ===============================================================
 
 test "first_is_one_of":
-    test_first_is_one_of()
-
-noinline func test_first_is_one_of():
     var no_values: i64[]
     # Finds item if in list of arguments
     assert(first_is_one_of(3, [1, 2, 3, 4, 5]))
@@ -43,9 +36,6 @@ noinline func test_first_is_one_of():
     assert(not first_is_one_of(10, no_values))
 
 test "first_is_smaller_or_equal_than_one_of":
-    test_first_is_smaller_or_equal_than_one_of()
-
-noinline func test_first_is_smaller_or_equal_than_one_of():
     var no_values: i64[]
     # Finds smaller items
     assert(first_is_smaller_or_equal_than_one_of(1, [1, -2, 3, -4, 5]))
@@ -68,9 +58,6 @@ noinline func test_first_is_smaller_or_equal_than_one_of():
     assert(not first_is_smaller_or_equal_than_one_of(10, no_values))
 
 test "first_is_smaller_than_one_of":
-    test_first_is_smaller_than_one_of()
-
-noinline func test_first_is_smaller_than_one_of():
     var no_values: i64[]
     # Finds smaller items
     assert(first_is_smaller_than_one_of(1, [1, -2, 3, -4, 5]))
@@ -89,9 +76,6 @@ noinline func test_first_is_smaller_than_one_of():
     assert(not first_is_smaller_than_one_of(10, no_values))
 
 test "first_is_smaller_or_equal_than_all_of":
-    test_first_is_smaller_or_equal_than_all_of()
-
-noinline func test_first_is_smaller_or_equal_than_all_of():
     var no_values: i64[]
     # Finds smaller than all items
     assert(first_is_smaller_or_equal_than_all_of(-10, [1, -2, 3, -4, 5]))
@@ -111,9 +95,6 @@ noinline func test_first_is_smaller_or_equal_than_all_of():
     assert(not first_is_smaller_or_equal_than_all_of(10, [1, 2, 3, 4, 5]))
 
 test "first_is_smaller_than_all_of":
-    test_first_is_smaller_than_all_of()
-
-noinline func test_first_is_smaller_than_all_of():
     var no_values: i64[]
     # Finds smaller than all items
     assert(first_is_smaller_than_all_of(-10, [1, -2, 3, -4, 5]))
@@ -133,9 +114,6 @@ noinline func test_first_is_smaller_than_all_of():
     assert(not first_is_smaller_than_all_of(10, [1, 2, 3, 4, 5]))
 
 test "first_is_larger_or_equal_than_one_of":
-    test_first_is_larger_or_equal_than_one_of()
-
-noinline func test_first_is_larger_or_equal_than_one_of():
     var no_values: i64[]
     # Finds larger items
     assert(first_is_larger_or_equal_than_one_of(1, [1, -2, 3, -4, 5]))
@@ -158,9 +136,6 @@ noinline func test_first_is_larger_or_equal_than_one_of():
     assert(not first_is_larger_or_equal_than_one_of(10, no_values))
 
 test "first_is_larger_than_one_of":
-    test_first_is_larger_than_one_of()
-
-noinline func test_first_is_larger_than_one_of():
     var no_values: i64[]
     # Finds larger items
     assert(first_is_larger_than_one_of(1, [1, -2, 3, -4, 5]))
@@ -179,9 +154,6 @@ noinline func test_first_is_larger_than_one_of():
     assert(not first_is_larger_than_one_of(10, no_values))
 
 test "first_is_equal_to_all_of":
-    test_first_is_equal_to_all_of()
-
-noinline func test_first_is_equal_to_all_of():
     var no_values: i64[]
     assert(first_is_equal_to_all_of(1, no_values))
 
@@ -196,9 +168,6 @@ noinline func test_first_is_equal_to_all_of():
     assert(not first_is_equal_to_all_of(2, [2, 1]))
 
 test "first_is_larger_or_equal_than_all_of":
-    test_first_is_larger_or_equal_than_all_of()
-
-noinline func test_first_is_larger_or_equal_than_all_of():
     var no_values: i64[]
     # Finds larger than all items
     assert(first_is_larger_or_equal_than_all_of(10, [1, -2, 3, -4, 5]))
@@ -218,9 +187,6 @@ noinline func test_first_is_larger_or_equal_than_all_of():
     assert(not first_is_larger_or_equal_than_all_of(-10, [1, 2, 3, 4, 5]))
 
 test "first_is_larger_than_all_of":
-    test_first_is_larger_than_all_of()
-
-noinline func test_first_is_larger_than_all_of():
     var no_values: i64[]
     # Finds larger than all items
     assert(first_is_larger_than_all_of(10, [1, -2, 3, -4, 5]))

@@ -19,26 +19,23 @@ pub func find_if[T, TContainer: IndexedContainer[T]](first: SimpleIterator[TCont
         discard(simple_iterator_inc(&it))
     return last
 
-# The predicate of find() and find_index(): `Traits<T>::equals(entry, value)`.
-# workaround: compiler-issues/generic_function_value (the callback is a static method)
-struct FindEqualsValue[T: luce.Equatable]:
-    var value: T
-
-    static func call(context: void*?, entry: const T*) -> bool:
-        let captures = (const FindEqualsValue[T]*)(context else trap("find: no captures"))
-        return *entry == captures.value
+# The predicate of find() and find_index(): `Traits<T>::equals(entry, value)`, with the value
+# as the context.
+func find_equals_value[T: luce.Equatable](context: void*?, entry: const T*) -> bool:
+    let value = (const T*)(context else trap("find: no value"))
+    return *entry == *value
 
 ## Ported from AK/Find.h:29 AK::find.
 pub func find[T: luce.Equatable, TContainer: IndexedContainer[T]](first: SimpleIterator[TContainer, T], last: SimpleIterator[TContainer, T], value: T) -> SimpleIterator[TContainer, T]:
-    var captures = FindEqualsValue[T](value = value)
-    let equals: func(void*?, const T*) -> bool = FindEqualsValue[T].call
-    return find_if(first, last, Function1[const T*, bool](call = equals, context = &captures))
+    var needle = value
+    let equals: func(void*?, const T*) -> bool = find_equals_value
+    return find_if(first, last, Function1[const T*, bool](call = equals, context = &needle))
 
 ## Ported from AK/Find.h:35 AK::find_index.
 pub func find_index[T: luce.Equatable, TContainer: IndexedContainer[T]](first: SimpleIterator[TContainer, T], last: SimpleIterator[TContainer, T], value: T) -> usize:
-    var captures = FindEqualsValue[T](value = value)
-    let equals: func(void*?, const T*) -> bool = FindEqualsValue[T].call
-    let found = find_if(first, last, Function1[const T*, bool](call = equals, context = &captures))
+    var needle = value
+    let equals: func(void*?, const T*) -> bool = find_equals_value
+    let found = find_if(first, last, Function1[const T*, bool](call = equals, context = &needle))
     return simple_iterator_index(&found)
 
 ## Ported from AK/Find.h:43 AK::find_value: the first element matching `pred`, if any.

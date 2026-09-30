@@ -6,16 +6,9 @@
 #       The donor has no test of AK/FloatingPoint.h; these pin the bit-field values the C++
 #       struct reads for a few floats (IEEE 754 binary32 and binary64).
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 test "float_extractor_f64_fields":
-    test_float_extractor_f64_fields()
-
-noinline func test_float_extractor_f64_fields():
     let one = float_extractor_f64_from_value(1.0)
     assert(float_extractor_f64_sign(&one) == 0)
     assert(float_extractor_f64_exponent(&one) == 1023)
@@ -32,9 +25,6 @@ noinline func test_float_extractor_f64_fields():
     assert((i64)float_extractor_f64_exponent(&eight) - (i64)float_extractor_f64_exponent_bias == 3)
 
 test "float_extractor_f64_from_parts":
-    test_float_extractor_f64_from_parts()
-
-noinline func test_float_extractor_f64_from_parts():
     let minus_one = float_extractor_f64_from_parts(0, 1023, 1)
     assert(minus_one.d == -1.0)
 
@@ -51,9 +41,6 @@ noinline func test_float_extractor_f64_from_parts():
     assert(float_extractor_f64_exponent(&extractor) == 2047)
 
 test "float_extractor_f32":
-    test_float_extractor_f32()
-
-noinline func test_float_extractor_f32():
     let one_and_a_half = float_extractor_f32_from_value(1.5)
     assert(one_and_a_half.bits == 0x3fc00000)
     assert(float_extractor_f32_sign(&one_and_a_half) == 0)

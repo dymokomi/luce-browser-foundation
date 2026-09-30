@@ -8,9 +8,7 @@
 #==============================================================================================
 
 ## Ported from AK/BitCast.h:14 AK::bit_cast.
-# workaround: compiler-issues/generic_sizeof_branch
 pub func bit_cast[T, U](a: U) -> T:
-    let size = sizeof(T)
-    assert(size == sizeof(U))
+    assert(sizeof(T) == sizeof(U))
     var source = a
     return memory.read[T](&source)

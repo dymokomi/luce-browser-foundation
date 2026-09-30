@@ -17,15 +17,13 @@
 #==============================================================================================
 
 # ensure_child's default provider: `[] { return OptionalNone {}; }`.
-# workaround: compiler-issues/generic_function_value (the callback is a static method)
-struct TrieNoMetadata[M]:
-    var empty_: u8
-
-    static func call(context: void*?) -> M?:
-        discard(context)
-        return none
+func trie_no_metadata[M](context: void*?) -> M?:
+    discard(context)
+    return none
 
 # insert's per-level provider: `[&] { return invoke_provide_missing_metadata(*last_root_node, it); }`.
+# A static method of the captures: the function type `func(void*?) -> M?` does not mention V and
+# VT, and a generic function value takes its type arguments from that type only.
 struct TrieProvideMetadata[V, M, VT: Traits[V]]:
     var provide: Function2[Trie2[V, M, VT]*, usize, M?]
     var node: Trie2[V, M, VT]*
@@ -125,7 +123,7 @@ pub func trie2_ensure_child[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, value: 
 
 # ensure_child with the donor's default provider (no metadata).
 func trie2_ensure_child_default[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, value: V) -> Trie2[V, M, VT]*!:
-    let none_provider: func(void*?) -> M? = TrieNoMetadata[M].call
+    let none_provider: func(void*?) -> M? = trie_no_metadata
     return try trie2_ensure_child(this, value, Function0[M?](call = none_provider, context = none))
 
 ## Ported from AK/Trie.h:125 AK::Detail::Trie::insert(It&, It const&, MetadataType,

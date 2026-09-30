@@ -8,10 +8,6 @@
 #       Vector<int&> is Vector[i32*]. Also the cases of TestAllOf.cpp, TestAnyOf.cpp and
 #       TestFind.cpp that run over a Vector.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # Predicates used below: a capture struct and a function taking its address (DESIGN.md §2.7).
@@ -40,18 +36,12 @@ func test_vector_is_even(context: void*?, value: const i32*) -> bool:
     return *value % 2 == 0
 
 test "vector: construct":
-    test_vector_construct()
-
-noinline func test_vector_construct():
     var v: Vector[i32]
     vector_construct(&v)
     assert(vector_is_empty(&v))
     assert(vector_size(&v) == 0)
 
 test "vector: ints":
-    test_vector_ints()
-
-noinline func test_vector_ints():
     var ints: Vector[i32]
     vector_append_t(&ints, 1)
     vector_append_t(&ints, 2)
@@ -67,9 +57,6 @@ noinline func test_vector_ints():
     assert(vector_size(&ints) == 0)
 
 test "vector: strings":
-    test_vector_strings()
-
-noinline func test_vector_strings():
     var strings: Vector[str]
     vector_append_t(&strings, "ABC")
     vector_append_t(&strings, "DEF")
@@ -80,9 +67,6 @@ noinline func test_vector_strings():
     assert(loop_counter == 2)
 
 test "vector: strings_insert_ordered":
-    test_vector_strings_insert_ordered()
-
-noinline func test_vector_strings_insert_ordered():
     var strings: Vector[str]
     vector_append_t(&strings, "abc")
     vector_append_t(&strings, "def")
@@ -100,9 +84,6 @@ func test_vector_after_f_g(context: void*?, entry: const str*) -> bool:
     return "f-g".compare(*entry) < 0
 
 test "vector: prepend_vector":
-    test_vector_prepend_vector()
-
-noinline func test_vector_prepend_vector():
     var ints = test_vector_make([1, 2, 3])
     var more_ints = test_vector_make([4, 5, 6])
     vector_prepend_vector(&ints, &more_ints)
@@ -125,9 +106,6 @@ struct TestVectorObject:
     var subobject: TestVectorSubObject*?
 
 test "vector: prepend_vector_object":
-    test_vector_prepend_vector_object()
-
-noinline func test_vector_prepend_vector_object():
     var objects: Vector[TestVectorObject]
     var more_objects: Vector[TestVectorObject]
     for i: i32 in 1..=3:
@@ -146,9 +124,6 @@ noinline func test_vector_prepend_vector_object():
         assert(sub.value == expected[i])
 
 test "vector: vector_compare":
-    test_vector_vector_compare()
-
-noinline func test_vector_vector_compare():
     with memory.heap:
         var ints: Vector[i32]
         var same_ints: Vector[i32]
@@ -166,9 +141,6 @@ noinline func test_vector_vector_compare():
         assert(vector_eq(&strings, &same_strings))
 
 test "vector: grow_and_clear":
-    test_vector_grow_and_clear()
-
-noinline func test_vector_grow_and_clear():
     var strings: Vector[str]
     for i in 0..<32:
         vector_append_t(&strings, "x" if i < 31 else "31")
@@ -185,9 +157,6 @@ noinline func test_vector_grow_and_clear():
     assert(vector_capacity(&strings) >= 32)
 
 test "vector: append_and_remove_trivial":
-    test_vector_append_and_remove_trivial()
-
-noinline func test_vector_append_and_remove_trivial():
     with memory.heap:
         var ints: Vector[i32]
         for i: i32 in 0..<10000:
@@ -202,9 +171,6 @@ noinline func test_vector_append_and_remove_trivial():
         assert(vector_size(&tmp) == 0)
 
 test "vector: vector_remove":
-    test_vector_vector_remove()
-
-noinline func test_vector_vector_remove():
     var ints = test_vector_make([1, 2, 3, 4, 5])
     vector_remove(&ints, 1)
     assert(vector_size(&ints) == 4)
@@ -230,9 +196,6 @@ noinline func test_vector_vector_remove():
     assert(*vector_at(&more, 0) == 6)
 
 test "vector: remove_all_matching":
-    test_vector_remove_all_matching()
-
-noinline func test_vector_remove_all_matching():
     var ints = test_vector_make([1, 2, 3, 4])
     assert(vector_size(&ints) == 4)
     var two = TestVectorLimit(limit = 2)
@@ -248,9 +211,6 @@ noinline func test_vector_remove_all_matching():
     assert(*vector_at(&more, 1) == 2)
 
 test "vector: insert_trivial":
-    test_vector_insert_trivial()
-
-noinline func test_vector_insert_trivial():
     var ints = test_vector_make([0, 10, 20, 30, 40])
     vector_insert(&ints, 2, 15)
     let expected: i32[6] = [0, 10, 15, 20, 30, 40]
@@ -266,9 +226,6 @@ noinline func test_vector_insert_trivial():
         recover ()
 
 test "vector: resize_initializes":
-    test_vector_resize_initializes()
-
-noinline func test_vector_resize_initializes():
     var ints: Vector[TestVectorLimit]
     vector_resize(&ints, 32)
     for idx in 0..<32usize:
@@ -281,9 +238,6 @@ noinline func test_vector_resize_initializes():
     assert(vector_capacity(&ints) == 10)
 
 test "vector: should_compare_vectors":
-    test_vector_should_compare_vectors()
-
-noinline func test_vector_should_compare_vectors():
     var a: Vector[i32]
     var b: Vector[i32]
     assert(vector_eq(&a, &b))
@@ -298,9 +252,6 @@ noinline func test_vector_should_compare_vectors():
     assert(not vector_eq(&a, &b))
 
 test "vector: should_find":
-    test_vector_should_find()
-
-noinline func test_vector_should_find():
     var v = test_vector_make([1, 2, 3, 4, 0, 6, 7, 8, 0, 0])
     let begin = vector_begin(&v)
     let expected = simple_iterator_add(&begin, 4)
@@ -316,9 +267,6 @@ noinline func test_vector_should_find():
     assert(not vector_contains(&v, Function1[const i32*, bool](call = test_vector_equals, context = &other)))
 
 test "vector: contains_in_range and contains_slow":
-    test_vector_contains_in_range_and_contains_slow()
-
-noinline func test_vector_contains_in_range_and_contains_slow():
     var v = test_vector_make([1, 2, 3, 4, 5])
     assert(vector_contains_in_range[i32, I32Traits](&v, 1, 0, 4))
     assert(vector_contains_in_range[i32, I32Traits](&v, 5, 0, 4))
@@ -329,9 +277,6 @@ noinline func test_vector_contains_in_range_and_contains_slow():
     assert(not vector_contains_slow[i32, I32Traits](&v, 9))
 
 test "vector: can_store_references":
-    test_vector_can_store_references()
-
-noinline func test_vector_can_store_references():
     var my_integer: i32 = 42
     var references: Vector[i32*]
     vector_append_t(&references, &my_integer)
@@ -350,9 +295,6 @@ noinline func test_vector_can_store_references():
     assert(vector_take_first(&references) == &my_integer)
 
 test "vector: rbegin, rend and reverse loops":
-    test_vector_rbegin_rend_and_reverse_loops()
-
-noinline func test_vector_rbegin_rend_and_reverse_loops():
     var v = test_vector_make([1, 2, 3, 4, 5, 6, 7, 8, 0])
     let begin = vector_begin(&v)
     let expected = simple_iterator_add(&begin, 4)
@@ -382,9 +324,6 @@ noinline func test_vector_rbegin_rend_and_reverse_loops():
     assert(index == -1)
 
 test "vector: remove_all":
-    test_vector_remove_all()
-
-noinline func test_vector_remove_all():
     var v0 = test_vector_make([1, 2, 3, 2, 4, 2, 5])
     let indices: usize[3] = [1, 4, 6]
     vector_remove_all_t_it(&v0, indices)
@@ -404,9 +343,6 @@ noinline func test_vector_remove_all():
     assert(*vector_at(&v2, 4) == 5)
 
 test "vector: unsafe_last":
-    test_vector_unsafe_last()
-
-noinline func test_vector_unsafe_last():
     var v: Vector[i32]
     vector_append_t(&v, 1)
     vector_append_t(&v, 2)
@@ -415,9 +351,6 @@ noinline func test_vector_unsafe_last():
     assert(*vector_unsafe_last(&v) == 1)
 
 test "vector: atomic storage":
-    test_vector_atomic_storage()
-
-noinline func test_vector_atomic_storage():
     var bytes = vector_create_atomic[u8]()
     for i: u8 in 0..<200:
         vector_append_t(&bytes, i)
@@ -425,9 +358,6 @@ noinline func test_vector_atomic_storage():
     assert(*vector_at(&bytes, 199) == 199)
 
 test "all_of and any_of over a vector":
-    test_all_of_and_any_of_over_a_vector()
-
-noinline func test_all_of_and_any_of_over_a_vector():
     var v = test_vector_make([2, 4, 6])
     assert(all_of_t_container(&v, Function1[const i32*, bool](call = test_vector_is_even, context = none)))
     vector_append_t(&v, 7)
@@ -443,9 +373,6 @@ noinline func test_all_of_and_any_of_over_a_vector():
     assert(not any_of_t_container(&empty, Function1[const i32*, bool](call = test_vector_is_even, context = none)))
 
 test "vector: copy of an empty vector that has capacity":
-    test_vector_copy_of_an_empty_vector_that_has_capacity()
-
-noinline func test_vector_copy_of_an_empty_vector_that_has_capacity():
     # Vector(Vector const&) of a cleared-with-capacity vector copies no elements (found by
     # LibURL's tests at integration).
     var values: Vector[i32]

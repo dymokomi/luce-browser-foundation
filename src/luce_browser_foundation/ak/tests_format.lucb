@@ -15,10 +15,6 @@
 #       Vector<Vector<ByteString>> uses spans of StringView spans: Formatter<ByteString> is
 #       Formatter<StringView>.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # mark: Helpers =================================================================================
@@ -51,9 +47,6 @@ func text_of(view: StringView) -> str:
 # mark: Focused tests ==========================================================================
 
 test "convert_unsigned_to_string":
-    test_convert_unsigned_to_string()
-
-noinline func test_convert_unsigned_to_string():
     var buffer: u8[128]
     let zero_length = convert_unsigned_to_string(0, &buffer, 10, false, false)
     assert((str)buffer[0..<zero_length] == "0")
@@ -66,9 +59,6 @@ noinline func test_convert_unsigned_to_string():
     assert(binary_length == 85)
 
 test "integral_helpers":
-    test_integral_helpers()
-
-noinline func test_integral_helpers():
     assert(pow_integral_u64(5, 0) == 1)
     assert(pow_integral_u64(5, 3) == 125)
     # Wraps as C++'s unsigned arithmetic does: 5^30 mod 2^64.
@@ -78,9 +68,6 @@ noinline func test_integral_helpers():
     assert(log2_u8(16) == 4)
 
 test "type_erased_parameters":
-    test_type_erased_parameters()
-
-noinline func test_type_erased_parameters():
     let parameters = [arg_u64(7), arg_i64(3), arg_bool(true)]
     var params = type_erased_format_params_create(parameters)
     assert(type_erased_format_params_parameters(&params).length == 3)
@@ -94,16 +81,10 @@ noinline func test_type_erased_parameters():
 # mark: TestFormat.cpp ==========================================================================
 
 test "format_string_literals":
-    test_format_string_literals()
-
-noinline func test_format_string_literals():
     assert(formatted("prefix-{}-suffix", [lit("abc")]) == "prefix-abc-suffix")
     assert(formatted("{}{}{}", [lit("a"), lit("b"), lit("c")]) == "abc")
 
 test "format_integers":
-    test_format_integers()
-
-noinline func test_format_integers():
     assert(formatted("{}", [arg_u64(42)]) == "42")
     assert(formatted("{:4}", [arg_u64(42)]) == "  42")
     assert(formatted("{:08}", [arg_u64(42)]) == "00000042")
@@ -128,9 +109,6 @@ noinline func test_format_integers():
     assert(formatted("{:'b}", [arg_u64(~(u64)0)]) == "1,111,111,111,111,111,111,111,111,111,111,111,111,111,111,111,111,111,111,111,111,111")
 
 test "reorder_format_arguments":
-    test_reorder_format_arguments()
-
-noinline func test_reorder_format_arguments():
     assert(formatted("{1}{0}", [lit("a"), lit("b")]) == "ba")
     assert(formatted("{0}{1}", [lit("a"), lit("b")]) == "ab")
     # Compiletime check bypass: ignoring a passed argument.
@@ -139,22 +117,13 @@ noinline func test_reorder_format_arguments():
     assert(formatted("{1}{}{0}", [lit("a"), lit("b"), lit("c")]) == "baa")
 
 test "escape_braces":
-    test_escape_braces()
-
-noinline func test_escape_braces():
     assert(formatted("{{{}", [lit("foo")]) == "{foo")
     assert(formatted("{}}}", [lit("bar")]) == "bar}")
 
 test "everything":
-    test_everything()
-
-noinline func test_everything():
     assert(formatted("{{{:04}/{}/{0:8}/{1}", [arg_u64(42), lit("foo")]) == "{0042/foo/      42/foo")
 
 test "string_builder":
-    test_string_builder()
-
-noinline func test_string_builder():
     var builder: StringBuilder
     string_builder_construct(&builder)
     vformat_arguments(&builder, sv(" {}  "), [arg_i64(42)]) else trap("MUST")
@@ -163,15 +132,9 @@ noinline func test_string_builder():
     assert(text_of(string_builder_string_view(&builder)) == " 42  21 ")
 
 test "format_without_arguments":
-    test_format_without_arguments()
-
-noinline func test_format_without_arguments():
     assert(formatted("foo", no_arguments()) == "foo")
 
 test "format_upper_case_integer":
-    test_format_upper_case_integer()
-
-noinline func test_format_upper_case_integer():
     assert(formatted("{:4X}", [arg_i64(0xff)]) == "  FF")
     assert(formatted("{:#4X}", [arg_i64(0xff)]) == "0XFF")
 
@@ -180,9 +143,6 @@ noinline func test_format_upper_case_integer():
     assert(formatted("{:#b}", [arg_i64(0xff)]) == "0b11111111")
 
 test "format_aligned":
-    test_format_aligned()
-
-noinline func test_format_aligned():
     assert(formatted("{:*<8}", [arg_i64(13)]) == "13******")
     assert(formatted("{:*^8}", [arg_i64(13)]) == "***13***")
     assert(formatted("{:*>8}", [arg_i64(13)]) == "******13")
@@ -190,18 +150,12 @@ noinline func test_format_aligned():
     assert(formatted("{:*^ 8}", [arg_i64(13)]) == "** 13***")
 
 test "format_octal":
-    test_format_octal()
-
-noinline func test_format_octal():
     assert(formatted("{:o}", [arg_i64(0o744)]) == "744")
     assert(formatted("{:#o}", [arg_i64(0o744)]) == "0744")
     assert(formatted("{:'o}", [arg_i64(0o54321)]) == "54,321")
     assert(formatted("{:'o}", [arg_i64(0o567012340)]) == "567,012,340")
 
 test "zero_pad":
-    test_zero_pad()
-
-noinline func test_zero_pad():
     assert(formatted("{: <010}", [arg_i64(42)]) == "42        ")
     assert(formatted("{:010}", [arg_i64(42)]) == "0000000042")
     assert(formatted("{:/^010}", [arg_i64(42)]) == "////42////")
@@ -209,9 +163,6 @@ noinline func test_zero_pad():
     assert(formatted("{:#06x}", [arg_i64(-64)]) == "-0x000040")
 
 test "replacement_field":
-    test_replacement_field()
-
-noinline func test_replacement_field():
     assert(formatted("{:*>{1}}", [arg_i64(13), arg_u64(10)]) == "********13")
     assert(formatted("{:*<{1}}", [arg_i64(7), arg_i64(4)]) == "7***")
     # Compiletime check bypass: intentionally ignoring extra arguments
@@ -220,15 +171,9 @@ noinline func test_replacement_field():
     assert(formatted("{:0{}}", [arg_i64(1), arg_i64(3)]) == "001")
 
 test "replacement_field_regression":
-    test_replacement_field_regression()
-
-noinline func test_replacement_field_regression():
     assert(formatted("{:{}}", [lit(""), arg_u64(6)]) == "      ")
 
 test "complex_string_specifiers":
-    test_complex_string_specifiers()
-
-noinline func test_complex_string_specifiers():
     assert(formatted("{:.8}", [lit("123456789")]) == "12345678")
     assert(formatted("{:9}", [lit("abcd")]) == "abcd     ")
     assert(formatted("{:>9}", [lit("abcd")]) == "     abcd")
@@ -238,16 +183,10 @@ noinline func test_complex_string_specifiers():
     assert(formatted("{:4.6}", [lit("abcdefghi")]) == "abcdef")
 
 test "cast_integer_to_character":
-    test_cast_integer_to_character()
-
-noinline func test_cast_integer_to_character():
     assert(formatted("{:c}", [arg_i64(97)]) == "a")
     assert(formatted("{:c}", [arg_u64(102)]) == "f")
 
 test "boolean_values":
-    test_boolean_values()
-
-noinline func test_boolean_values():
     assert(formatted("{}", [arg_bool(true)]) == "true")
     assert(formatted("{}", [arg_bool(false)]) == "false")
     assert(formatted("{:6}", [arg_bool(true)]) == "true  ")
@@ -257,9 +196,6 @@ noinline func test_boolean_values():
     assert(formatted("{:#08x}", [arg_bool(true)]) == "0x00000001")
 
 test "pointers":
-    test_pointers()
-
-noinline func test_pointers():
     let ptr = (const void*?)(usize)0x4000
 
     # sizeof(void*) == 8 on every luce-base native target.
@@ -272,9 +208,6 @@ noinline func test_pointers():
 #
 # This is a bit scary, thus this test. At least this test should fail in this case.
 test "ensure_that_format_works":
-    test_ensure_that_format_works()
-
-noinline func test_ensure_that_format_works():
     if formatted("FAIL", no_arguments()) != "FAIL":
         trap("FAIL")
 
@@ -282,16 +215,10 @@ noinline func test_ensure_that_format_works():
         trap("FAIL")
 
 test "format_string_literal_as_pointer":
-    test_format_string_literal_as_pointer()
-
-noinline func test_format_string_literal_as_pointer():
     let literal = "abc"
     assert(formatted("{:p}", [lit(literal)]) == formatted("{:p}", [arg_u64((u64)(usize)literal.bytes.data)]))
 
 test "format_character":
-    test_format_character()
-
-noinline func test_format_character():
     let a: u8 = 'a'
     assert(formatted("{}", [arg_char(a)]) == "a")
 
@@ -310,9 +237,6 @@ func format_value_format_test_b(params: TypeErasedFormatParams*, builder: Format
     try formatter_string_view_format(&formatter, builder, sv("B"))
 
 test "format_if_supported":
-    test_format_if_supported()
-
-noinline func test_format_if_supported():
     let a = FormatTestA(unused = 0)
     var a_if_supported: FormatIfSupported[u8] = ---
     format_if_supported_construct(&a_if_supported, &a.unused)
@@ -327,9 +251,6 @@ extern func fread(ptr: void*, size: usize, count: usize, stream: SFile*?) -> usi
 extern func fclose(stream: SFile*?) -> i32
 
 test "file_descriptor":
-    test_file_descriptor()
-
-noinline func test_file_descriptor():
     let file = tmpfile()
 
     # outln(file, "{}", "Hello, World!");

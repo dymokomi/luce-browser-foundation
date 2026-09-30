@@ -6,10 +6,6 @@
 #       Port of Tests/AK/TestBitmap.cpp. The randomized cases run over a fixed set of
 #       seeds from testing.random().
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # MUST(Bitmap::create(size, value)).
@@ -21,17 +17,11 @@ func test_bitmap_free(bitmap: Bitmap*):
     kfree(bitmap.bitmap_view.m_data)
 
 test "bitmap: construct_empty":
-    test_bitmap_construct_empty()
-
-noinline func test_bitmap_construct_empty():
     var bitmap: Bitmap
     bitmap_init_fields(&bitmap)
     assert(bitmap_view_size(&bitmap.bitmap_view) == 0)
 
 test "bitmap: find_first_set and find_first_unset":
-    test_bitmap_find_first_set_and_find_first_unset()
-
-noinline func test_bitmap_find_first_set_and_find_first_unset():
     var bitmap = test_bitmap(128, false)
     bitmap_set(&bitmap, 69, true)
     assert((bitmap_view_find_first_set(&bitmap.bitmap_view) else trap("none")) == 69)
@@ -46,9 +36,6 @@ func test_find_anywhere(bitmap: const Bitmap*, set: bool, hint: usize) -> usize:
     return bitmap_view_find_one_anywhere_unset(&bitmap.bitmap_view, hint) else trap("none")
 
 test "bitmap: find_one_anywhere_set and find_one_anywhere_unset":
-    test_bitmap_find_one_anywhere_set_and_find_one_anywhere_unset()
-
-noinline func test_bitmap_find_one_anywhere_set_and_find_one_anywhere_unset():
     for set in [true, false]:
         var bitmap = test_bitmap(168, not set)
         bitmap_set(&bitmap, 34, set)
@@ -79,9 +66,6 @@ noinline func test_bitmap_find_one_anywhere_set_and_find_one_anywhere_unset():
         assert(got == 12 or got == 24)
 
 test "bitmap: find_first_range":
-    test_bitmap_find_first_range()
-
-noinline func test_bitmap_find_first_range():
     var bitmap = test_bitmap(128, true)
     for i in 47..<52usize:
         bitmap_set(&bitmap, i, false)
@@ -92,9 +76,6 @@ noinline func test_bitmap_find_first_range():
     assert((result else 0) == 47)
 
 test "bitmap: set_range":
-    test_bitmap_set_range()
-
-noinline func test_bitmap_set_range():
     var bitmap = test_bitmap(128, false)
     bitmap_set_range(&bitmap, 41, 10, true)
     assert(not bitmap_view_get(&bitmap.bitmap_view, 40))
@@ -113,9 +94,6 @@ noinline func test_bitmap_set_range():
     assert(bitmap_view_count_slow(&big.bitmap_view, true) == 32 + 39 + 71 - 7)
 
 test "bitmap: find_first_fit":
-    test_bitmap_find_first_fit()
-
-noinline func test_bitmap_find_first_fit():
     var full = test_bitmap(32, true)
     assert(bitmap_view_find_first_fit(&full.bitmap_view, 1) == none)
     bitmap_set(&full, 31, false)
@@ -144,9 +122,6 @@ noinline func test_bitmap_find_first_fit():
             test_bitmap_free(&bitmap)
 
 test "bitmap: find_longest_range_of_unset_bits_edge":
-    test_bitmap_find_longest_range_of_unset_bits_edge()
-
-noinline func test_bitmap_find_longest_range_of_unset_bits_edge():
     var bitmap = test_bitmap(36, true)
     bitmap_set_range(&bitmap, 32, 4, false)
     var found_range_size: usize = 0
@@ -162,9 +137,6 @@ func test_count_bits_slow(b: const Bitmap*, start: usize, len: usize, value: boo
     return count
 
 test "bitmap: count_in_range":
-    test_bitmap_count_in_range()
-
-noinline func test_bitmap_count_in_range():
     var bitmap = test_bitmap(256, false)
     bitmap_set(&bitmap, 14, true)
     bitmap_set(&bitmap, 17, true)
@@ -186,9 +158,6 @@ noinline func test_bitmap_count_in_range():
                 assert(bitmap_view_count_in_range(&bitmap.bitmap_view, start, i - start, value) == test_count_bits_slow(&bitmap, start, i - start, value))
 
 test "bitmap: byte_aligned_access":
-    test_bitmap_byte_aligned_access()
-
-noinline func test_bitmap_byte_aligned_access():
     var a = test_bitmap(16, true)
     assert(bitmap_view_count_in_range(&a.bitmap_view, 0, 16, true) == 16)
     assert(bitmap_view_count_in_range(&a.bitmap_view, 8, 8, true) == 8)
@@ -209,9 +178,6 @@ noinline func test_bitmap_byte_aligned_access():
     assert(bitmap_view_count_in_range(&c.bitmap_view, 4, 4, true) == 1)
 
 test "bitmap: randomized set_get and set_range":
-    test_bitmap_randomized_set_get_and_set_range()
-
-noinline func test_bitmap_randomized_set_get_and_set_range():
     for round in 0..<200:
         discard(round)
         let init = (testing.random() & 1) == 1
@@ -231,9 +197,6 @@ noinline func test_bitmap_randomized_set_get_and_set_range():
         test_bitmap_free(&bitmap)
 
 test "bitmap: grow, eq and verify-all-bits-flip":
-    test_bitmap_grow_eq_and_verify_all_bits_flip()
-
-noinline func test_bitmap_grow_eq_and_verify_all_bits_flip():
     var bitmap = test_bitmap(10, true)
     bitmap_grow(&bitmap, 30, false)
     assert(bitmap_view_size(&bitmap.bitmap_view) == 30)

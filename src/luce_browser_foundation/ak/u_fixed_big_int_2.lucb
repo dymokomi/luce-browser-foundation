@@ -47,10 +47,8 @@ func fbi_words[TStorage](this: const UFixedBigInt[TStorage]*) -> u64[]:
 # BigIntBase.h:170 get_storage_of for a UFixedInt value: its words, least significant first. A
 # builtin integer narrower than a word is widened into `small`.
 func storage_of[T](value: const T*, small: u64*) -> u64[]:
-    # workaround: compiler-issues/generic_sizeof_branch (bind sizeof(T) before testing it)
-    let size = sizeof(T)
-    if size % 8 == 0:
-        return u64[]((u64*)value, size // 8)
+    if sizeof(T) % 8 == 0:
+        return u64[]((u64*)value, sizeof(T) // 8)
     else:
         *small = 0
         memory.copy(u8[]((u8*)small, sizeof(T)), u8[]((u8*)value, sizeof(T)), sizeof(T))
@@ -99,10 +97,7 @@ pub func u_fixed_big_int_to_t[TStorage, T](this: const UFixedBigInt[TStorage]*) 
     var result: T = ---
     let bytes = u8[]((u8*)&result, sizeof(T))
     memory.set(bytes, 0)
-    # workaround: compiler-issues/generic_sizeof_branch
-    let size = sizeof(T)
-    let storage_size = sizeof(TStorage)
-    let count = size if size < storage_size else storage_size
+    let count = sizeof(T) if sizeof(T) < sizeof(TStorage) else sizeof(TStorage)
     memory.copy(bytes[0..<count], u8[]((u8*)&this.m_data, count), count)
     return result
 

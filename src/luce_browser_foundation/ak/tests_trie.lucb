@@ -7,10 +7,6 @@
 #       by formatting the parent's metadata with the next character) is the length of the
 #       prefix a node spells; the word itself is compared through that length.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 type TestDictionary = Trie2[u8, usize, U8Traits]
@@ -31,9 +27,6 @@ func test_trie_count(context: void*?, node: const TestDictionary*) -> IterationD
     return IterationDecision.continue_
 
 test "trie: normal_behavior":
-    test_trie_normal_behavior()
-
-noinline func test_trie_normal_behavior():
     var dictionary: Trie[u8, usize, U8Traits]
     trie_construct_opaque(&dictionary, '/', 0)
     let data: str[4] = ["test", "example", "foo", "foobar"]
@@ -75,9 +68,6 @@ func test_trie_walk(context: void*?, node: const Trie2[i32, i32, I32Traits]*) ->
     return IterationDecision.continue_
 
 test "trie: iterate":
-    test_trie_iterate()
-
-noinline func test_trie_iterate():
     var bunch_of_numbers: Trie[i32, i32, I32Traits]
     trie_construct(&bunch_of_numbers, 0)
     var input: i32[64]

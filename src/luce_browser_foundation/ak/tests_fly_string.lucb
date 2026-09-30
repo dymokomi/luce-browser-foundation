@@ -12,10 +12,6 @@
 #       The tests intern under the per-test allocator: interned strings and the table live in
 #       `memory.heap` whatever allocator is current (see fly_string.lucb).
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 ## `FlyString { "text"_string }`.
@@ -27,9 +23,6 @@ func tc_fly_is(fly: const FlyString*, text: str) -> bool:
     return fly_string_eq_string_view(fly, sv(text))
 
 test "empty_string":
-    test_empty_string()
-
-noinline func test_empty_string():
     let fly = fly_string_new()
     assert(fly_string_is_empty(&fly))
     assert(tc_fly_is(&fly, ""))
@@ -40,9 +33,6 @@ noinline func test_empty_string():
     assert(fly_string_number_of_fly_strings() == before)
 
 test "short_ascii_literal_is_constexpr":
-    test_short_ascii_literal_is_constexpr()
-
-noinline func test_short_ascii_literal_is_constexpr():
     # The _fly_string UDL folds short ASCII literals to a constant.
     let fly = fly_string_from_str("foo")
     assert(tc_fly_is(&fly, "foo"))
@@ -50,9 +40,6 @@ noinline func test_short_ascii_literal_is_constexpr():
     assert(string_view_length(&view) == 3)
 
 test "short_string":
-    test_short_string()
-
-noinline func test_short_string():
     var before: usize = 0
     before = fly_string_number_of_fly_strings()
 
@@ -80,9 +67,6 @@ noinline func test_short_string():
     assert(fly_string_number_of_fly_strings() == before)
 
 test "long_string":
-    test_long_string()
-
-noinline func test_long_string():
     let before = fly_string_number_of_fly_strings()
 
     let fly1 = tc_fly("long_string: thisisdefinitelymorethan7bytes")
@@ -109,9 +93,6 @@ noinline func test_long_string():
     assert(not string_base_is_short_string(&string3.string_base))
 
 test "from_string_view":
-    test_from_string_view()
-
-noinline func test_from_string_view():
     let before = fly_string_number_of_fly_strings()
 
     let fly1 = fly_string_from_str("from_string_view: thisisdefinitelymorethan7bytes")
@@ -131,9 +112,6 @@ noinline func test_from_string_view():
     assert(not fly_string_eq_fly_string(&fly2, &fly3))
 
 test "fly_string_keep_string_data_alive":
-    test_fly_string_keep_string_data_alive()
-
-noinline func test_fly_string_keep_string_data_alive():
     let before = fly_string_number_of_fly_strings()
     var fly = fly_string_new()
     if true:
@@ -145,9 +123,6 @@ noinline func test_fly_string_keep_string_data_alive():
     assert(fly_string_number_of_fly_strings() == before + 1)
 
 test "moved_fly_string_becomes_empty":
-    test_moved_fly_string_becomes_empty()
-
-noinline func test_moved_fly_string_becomes_empty():
     var fly1 = fly_string_new()
     assert(fly_string_is_empty(&fly1))
 
@@ -162,9 +137,6 @@ noinline func test_moved_fly_string_becomes_empty():
     assert(fly_string_number_of_fly_strings() == before + 1)
 
 test "is_one_of":
-    test_is_one_of()
-
-noinline func test_is_one_of():
     let foo = fly_string_from_utf8(sv("foo")) else trap("MUST")
     let bar = fly_string_from_utf8(sv("bar")) else trap("MUST")
 
@@ -189,14 +161,11 @@ func tc_scoped_text(buffer: u8[], n: usize) -> u8[]:
     return buffer[..<prefix.length + 2]
 
 test "interned_strings_outlive_the_allocator_that_was_current":
-    test_interned_strings_outlive_the_allocator_that_was_current()
-
-# Not in the donor's tests. The table is a module global that outlives any allocator scope,
-# such as the fixed buffer luce-base's test runner makes current for each test. Strings are
-# interned while a scoped allocator is current (enough of them that the table grows), the
-# scope ends and its memory is overwritten, and the FlyStrings, the table and later lookups
-# must be unaffected.
-noinline func test_interned_strings_outlive_the_allocator_that_was_current():
+    # Not in the donor's tests. The table is a module global that outlives any allocator scope,
+    # such as the fixed buffer luce-base's test runner makes current for each test. Strings are
+    # interned while a scoped allocator is current (enough of them that the table grows), the
+    # scope ends and its memory is overwritten, and the FlyStrings, the table and later lookups
+    # must be unaffected.
     let count: usize = 40
     var text: u8[64]
     var flys: FlyString[40]

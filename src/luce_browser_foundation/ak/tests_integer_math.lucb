@@ -7,55 +7,33 @@
 #       gcd, lcm), TestSaturatingMath.cpp, TestBitCast.cpp, TestEndian.cpp and the
 #       timing_safe_compare case of TestMemory.cpp.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # mark: TestHashFunctions =======================================================================
 
 test "hash_functions: u32_hash":
-    test_hash_functions_u32_hash()
-
-noinline func test_hash_functions_u32_hash():
     assert(u32_hash(42) == 142593372)
     assert(u32_hash(0) == 0)
 
 test "hash_functions: pair_int_hash":
-    test_hash_functions_pair_int_hash()
-
-noinline func test_hash_functions_pair_int_hash():
     assert(pair_int_hash(42, 17) == 1110885963)
     assert(pair_int_hash(0, 0) == 0)
 
 test "hash_functions: u64_hash":
-    test_hash_functions_u64_hash()
-
-noinline func test_hash_functions_u64_hash():
     assert(u64_hash(42) == 2386713036)
     assert(u64_hash(0) == 0)
 
 test "hash_functions: ptr_hash":
-    test_hash_functions_ptr_hash()
-
-noinline func test_hash_functions_ptr_hash():
     assert(ptr_hash_usize(42) == 2386713036)
     assert(ptr_hash_usize(0) == 0)
     assert(ptr_hash_void((void*?)42usize) == 2386713036)
     assert(ptr_hash_void(none) == 0)
 
 test "hash_functions: deterministic_hash":
-    test_hash_functions_deterministic_hash()
-
-noinline func test_hash_functions_deterministic_hash():
     for i: u64 in 0..<1000:
         assert(u64_hash(i) == u64_hash(i))
 
 test "string_hash: pinned values":
-    test_string_hash_pinned_values()
-
-noinline func test_string_hash_pinned_values():
     # Pinned against AK::string_hash / case_insensitive_string_hash.
     let text = "Hello, friends!"
     assert(case_insensitive_string_hash(text.bytes.data, text.length) == 2801058533)
@@ -77,9 +55,6 @@ noinline func test_string_hash_pinned_values():
 # mark: TestIntegerMath =========================================================================
 
 test "integer_math: exp2":
-    test_integer_math_exp2()
-
-noinline func test_integer_math_exp2():
     assert(exp2_u64(0) == 1)
     assert(exp2_u64(1) == 2)
     assert(exp2_i8(6) == 64)
@@ -96,9 +71,6 @@ noinline func test_integer_math_exp2():
     assert(exp2_u64(63) == 9223372036854775808)
 
 test "integer_math: log2":
-    test_integer_math_log2()
-
-noinline func test_integer_math_log2():
     assert(log2_u64(0) == 0)
     assert(log2_u64(1) == 0)
     assert(log2_i8(64) == 6)
@@ -115,9 +87,6 @@ noinline func test_integer_math_log2():
     assert(log2_u64(9223372036854775808) == 63)
 
 test "integer_math: ceil_log2":
-    test_integer_math_ceil_log2()
-
-noinline func test_integer_math_ceil_log2():
     assert(ceil_log2_u64(0) == 0)
     assert(ceil_log2_u64(1) == 0)
     assert(ceil_log2_u8(2) == 1)
@@ -150,9 +119,6 @@ noinline func test_integer_math_ceil_log2():
     assert(ceil_log2_u64(18446744073709551615) == 64)
 
 test "integer_math: gcd":
-    test_integer_math_gcd()
-
-noinline func test_integer_math_gcd():
     assert(gcd_i32(0, 0) == 0)
     assert(gcd_i32(1, 1) == 1)
     assert(gcd_i32(0, 2) == 2)
@@ -168,9 +134,6 @@ noinline func test_integer_math_gcd():
     assert(gcd_i32(-i32_max, i32_max) == i32_max)
 
 test "integer_math: lcm":
-    test_integer_math_lcm()
-
-noinline func test_integer_math_lcm():
     assert(lcm_i32(0, 0) == 0)
     assert(lcm_i32(0, 5) == 0)
     assert(lcm_i32(5, 0) == 0)
@@ -185,9 +148,6 @@ noinline func test_integer_math_lcm():
     assert(lcm_i32(1, 8) == 8)
 
 test "integer_math: reinterpret_as_octal":
-    test_integer_math_reinterpret_as_octal()
-
-noinline func test_integer_math_reinterpret_as_octal():
     assert(reinterpret_as_octal_u32(755) == 493)
     assert(reinterpret_as_octal_u64(0) == 0)
     assert(reinterpret_as_octal_usize(17) == 15)
@@ -195,9 +155,6 @@ noinline func test_integer_math_reinterpret_as_octal():
 # mark: TestSaturatingMath ======================================================================
 
 test "saturating_math: signed add":
-    test_saturating_math_signed_add()
-
-noinline func test_saturating_math_signed_add():
     assert(saturating_add_i32(0, 0) == 0)
     assert(saturating_add_i32(3, 4) == 7)
     assert(saturating_add_i32(-3, -4) == -7)
@@ -217,9 +174,6 @@ noinline func test_saturating_math_signed_add():
     assert(saturating_add_i32(0, i32_min) == i32_min)
 
 test "saturating_math: signed sub":
-    test_saturating_math_signed_sub()
-
-noinline func test_saturating_math_signed_sub():
     assert(saturating_sub_i32(7, 4) == 3)
     assert(saturating_sub_i32(4, 7) == -3)
     assert(saturating_sub_i32(-3, 4) == -7)
@@ -236,9 +190,6 @@ noinline func test_saturating_math_signed_sub():
     assert(saturating_sub_i32(i32_min, i32_max) == i32_min)
 
 test "saturating_math: unsigned add and sub":
-    test_saturating_math_unsigned_add_and_sub()
-
-noinline func test_saturating_math_unsigned_add_and_sub():
     assert(saturating_add_u32(3, 4) == 7)
     assert(saturating_add_u32(u32_max - 1, 1) == u32_max)
     assert(saturating_add_u32(u32_max, 1) == u32_max)
@@ -254,9 +205,6 @@ noinline func test_saturating_math_unsigned_add_and_sub():
     assert(saturating_sub_u32(u32_max, 0) == u32_max)
 
 test "saturating_math: mul":
-    test_saturating_math_mul()
-
-noinline func test_saturating_math_mul():
     assert(saturating_mul_i32(-3, 4) == -12)
     assert(saturating_mul_i32(-3, -4) == 12)
     assert(saturating_mul_i32(0, i32_max) == 0)
@@ -273,9 +221,6 @@ noinline func test_saturating_math_mul():
     assert(saturating_mul_u32(u32_max, u32_max) == u32_max)
 
 test "saturating_math: all sizes":
-    test_saturating_math_all_sizes()
-
-noinline func test_saturating_math_all_sizes():
     assert(saturating_add_i8(50, 30) == 80)
     assert(saturating_add_i8(100, 100) == i8_max)
     assert(saturating_add_i8(-100, -100) == i8_min)
@@ -295,9 +240,6 @@ noinline func test_saturating_math_all_sizes():
 # mark: TestBitCast, TestEndian, TestMemory =====================================================
 
 test "bit_cast: double_int_conversion":
-    test_bit_cast_double_int_conversion()
-
-noinline func test_bit_cast_double_int_conversion():
     assert(bit_cast[u64, f64](0.0) == 0)
     assert(bit_cast[f64, u64](0) == 0.0)
     assert(bit_cast[u64, f64](-0.0) == (u64)1 << 63)
@@ -305,9 +247,6 @@ noinline func test_bit_cast_double_int_conversion():
     assert(bit_cast[f64, u64](0x4172f58bc0000000) == 19880124.0)
 
 test "endian: big and little endian round trips":
-    test_endian_big_and_little_endian_round_trips()
-
-noinline func test_endian_big_and_little_endian_round_trips():
     var big: BigEndian[u32]
     assert(big_endian_to_t(&big) == 0)
     big_endian_construct(&big, 42)
@@ -324,9 +263,6 @@ noinline func test_endian_big_and_little_endian_round_trips():
     assert(bitswap(0x00f0) == 0x0f00)
 
 test "memory: timing_safe_compare":
-    test_memory_timing_safe_compare()
-
-noinline func test_memory_timing_safe_compare():
     let data_set = "abcdefghijklmnopqrstuvwxyz123456789"
     assert(timing_safe_compare(data_set.bytes.data, data_set.bytes.data, data_set.length))
     let reversed = "987654321zyxwvutsrqponmlkjihgfedcba"

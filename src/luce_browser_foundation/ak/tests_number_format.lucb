@@ -6,18 +6,11 @@
 #       Port of Tests/AK/TestNumberFormat.cpp (Ladybird 47c82b38d0), with the sizes written
 #       out (KiB, MiB, GiB of AK/Types.h) and the 8-byte size_t branch always taken.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # mark: TestNumberFormat.cpp ====================================================================
 
 test "golden_path":
-    test_golden_path()
-
-noinline func test_golden_path():
     assert(text_of_string(human_readable_size(0)) == "0 B")
     assert(text_of_string(human_readable_size(123)) == "123 B")
     assert(text_of_string(human_readable_size(125952)) == "123.0 KiB")  # 123 * KiB
@@ -25,9 +18,6 @@ noinline func test_golden_path():
     assert(text_of_string(human_readable_size(2147483648)) == "2.0 GiB")  # 2 * GiB
 
 test "border_B_KiB":
-    test_border_b_kib()
-
-noinline func test_border_b_kib():
     assert(text_of_string(human_readable_size(1000)) == "1000 B")
     assert(text_of_string(human_readable_size(1023)) == "1023 B")
     # KiB = 1024
@@ -35,9 +25,6 @@ noinline func test_border_b_kib():
     assert(text_of_string(human_readable_size(1025)) == "1.0 KiB")
 
 test "fraction_KiB":
-    test_fraction_kib()
-
-noinline func test_fraction_kib():
     assert(text_of_string(human_readable_size(1050)) == "1.0 KiB")
     assert(text_of_string(human_readable_size(1075)) == "1.0 KiB")
     # 1024 * 1.05 = 1075.2
@@ -49,9 +36,6 @@ noinline func test_fraction_kib():
     assert(text_of_string(human_readable_size(1146)) == "1.1 KiB")
 
 test "border_KiB_MiB":
-    test_border_kib_mib()
-
-noinline func test_border_kib_mib():
     assert(text_of_string(human_readable_size(1024000)) == "1000.0 KiB")  # 1000 * KiB
     assert(text_of_string(human_readable_size(1048575)) == "1023.9 KiB")  # 1024 * KiB - 1
     # MiB
@@ -59,9 +43,6 @@ noinline func test_border_kib_mib():
     assert(text_of_string(human_readable_size(1048577)) == "1.0 MiB")  # 1024 * KiB + 1
 
 test "fraction_MiB":
-    test_fraction_mib()
-
-noinline func test_fraction_mib():
     assert(text_of_string(human_readable_size(1069547)) == "1.0 MiB")
     assert(text_of_string(human_readable_size(1101004)) == "1.0 MiB")
     # 1024 * 1024 * 1.05 = 1101004.8
@@ -73,18 +54,12 @@ noinline func test_fraction_mib():
     assert(text_of_string(human_readable_size(1153434)) == "1.1 MiB")
 
 test "border_MiB_GiB":
-    test_border_mib_gib()
-
-noinline func test_border_mib_gib():
     assert(text_of_string(human_readable_size(1048576000)) == "1000.0 MiB")  # 1000 * MiB
     assert(text_of_string(human_readable_size(1073741823)) == "1023.9 MiB")  # 1024 * MiB - 1
     assert(text_of_string(human_readable_size(1073741824)) == "1.0 GiB")  # 1024 * MiB
     assert(text_of_string(human_readable_size(1073741825)) == "1.0 GiB")  # 1024 * MiB + 1
 
 test "fraction_GiB":
-    test_fraction_gib()
-
-noinline func test_fraction_gib():
     assert(text_of_string(human_readable_size(1095216660)) == "1.0 GiB")
     assert(text_of_string(human_readable_size(1127428915)) == "1.0 GiB")
     # 1024 * 1024 * 1024 * 1.05 = 1127428915.2
@@ -100,17 +75,11 @@ noinline func test_fraction_gib():
     assert(text_of_string(human_readable_size(1202590842)) == "1.1 GiB")
 
 test "extremes_4byte":
-    test_extremes_4byte()
-
-noinline func test_extremes_4byte():
     assert(text_of_string(human_readable_size(2147483647)) == "1.9 GiB")  # 0x7fffffff
     assert(text_of_string(human_readable_size(2147483648)) == "2.0 GiB")  # 0x80000000
     assert(text_of_string(human_readable_size(4294967295)) == "3.9 GiB")  # 0xffffffff
 
 test "extremes_8byte":
-    test_extremes_8byte()
-
-noinline func test_extremes_8byte():
     assert(text_of_string(human_readable_size(4294967296)) == "4.0 GiB")  # 0x100000000ULL
     assert(text_of_string(human_readable_size(4294967297)) == "4.0 GiB")  # 0x100000001ULL
     assert(text_of_string(human_readable_size(34359738368)) == "32.0 GiB")  # 0x800000000ULL
@@ -121,18 +90,12 @@ noinline func test_extremes_8byte():
     assert(text_of_string(human_readable_size(18446744073709551615)) == "15.9 EiB")  # 0xffffffffffffffffULL
 
 test "base10_units":
-    test_base10_units()
-
-noinline func test_base10_units():
     assert(text_of_string(human_readable_size(999, HumanReadableBasedOn.base10)) == "999 B")
     assert(text_of_string(human_readable_size(1024, HumanReadableBasedOn.base10)) == "1.0 KB")
     assert(text_of_string(human_readable_size(1100, HumanReadableBasedOn.base10)) == "1.1 KB")
     assert(text_of_string(human_readable_size(1000000, HumanReadableBasedOn.base10)) == "1.0 MB")
 
 test "human_readable_short_time":
-    test_human_readable_short_time()
-
-noinline func test_human_readable_short_time():
     assert(text_of_string(human_readable_short_time(duration_from_nanoseconds(0))) == "0ns")
     assert(text_of_string(human_readable_short_time(duration_from_nanoseconds(1))) == "1ns")
     assert(text_of_string(human_readable_short_time(duration_from_nanoseconds(99))) == "99ns")
@@ -181,9 +144,6 @@ noinline func test_human_readable_short_time():
 
 # The donor tests nothing below; these values are the reference build's (Ladybird 47c82b38d0).
 test "human_readable_size_long_and_quantity":
-    test_human_readable_size_long_and_quantity()
-
-noinline func test_human_readable_size_long_and_quantity():
     assert(text_of_string(human_readable_size_long(1000)) == "1000 bytes")
     assert(text_of_string(human_readable_size_long(1000, UseThousandsSeparator.yes)) == "1,000 bytes")
     assert(text_of_string(human_readable_size_long(123456789)) == "117.7 MiB (123456789 bytes)")
@@ -193,9 +153,6 @@ noinline func test_human_readable_size_long_and_quantity():
     assert(text_of_string(human_readable_size(1234567, HumanReadableBasedOn.base2, UseThousandsSeparator.yes)) == "1.1 MiB")
 
 test "human_readable_time_and_digital_time":
-    test_human_readable_time_and_digital_time()
-
-noinline func test_human_readable_time_and_digital_time():
     assert(text_of_string(human_readable_time(duration_from_milliseconds(1000))) == "1 second")
     assert(text_of_string(human_readable_time(duration_from_milliseconds(90061001))) == "1 day 1 hour 1 minute 1.001 seconds")
     assert(text_of_string(human_readable_time(duration_from_milliseconds(172800000 + 7200000 + 120000 + 2500))) == "2 days 2 hours 2 minutes 2.5 seconds")

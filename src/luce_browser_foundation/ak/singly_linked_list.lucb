@@ -264,20 +264,16 @@ pub func singly_linked_list_find_if_const[T, P: SizeCalculationPolicy[T]](this: 
 pub func singly_linked_list_find_if[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, pred: Function1[const T*, bool]) -> SinglyLinkedListIterator[T]:
     return singly_linked_list_find_if_const(this, pred)
 
-# The predicate of find(): `Traits<T>::equals(entry, value)`.
-# workaround: compiler-issues/generic_function_value (the callback is a static method)
-struct SinglyLinkedListEqualsValue[T: luce.Equatable]:
-    var value: T
-
-    static func call(context: void*?, entry: const T*) -> bool:
-        let captures = (const SinglyLinkedListEqualsValue[T]*)(context else trap("SinglyLinkedList: no captures"))
-        return *entry == captures.value
+# The predicate of find(): `Traits<T>::equals(entry, value)`, with the value as the context.
+func singly_linked_list_equals_value[T: luce.Equatable](context: void*?, entry: const T*) -> bool:
+    let value = (const T*)(context else trap("SinglyLinkedList: no value"))
+    return *entry == *value
 
 ## Ported from AK/SinglyLinkedList.h:213 AK::SinglyLinkedList::find const.
 pub func singly_linked_list_find_const[T: luce.Equatable, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*, value: T) -> SinglyLinkedListIterator[T]:
-    var captures = SinglyLinkedListEqualsValue[T](value = value)
-    let equals: func(void*?, const T*) -> bool = SinglyLinkedListEqualsValue[T].call
-    return singly_linked_list_find_if_const(this, Function1[const T*, bool](call = equals, context = &captures))
+    var needle = value
+    let equals: func(void*?, const T*) -> bool = singly_linked_list_equals_value
+    return singly_linked_list_find_if_const(this, Function1[const T*, bool](call = equals, context = &needle))
 
 ## Ported from AK/SinglyLinkedList.h:218 AK::SinglyLinkedList::find.
 pub func singly_linked_list_find[T: luce.Equatable, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*, value: T) -> SinglyLinkedListIterator[T]:

@@ -8,16 +8,9 @@
 #       functions AK computes itself: log2, pow, cbrt, asin, acos, round, the hyperbolic
 #       functions, round_to).
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 test "math: clamp_to":
-    test_math_clamp_to()
-
-noinline func test_math_clamp_to():
     assert(clamp_to_i32_u32(1000000) == 1000000)
     assert(clamp_to_i32_u64(u64_max) == i32_max)
     assert(clamp_to_u32_i32(-10) == 0)
@@ -30,9 +23,6 @@ noinline func test_math_clamp_to():
     assert(clamp_to_u32_f32(-3.0) == 0)
 
 test "math: log2 and pow":
-    test_math_log2_and_pow()
-
-noinline func test_math_log2_and_pow():
     assert(exponentials_log2_f64(10.0).bits() == 0x400a934f0979a371)
     assert(exponentials_log2_f64(3.0).bits() == 0x3ff95c01a39fbd69)
     assert(exponentials_log2_f32(10.0).bits() == 0x40549a78)
@@ -47,9 +37,6 @@ noinline func test_math_log2_and_pow():
     assert(pow_f64(5.0, 0.0) == 1.0)
 
 test "math: cbrt, asin, acos":
-    test_math_cbrt_asin_acos()
-
-noinline func test_math_cbrt_asin_acos():
     assert(cbrt_f64(27.0).bits() == 0x4008000000000000)
     assert(cbrt_f64(10.0).bits() == 0x40013c484138704e)
     assert(cbrt_f32(27.0).bits() == 0x40400000)
@@ -62,9 +49,6 @@ noinline func test_math_cbrt_asin_acos():
     assert(out_of_range != out_of_range)
 
 test "math: rounding":
-    test_math_rounding()
-
-noinline func test_math_rounding():
     assert(rounding_round_f64(2.5) == 3.0)
     assert(rounding_round_f64(-2.5) == -3.0)
     assert(rounding_round_f32(0.4) == 0.0)
@@ -81,9 +65,6 @@ noinline func test_math_rounding():
     assert(division_remainder_f64(7.0, 4.0) == -1.0)
 
 test "math: hyperbolic and trigonometry":
-    test_math_hyperbolic_and_trigonometry()
-
-noinline func test_math_hyperbolic_and_trigonometry():
     assert(hyperbolic_sinh_f64(1.0).bits() == 0x3ff2cd9fc44eb982)
     assert(hyperbolic_cosh_f64(1.0).bits() == 0x3ff8b07551d9f550)
     assert(hyperbolic_tanh_f64(1.0).bits() == 0x3fe85efab514f394)

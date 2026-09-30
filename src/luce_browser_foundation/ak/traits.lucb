@@ -82,7 +82,7 @@ pub struct CharTraits: Traits[char]:
 pub struct F32Traits: Traits[f32]:
     var empty_: u8
 
-    func hash_of(key: const f32*) -> u32: return f32_traits_hash(*key)
+    func hash_of(key: const f32*) -> u32: return u32_hash(key.bits())
 
     func equals(a: const f32*, b: const f32*) -> bool: return *a == *b
 
@@ -90,17 +90,9 @@ pub struct F32Traits: Traits[f32]:
 pub struct F64Traits: Traits[f64]:
     var empty_: u8
 
-    func hash_of(key: const f64*) -> u32: return f64_traits_hash(*key)
+    func hash_of(key: const f64*) -> u32: return u64_hash(key.bits())
 
     func equals(a: const f64*, b: const f64*) -> bool: return *a == *b
-
-# Traits<float>::hash and Traits<double>::hash, taking the value (not a pointer to it).
-# workaround: compiler-issues/float_bits_through_pointer
-func f32_traits_hash(value: f32) -> u32:
-    return u32_hash(value.bits())
-
-func f64_traits_hash(value: f64) -> u32:
-    return u64_hash(value.bits())
 
 ## AK::IdentityHashTraits<u32>: the value is its own hash.
 pub struct U32IdentityHashTraits: Traits[u32]:

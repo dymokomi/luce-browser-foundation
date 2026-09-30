@@ -9,10 +9,6 @@
 #       string (the port's join takes views or strings with the default "{}" format).
 #       `is_one_of` has no port (variadic); its cases are the comparisons it folds.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 ## `EXPECT_EQ(string, "text"sv)`.
@@ -20,9 +16,6 @@ func string_2_is(string: const String*, text: str) -> bool:
     return string_eq_string_view(string, sv(text))
 
 test "is_one_of":
-    test_is_one_of_2()
-
-noinline func test_is_one_of_2():
     let foo = string_from_str("foo")
     let bar = string_from_str("bar")
 
@@ -37,9 +30,6 @@ noinline func test_is_one_of_2():
     assert(string_2_is(&bar, "bar"))
 
 test "split":
-    test_split_2()
-
-noinline func test_split_2():
     let test1 = string_from_str("foo bar baz")
     let parts1 = string_split(&test1, (u32)' ') else trap("MUST")
     assert(test_vector_size(&parts1) == 3)
@@ -61,9 +51,6 @@ noinline func test_split_2():
     assert(string_2_is(&part22, "ω"))
 
 test "find_byte_offset":
-    test_find_byte_offset()
-
-noinline func test_find_byte_offset():
     let empty = string_new()
     assert(string_find_byte_offset_u32(&empty, 0) == none)
     assert(string_find_byte_offset_string_view(&empty, sv("")) == none)
@@ -104,9 +91,6 @@ func string_2_length(string: const String*) -> usize:
     return string_view_length(&view)
 
 test "repeated":
-    test_repeated_2()
-
-noinline func test_repeated_2():
     let string01 = string_repeated_must((u32)'a', 0)
     assert(string_base_is_short_string(&string01.string_base))
     assert(string_is_empty(&string01))
@@ -165,9 +149,6 @@ noinline func test_repeated_2():
     assert(string_2_is(&string103, "𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀𐌀"))
 
 test "join":
-    test_join()
-
-noinline func test_join():
     let empty_views: StringView[1] = [sv("")]
     let string1 = string_join_string_view(sv(","), empty_views[..<0]) else trap("MUST")
     assert(string_is_empty(&string1))
@@ -185,9 +166,6 @@ func string_trim_is(string: const String*, characters: str, mode: TrimMode, expe
     return string_2_is(&result, expected)
 
 test "trim":
-    test_trim()
-
-noinline func test_trim():
     let empty = string_new()
     assert(string_trim_is(&empty, " ", TrimMode.both, ""))
     assert(string_trim_is(&empty, " ", TrimMode.left, ""))
@@ -241,9 +219,6 @@ func string_2_contains_code_point(text: str, code_point: u32) -> bool:
     return string_contains_u32(&string, code_point)
 
 test "contains":
-    test_contains()
-
-noinline func test_contains():
     let empty = string_new()
     # `contains({})` picks the u32 overload: the code point U+0000.
     assert(not string_contains_u32(&empty, 0))
@@ -300,9 +275,6 @@ func string_2_starts_with(text: str, code_point: u32) -> bool:
     return string_starts_with(&string, code_point)
 
 test "starts_with":
-    test_starts_with_2()
-
-noinline func test_starts_with_2():
     let empty = string_new()
     assert(string_starts_with_bytes(&empty, StringView()))
     assert(not string_starts_with_bytes(&empty, sv(" ")))
@@ -353,9 +325,6 @@ func string_2_ends_with(text: str, code_point: u32) -> bool:
     return string_ends_with(&string, code_point)
 
 test "ends_with":
-    test_ends_with_2()
-
-noinline func test_ends_with_2():
     let empty = string_new()
     assert(string_ends_with_bytes(&empty, StringView()))
     assert(not string_ends_with_bytes(&empty, sv(" ")))
@@ -410,9 +379,6 @@ func string_2_to_ascii_uppercase_is(text: str, expected: str) -> bool:
     return string_equals(&result, &expected_string)
 
 test "to_ascii_lowercase":
-    test_to_ascii_lowercase_2()
-
-noinline func test_to_ascii_lowercase_2():
     assert(string_2_to_ascii_lowercase_is("foobar", "foobar"))
     assert(string_2_to_ascii_lowercase_is("FooBar", "foobar"))
     assert(string_2_to_ascii_lowercase_is("FOOBAR", "foobar"))
@@ -423,9 +389,6 @@ noinline func test_to_ascii_lowercase_2():
     assert(string_base_bytes(&long_string.string_base).data == string_base_bytes(&lowercased.string_base).data)
 
 test "to_ascii_uppercase":
-    test_to_ascii_uppercase_2()
-
-noinline func test_to_ascii_uppercase_2():
     assert(string_2_to_ascii_uppercase_is("foobar", "FOOBAR"))
     assert(string_2_to_ascii_uppercase_is("FooBar", "FOOBAR"))
     assert(string_2_to_ascii_uppercase_is("FOOBAR", "FOOBAR"))
@@ -441,9 +404,6 @@ func string_2_is_ascii(text: str) -> bool:
     return string_is_ascii(&string)
 
 test "is_ascii":
-    test_is_ascii()
-
-noinline func test_is_ascii():
     let empty = string_new()
     assert(string_is_ascii(&empty))
     assert(string_2_is_ascii(" "))
@@ -460,9 +420,6 @@ func string_2_bijective_base_is(value: usize, expected: str) -> bool:
     return string_2_is(&result, expected)
 
 test "bijective_base":
-    test_bijective_base()
-
-noinline func test_bijective_base():
     assert(string_2_bijective_base_is(0, "A"))
     assert(string_2_bijective_base_is(25, "Z"))
     assert(string_2_bijective_base_is(26, "AA"))
@@ -473,9 +430,6 @@ noinline func test_bijective_base():
     assert(string_2_bijective_base_is(18277, "ZZZ"))
 
 test "roman_numerals":
-    test_roman_numerals()
-
-noinline func test_roman_numerals():
     let four_thousand = string_roman_number_from(4000, StringCase.upper)
     assert(string_2_is(&four_thousand, "4000"))
 

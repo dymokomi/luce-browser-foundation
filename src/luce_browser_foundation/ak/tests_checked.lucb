@@ -6,16 +6,9 @@
 #       Port of Tests/AK/TestChecked.cpp (the operator, overflow-detection and
 #       operations-with-overflowed cases) and of the Checked cases of kmalloc_array.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 test "checked: operator_identity":
-    test_checked_operator_identity()
-
-noinline func test_checked_operator_identity():
     let a = make_checked[i32](4)
     assert(eq_checked(a, 4))
     assert(not eq_checked(a, 5))
@@ -23,9 +16,6 @@ noinline func test_checked_operator_identity():
     assert(ne_checked(a, 5))
 
 test "checked: operator_incr":
-    test_checked_operator_incr()
-
-noinline func test_checked_operator_incr():
     var a = make_checked[i32](4)
     assert(checked_value(checked_inc_i32(&a)) == 5)
     assert(checked_value(checked_inc_i32(&a)) == 6)
@@ -39,9 +29,6 @@ noinline func test_checked_operator_incr():
     assert(eq_checked(a, 10))
 
 test "checked: operator_decr":
-    test_checked_operator_decr()
-
-noinline func test_checked_operator_decr():
     var a = make_checked[u32](5)
     assert(checked_value(checked_dec_u32(&a)) == 4)
     assert(checked_value(checked_dec_u32(&a)) == 3)
@@ -57,9 +44,6 @@ noinline func test_checked_operator_decr():
     assert(checked_has_overflow(&a))
 
 test "checked: operator_cmp":
-    test_checked_operator_cmp()
-
-noinline func test_checked_operator_cmp():
     let a = make_checked[i32](4)
     assert(gt_checked(a, 3))
     assert(not lt_checked(a, 3))
@@ -77,9 +61,6 @@ noinline func test_checked_operator_cmp():
     assert(ne_t[i32](5, a))
 
 test "checked: operator_arith":
-    test_checked_operator_arith()
-
-noinline func test_checked_operator_arith():
     let a = make_checked[i32](12)
     let b = make_checked[i32](345)
     assert(eq_checked(add_i32(a, b), 357))
@@ -93,9 +74,6 @@ noinline func test_checked_operator_arith():
     assert(eq_checked(rem_i32(b, a), 9))
 
 test "checked: detects_signed_overflow":
-    test_checked_detects_signed_overflow()
-
-noinline func test_checked_detects_signed_overflow():
     var c = add_i32(make_checked[i32](0x40000000), make_checked[i32](0x3fffffff))
     assert(not checked_has_overflow(&c))
     c = add_i32(make_checked[i32](0x40000000), make_checked[i32](0x40000000))
@@ -122,9 +100,6 @@ noinline func test_checked_detects_signed_overflow():
     assert(checked_has_overflow(&d))
 
 test "checked: detects_unsigned_overflow":
-    test_checked_detects_unsigned_overflow()
-
-noinline func test_checked_detects_unsigned_overflow():
     var c = add_u32(make_checked[u32](0x40000000), make_checked[u32](0x40000000))
     assert(not checked_has_overflow(&c))
     c = add_u32(make_checked[u32](0xf0000000), make_checked[u32](0x0fffffff))
@@ -141,9 +116,6 @@ noinline func test_checked_detects_unsigned_overflow():
     assert(checked_has_overflow(&d))
 
 test "checked: operations_with_overflowed":
-    test_checked_operations_with_overflowed()
-
-noinline func test_checked_operations_with_overflowed():
     var overflowed: Checked[u32]
     checked_checked_t_u64_u32(&overflowed, 0x100000000)
     assert(checked_has_overflow(&overflowed))
@@ -167,9 +139,6 @@ noinline func test_checked_operations_with_overflowed():
     assert(checked_has_overflow(&c))
 
 test "checked: would_overflow and is_within_range":
-    test_checked_would_overflow_and_is_within_range()
-
-noinline func test_checked_would_overflow_and_is_within_range():
     assert(checked_addition_would_overflow_u32(u32_max, 1))
     assert(not checked_addition_would_overflow_u32(u32_max - 1, 1))
     assert(checked_subtraction_would_overflow_usize(0, 1))
@@ -183,9 +152,6 @@ noinline func test_checked_would_overflow_and_is_within_range():
     assert(is_within_range_u64_usize(u64_max))
 
 test "kmalloc: kmalloc_array, krealloc and kfree":
-    test_kmalloc_kmalloc_array_krealloc_and_kfree()
-
-noinline func test_kmalloc_kmalloc_array_krealloc_and_kfree():
     let pointer = kmalloc_array(make_checked[usize](4), make_checked[usize](8)) else trap("null")
     let words = (u64*)pointer
     for i in 0..<4usize:

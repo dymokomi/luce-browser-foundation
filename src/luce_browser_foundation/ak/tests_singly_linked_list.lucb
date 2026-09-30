@@ -6,10 +6,6 @@
 #       Port of Tests/AK/TestSinglyLinkedList.cpp, including the size-policy call counting
 #       (TestSizeCalculationPolicy, whose counters are module globals as in the donor).
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 type TestIntList = SinglyLinkedList[i32, DefaultSizeCalculationPolicy[i32]]
@@ -25,9 +21,6 @@ func test_sll_equals(context: void*?, value: const i32*) -> bool:
     return *value == *target
 
 test "singly_linked_list: should_find_mutable":
-    test_singly_linked_list_should_find_mutable()
-
-noinline func test_singly_linked_list_should_find_mutable():
     var sut = test_sll_make_list()
     var it = singly_linked_list_find(&sut, 4)
     assert(*singly_linked_list_iterator_deref(&it) == 4)
@@ -35,9 +28,6 @@ noinline func test_singly_linked_list_should_find_mutable():
     assert(singly_linked_list_iterator_eq(&missing, singly_linked_list_end(&sut)))
 
 test "singly_linked_list: should_find_mutable_with_predicate":
-    test_singly_linked_list_should_find_mutable_with_predicate()
-
-noinline func test_singly_linked_list_should_find_mutable_with_predicate():
     var sut = test_sll_make_list()
     var four: i32 = 4
     var it = singly_linked_list_find_if(&sut, Function1[const i32*, bool](call = test_sll_equals, context = &four))
@@ -47,9 +37,6 @@ noinline func test_singly_linked_list_should_find_mutable_with_predicate():
     assert(singly_linked_list_iterator_eq(&missing, singly_linked_list_end(&sut)))
 
 test "singly_linked_list: should_find_const":
-    test_singly_linked_list_should_find_const()
-
-noinline func test_singly_linked_list_should_find_const():
     let sut = test_sll_make_list()
     var it = singly_linked_list_find_const(&sut, 4)
     assert(*singly_linked_list_iterator_deref(&it) == 4)
@@ -59,9 +46,6 @@ noinline func test_singly_linked_list_should_find_const():
     assert(singly_linked_list_size(&sut) == 10)
 
 test "singly_linked_list: removal_during_iteration":
-    test_singly_linked_list_removal_during_iteration()
-
-noinline func test_singly_linked_list_removal_during_iteration():
     var list = test_sll_make_list()
     var size = singly_linked_list_size(&list)
     var it = singly_linked_list_begin(&list)
@@ -112,9 +96,6 @@ func test_sll_get_size(head: const SinglyLinkedListNode[i32]*?) -> usize:
 type TestPolicyList = SinglyLinkedList[i32, TestSizeCalculationPolicy]
 
 test "singly_linked_list: size policy calls":
-    test_singly_linked_list_size_policy_calls()
-
-noinline func test_singly_linked_list_size_policy_calls():
     test_sll_setup()
     var list: TestPolicyList
     singly_linked_list_append(&list, 0)
@@ -131,9 +112,6 @@ noinline func test_singly_linked_list_size_policy_calls():
     assert(calls_to_decrease == 2)
 
 test "singly_linked_list: size policy calls on the fallible and positional inserts":
-    test_singly_linked_list_size_policy_calls_on_the_fallible_and_positional_inserts()
-
-noinline func test_singly_linked_list_size_policy_calls_on_the_fallible_and_positional_inserts():
     test_sll_setup()
     var list: TestPolicyList
     singly_linked_list_try_append(&list, 0) else trap("MUST")
@@ -150,9 +128,6 @@ noinline func test_singly_linked_list_size_policy_calls_on_the_fallible_and_posi
     assert(calls_to_increase == 6)
 
 test "singly_linked_list: remove_does_not_leave_dangling_iterator":
-    test_singly_linked_list_remove_does_not_leave_dangling_iterator()
-
-noinline func test_singly_linked_list_remove_does_not_leave_dangling_iterator():
     var list: TestIntList
     singly_linked_list_append(&list, 1)
     singly_linked_list_append(&list, 2)
@@ -165,9 +140,6 @@ noinline func test_singly_linked_list_remove_does_not_leave_dangling_iterator():
     assert(singly_linked_list_is_empty(&list))
 
 test "singly_linked_list: remove_consecutive_mid_list_nodes":
-    test_singly_linked_list_remove_consecutive_mid_list_nodes()
-
-noinline func test_singly_linked_list_remove_consecutive_mid_list_nodes():
     var list: TestIntList
     for i: i32 in 1..=4:
         singly_linked_list_append(&list, i)
@@ -190,9 +162,6 @@ noinline func test_singly_linked_list_remove_consecutive_mid_list_nodes():
     assert(*singly_linked_list_last(&list) == 4)
 
 test "singly_linked_list: counting policy":
-    test_singly_linked_list_counting_policy()
-
-noinline func test_singly_linked_list_counting_policy():
     var list: SinglyLinkedList[i32, CountingSizeCalculationPolicy[i32]]
     for i: i32 in 0..<5:
         singly_linked_list_prepend(&list, i)

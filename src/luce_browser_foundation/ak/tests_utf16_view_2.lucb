@@ -5,16 +5,9 @@
 #   DESCRIPTION:
 #       Port of Tests/AK/TestUtf16View.cpp (lines 542-932).
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 test "equals_ignoring_case":
-    test_equals_ignoring_case()
-
-noinline func test_equals_ignoring_case():
     var string1 = utf16_string_from_utf8_string_view(sv("foobar"))
     var string2 = utf16_string_from_utf8_string_view(sv("FooBar"))
     var view1 = t16s_view(&string1)
@@ -34,27 +27,18 @@ noinline func test_equals_ignoring_case():
     assert(not utf16_view_equals_ignoring_case(&view1, &view2))
 
 test "code_unit_offset_of":
-    test_code_unit_offset_of()
-
-noinline func test_code_unit_offset_of():
     let view = t16("😂 foo 😀 bar")
     let expected: usize[12] = [0, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13]
     for code_point_offset in 0..<expected.length:
         assert(utf16_view_code_unit_offset_of(&view, code_point_offset) == expected[code_point_offset])
 
 test "code_point_offset_of":
-    test_code_point_offset_of()
-
-noinline func test_code_point_offset_of():
     let view = t16("😂 foo 😀 bar")
     let expected: usize[14] = [0, 0, 1, 2, 3, 4, 5, 6, 6, 7, 8, 9, 10, 11]
     for code_unit_offset in 0..<expected.length:
         assert(utf16_view_code_point_offset_of(&view, code_unit_offset) == expected[code_unit_offset])
 
 test "iterator_offset":
-    test_iterator_offset()
-
-noinline func test_iterator_offset():
     let view = t16("😂 foo 😀 bar")
     var expected_offset: usize = 0
 
@@ -68,9 +52,6 @@ noinline func test_iterator_offset():
     assert(utf16_view_iterator_offset(&view, &end) == utf16_view_length_in_code_units(&view))
 
 test "iterator_at_code_unit_offset":
-    test_iterator_at_code_unit_offset()
-
-noinline func test_iterator_at_code_unit_offset():
     let view = t16("😂 foo 😀 bar")
 
     for i in 0..<utf16_view_length_in_code_units(&view):
@@ -87,9 +68,6 @@ func t16_replace_is(input: Utf16View, needle: Utf16View, replacement: Utf16View,
     return t16s_eq(&result, expected)
 
 test "replace":
-    test_replace_3()
-
-noinline func test_replace_3():
     assert(t16_replace_is(t16(""), utf16_view_new(), utf16_view_new(), ReplaceMode.first_only, t16("")))
     assert(t16_replace_is(t16(""), t16("foo"), t16("bar"), ReplaceMode.first_only, t16("")))
     assert(t16_replace_is(t16("foo"), t16("bar"), t16("baz"), ReplaceMode.first_only, t16("foo")))
@@ -104,9 +82,6 @@ noinline func test_replace_3():
     assert(t16_replace_is(t16("foo 😀 boo 😀"), t16("😀 "), t16("🙃 "), ReplaceMode.all, t16("foo 🙃 boo 😀")))
 
 test "substring_view":
-    test_substring_view()
-
-noinline func test_substring_view():
     let string = utf16_string_from_utf8_string_view(sv("Привет 😀"))
 
     let whole = t16s_view(&string)
@@ -126,9 +101,6 @@ func t16_trim_is(view: Utf16View, code_units: Utf16View, both: Utf16View, left: 
     assert(t16_eq(utf16_view_trim(&view, code_units, TrimMode.right), right))
 
 test "trim":
-    test_trim_4()
-
-noinline func test_trim_4():
     let whitespace = t16(" ")
     t16_trim_is(t16("word"), whitespace, t16("word"), t16("word"), t16("word"))
     t16_trim_is(t16("   word"), whitespace, t16("word"), t16("word"), t16("   word"))
@@ -148,9 +120,6 @@ func t16_contains(view: Utf16View, needle: Utf16View) -> bool:
     return utf16_view_contains_utf16_view(&view, needle)
 
 test "contains":
-    test_contains_3()
-
-noinline func test_contains_3():
     assert(not t16_contains_unit(t16(""), 0x61))
     assert(t16_contains_unit(t16("a"), 0x61))
     assert(not t16_contains_unit(t16("b"), 0x61))
@@ -179,9 +148,6 @@ func t16_contains_any_of(view: Utf16View, needles: const u32[]) -> bool:
     return utf16_view_contains_any_of(&view, needles)
 
 test "contains_any_of":
-    test_contains_any_of()
-
-noinline func test_contains_any_of():
     let no_needles: u32[1] = [0]
     assert(not t16_contains_any_of(t16(""), no_needles[..<0]))
     assert(not t16_contains_any_of(t16("a"), no_needles[..<0]))
@@ -207,9 +173,6 @@ func t16_count(view: Utf16View, needle: Utf16View) -> usize:
     return utf16_view_count(&view, needle)
 
 test "count":
-    test_count_2()
-
-noinline func test_count_2():
     assert(t16_count(t16(""), utf16_view_new()) == 0)
     assert(t16_count(t16("abc"), utf16_view_new()) == 3)
 
@@ -240,9 +203,6 @@ func t16_ends_with(view: Utf16View, needle: Utf16View) -> bool:
     return utf16_view_ends_with_utf16_view(&view, needle)
 
 test "starts_with":
-    test_starts_with_5()
-
-noinline func test_starts_with_5():
     assert(t16_starts_with(utf16_view_new(), t16("")))
     assert(not t16_starts_with(utf16_view_new(), t16(" ")))
 
@@ -267,9 +227,6 @@ noinline func test_starts_with_5():
     assert(not t16_starts_with(emoji, t16("🙃")))
 
 test "ends_with":
-    test_ends_with_5()
-
-noinline func test_ends_with_5():
     assert(t16_ends_with(utf16_view_new(), t16("")))
     assert(not t16_ends_with(utf16_view_new(), t16(" ")))
 
@@ -313,9 +270,6 @@ func t16_split(view: Utf16View, separator: Utf16View, behavior: SplitBehavior) -
     return utf16_view_split_view_utf16_view(&view, separator, behavior)
 
 test "split_view":
-    test_split_view_2()
-
-noinline func test_split_view_2():
     let test1 = t16("axxbxcxd")
     var parts = t16_split_unit(test1, 0x78, SplitBehavior.nothing)
     assert(t16_parts_are(&parts, ["a", "b", "c", "d"]))
@@ -359,9 +313,6 @@ noinline func test_split_view_2():
     assert(t16_parts_are(&parts, ["ω", "2ω", "ω"]))
 
 test "find_code_unit_offset":
-    test_find_code_unit_offset()
-
-noinline func test_find_code_unit_offset():
     let conversion_result = utf16_string_from_utf8_string_view(sv("😀foo😀bar"))
     let view = t16s_view(&conversion_result)
 
@@ -377,9 +328,6 @@ noinline func test_find_code_unit_offset():
     assert(utf16_view_find_code_unit_offset_utf16_view(&view, t16("baz")) == none)
 
 test "find_code_unit_offset_ignoring_case":
-    test_find_code_unit_offset_ignoring_case()
-
-noinline func test_find_code_unit_offset_ignoring_case():
     let conversion_result = utf16_string_from_utf8_string_view(sv("😀Foo😀Bar"))
     let view = t16s_view(&conversion_result)
 
@@ -401,9 +349,6 @@ func t16_previous_code_points_are(view: Utf16View, start: usize, expected: const
         assert(index == indices[i])
 
 test "previous_code_point_at":
-    test_previous_code_point_at()
-
-noinline func test_previous_code_point_at():
     # ASCII text.
     t16_previous_code_points_are(t16("abc"), 3, [0x63, 0x62, 0x61], [2, 1, 0])
 

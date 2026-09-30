@@ -7,10 +7,6 @@
 #       Not ported: the EXPECT_DEATH cases (a trap cannot be caught), the static_asserts of
 #       user_defined_literals (run as asserts) and the benchmark.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # mark: Helpers =================================================================================
@@ -103,9 +99,6 @@ func dv_to_truncated_seconds(d: Duration) -> i64:
 # mark: Duration ================================================================================
 
 test "time: is_sane":
-    test_time_is_sane()
-
-noinline func test_time_is_sane():
     let t0 = duration_from_seconds(0)
     let t2 = duration_from_seconds(2)
     let t5 = duration_from_seconds(5)
@@ -122,18 +115,12 @@ noinline func test_time_is_sane():
     expect_duration(duration_add(&tn3, t5), 2, 0)
 
 test "time: limits":
-    test_time_limits()
-
-noinline func test_time_limits():
     expect_duration(duration_min(), -0x8000000000000000, 0)
     expect_duration(duration_max(), 0x7fffffffffffffff, 999999999)
 
 # mark: Donor tables ============================================================================
 
 test "time: timespec_parsing":
-    test_time_timespec_parsing()
-
-noinline func test_time_timespec_parsing():
     expect_duration(duration_from_timespec(Timespec(tv_sec = 2, tv_nsec = 4)), 2, 4)
     expect_duration(duration_from_timespec(Timespec(tv_sec = 1234, tv_nsec = 5678)), 1234, 5678)
     expect_duration(duration_from_timespec(Timespec(tv_sec = 0, tv_nsec = 1000000000)), 1, 0)
@@ -156,9 +143,6 @@ noinline func test_time_timespec_parsing():
     expect_duration(duration_from_timespec(Timespec(tv_sec = -0x7ffffffffffffffe, tv_nsec = -2000000001)), -0x8000000000000000, 0)
 
 test "time: timeval_parsing":
-    test_time_timeval_parsing()
-
-noinline func test_time_timeval_parsing():
     expect_duration(duration_from_timeval(Timeval(tv_sec = 2, tv_usec = 4)), 2, 4000)
     expect_duration(duration_from_timeval(Timeval(tv_sec = 1234, tv_usec = 5678)), 1234, 5678000)
     expect_duration(duration_from_timeval(Timeval(tv_sec = -123, tv_usec = -45678)), -124, 954322000)
@@ -183,9 +167,6 @@ noinline func test_time_timeval_parsing():
     expect_duration(duration_from_timeval(Timeval(tv_sec = -0x7ffffffffffffffe, tv_usec = -2000001)), -0x8000000000000000, 0)
 
 test "time: addition":
-    test_time_addition()
-
-noinline func test_time_addition():
     expect_addition(11, 123456789, 22, 900000000, 34, 23456789)
     expect_addition(0, 0, 9223372036854775807, 999999998, 0x7fffffffffffffff, 999999998)
     expect_addition(0, 1, 9223372036854775807, 999999998, 0x7fffffffffffffff, 999999999)
@@ -204,9 +185,6 @@ noinline func test_time_addition():
     expect_addition(-0x8000000000000000, 999999995, 0x7fffffffffffffff, 6, 0, 1)
 
 test "time: subtraction":
-    test_time_subtraction()
-
-noinline func test_time_subtraction():
     expect_subtraction(5, 0, 3, 0, 2, 0)
     expect_subtraction(0, 0, 0, 0, 0, 0)
     expect_subtraction(0, 5, 0, 3, 0, 2)
@@ -230,9 +208,6 @@ noinline func test_time_subtraction():
     expect_subtraction(-0x7fffffffffffffff, 999999995, 1, 999999996, -0x8000000000000000, 0)
 
 test "time: rounding":
-    test_time_rounding()
-
-noinline func test_time_rounding():
     assert(dv_to_seconds(duration_of(2, 800800800)) == 3)
     assert(dv_to_milliseconds(duration_of(2, 800800800)) == 2801)
     assert(dv_to_microseconds(duration_of(2, 800800800)) == 2800801)
@@ -261,9 +236,6 @@ noinline func test_time_rounding():
     assert(dv_to_nanoseconds(duration_of(9223372036, 854775808)) == 0x7fffffffffffffff)
 
 test "time: truncation":
-    test_time_truncation()
-
-noinline func test_time_truncation():
     assert(dv_to_truncated_seconds(duration_of(2, 0)) == 2)
     assert(dv_to_truncated_seconds(duration_of(-2, 0)) == -2)
     assert(dv_to_truncated_seconds(duration_of(2, 800800800)) == 2)
@@ -292,9 +264,6 @@ noinline func test_time_truncation():
     assert(dv_to_truncated_microseconds(duration_of(9223372036854, 775808000)) == 0x7fffffffffffffff)
 
 test "time: from_iso8601_week":
-    test_time_from_iso8601_week()
-
-noinline func test_time_from_iso8601_week():
     expect_duration(offset_of(unix_date_time_from_iso8601_week(1970, 1)), -259200, 0)
     expect_duration(offset_of(unix_date_time_from_iso8601_week(2000, 2)), 947462400, 0)
     expect_duration(offset_of(unix_date_time_from_iso8601_week(2000, 51)), 977097600, 0)
@@ -359,9 +328,6 @@ noinline func test_time_from_iso8601_week():
     expect_duration(offset_of(unix_date_time_from_iso8601_week(2005, 52)), 1135555200, 0)
 
 test "time: from_unix_time_parts_common_values":
-    test_time_from_unix_time_parts_common_values()
-
-noinline func test_time_from_unix_time_parts_common_values():
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(1970, 1, 1, 0, 0, 0, 0)), 0, 0)
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(1970, 1, 1, 0, 0, 0, 1)), 0, 1000000)
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(1970, 1, 1, 0, 0, 0, 999)), 0, 999000000)
@@ -389,9 +355,6 @@ noinline func test_time_from_unix_time_parts_common_values():
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(2023, 5, 24, 18, 44, 40, 0)), 1684953880, 0)
 
 test "time: from_unix_time_parts_negative":
-    test_time_from_unix_time_parts_negative()
-
-noinline func test_time_from_unix_time_parts_negative():
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(1970, 1, 0, 23, 0, 0, 0)), -3600, 0)
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(1970, 1, 0, 24, 0, 0, 0)), 0, 0)
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(1970, 0, 31, 0, 0, 0, 0)), 0, 0)
@@ -412,9 +375,6 @@ noinline func test_time_from_unix_time_parts_negative():
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(1967, 1, 1, 0, 0, 0, 0)), -94694400, 0)
 
 test "time: from_milliseconds":
-    test_time_from_milliseconds()
-
-noinline func test_time_from_milliseconds():
     expect_duration(duration_from_milliseconds(0), 0, 0)
     expect_duration(duration_from_milliseconds(42), 0, 42000000)
     expect_duration(duration_from_milliseconds(-1), -1, 999000000)
@@ -424,9 +384,6 @@ noinline func test_time_from_milliseconds():
     expect_duration(duration_from_milliseconds(-0x8000000000000000), -9223372036854776, 192000000)
 
 test "time: from_unix_time_parts_overflow":
-    test_time_from_unix_time_parts_overflow()
-
-noinline func test_time_from_unix_time_parts_overflow():
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(0, 1, 1, 0, 0, 0, 0)), -62167219200, 0)
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(-1000000, 1, 1, 0, 0, 0, 0)), -31619119219200, 0)
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(-2147483648, 1, 1, 0, 0, 0, 0)), -67768100567971200, 0)
@@ -446,9 +403,6 @@ noinline func test_time_from_unix_time_parts_overflow():
     expect_duration(offset_of(unix_date_time_from_unix_time_parts(2147483647, 255, 255, 255, 255, 255, 65535)), 67767976202930420, 535000000)
 
 test "time: seconds_parsing":
-    test_time_seconds_parsing()
-
-noinline func test_time_seconds_parsing():
     expect_duration(duration_from_seconds(0), 0, 0)
     expect_duration(duration_from_seconds(42), 42, 0)
     expect_duration(duration_from_seconds(-1), -1, 0)
@@ -457,9 +411,6 @@ noinline func test_time_seconds_parsing():
     expect_duration(duration_from_seconds(0x7fffffffffffffff), 0x7fffffffffffffff, 0)
 
 test "time: is_negative":
-    test_time_is_negative()
-
-noinline func test_time_is_negative():
     let small = duration_from_nanoseconds(10)
     let large = duration_from_nanoseconds(15)
     var result = duration_sub(&small, large)

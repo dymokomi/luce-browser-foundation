@@ -11,10 +11,6 @@
 #       has no luce-base counterpart. json_object_move_from_value does not check that the
 #       moved-from object is empty: a move is a copy in the port (DESIGN.md §3.3 rule 1).
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # mark: Helpers =================================================================================
@@ -84,9 +80,6 @@ func load_form_member(context: void*?, property_name: const String*, property_va
 # mark: TestJSON.cpp ============================================================================
 
 test "load_form":
-    test_load_form()
-
-noinline func test_load_form():
     var form_json = parse_json(raw_form_json)
 
     assert(json_value2_is_object(&form_json))
@@ -102,36 +95,24 @@ noinline func test_load_form():
     json_array_for_each_const(widgets else trap("VERIFY_NOT_REACHED"), load_form_widget, none)
 
 test "json_empty_string":
-    test_json_empty_string()
-
-noinline func test_json_empty_string():
     let json = parse_json("\"\"")
     assert(json_value2_type(&json) == JsonValueType.string)
     let string = json_value2_as_string(&json)
     assert(string_is_empty(&string))
 
 test "json_string":
-    test_json_string()
-
-noinline func test_json_string():
     let json = parse_json("\"A\"")
     assert(json_value2_type(&json) == JsonValueType.string)
     assert(text_of_string(json_value2_as_string(&json)).length == 1)
     assert(text_of_string(json_value2_as_string(&json)) == "A")
 
 test "json_utf8_character":
-    test_json_utf8_character()
-
-noinline func test_json_utf8_character():
     let json = parse_json("\"\\u0041\"")
     assert(json_value2_type(&json) == JsonValueType.string)
     assert(text_of_string(json_value2_as_string(&json)).length == 1)
     assert(text_of_string(json_value2_as_string(&json)) == "A")
 
 test "json_encoded_surrogates":
-    test_json_encoded_surrogates()
-
-noinline func test_json_encoded_surrogates():
     let pair = parse_json("\"\\uD83E\\uDD13\"")
     assert(json_value2_type(&pair) == JsonValueType.string)
     assert(text_of_string(json_value2_as_string(&pair)).length == 4)
@@ -155,9 +136,6 @@ noinline func test_json_encoded_surrogates():
     assert(low_bytes[0] == 0xed and low_bytes[1] == 0xb4 and low_bytes[2] == 0x93)
 
 test "json_64_bit_value":
-    test_json_64_bit_value()
-
-noinline func test_json_64_bit_value():
     let big_value: u64 = 0x12345678aabbccdd
     var big_json_value = json_value2_create()
     json_value2_construct_u64_2(&big_json_value, big_value)
@@ -168,9 +146,6 @@ noinline func test_json_64_bit_value():
     assert(json_value2_equals(&big_json_value, &big_json_value_copy))
 
 test "json_64_bit_value_coerced_to_32_bit":
-    test_json_64_bit_value_coerced_to_32_bit()
-
-noinline func test_json_64_bit_value_coerced_to_32_bit():
     let min_i64: i64 = -9223372036854775808
     let max_i64: i64 = 9223372036854775807
 
@@ -194,9 +169,6 @@ noinline func test_json_64_bit_value_coerced_to_32_bit():
     assert(not json_value2_is_integer_u32(&json))
 
 test "json_duplicate_keys":
-    test_json_duplicate_keys()
-
-noinline func test_json_duplicate_keys():
     var json: JsonObject
     json_object_construct(&json)
     json_object_set_string_view(&json, sv("test"), json_string_value("foo"))
@@ -205,9 +177,6 @@ noinline func test_json_duplicate_keys():
     assert(text_of_string(json_object_serialized(&json)) == "{\"test\":\"baz\"}")
 
 test "json_u64_roundtrip":
-    test_json_u64_roundtrip()
-
-noinline func test_json_u64_roundtrip():
     let big_value: u64 = 0xffffffffffffffff
     var big = json_value2_create()
     json_value2_construct_u64_2(&big, big_value)
@@ -216,22 +185,13 @@ noinline func test_json_u64_roundtrip():
     assert(json_value2_as_integer_u64(&value) == big_value)
 
 test "json_parse_empty_string":
-    test_json_parse_empty_string()
-
-noinline func test_json_parse_empty_string():
     assert(parse_json_fails(""))
 
 test "json_parse_long_decimals":
-    test_json_parse_long_decimals()
-
-noinline func test_json_parse_long_decimals():
     let value = parse_json("1644452550.6489999294281")
     assert(json_value2_get_double_with_precision_loss(&value) == 1644452550.6489999294281)
 
 test "json_parse_number_with_exponent":
-    test_json_parse_number_with_exponent()
-
-noinline func test_json_parse_number_with_exponent():
     let value_without_fraction = parse_json("10e5")
     assert(json_value2_get_double_with_precision_loss(&value_without_fraction) == 1000000.0)
 
@@ -246,9 +206,6 @@ func expect_to_match_number_bit_wise(text: str, expected: f64):
     assert(value_as_double.bits() == expected.bits())
 
 test "json_parse_special_numbers":
-    test_json_parse_special_numbers()
-
-noinline func test_json_parse_special_numbers():
     expect_to_match_number_bit_wise("-0", -0.0)
     expect_to_match_number_bit_wise("-0.0", -0.0)
     expect_to_match_number_bit_wise("-0.00", -0.0)
@@ -282,16 +239,10 @@ let invalid_numbers: str[73] = [
 ]
 
 test "json_parse_fails_on_invalid_number":
-    test_json_parse_fails_on_invalid_number()
-
-noinline func test_json_parse_fails_on_invalid_number():
     for text in invalid_numbers:
         assert(parse_json_fails(text))
 
 test "json_parse_rejects_excessive_nesting_depth":
-    test_json_parse_rejects_excessive_nesting_depth()
-
-noinline func test_json_parse_rejects_excessive_nesting_depth():
     var input: StringBuilder
     string_builder_construct(&input)
     let nesting_depth: usize = 4096
@@ -303,9 +254,6 @@ noinline func test_json_parse_rejects_excessive_nesting_depth():
     assert(parse_json_fails(text_of(string_builder_string_view(&input))))
 
 test "json_parse_accepts_reasonable_nesting_depth":
-    test_json_parse_accepts_reasonable_nesting_depth()
-
-noinline func test_json_parse_accepts_reasonable_nesting_depth():
     var input: StringBuilder
     string_builder_construct(&input)
     let nesting_depth: usize = 64
@@ -347,9 +295,6 @@ func failing_element_callback(context: void*?, value: const JsonValue2*) -> !:
     error(ak_error, "nanananana")
 
 test "fallible_json_object_for_each":
-    test_fallible_json_object_for_each()
-
-noinline func test_fallible_json_object_for_each():
     let json = parse_json(raw_member_json)
     let object = json_value2_as_object_const(&json)
 
@@ -362,9 +307,6 @@ noinline func test_fallible_json_object_for_each():
     assert(message == "nanananana")
 
 test "fallible_json_array_for_each":
-    test_fallible_json_array_for_each()
-
-noinline func test_fallible_json_array_for_each():
     let json = parse_json(raw_element_json)
     let array = json_value2_as_array_const(&json)
 

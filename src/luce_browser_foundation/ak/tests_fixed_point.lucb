@@ -6,10 +6,6 @@
 #       Port of Tests/AK/TestFixedPoint.cpp (arithmetic, rounding, logarithm, comparison and
 #       cast; the formatter cases belong to AK/Format). `Type` is FixedPoint<4>.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 type TestFixed4 = FixedPoint[i32, FixedPointPrecision4]
@@ -28,9 +24,6 @@ func fixed4_eq(a: TestFixed4, b: TestFixed4) -> bool:
     return fixed_point_eq_fixed_point_i32(&a, b)
 
 test "fixed_point: arithmetic":
-    test_fixed_point_arithmetic()
-
-noinline func test_fixed_point_arithmetic():
     let half = fixed4(0.5)
     assert(fixed4_eq(fixed_point_add_fixed_point_i32(&half, fixed4(0.5)), fixed4_int(1)))
     let one = fixed4_int(1)
@@ -56,9 +49,6 @@ func check_rounding(value: f64, rint: f64, floor: f64, ceil: f64, trunc: f64):
     assert(fixed_point_ltrunc_i32(&x) == (i32)trunc)
 
 test "fixed_point: rounding":
-    test_fixed_point_rounding()
-
-noinline func test_fixed_point_rounding():
     check_rounding(0.5, 0.0, 0.0, 1.0, 0.0)
     check_rounding(1.5, 2.0, 1.0, 2.0, 1.0)
     check_rounding(-0.5, 0.0, -1.0, 0.0, 0.0)
@@ -104,9 +94,6 @@ noinline func test_fixed_point_rounding():
     assert(s15.m_value == 0xa5b)
 
 test "fixed_point: logarithm":
-    test_fixed_point_logarithm()
-
-noinline func test_fixed_point_logarithm():
     var x = fixed4_int(0)
     var l = fixed_point_log2_i32(&x)
     assert(l.m_value == i32_min)
@@ -124,9 +111,6 @@ noinline func test_fixed_point_logarithm():
     assert(fixed4_eq(fixed_point_log2_i32(&x), fixed4(11.592457037268080419637304576833)))
 
 test "fixed_point: comparison":
-    test_fixed_point_comparison()
-
-noinline func test_fixed_point_comparison():
     var x = fixed4_int(0)
     assert(fixed_point_lt_i_i32(&x, 1))
     assert(fixed_point_le_i_i32(&x, 1))
@@ -159,9 +143,6 @@ func between(value: f64, low: f64, high: f64) -> bool:
     return value >= low and value <= high
 
 test "fixed_point: cast":
-    test_fixed_point_cast()
-
-noinline func test_fixed_point_cast():
     var wide: FixedPoint[u64, FixedPointPrecision32] = ---
     fixed_point_construct_f64_u64(&wide, 123.4567)
     var down16 = fixed_point_cast_to_u32_from_u64[FixedPointPrecision32, FixedPointPrecision16](&wide)
@@ -193,9 +174,6 @@ noinline func test_fixed_point_cast():
     assert(between(fixed_point_to_f64_u64(&up), 7654.45, 7654.46))
 
 test "fixed_point: u64 multiply and divide, integral operators":
-    test_fixed_point_u64_multiply_and_divide_integral_operators()
-
-noinline func test_fixed_point_u64_multiply_and_divide_integral_operators():
     var a: FixedPoint[u64, FixedPointPrecision32] = ---
     fixed_point_construct_f64_u64(&a, 1.5)
     var b: FixedPoint[u64, FixedPointPrecision32] = ---

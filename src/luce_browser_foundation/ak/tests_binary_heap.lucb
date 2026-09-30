@@ -7,26 +7,16 @@
 #       TestCircularQueue.cpp (ByteString values are `str`; the randomized heap cases run over
 #       a fixed pseudo-random sequence), and focused IDAllocator cases.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # mark: TestBinaryHeap ==========================================================================
 
 test "binary_heap: construct":
-    test_binary_heap_construct()
-
-noinline func test_binary_heap_construct():
     var empty: BinaryHeap[i32, i32]
     assert(binary_heap_is_empty(&empty))
     assert(binary_heap_size(&empty) == 0)
 
 test "binary_heap: construct_from_existing":
-    test_binary_heap_construct_from_existing()
-
-noinline func test_binary_heap_construct_from_existing():
     let keys: i32[3] = [3, 2, 1]
     let values: u8[3] = ['c', 'b', 'a']
     var from_existing: BinaryHeap[i32, u8]
@@ -37,9 +27,6 @@ noinline func test_binary_heap_construct_from_existing():
     assert(binary_heap_pop_min(&from_existing) == 'c')
 
 test "binary_heap: populate_int":
-    test_binary_heap_populate_int()
-
-noinline func test_binary_heap_populate_int():
     var ints: BinaryHeap[i32, i32]
     binary_heap_insert(&ints, 1, 10)
     binary_heap_insert(&ints, 3, 20)
@@ -53,9 +40,6 @@ noinline func test_binary_heap_populate_int():
     assert(binary_heap_size(&ints) == 0)
 
 test "binary_heap: populate_string":
-    test_binary_heap_populate_string()
-
-noinline func test_binary_heap_populate_string():
     var strings: BinaryHeap[i32, str]
     binary_heap_insert(&strings, 1, "ABC")
     binary_heap_insert(&strings, 2, "DEF")
@@ -65,9 +49,6 @@ noinline func test_binary_heap_populate_string():
     assert(binary_heap_is_empty(&strings))
 
 test "binary_heap: large_populate_reverse":
-    test_binary_heap_large_populate_reverse()
-
-noinline func test_binary_heap_large_populate_reverse():
     var ints: BinaryHeap[i32, i32]
     var i: i32 = 1023
     while i >= 0:
@@ -80,9 +61,6 @@ noinline func test_binary_heap_large_populate_reverse():
         assert(binary_heap_pop_min(&ints) == j)
 
 test "binary_heap: pop_min_is_min over pseudo-random keys":
-    test_binary_heap_pop_min_is_min_over_pseudo_random_keys()
-
-noinline func test_binary_heap_pop_min_is_min_over_pseudo_random_keys():
     var state: u64 = 12345
     for round in 0..<50:
         discard(round)
@@ -107,9 +85,6 @@ noinline func test_binary_heap_pop_min_is_min_over_pseudo_random_keys():
 # mark: TestQueue ===============================================================================
 
 test "queue: construct and populate_int":
-    test_queue_construct_and_populate_int()
-
-noinline func test_queue_construct_and_populate_int():
     var ints: Queue[i32]
     assert(queue_is_empty(&ints))
     assert(queue_size(&ints) == 0)
@@ -130,9 +105,6 @@ noinline func test_queue_construct_and_populate_int():
         recover 0
 
 test "queue: populate_string":
-    test_queue_populate_string()
-
-noinline func test_queue_populate_string():
     var strings: Queue[str]
     queue_enqueue(&strings, "ABC")
     queue_enqueue(&strings, "DEF")
@@ -149,9 +121,6 @@ func test_queue_add(context: void*?, value: const i64*):
     captures.sum += *value
 
 test "queue: order across segments":
-    test_queue_order_across_segments()
-
-noinline func test_queue_order_across_segments():
     with memory.heap:
         var numbers: Queue[i64]
         for i: i64 in 0..<10000:
@@ -172,9 +141,6 @@ noinline func test_queue_order_across_segments():
 # mark: TestStack ===============================================================================
 
 test "stack: basic":
-    test_stack_basic()
-
-noinline func test_stack_basic():
     var stack: Stack[i32]
     stack_construct(&stack, 3)
     assert(stack_is_empty(&stack))
@@ -192,9 +158,6 @@ noinline func test_stack_basic():
     assert(stack_is_empty(&stack))
 
 test "stack: complex_type":
-    test_stack_complex_type()
-
-noinline func test_stack_complex_type():
     var stack: Stack[str]
     stack_construct(&stack, 4)
     assert(stack_is_empty(&stack))
@@ -215,9 +178,6 @@ noinline func test_stack_complex_type():
 # mark: TestCircularQueue =======================================================================
 
 test "circular_queue: basic":
-    test_circular_queue_basic()
-
-noinline func test_circular_queue_basic():
     var ints: CircularQueue[i32]
     circular_queue_construct(&ints, 3)
     assert(circular_queue_is_empty(&ints))
@@ -241,9 +201,6 @@ noinline func test_circular_queue_basic():
     assert(circular_queue_size(&ints) == 0)
 
 test "circular_queue: complex_type and clear":
-    test_circular_queue_complex_type_and_clear()
-
-noinline func test_circular_queue_complex_type_and_clear():
     var strings: CircularQueue[str]
     circular_queue_construct(&strings, 2)
     circular_queue_enqueue(&strings, "ABC")

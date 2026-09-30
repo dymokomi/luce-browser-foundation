@@ -8,10 +8,6 @@
 #       empty table, and the checks that a table entry disappears with its last string (and that
 #       a moved-from string is empty) are left out.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 ## Empties the Utf16FlyString table, as every donor test starts with one (in the donor, the
@@ -38,9 +34,6 @@ func t16f_lit(text: str) -> Utf16FlyString:
     return literalutf16_fly_string_u16(units.data, units.length)
 
 test "short_ascii_literal_is_constexpr (Utf16FlyString)":
-    test_short_ascii_literal_is_constexpr_utf16flystring()
-
-noinline func test_short_ascii_literal_is_constexpr_utf16flystring():
     # The _utf16_fly_string UDL folds short ASCII literals to compile-time constants, both for
     # char and char16_t inputs.
     let from_char = t16f("foo")
@@ -51,9 +44,6 @@ noinline func test_short_ascii_literal_is_constexpr_utf16flystring():
     assert(utf16_fly_string_length_in_code_units(&from_char16) == 3)
 
 test "empty_string (Utf16FlyString)":
-    test_empty_string_utf16flystring()
-
-noinline func test_empty_string_utf16flystring():
     t16_reset_fly_strings()
     let fly = utf16_fly_string_new()
     assert(utf16_fly_string_is_empty(&fly))
@@ -63,9 +53,6 @@ noinline func test_empty_string_utf16flystring():
     assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
 
 test "short_string (Utf16FlyString)":
-    test_short_string_utf16flystring()
-
-noinline func test_short_string_utf16flystring():
     t16_reset_fly_strings()
     let fly1 = utf16_fly_string_from_utf16_string(utf16_string_from_str("foo"))
     assert(t16f_eq_str(&fly1, "foo"))
@@ -91,9 +78,6 @@ noinline func test_short_string_utf16flystring():
     assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
 
 test "long_string (Utf16FlyString)":
-    test_long_string_utf16flystring()
-
-noinline func test_long_string_utf16flystring():
     t16_reset_fly_strings()
     let fly1 = utf16_fly_string_from_utf16_string(utf16_string_from_str("thisisdefinitelymorethan7bytes"))
     assert(t16f_eq_str(&fly1, "thisisdefinitelymorethan7bytes"))
@@ -119,9 +103,6 @@ noinline func test_long_string_utf16flystring():
     assert(utf16_string_base_has_long_ascii_storage(&string3.utf16_string_base))
 
 test "user_defined_literal (Utf16FlyString)":
-    test_user_defined_literal_utf16flystring()
-
-noinline func test_user_defined_literal_utf16flystring():
     t16_reset_fly_strings()
     let fly1 = t16f("thisisdefinitelymorethan7bytes")
     assert(t16f_eq_str(&fly1, "thisisdefinitelymorethan7bytes"))
@@ -149,9 +130,6 @@ noinline func test_user_defined_literal_utf16flystring():
     assert(not t16f_eq(&fly3, &fly4))
 
 test "fly_string_keep_string_data_alive (Utf16FlyString)":
-    test_fly_string_keep_string_data_alive_utf16flystring()
-
-noinline func test_fly_string_keep_string_data_alive_utf16flystring():
     t16_reset_fly_strings()
     assert(utf16_fly_string_number_of_utf16_fly_strings() == 0)
     var fly = utf16_fly_string_new()
@@ -163,9 +141,6 @@ noinline func test_fly_string_keep_string_data_alive_utf16flystring():
     assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
 
 test "moved_fly_string_becomes_empty (Utf16FlyString)":
-    test_moved_fly_string_becomes_empty_utf16flystring()
-
-noinline func test_moved_fly_string_becomes_empty_utf16flystring():
     t16_reset_fly_strings()
     var fly1 = utf16_fly_string_new()
     assert(utf16_fly_string_is_empty(&fly1))
@@ -180,9 +155,6 @@ noinline func test_moved_fly_string_becomes_empty_utf16flystring():
     assert(utf16_fly_string_number_of_utf16_fly_strings() == 1)
 
 test "is_one_of (Utf16FlyString)":
-    test_is_one_of_utf16flystring()
-
-noinline func test_is_one_of_utf16flystring():
     let foo = utf16_fly_string_from_utf8_string_view(sv("foo"))
     let bar = utf16_fly_string_from_utf16(t16("bar"))
 
@@ -197,9 +169,6 @@ noinline func test_is_one_of_utf16flystring():
     assert(t16f_eq_str(&bar, "bar"))
 
 test "optional (Utf16FlyString)":
-    test_optional_utf16flystring()
-
-noinline func test_optional_utf16flystring():
     t16_reset_fly_strings()
     # Optional<Utf16FlyString> is the null sentinel (is_invalid) in the C++.
     var string = utf16_fly_string_new()
@@ -216,12 +185,9 @@ noinline func test_optional_utf16flystring():
     assert(utf16_fly_string_eq_utf16_view(&string, &expected))
 
 test "interned_strings_outlive_the_allocator_that_was_current (Utf16FlyString)":
-    test_interned_strings_outlive_the_allocator_that_was_current_utf16flystring()
-
-# Not in the donor's tests: as FlyString's test of the same name, for ASCII and UTF-16 storage.
-# Strings are interned while a scoped allocator is current, the scope ends and its memory is
-# overwritten, and the strings, the table and later lookups must be unaffected.
-noinline func test_interned_strings_outlive_the_allocator_that_was_current_utf16flystring():
+    # Not in the donor's tests: as FlyString's test of the same name, for ASCII and UTF-16 storage.
+    # Strings are interned while a scoped allocator is current, the scope ends and its memory is
+    # overwritten, and the strings, the table and later lookups must be unaffected.
     t16_reset_fly_strings()
     let count: usize = 40
     var text: u8[64]

@@ -7,10 +7,6 @@
 #       (to_number<T>); move_string's "moved-from is empty" check has no counterpart (moves
 #       are copies, DESIGN.md §3.3).
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 ## `ByteString("text")`.
@@ -29,9 +25,6 @@ func tc_strlen(characters: const u8*) -> usize:
     return length
 
 test "construct_empty":
-    test_construct_empty()
-
-noinline func test_construct_empty():
     let empty = byte_string_empty()
     assert(byte_string_is_empty(&empty))
 
@@ -46,9 +39,6 @@ noinline func test_construct_empty():
     assert(byte_string_characters(&from_literal)[0] == 0)
 
 test "construct_contents":
-    test_construct_contents()
-
-noinline func test_construct_contents():
     let test_string = tc_bs("ABCDEF")
     assert(not byte_string_is_empty(&test_string))
     assert(byte_string_length(&test_string) == 6)
@@ -60,18 +50,12 @@ noinline func test_construct_contents():
     assert(not tc_bs_is(&test_string, "ABCDEFG"))
 
 test "equal":
-    test_equal()
-
-noinline func test_equal():
     var constructed = byte_string_empty()
     byte_string_construct(&constructed)
     let empty = byte_string_empty()
     assert(byte_string_eq_byte_string(&empty, &constructed))
 
 test "compare":
-    test_compare()
-
-noinline func test_compare():
     let a = tc_bs("a")
     let b = tc_bs("b")
     let empty = byte_string_empty()
@@ -102,17 +86,11 @@ noinline func test_compare():
     assert(byte_string_le_byte_string(&empty, &empty))
 
 test "index_access":
-    test_index_access()
-
-noinline func test_index_access():
     let test_string = tc_bs("ABCDEF")
     assert(byte_string_at(&test_string, 0) == 'A')
     assert(byte_string_at(&test_string, 1) == 'B')
 
 test "starts_with":
-    test_starts_with()
-
-noinline func test_starts_with():
     let test_string = tc_bs("ABCDEF")
     assert(byte_string_starts_with_string_view(&test_string, sv("AB")))
     assert(byte_string_starts_with_u8(&test_string, 'A'))
@@ -123,9 +101,6 @@ noinline func test_starts_with():
     assert(not byte_string_starts_with_string_view(&test_string, sv("abc"), CaseSensitivity.case_sensitive))
 
 test "ends_with":
-    test_ends_with()
-
-noinline func test_ends_with():
     let test_string = tc_bs("ABCDEF")
     assert(byte_string_ends_with_string_view(&test_string, sv("EF")))
     assert(byte_string_ends_with_u8(&test_string, 'F'))
@@ -136,27 +111,18 @@ noinline func test_ends_with():
     assert(not byte_string_ends_with_string_view(&test_string, sv("def"), CaseSensitivity.case_sensitive))
 
 test "copy_string":
-    test_copy_string()
-
-noinline func test_copy_string():
     let test_string = tc_bs("ABCDEF")
     let test_string_copy = test_string
     assert(byte_string_eq_byte_string(&test_string, &test_string_copy))
     assert(byte_string_characters(&test_string) == byte_string_characters(&test_string_copy))
 
 test "move_string":
-    test_move_string()
-
-noinline func test_move_string():
     let test_string = tc_bs("ABCDEF")
     let test_string_copy = test_string
     let test_string_move = test_string_copy
     assert(byte_string_eq_byte_string(&test_string, &test_string_move))
 
 test "repeated":
-    test_repeated()
-
-noinline func test_repeated():
     let zero = byte_string_repeated_u8('x', 0)
     assert(tc_bs_is(&zero, ""))
     let one = byte_string_repeated_u8('x', 1)
@@ -165,25 +131,16 @@ noinline func test_repeated():
     assert(tc_bs_is(&two, "xx"))
 
 test "to_lowercase":
-    test_to_lowercase()
-
-noinline func test_to_lowercase():
     let string = tc_bs("ABC")
     let lowercase = byte_string_to_lowercase(&string)
     assert(tc_bs_is(&lowercase, "abc"))
 
 test "to_uppercase":
-    test_to_uppercase()
-
-noinline func test_to_uppercase():
     let string = tc_bs("AbC")
     let uppercase = byte_string_to_uppercase(&string)
     assert(tc_bs_is(&uppercase, "ABC"))
 
 test "replace":
-    test_replace()
-
-noinline func test_replace():
     var test_string = tc_bs("Well, hello Friends!")
 
     test_string = byte_string_replace(&test_string, sv("Friends"), sv("Testers"), ReplaceMode.first_only)
@@ -203,9 +160,6 @@ noinline func test_replace():
     assert(tc_bs_is(&test_string, "111._.|||._.|||"))
 
 test "count":
-    test_count()
-
-noinline func test_count():
     var test_string = tc_bs("Well, hello Friends!")
     var count = byte_string_count(&test_string, sv("Friends"))
     assert(count == 1)
@@ -224,9 +178,6 @@ noinline func test_count():
     assert(count == 2)
 
 test "substring":
-    test_substring()
-
-noinline func test_substring():
     let subject = tc_bs("abcdef")
     let whole = byte_string_substring_usize(&subject, 0, 6)
     assert(byte_string_eq_byte_string(&whole, &subject))
@@ -240,9 +191,6 @@ noinline func test_substring():
     assert(tc_bs_is(&empty_end, ""))
 
 test "split":
-    test_split()
-
-noinline func test_split():
     var subject = tc_bs("foo bar baz")
     var parts = byte_string_split(&subject, ' ')
     assert(test_vector_size(&parts) == 3)
@@ -284,18 +232,12 @@ noinline func test_split():
     assert(test_vector_size(&split_view_x_empty) == 4)
 
 test "builder_zero_initial_capacity":
-    test_builder_zero_initial_capacity()
-
-noinline func test_builder_zero_initial_capacity():
     var builder = string_builder_new_usize(0)
     string_builder_append_string_view(&builder, sv(""))
     let built = string_builder_to_byte_string(&builder)
     assert(byte_string_length(&built) == 0)
 
 test "find":
-    test_find()
-
-noinline func test_find():
     let a = tc_bs("foobarbar")
     assert(byte_string_find_string_view(&a, sv("bar")) == 3)
     assert(byte_string_find_string_view(&a, sv("baz")) == none)
@@ -310,9 +252,6 @@ noinline func test_find():
     assert(byte_string_find_u8(&a, 'b', 9) == none)
 
 test "find_with_empty_needle":
-    test_find_with_empty_needle()
-
-noinline func test_find_with_empty_needle():
     var string = tc_bs("")
     assert(byte_string_find_string_view(&string, sv("")) == 0)
     let all_in_empty = byte_string_find_all(&string, sv(""))

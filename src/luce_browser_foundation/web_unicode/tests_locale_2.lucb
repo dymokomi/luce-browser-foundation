@@ -13,10 +13,6 @@
 #       by syntax only (docs/regions/r07.md). Those cases stay in place as comments marked
 #       "CLDR alias, not ported".
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # mark: Helpers =================================================================================
@@ -81,9 +77,6 @@ var no_strings: const str[]
 # mark: parse_unicode_locale_id =================================================================
 
 test "parse_unicode_locale_id":
-    test_parse_unicode_locale_id()
-
-noinline func test_parse_unicode_locale_id():
     expect_locale_parse_fails("a")
     expect_locale_parse_fails("1234")
     expect_locale_parse_fails("aaa-")
@@ -114,9 +107,6 @@ func expect_locale_extension(locale: str, attributes: const str[], keywords: con
             trap("get<Unicode::LocaleExtension>()")
 
 test "parse_unicode_locale_id_with_unicode_locale_extension":
-    test_parse_unicode_locale_id_with_unicode_locale_extension()
-
-noinline func test_parse_unicode_locale_id_with_unicode_locale_extension():
     expect_locale_parse_fails("en-u")
     expect_locale_parse_fails("en-u-")
     expect_locale_parse_fails("en-u-x")
@@ -158,9 +148,6 @@ func expect_transformed_extension(locale: str, language: ExpectedLanguage?, fiel
             trap("get<Unicode::TransformedExtension>()")
 
 test "parse_unicode_locale_id_with_transformed_extension":
-    test_parse_unicode_locale_id_with_transformed_extension()
-
-noinline func test_parse_unicode_locale_id_with_transformed_extension():
     expect_locale_parse_fails("en-t")
     expect_locale_parse_fails("en-t-")
     expect_locale_parse_fails("en-t-a")
@@ -205,9 +192,6 @@ func expect_other_extension(locale: str, key: u8, value: str):
             trap("get<Unicode::OtherExtension>()")
 
 test "parse_unicode_locale_id_with_other_extension":
-    test_parse_unicode_locale_id_with_other_extension()
-
-noinline func test_parse_unicode_locale_id_with_other_extension():
     expect_locale_parse_fails("en-z")
     expect_locale_parse_fails("en-0")
     expect_locale_parse_fails("en-z-")
@@ -232,9 +216,6 @@ func expect_private_use(locale: str, expected: const str[]):
     assert(string_vector_equals(&locale_id.private_use_extensions, expected))
 
 test "parse_unicode_locale_id_with_private_use_extension":
-    test_parse_unicode_locale_id_with_private_use_extension()
-
-noinline func test_parse_unicode_locale_id_with_private_use_extension():
     expect_locale_parse_fails("en-x")
     expect_locale_parse_fails("en-x-")
     expect_locale_parse_fails("en-x-aaaaaaaaa")
@@ -253,9 +234,6 @@ func expect_canonical(locale: str, expected: str):
     assert(view_equals(ak.string_bytes_as_string_view(&canonical_locale), expected))
 
 test "canonicalize_unicode_locale_id":
-    test_canonicalize_unicode_locale_id()
-
-noinline func test_canonicalize_unicode_locale_id():
     expect_canonical("aaa", "aaa")
     expect_canonical("AaA", "aaa")
     expect_canonical("aaa-bbbb", "aaa-Bbbb")

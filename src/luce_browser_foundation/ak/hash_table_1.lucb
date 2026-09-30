@@ -324,8 +324,9 @@ pub func hash_table_ensure_u32[T, TT: Traits[T]](this: HashTable[T, TT]*, hash_:
 pub func hash_table_find_u32_tt_unary_predicate[T, TT: Traits[T]](this: HashTable[T, TT]*, hash_: u32, predicate: Function1[const T*, bool]) -> HashTableIterator[T]:
     return HashTableIterator[T](m_bucket = hash_table_lookup_with_hash(this, hash_, predicate), m_end_bucket = hash_table_end_bucket(this), m_ordered = this.m_ordered)
 
-# The predicate of find(T const&): `TraitsForT::equals(entry, value)`.
-# workaround: compiler-issues/generic_function_value (the callback is a static method)
+# The predicate of find(T const&): `TraitsForT::equals(entry, value)`. It is a static method of
+# the captures because no parameter of a function mentions TT, and a generic function value takes
+# its type arguments from the expected function type only (`f[T, TT]` does not name an instance).
 struct HashTableEqualsValue[T, TT: Traits[T]]:
     var value: T
 
@@ -351,8 +352,8 @@ pub func hash_table_find_u32_tt_unary_predicate_const[T, TT: Traits[T]](this: co
 pub func hash_table_find_t_const[T, TT: Traits[T]](this: const HashTable[T, TT]*, value: T) -> HashTableIterator[T]:
     return hash_table_find_t((HashTable[T, TT]*)this, value)
 
-# The predicate of find(K const&): `Traits<T>::equals(entry, value)` for a hash-compatible key.
-# workaround: compiler-issues/generic_function_value (the callback is a static method)
+# The predicate of find(K const&): `Traits<T>::equals(entry, value)` for a hash-compatible key. A
+# static method of the captures, as HashTableEqualsValue is (no parameter mentions KT).
 struct HashTableEqualsKey[T, K, KT: HashCompatibleTraits[T, K]]:
     var value: K
 

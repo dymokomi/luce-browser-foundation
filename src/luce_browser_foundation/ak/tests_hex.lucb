@@ -6,16 +6,9 @@
 #       Port of Tests/AK/TestHex.cpp (should_constexpr_decode_hex_digit runs at run time),
 #       plus tests of decode_hex/encode_hex pinned to the donor's behaviour.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 test "hex: should decode hex digit":
-    test_hex_should_decode_hex_digit()
-
-noinline func test_hex_should_decode_hex_digit():
     assert(0 == decode_hex_digit('0'))
     assert(1 == decode_hex_digit('1'))
     assert(2 == decode_hex_digit('2'))
@@ -42,9 +35,6 @@ noinline func test_hex_should_decode_hex_digit():
     assert(255 == decode_hex_digit(' '))
 
 test "hex: decode and encode":
-    test_hex_decode_and_encode()
-
-noinline func test_hex_decode_and_encode():
     let decoded = decode_hex(sv("48656c6C6f00ff")) else trap("decode_hex")
     let bytes = byte_buffer_span_const(&decoded)
     assert(compare_bytes(bytes, b"Hello\x00\xff") == 0 and bytes.length == 7)

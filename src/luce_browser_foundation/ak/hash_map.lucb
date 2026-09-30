@@ -28,8 +28,9 @@ pub func hash_map_entry_traits_equals[K, V, KT: Traits[K]](a: const HashMapEntry
     var traits: KT = ---
     return traits.equals(&a.key, &b.key)
 
-# The predicate of find(key): `KeyTraits::equals(entry.key, key)`.
-# workaround: compiler-issues/generic_function_value (the callback is a static method)
+# The predicate of find(key): `KeyTraits::equals(entry.key, key)`. It is a static method of the
+# captures because no parameter of a function mentions KT, and a generic function value takes its
+# type arguments from the expected function type only (`f[K, V, KT]` does not name an instance).
 struct HashMapKeyEquals[K, V, KT: Traits[K]]:
     var key: K
 
@@ -47,32 +48,28 @@ struct HashMapCompatibleKeyEquals[K, V, Key, KeyT: HashCompatibleTraits[K, Key]]
         var traits: KeyT = ---
         return traits.equals(&entry.key, &captures.key)
 
-# The predicate of remove_all_matching and take_all_matching: `predicate(entry.key, entry.value)`.
-struct HashMapEntryPredicate[K, V]:
-    var predicate: Function2[const K*, const V*, bool]
+# The predicate of remove_all_matching and take_all_matching: `predicate(entry.key, entry.value)`,
+# with the predicate as the context.
+func hash_map_entry_predicate[K, V](context: void*?, entry: const HashMapEntry[K, V]*) -> bool:
+    let predicate = (const Function2[const K*, const V*, bool]*)(context else trap("HashMap: no predicate"))
+    return function2_call(predicate, &entry.key, &entry.value)
 
-    static func call(context: void*?, entry: const HashMapEntry[K, V]*) -> bool:
-        let captures = (const HashMapEntryPredicate[K, V]*)(context else trap("HashMap: no captures"))
-        return function2_call(&captures.predicate, &entry.key, &entry.value)
-
-# ensure()'s initialization callback: `[&] -> Entry { return { key, initialization_callback() }; }`.
+# The captures of ensure()'s initialization callback.
 struct HashMapEnsureEntry[K, V]:
     var key: K
     var initialization_callback: Function0[V]
 
-    static func call(context: void*?) -> HashMapEntry[K, V]:
-        let captures = (const HashMapEnsureEntry[K, V]*)(context else trap("HashMap: no captures"))
-        return HashMapEntry[K, V](key = captures.key, value = function0_call(&captures.initialization_callback))
+# ensure()'s initialization callback: `[&] -> Entry { return { key, initialization_callback() }; }`.
+func hash_map_ensure_entry[K, V](context: void*?) -> HashMapEntry[K, V]:
+    let captures = (const HashMapEnsureEntry[K, V]*)(context else trap("HashMap: no captures"))
+    return HashMapEntry[K, V](key = captures.key, value = function0_call(&captures.initialization_callback))
 
 # ensure(key)'s default callback: `[] { return V(); }`, the zero value.
-struct HashMapDefaultValue[V]:
-    var unused: u8
-
-    static func call(context: void*?) -> V:
-        discard(context)
-        var value: V = ---
-        memory.set(u8[]((u8*)&value, sizeof(V)), 0)
-        return value
+func hash_map_default_value[V](context: void*?) -> V:
+    discard(context)
+    var value: V = ---
+    memory.set(u8[]((u8*)&value, sizeof(V)), 0)
+    return value
 
 # mark: Construction and size ===================================================================
 
@@ -163,15 +160,15 @@ pub func hash_map_remove_t_key[K, V, KT: Traits[K], Key, KeyT: HashCompatibleTra
 
 ## Ported from AK/HashMap.h:96 AK::HashMap::remove_all_matching.
 pub func hash_map_remove_all_matching[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, predicate: Function2[const K*, const V*, bool]) -> bool:
-    var captures = HashMapEntryPredicate[K, V](predicate = predicate)
-    let call: func(void*?, const HashMapEntry[K, V]*) -> bool = HashMapEntryPredicate[K, V].call
-    return hash_table_remove_all_matching(&this.m_table, Function1[const HashMapEntry[K, V]*, bool](call = call, context = &captures))
+    var captured = predicate
+    let call: func(void*?, const HashMapEntry[K, V]*) -> bool = hash_map_entry_predicate
+    return hash_table_remove_all_matching(&this.m_table, Function1[const HashMapEntry[K, V]*, bool](call = call, context = &captured))
 
 ## Ported from AK/HashMap.h:104 AK::HashMap::take_all_matching.
 pub func hash_map_take_all_matching[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, predicate: Function2[const K*, const V*, bool]) -> Vector[HashMapEntry[K, V]]:
-    var captures = HashMapEntryPredicate[K, V](predicate = predicate)
-    let call: func(void*?, const HashMapEntry[K, V]*) -> bool = HashMapEntryPredicate[K, V].call
-    return hash_table_take_all_matching(&this.m_table, Function1[const HashMapEntry[K, V]*, bool](call = call, context = &captures))
+    var captured = predicate
+    let call: func(void*?, const HashMapEntry[K, V]*) -> bool = hash_map_entry_predicate
+    return hash_table_take_all_matching(&this.m_table, Function1[const HashMapEntry[K, V]*, bool](call = call, context = &captured))
 
 # mark: Iteration and lookup ====================================================================
 
@@ -305,14 +302,14 @@ pub func hash_map_ensure_t_callback[K, V, KT: Traits[K]](this: HashMap[K, V, KT]
     var equals_captures = HashMapKeyEquals[K, V, KT](key = key)
     let equals: func(void*?, const HashMapEntry[K, V]*) -> bool = HashMapKeyEquals[K, V, KT].call
     var entry_captures = HashMapEnsureEntry[K, V](key = key, initialization_callback = initialization_callback)
-    let make_entry: func(void*?) -> HashMapEntry[K, V] = HashMapEnsureEntry[K, V].call
+    let make_entry: func(void*?) -> HashMapEntry[K, V] = hash_map_ensure_entry
     let entry = hash_table_ensure_u32(&this.m_table, traits.hash_of(&key), Function1[const HashMapEntry[K, V]*, bool](call = equals, context = &equals_captures), Function0[HashMapEntry[K, V]](call = make_entry, context = &entry_captures), existing_entry_behavior)
     return &entry.value
 
 ## Ported from AK/HashMap.h:274 AK::HashMap::ensure(key): inserts V() (the zero value) when the
 ## key is absent.
 pub func hash_map_ensure[K, V, KT: Traits[K]](this: HashMap[K, V, KT]*, key: K) -> V*:
-    let make_value: func(void*?) -> V = HashMapDefaultValue[V].call
+    let make_value: func(void*?) -> V = hash_map_default_value
     return hash_map_ensure_t_callback(this, key, Function0[V](call = make_value, context = none))
 
 ## Ported from AK/HashMap.h:280 AK::HashMap::try_ensure. A fallible callback (FallibleFunction)

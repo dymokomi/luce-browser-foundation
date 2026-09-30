@@ -7,10 +7,6 @@
 #       donor build's libsimdutf 7.4.0), MemMem, UnicodeUtils, StringBuilder, StringNumber and
 #       Utf32View.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # mark: simdutf =================================================================================
@@ -24,9 +20,6 @@ func tc_check_utf8(bytes: const u8[], expected_error: SimdutfErrorCode, count: u
     assert(simdutf_utf16_length_from_utf8(bytes) == utf16_length)
 
 test "simdutf: UTF-8 validation errors and lengths":
-    test_simdutf_utf_8_validation_errors_and_lengths()
-
-noinline func test_simdutf_utf_8_validation_errors_and_lengths():
     tc_check_utf8(b"hello", SimdutfErrorCode.success, 5, 5, 5)
     tc_check_utf8(b"h\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80", SimdutfErrorCode.success, 10, 4, 5)
     tc_check_utf8(b"ab\xff", SimdutfErrorCode.header_bits, 2, 3, 4)
@@ -39,9 +32,6 @@ noinline func test_simdutf_utf_8_validation_errors_and_lengths():
     assert(not simdutf_validate_ascii(b"caf\xc3\xa9"))
 
 test "simdutf: UTF-8 to UTF-16":
-    test_simdutf_utf_8_to_utf_16()
-
-noinline func test_simdutf_utf_8_to_utf_16():
     var output: u16[8]
     let written = simdutf_convert_utf8_to_utf16(b"h\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80", output)
     assert(written == 5)
@@ -51,9 +41,6 @@ noinline func test_simdutf_utf_8_to_utf_16():
     assert(simdutf_convert_utf8_to_utf16(b"a\xff", output) == 0)
 
 test "simdutf: UTF-16 validation, lengths and well-formed copies":
-    test_simdutf_utf_16_validation_lengths_and_well_formed_copies()
-
-noinline func test_simdutf_utf_16_validation_lengths_and_well_formed_copies():
     let units: u16[7] = [0x41, 0xd83d, 0xde00, 0xe9, 0xdc00, 0x42, 0xd800]
     let result = simdutf_validate_utf16_with_errors(units)
     assert(result.error == SimdutfErrorCode.surrogate)
@@ -72,9 +59,6 @@ noinline func test_simdutf_utf_16_validation_lengths_and_well_formed_copies():
         assert(well_formed[i] == expected[i])
 
 test "simdutf: UTF-16 to UTF-8":
-    test_simdutf_utf_16_to_utf_8()
-
-noinline func test_simdutf_utf_16_to_utf_8():
     let units: u16[7] = [0x41, 0xd83d, 0xde00, 0xe9, 0xdc00, 0x42, 0xd800]
     var output: u8[32]
     let written = simdutf_convert_utf16_to_utf8(units[..<4], output)
@@ -88,9 +72,6 @@ noinline func test_simdutf_utf_16_to_utf_8():
     assert(simdutf_convert_utf16_to_utf8(units, output) == 0)
 
 test "simdutf: UTF-16 bytes in either order":
-    test_simdutf_utf_16_bytes_in_either_order()
-
-noinline func test_simdutf_utf_16_bytes_in_either_order():
     let big_endian = b"\x00\x41\xd8\x3d\xde\x00\xd8\x00"
     assert(simdutf_validate_utf16_bytes(big_endian[..<6], true))
     assert(not simdutf_validate_utf16_bytes(big_endian, true))
@@ -104,9 +85,6 @@ noinline func test_simdutf_utf_16_bytes_in_either_order():
     assert(tc_bytes_equal(output[..<5], b"\x41\xf0\x9f\x98\x80"))
 
 test "simdutf: UTF-32":
-    test_simdutf_utf_32()
-
-noinline func test_simdutf_utf_32():
     let code_points: u32[4] = [0x41, 0xe9, 0x20ac, 0x1f600]
     assert(simdutf_validate_utf32(code_points))
     assert(simdutf_utf16_length_from_utf32(code_points) == 5)
@@ -126,9 +104,6 @@ noinline func test_simdutf_utf_32():
     assert(simdutf_convert_utf32_to_utf8(too_large, utf8) == 0)
 
 test "simdutf: find":
-    test_simdutf_find()
-
-noinline func test_simdutf_find():
     assert(simdutf_find(b"abcabc", 'c') == 2)
     assert(simdutf_find(b"abcabc", 'x') == none)
     let units: u16[3] = [1, 2, 2]
@@ -138,9 +113,6 @@ noinline func test_simdutf_find():
 # mark: MemMem ==================================================================================
 
 test "memmem: short needles (bitap)":
-    test_memmem_short_needles_bitap()
-
-noinline func test_memmem_short_needles_bitap():
     assert(memmem_optional(b"hello", b"") == 0)
     assert(memmem_optional(b"he", b"hello") == none)
     assert(memmem_optional(b"hello", b"hello") == 0)
@@ -151,9 +123,6 @@ noinline func test_memmem_short_needles_bitap():
     assert(memmem_optional(b"aaaab", b"aab") == 2)
 
 test "memmem: long needles (KMP)":
-    test_memmem_long_needles_kmp()
-
-noinline func test_memmem_long_needles_kmp():
     let needle = b"abcdefghijklmnopqrstuvwxyz0123456789"
     assert(memmem_optional(b"--abcdefghijklmnopqrstuvwxyz0123456789--", needle) == 2)
     assert(memmem_optional(b"--abcdefghijklmnopqrstuvwxyz012345678--", needle) == none)
@@ -175,9 +144,6 @@ struct TcCodeUnits: Utf16CodeUnitCallback:
         self.count += 1
 
 test "unicode utils: UTF-8 encoding":
-    test_unicode_utils_utf_8_encoding()
-
-noinline func test_unicode_utils_utf_8_encoding():
     assert(unicode_utils_bytes_to_store_code_point_in_utf8(0x7f) == 1)
     assert(unicode_utils_bytes_to_store_code_point_in_utf8(0x80) == 2)
     assert(unicode_utils_bytes_to_store_code_point_in_utf8(0x7ff) == 2)
@@ -195,9 +161,6 @@ noinline func test_unicode_utils_utf_8_encoding():
     assert(too_large.length == 0)
 
 test "unicode utils: UTF-16 encoding":
-    test_unicode_utils_utf_16_encoding()
-
-noinline func test_unicode_utils_utf_16_encoding():
     assert(unicode_utils_code_unit_length_for_code_point(0xffff) == 1)
     assert(unicode_utils_code_unit_length_for_code_point(0x10000) == 2)
     assert(unicode_utils_is_utf16_high_surrogate(0xd800) and unicode_utils_is_utf16_high_surrogate(0xdbff))
@@ -228,9 +191,6 @@ func tc_utf16_is(view: const Utf16View*, expected: const u16[]) -> bool:
     return true
 
 test "string builder: UTF-8 code points":
-    try test_string_builder_utf_8_code_points()
-
-noinline func test_string_builder_utf_8_code_points() -> !:
     var builder = string_builder_new()
     string_builder_append_code_point(&builder, (u32)'a')
     string_builder_append_code_point(&builder, 0xe9)
@@ -250,9 +210,6 @@ noinline func test_string_builder_utf_8_code_points() -> !:
     assert(string_builder_is_empty(&builder))
 
 test "string builder: UTF-16 mode switches from ASCII storage":
-    test_string_builder_utf_16_mode_switches_from_ascii_storage()
-
-noinline func test_string_builder_utf_16_mode_switches_from_ascii_storage():
     var builder = string_builder_new_mode(StringBuilderMode.utf16)
     string_builder_append(&builder, "abc")
     let ascii_view = string_builder_utf16_string_view(&builder)
@@ -278,9 +235,6 @@ noinline func test_string_builder_utf_16_mode_switches_from_ascii_storage():
     assert(utf16_string_base_length_in_code_points(&string.utf16_string_base) == 5)
 
 test "string builder: UTF-16 views appended in UTF-8 mode":
-    test_string_builder_utf_16_views_appended_in_utf_8_mode()
-
-noinline func test_string_builder_utf_16_views_appended_in_utf_8_mode():
     var builder = string_builder_new()
     let units: u16[5] = [0x41, 0xd83d, 0xde00, 0xdc00, 0x42]
     string_builder_append_utf16_view(&builder, utf16_view_from_utf16(units))
@@ -289,18 +243,12 @@ noinline func test_string_builder_utf_16_views_appended_in_utf_8_mode():
     assert(tc_bytes_equal(string_view_bytes(&view), b"\x41\xf0\x9f\x98\x80\xed\xb0\x80\x42"))
 
 test "string builder: append_escaped_for_json":
-    test_string_builder_append_escaped_for_json()
-
-noinline func test_string_builder_append_escaped_for_json():
     var builder = string_builder_new()
     string_builder_append_escaped_for_json(&builder, string_view_from_bytes(b"\"\\\x08\n\t\x01\x1fx"))
     let view = string_builder_string_view(&builder)
     assert(tc_view_is(view, "\\\"\\\\\\b\\n\\t\\u0001\\u001fx"))
 
 test "string builder: append_repeated and append_as_lowercase":
-    test_string_builder_append_repeated_and_append_as_lowercase()
-
-noinline func test_string_builder_append_repeated_and_append_as_lowercase():
     var builder = string_builder_new()
     string_builder_append_repeated_u8(&builder, '-', 3)
     string_builder_append_repeated_string_view(&builder, sv("ab"), 2)
@@ -314,9 +262,6 @@ noinline func test_string_builder_append_repeated_and_append_as_lowercase():
 # mark: StringNumber ============================================================================
 
 test "string number: extremes":
-    test_string_number_extremes()
-
-noinline func test_string_number_extremes():
     let minimum = string_number_i64(-9223372036854775808)
     assert(string_eq_string_view(&minimum, sv("-9223372036854775808")))
     let maximum = string_number_i64(9223372036854775807)
@@ -341,9 +286,6 @@ noinline func test_string_number_extremes():
 # mark: Utf32View ===============================================================================
 
 test "utf32 view":
-    test_utf32_view()
-
-noinline func test_utf32_view():
     let code_points: u32[4] = [0x41, 0xe9, 0x20ac, 0x1f600]
     let view = utf32_view_from_span(code_points)
     assert(utf32_view_length(&view) == 4)

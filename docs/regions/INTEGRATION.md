@@ -131,9 +131,9 @@ merge changed to make the regions fit, what is still unported, and why nothing i
 
 - The generated upcast methods (`cell()`, `stream()`, `cell_visitor()`, …) are `pub` in ak, gc
   and text_codec. web_unicode is left as the skeleton made it, because r07 edits it.
-- Every ak test block calls a `noinline` function that holds its body (# workaround:
-  compiler-issues/ranges_facts_cubic). Without this, the ak test build takes more than 25
-  minutes; with it, the whole of `./test.sh` runs in about 1.5 minutes.
+- Every ak test block used to call a `noinline` function that held its body, because of
+  compiler-issues/ranges_facts_cubic (the ak test build took more than 25 minutes). Luce 0.8.13
+  fixed it; the bodies are back in the test blocks and ak's tests build and run in seconds.
 - Test fragments over about 600 lines are split: `tests_hash_map`, `tests_time_2`,
   `tests_json_2` and `tests_format_2`.
 - The test gates are removed:
@@ -143,8 +143,9 @@ merge changed to make the regions fit, what is still unported, and why nothing i
 
   Every test they guarded runs.
 - `test.sh` always checks and runs every module's tests and both test programs:
-  - the text_codec and web_url tests with `--native`, because of the interpreter's quadratic
-    start-up on large global arrays;
+  - the text_codec and web_url tests used to run with `--native`, because of the interpreter's
+    quadratic start-up on large global arrays (compiler-issues/interpreter_global_array_quadratic);
+    that is fixed, and they run as `luce-base test` in a few seconds;
   - ak and gc natively anyway, because they contain `asm`.
 - `docs/namemap.tsv` is sorted in byte order. It is the union of r02's, r04's and r05's rows
   (r01, r03 and r06 added none), plus the integration's rows:
@@ -248,6 +249,8 @@ None. Every test block runs.
 
 - `compiler-issues/ranges_facts_cubic.lucb`: the native backend's range pass is cubic in the
   bounds checks that dominate each other in one function. Test blocks called once from `main`
-  are inlined into it. The workaround is the `noinline` test bodies described above.
-- Not reduced, and not needed by `test.sh`: `luce-base test --backend=c` crashes (SIGSEGV) on
-  this package's modules (web_infra, ak), but not on a single-file test.
+  are inlined into it. Fixed in Luce 0.8.13; the `noinline` test bodies described above are gone.
+- Not needed by `test.sh`: with Luce 0.8.22, `luce-base test --backend=c` of ak and of every
+  module that imports it is rejected by the C compiler: the C backend does not declare a
+  top-level `let` before another top-level `let` takes its address (ak's stream vtables and
+  class infos name each other: "use of undeclared identifier ..._12stream_class").

@@ -7,10 +7,6 @@
 #       std::random_access_iterator) has no luce-base counterpart; constexpr_stuff runs its
 #       static_asserts at run time, with `is_one_of` spelled as the comparisons it folds.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 ## Whether a vector of views holds exactly the `expected` texts, in order.
@@ -24,18 +20,12 @@ func string_view_vector_equals(views: const Vector[StringView]*, expected: const
     return true
 
 test "construct_empty":
-    test_construct_empty_3()
-
-noinline func test_construct_empty_3():
     let empty = StringView()
     assert(string_view_is_empty(&empty))
     assert(string_view_eq_string_view(&empty, sv("")))
     assert(string_view_length(&empty) == 0)
 
 test "view_literal":
-    test_view_literal()
-
-noinline func test_view_literal():
     let truth = "cats rule dogs drool"
     let view = literalsv_u8(truth.bytes.data, truth.length)
     assert(string_view_characters_without_null_termination(&view) == truth.bytes.data)
@@ -43,9 +33,6 @@ noinline func test_view_literal():
     assert(string_view_eq_u8_const(&view, truth.bytes.data))
 
 test "optional_string_view":
-    test_optional_string_view()
-
-noinline func test_optional_string_view():
     var missing: StringView? = none
     assert(missing == none)
 
@@ -64,9 +51,6 @@ noinline func test_optional_string_view():
     assert(missing != none)
 
 test "compare_views":
-    test_compare_views()
-
-noinline func test_compare_views():
     let foo1 = byte_string_from_str("foo")
     let foo2 = byte_string_from_str("foo")
     let view1 = byte_string_view(&foo1)
@@ -86,9 +70,6 @@ noinline func test_compare_views():
     assert(string_view_equals(&default_view, ""))
 
 test "string_view_literal_operator":
-    test_string_view_literal_operator()
-
-noinline func test_string_view_literal_operator():
     let literal_view = sv("foo")
     let test_string = byte_string_from_str("foo")
 
@@ -96,9 +77,6 @@ noinline func test_string_view_literal_operator():
     assert(string_view_eq_byte_string(&literal_view, test_string))
 
 test "starts_with":
-    test_starts_with_4()
-
-noinline func test_starts_with_4():
     let test_string = byte_string_from_str("ABCDEF")
     let test_string_view = byte_string_view(&test_string)
     assert(string_view_starts_with_u8(&test_string_view, 'A'))
@@ -110,9 +88,6 @@ noinline func test_starts_with_4():
     assert(not string_view_starts_with_string_view(&test_string_view, sv("abc"), CaseSensitivity.case_sensitive))
 
 test "ends_with":
-    test_ends_with_4()
-
-noinline func test_ends_with_4():
     let test_string = byte_string_from_str("ABCDEF")
     let test_string_view = byte_string_view(&test_string)
     assert(string_view_ends_with_string_view(&test_string_view, sv("DEF")))
@@ -125,9 +100,6 @@ noinline func test_ends_with_4():
     assert(not string_view_ends_with_string_view(&test_string_view, sv("def"), CaseSensitivity.case_sensitive))
 
 test "lines":
-    test_lines()
-
-noinline func test_lines():
     var test_string = byte_string_from_str("a\rb\nc\r\nd")
     var test_string_view = byte_string_view(&test_string)
     var test_string_vector = string_view_lines(&test_string_view)
@@ -154,9 +126,6 @@ func string_view_count_lines_of(text: str, consider_carriage_return: StringViewC
     return string_view_count_lines(&view, consider_carriage_return)
 
 test "count_lines":
-    test_count_lines()
-
-noinline func test_count_lines():
     assert(string_view_count_lines_of("") == 1)
     assert(string_view_count_lines_of("foo") == 1)
 
@@ -173,18 +142,12 @@ noinline func test_count_lines():
     assert(string_view_count_lines_of("foo\r\nbar\r\nbaz", StringViewConsiderCarriageReturn.no) == 3)
 
 test "find":
-    test_find_3()
-
-noinline func test_find_3():
     let test_string_view = sv("aabbcc_xy_ccbbaa")
     assert(string_view_find_u8(&test_string_view, 'b') == 2)
     assert(string_view_find_u8(&test_string_view, '_') == 6)
     assert(string_view_find_u8(&test_string_view, 'n') == none)
 
 test "find_last":
-    test_find_last_2()
-
-noinline func test_find_last_2():
     var test_string_view = sv("aabbcc_xy_ccbbaa")
     assert(string_view_find_last_u8(&test_string_view, 'b') == 13)
     assert(string_view_find_last_u8(&test_string_view, '_') == 9)
@@ -194,9 +157,6 @@ noinline func test_find_last_2():
     assert(string_view_find_last_u8(&test_string_view, '/') == 0)
 
 test "find_any_of":
-    test_find_any_of()
-
-noinline func test_find_any_of():
     var test_string_view = sv("aabbcc_xy_ccbbaa")
     assert(string_view_find_any_of(&test_string_view, sv("bc"), SearchDirection.forward) == 2)
     assert(string_view_find_any_of(&test_string_view, sv("yx"), SearchDirection.forward) == 7)
@@ -217,9 +177,6 @@ struct StringViewSplitViewTestPredicate: CharPredicate:
         return ch == 'x' or ch == '_'
 
 test "split_view":
-    test_split_view()
-
-noinline func test_split_view():
     var test_string_view = sv("axxbxcxd")
     var parts = string_view_split_view_u8(&test_string_view, 'x')
     assert(string_view_vector_equals(&parts, ["a", "b", "c", "d"]))
@@ -262,9 +219,6 @@ noinline func test_split_view():
     assert(string_view_vector_equals(&parts, ["a,", ",", ",", "b"]))
 
 test "constexpr_stuff":
-    test_constexpr_stuff()
-
-noinline func test_constexpr_stuff():
     # Can initialize from ""sv.
     let test_constexpr = sv("foo")
     assert(string_view_length(&test_constexpr) == 3)
@@ -276,9 +230,6 @@ noinline func test_constexpr_stuff():
     assert(string_view_equals(&tail, "oo"))
 
 test "case_insensitive_hash":
-    test_case_insensitive_hash()
-
-noinline func test_case_insensitive_hash():
     let string1 = sv("abcdef")
     let string2 = sv("ABCDEF")
     let string3 = sv("aBcDeF")
@@ -289,11 +240,8 @@ noinline func test_case_insensitive_hash():
     assert(case_insensitive_ascii_string_view_traits_hash(string1) != case_insensitive_ascii_string_view_traits_hash(string4))
 
 test "case_insensitive_traits_key_a_hash_map":
-    test_case_insensitive_traits_key_a_hash_map()
-
-# Not in the donor's tests: CaseInsensitiveASCIIStringViewTraits as the traits of a HashMap, as
-# LibWeb's generated keyword and property tables use it.
-noinline func test_case_insensitive_traits_key_a_hash_map():
+    # Not in the donor's tests: CaseInsensitiveASCIIStringViewTraits as the traits of a HashMap, as
+    # LibWeb's generated keyword and property tables use it.
     var map: HashMap[StringView, i32, CaseInsensitiveAsciiStringViewTraits]
     assert(hash_map_set(&map, sv("background-color"), 1) == HashSetResult.inserted_new_entry)
     assert(hash_map_set(&map, sv("Color"), 2) == HashSetResult.inserted_new_entry)

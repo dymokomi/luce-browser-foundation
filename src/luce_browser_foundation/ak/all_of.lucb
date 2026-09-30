@@ -8,19 +8,16 @@
 #
 #==============================================================================================
 
-# all_of's negated predicate: `[&](auto const& elem) { return !pred(elem); }`.
-# workaround: compiler-issues/generic_function_value (the callback is a static method)
-struct AllOfNegated[T]:
-    var pred: Function1[const T*, bool]
-
-    static func call(context: void*?, elem: const T*) -> bool:
-        let captures = (const AllOfNegated[T]*)(context else trap("all_of: no captures"))
-        return not function1_call(&captures.pred, elem)
+# all_of's negated predicate: `[&](auto const& elem) { return !pred(elem); }`, with `pred` as the
+# context.
+func all_of_negated[T](context: void*?, elem: const T*) -> bool:
+    let pred = (const Function1[const T*, bool]*)(context else trap("all_of: no predicate"))
+    return not function1_call(pred, elem)
 
 ## Ported from AK/AllOf.h:16 AK::all_of.
 pub func all_of_tt_iterator[T, TContainer: IndexedContainer[T]](begin: SimpleIterator[TContainer, T], end: SimpleIterator[TContainer, T], predicate: Function1[const T*, bool]) -> bool:
-    var captured = AllOfNegated[T](pred = predicate)
-    let negated: func(void*?, const T*) -> bool = AllOfNegated[T].call
+    var captured = predicate
+    let negated: func(void*?, const T*) -> bool = all_of_negated
     let found = find_if(begin, end, Function1[const T*, bool](call = negated, context = &captured))
     return not (not simple_iterator_eq(&found, end))
 

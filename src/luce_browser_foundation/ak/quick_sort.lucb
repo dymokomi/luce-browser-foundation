@@ -12,20 +12,14 @@
 #==============================================================================================
 
 # The default comparison `[](auto& a, auto& b) { return a < b; }`.
-# workaround: compiler-issues/generic_function_value (the callback is a static method)
-struct QuickSortLessThan[T: luce.Comparable]:
-    var unused: u8
-
-    static func call(context: void*?, a: const T*, b: const T*) -> bool:
-        discard(context)
-        # workaround: compiler-issues/float_bits_through_pointer
-        let left = *a
-        return left.compare(*b) < 0
+func quick_sort_less_than[T: luce.Comparable](context: void*?, a: const T*, b: const T*) -> bool:
+    discard(context)
+    return a.compare(*b) < 0
 
 ## The Function2 comparing with `a < b`, the default comparator of quick_sort and
 ## insertion_sort.
 pub func default_less_than[T: luce.Comparable]() -> Function2[const T*, const T*, bool]:
-    let call: func(void*?, const T*, const T*) -> bool = QuickSortLessThan[T].call
+    let call: func(void*?, const T*, const T*) -> bool = quick_sort_less_than
     return Function2[const T*, const T*, bool](call = call, context = none)
 
 # `less_than(col[a], col[b])` for the i32 indices the donor's quick sort uses.

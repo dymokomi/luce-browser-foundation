@@ -5,10 +5,6 @@
 #   DESCRIPTION:
 #       Port of Tests/AK/TestHashMap.cpp; the key traits and helpers are tests_hash_table's.
 #
-#       Each test's body is a noinline function the test block calls, so that the test
-#       runner's `main` does not inline every body (# workaround:
-#       compiler-issues/ranges_facts_cubic).
-#
 #==============================================================================================
 
 # mark: TestHashMap =============================================================================
@@ -25,9 +21,6 @@ func test_map_bool(context: void*?, key: const i32*, value: const str*) -> bool:
     return context != none
 
 test "hash_map: construct, populate and range_loop":
-    test_hash_map_construct_populate_and_range_loop()
-
-noinline func test_hash_map_construct_populate_and_range_loop():
     var empty: IntIntMap
     assert(hash_map_is_empty(&empty))
     assert(hash_map_size(&empty) == 0)
@@ -43,9 +36,6 @@ noinline func test_hash_map_construct_populate_and_range_loop():
     assert(loop_counter == 3)
 
 test "hash_map: map_remove":
-    test_hash_map_map_remove()
-
-noinline func test_hash_map_map_remove():
     var number_to_string: HashMap[i32, str, I32Traits]
     assert(hash_map_set(&number_to_string, 1, "One") == HashSetResult.inserted_new_entry)
     assert(hash_map_set(&number_to_string, 2, "Two") == HashSetResult.inserted_new_entry)
@@ -58,9 +48,6 @@ noinline func test_hash_map_map_remove():
     assert(hash_map_find_k(&number_to_string, 2).m_bucket != none)
 
 test "hash_map: remove_all_matching and take_all_matching":
-    test_hash_map_remove_all_matching_and_take_all_matching()
-
-noinline func test_hash_map_remove_all_matching_and_take_all_matching():
     var map: HashMap[i32, str, I32Traits]
     discard(hash_map_set(&map, 1, "One"))
     discard(hash_map_set(&map, 2, "Two"))
@@ -92,9 +79,6 @@ noinline func test_hash_map_remove_all_matching_and_take_all_matching():
     assert(hash_map_is_empty(&map))
 
 test "hash_map: case_insensitive":
-    test_hash_map_case_insensitive()
-
-noinline func test_hash_map_case_insensitive():
     var casemap: HashMap[str, i32, TestCaseInsensitiveStrTraits]
     assert(hash_map_set(&casemap, "nickserv", 3) == HashSetResult.inserted_new_entry)
     assert(hash_map_set(&casemap, "NickServ", 3) == HashSetResult.replaced_existing_entry)
@@ -104,9 +88,6 @@ struct TestMapObject:
     var string: str
 
 test "hash_map: hashmap_of_pointers_get":
-    test_hash_map_hashmap_of_pointers_get()
-
-noinline func test_hash_map_hashmap_of_pointers_get():
     var objects: HashMap[i32, TestMapObject*, I32Traits]
     let one = new TestMapObject(string = "One") else trap("out of memory")
     let two = new TestMapObject(string = "Two") else trap("out of memory")
@@ -123,9 +104,6 @@ noinline func test_hash_map_hashmap_of_pointers_get():
     assert(hash_map_size(&objects) == 3)
 
 test "hash_map: basic_remove and basic_contains":
-    test_hash_map_basic_remove_and_basic_contains()
-
-noinline func test_hash_map_basic_remove_and_basic_contains():
     var map: IntIntMap
     discard(hash_map_set(&map, 1, 10))
     discard(hash_map_set(&map, 2, 20))
@@ -142,9 +120,6 @@ noinline func test_hash_map_basic_remove_and_basic_contains():
     assert(hash_map_size(&map) == 0)
 
 test "hash_map: in_place_rehashing_ordered_loop_bug":
-    test_hash_map_in_place_rehashing_ordered_loop_bug()
-
-noinline func test_hash_map_in_place_rehashing_ordered_loop_bug():
     var map: OrderedHashMap[str, str, TestStrTraits]
     discard(ordered_hash_map_set(&map, "yt.innertube::nextId", ""))
     discard(ordered_hash_map_set(&map, "yt.innertube::requests", ""))
@@ -157,9 +132,6 @@ noinline func test_hash_map_in_place_rehashing_ordered_loop_bug():
     assert(ordered_hash_map_size(&map) == 1)
 
 test "hash_map: take":
-    test_hash_map_take()
-
-noinline func test_hash_map_take():
     var map: HashMap[str, i32, TestStrTraits]
     assert(hash_map_take_k(&map, "foo") == none)
     discard(hash_map_set(&map, "foo", 1))
@@ -173,9 +145,6 @@ noinline func test_hash_map_take():
     assert(hash_map_take_k(&map, "baz") == none)
 
 test "hash_map: clone, move and update":
-    test_hash_map_clone_move_and_update()
-
-noinline func test_hash_map_clone_move_and_update():
     var orig: IntIntMap
     discard(hash_map_set(&orig, 1, 10))
     discard(hash_map_set(&orig, 2, 20))
@@ -204,9 +173,6 @@ noinline func test_hash_map_clone_move_and_update():
     assert(hash_map_size(&other) == 4)
 
 test "hash_map: compare":
-    test_hash_map_compare()
-
-noinline func test_hash_map_compare():
     var first: IntIntMap
     var second: IntIntMap
     assert(hash_map_eq(&first, &second))
@@ -233,9 +199,6 @@ func test_ensure_callback(context: void*?) -> TestSentinel:
     return TestSentinel(magic = test_sentinel_magic)
 
 test "hash_map: ensure_callback_sees_consistent_table":
-    test_hash_map_ensure_callback_sees_consistent_table()
-
-noinline func test_hash_map_ensure_callback_sees_consistent_table():
     # HashMap::ensure() must run the initialization callback while the tentative
     # target bucket is invisible to iterators.
     var map: HashMap[i32, TestSentinel, I32Traits]
@@ -251,9 +214,6 @@ noinline func test_hash_map_ensure_callback_sees_consistent_table():
     assert(hash_map_size(&map) == 102)
 
 test "hash_map: iteration order matches the donor":
-    test_hash_map_iteration_order_matches_the_donor()
-
-noinline func test_hash_map_iteration_order_matches_the_donor():
     var m: HashMap[u32, u32, U32Traits]
     for i: u32 in 0..<25:
         discard(hash_map_set(&m, i * 1000003, i))

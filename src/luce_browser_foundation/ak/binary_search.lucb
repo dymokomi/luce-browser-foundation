@@ -13,10 +13,7 @@
 ## lhs < rhs, else 0.
 pub func default_comparator_call[T: luce.Comparable](this: DefaultComparator*, lhs: const T*, rhs: const T*) -> i32:
     discard(this)
-    # workaround: compiler-issues/float_bits_through_pointer (a float method is not called
-    # through the pointer)
-    let left = *lhs
-    let order = left.compare(*rhs)
+    let order = lhs.compare(*rhs)
     if order > 0:
         return 1
     if order < 0:
@@ -24,18 +21,14 @@ pub func default_comparator_call[T: luce.Comparable](this: DefaultComparator*, l
     return 0
 
 # DefaultComparator as a callback.
-# workaround: compiler-issues/generic_function_value (the callback is a static method)
-struct BinarySearchDefaultComparator[T: luce.Comparable]:
-    var unused: u8
-
-    static func call(context: void*?, lhs: const T*, rhs: const T*) -> i32:
-        discard(context)
-        var comparator = DefaultComparator(empty_ = 0)
-        return default_comparator_call(&comparator, lhs, rhs)
+func binary_search_default_comparator[T: luce.Comparable](context: void*?, lhs: const T*, rhs: const T*) -> i32:
+    discard(context)
+    var comparator = DefaultComparator(empty_ = 0)
+    return default_comparator_call(&comparator, lhs, rhs)
 
 ## DefaultComparator as the comparator argument of binary_search.
 pub func default_comparator[T: luce.Comparable]() -> Function2[const T*, const T*, i32]:
-    let call: func(void*?, const T*, const T*) -> i32 = BinarySearchDefaultComparator[T].call
+    let call: func(void*?, const T*, const T*) -> i32 = binary_search_default_comparator
     return Function2[const T*, const T*, i32](call = call, context = none)
 
 ## Ported from AK/BinarySearch.h:29 AK::binary_search: the element comparing equal to `needle`,
