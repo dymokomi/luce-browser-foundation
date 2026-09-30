@@ -79,22 +79,14 @@ noinline func run_stray_addresses():
     assert(past != 0 and header != 0)
     destroy_test_heap(heap)
 
-## Spills the callee-saved registers into `buffer` with `marker` in the first of them (x19, rbx).
-noinline func spill_with_marker(buffer: usize[], marker: usize):
-    asm arm64 (in("x9") marker, out("x19") _):
-        mov x19, x9
-    asm x86_64 (in("rax") marker, out("rbx") _):
-        mov %rax, %rbx
-    spill_callee_saved_registers(buffer)
-
 test "the callee-saved registers are spilled where the scan reads them":
-    # the marker set in x19 (rbx) is spilled first; the spilled frame pointer (x29, rbp) is inside
-    # the live stack, and the spilled link register (arm64) nonzero.
+    # the spilled frame pointer (x29, rbp) is the spilling function's, inside the live stack,
+    # and the spilled link register (arm64) nonzero. No marker is planted first: an `asm` block
+    # that sets x19 (rbx) declares it clobbered, and nothing keeps the value there until the
+    # spill is called, so the check reads what the registers hold.
     let heap = create_test_heap()
     var buffer: usize[16]
-    let marker: usize = 0x5eed_c0de
-    spill_with_marker(buffer, marker)
-    assert(buffer[0] == marker)
+    spill_callee_saved_registers(buffer)
     let sp = current_stack_pointer()
     let frame_pointer = buffer[10] if os.arm64 else buffer[1]
     assert(frame_pointer > sp - 4096 and frame_pointer < heap.m_stack_info.m_top)
