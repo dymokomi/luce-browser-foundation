@@ -148,7 +148,9 @@ noinline func run_atomic_blob():
     heap_collect_garbage(heap)
     assert(not alive(&weak))
     assert(live_blob_count(heap) == 1)
-    assert(blob.length == 32)
+    # Reading the data after the collection is what keeps `blob.data` live across it: were only
+    # the length used, the compiler may drop the pointer and the scan would not find the blob.
+    assert(blob.length == 32 and memory.read[usize](blob.data) != 0)
     destroy_test_heap(heap)
 
 test "the atomic allocator view makes atomic blobs":
