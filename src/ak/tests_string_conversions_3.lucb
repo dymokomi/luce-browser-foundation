@@ -130,6 +130,14 @@ test "StringConversions: float_conversion":
     test_converts_f32(11754944e-45f32, false, 11754944, -45)
     test_converts_f32(-11754944e-45f32, true, 11754944, -45)
 
+## Not in TestStringConversions.cpp: exact ties between the two shortest candidates go to the
+## even significand, as Dragonbox's (AK's own digits, from the local oracle).
+test "StringConversions: ties to even":
+    test_converts_f32(128.328125f32, false, 12832812, -5)
+    test_converts_f32(144.203125f32, false, 14420312, -5)
+    test_converts_f32(f32.bits(0x39800000), false, 24414062, -11)
+    test_converts_f64(-10.2350006103515625, true, 10235000610351562, -15)
+
 ## Shortest digits of random doubles, checked against Python's repr (also shortest round-trip).
 test "StringConversions: double_conversion (random values)":
     let cases: (u64, bool, u64, i32)[200] = [

@@ -8,7 +8,8 @@
 #       such, trailing zeros removed). Dragonbox is replaced, not ported: the same digits come
 #       from Burger and Dybvig's free-format algorithm ("Printing Floating-Point Numbers Quickly
 #       and Accurately", 1996) over exact big integers, which yields the shortest correctly
-#       rounded digits with the same round-to-even interval.
+#       rounded digits with the same round-to-even interval; among the shortest, the closest,
+#       and on an exact tie the even one, as Dragonbox (fmt 12.1's to_decimal).
 #
 #==============================================================================================
 
@@ -171,9 +172,14 @@ func shortest_decimal_form(significand: u64, exponent: i32, precision: u32, mini
         elif not termination_low and termination_high:
             digits = digits * 10 + digit + 1
         else:
+            # Both neighbours round-trip: take the closer one, and on an exact tie the even one,
+            # as Dragonbox does (`y_mul.is_integer & (significand % 2 != 0)` in to_decimal,
+            # the `% 2` choice of shorter_interval_case).
             var twice_r = r
             decimal_bignum_multiply_small(&twice_r, 2)
-            digits = digits * 10 + (digit if decimal_bignum_compare(&twice_r, &s) < 0 else digit + 1)
+            let middle = decimal_bignum_compare(&twice_r, &s)
+            let round_down = middle < 0 or (middle == 0 and digit % 2 == 0)
+            digits = digits * 10 + (digit if round_down else digit + 1)
         break
 
     var decimal_exponent = k - digit_count

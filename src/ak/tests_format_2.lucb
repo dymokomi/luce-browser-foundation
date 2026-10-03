@@ -63,6 +63,32 @@ test "floating_point_default_precision":
     assert(formatted("{}", [arg_f64(123456.78)]) == "123456.78")
     assert(formatted("{}", [arg_f64(23456.78910)]) == "23456.7891")
 
+## Not in TestFormat.cpp: values whose two shortest round-trip candidates are equally close.
+## Dragonbox takes the even one; the texts are AK's own, printed by the local oracle
+## (luce-browser-tools oracles/luce-browser-foundation/float_format_oracle.cpp, linked against
+## the reference build's AK), which agrees with this port on 80,013 values.
+test "floating_point_default_precision: ties round to even":
+    assert(formatted("{}", [arg_f32(128.328125)]) == "128.32812")
+    assert(formatted("{}", [arg_f32(144.203125)]) == "144.20312")
+    assert(formatted("{}", [arg_f32(264.640625)]) == "264.64062")
+    assert(formatted("{}", [arg_f32(53.7265625)]) == "53.726562")
+    assert(formatted("{}", [arg_f32(f32.bits(0x455d1880))]) == "3537.5312")
+    assert(formatted("{}", [arg_f32(f32.bits(0x404c4000))]) == "3.1914062")
+    assert(formatted("{}", [arg_f32(f32.bits(0x3d540000))]) == "0.051757812")
+    assert(formatted("{}", [arg_f32(f32.bits(0xbb900000))]) == "-0.0043945312")
+    assert(formatted("{}", [arg_f32(f32.bits(0x489607d4))]) == "307262.62")
+    assert(formatted("{}", [arg_f32(f32.bits(0xca27106d))]) == "-2737179.2")
+    # A power of two (Dragonbox's shorter_interval_case).
+    assert(formatted("{}", [arg_f32(f32.bits(0x39800000))]) == "0.00024414062")
+    assert(formatted("{}", [arg_f64(-10.2350006103515625)]) == "-10.235000610351562")
+    assert(formatted("{}", [arg_f64(f64.bits(0x4065d34b40000000))]) == "174.60293579101562")
+    assert(formatted("{}", [arg_f64(f64.bits(0x408afa61a0000000))]) == "863.2976684570312")
+    assert(formatted("{}", [arg_f64(f64.bits(0x4001c9d400000000))]) == "2.2235488891601562")
+    assert(formatted("{}", [arg_f64(f64.bits(0x431dc7f5737a7d35))]) == "2095657835732813.2")
+    assert(formatted("{}", [arg_f64(f64.bits(0xc3132ee1fbfa34bd))]) == "-1349893171875119.2")
+    # Not ties: the closer candidate wins whatever its parity.
+    assert(formatted("{}", [arg_f32(f32.bits(0x430053ff))]) == "128.32811")
+
 test "no_precision_no_trailing_number":
     assert(formatted("{:.0}", [arg_f64(0.1)]) == "0")
 
