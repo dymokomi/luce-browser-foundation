@@ -47,6 +47,23 @@ test "hash_map: map_remove":
     assert(hash_map_size(&number_to_string) == 1)
     assert(hash_map_find_k(&number_to_string, 2).m_bucket != none)
 
+test "hash_map: a removed entry's bucket keeps none of its bytes":
+    # Addition: the storage of a freed bucket is cleared (hash_table_delete_bucket), so the
+    # conservative scan of managed memory cannot keep what a removed value pointed to alive.
+    var map: HashMap[u64, u64, U64Traits]
+    for key: u64 in 1..=6:
+        hash_map_set(&map, key, 0xdeadbeef00 + key)
+    assert(hash_map_remove_k(&map, 3))
+    assert(hash_map_remove_k(&map, 5))
+    let buckets = map.m_table.m_buckets else trap("no buckets")
+    var found_removed = false
+    for i in 0..=map.m_table.m_mask:
+        let bucket = &buckets[i]
+        if bucket.storage.key == 3 or bucket.storage.value == 0xdeadbeef03 or bucket.storage.value == 0xdeadbeef05:
+            found_removed = true
+    assert(not found_removed)
+    assert(*(hash_map_get_k(&map, 4) else trap("key 4 is missing")) == 0xdeadbeef04)
+
 test "hash_map: remove_all_matching and take_all_matching":
     var map: HashMap[i32, str, I32Traits]
     discard(hash_map_set(&map, 1, "One"))

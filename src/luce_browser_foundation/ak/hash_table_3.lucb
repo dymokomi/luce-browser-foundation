@@ -216,4 +216,9 @@ pub func hash_table_delete_bucket[T, TT: Traits[T]](this: HashTable[T, TT]*, buc
         shift_to_index = (shift_to_index + 1) & this.m_mask
 
     # Mark last bucket as free
-    hash_table_bucket_at(this, shift_to_index).state = (u8)BucketState.free_
+    let freed_bucket = hash_table_bucket_at(this, shift_to_index)
+    # Addition (DESIGN.md §3.3): C++ destroys the value it removes or moves out; here the storage
+    # stays in scanned memory, so the freed slot is cleared, or the conservative scan would keep
+    # whatever the removed value pointed to alive.
+    memory.set(u8[]((u8*)&freed_bucket.storage, sizeof(T)), 0)
+    freed_bucket.state = (u8)BucketState.free_
