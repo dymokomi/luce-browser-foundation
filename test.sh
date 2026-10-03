@@ -23,15 +23,15 @@ check() {
 }
 
 for module in ak gc web_unicode text_codec web_url web_infra; do
-    check "src/luce_browser_foundation/$module"
+    check "src/$module"
 done
 check tests/text_codec_tests
 check tests/web_url_tests
 
 # Unit tests (ported from Tests/AK, Tests/LibWeb and focused cases), module by module.
 for module in ak gc web_unicode text_codec web_url web_infra; do
-    echo "== luce-base test src/luce_browser_foundation/$module"
-    luce-base test "src/luce_browser_foundation/$module"
+    echo "== luce-base test src/$module"
+    luce-base test "src/$module"
 done
 for package in text_codec_tests web_url_tests; do
     echo "== luce-base test tests/$package"
@@ -45,5 +45,5 @@ generated=$(mktemp -d)
 trap 'rm -rf "$generated"' EXIT
 build/gen_ucd data "$generated"
 for file in "$generated"/*.lucb; do
-    cmp "$file" "src/luce_browser_foundation/web_unicode/$(basename "$file")"
+    cmp "$file" "src/web_unicode/$(basename "$file")"
 done

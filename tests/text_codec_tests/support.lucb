@@ -9,8 +9,8 @@
 #
 #==============================================================================================
 
-import ak
-import text_codec as tc
+import luce_browser_foundation.ak
+import luce_browser_foundation.text_codec as tc
 
 # mark: Helpers ================================================================================
 

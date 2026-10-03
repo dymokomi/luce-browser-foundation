@@ -1,6 +1,6 @@
 #==============================================================================================
 #
-#   ak - the AK subset LibWeb uses (containers, strings, formatting)
+#   web_unicode - the LibUnicode pieces LibWeb uses (segmentation, character types)
 #
 #   DESCRIPTION:
 #       Part of the luce-browser port of Ladybird (47c82b38d0) to luce-base, DESIGN.md §4.1.
@@ -13,17 +13,7 @@
 #
 #==============================================================================================
 
-# Module-wide imports (imports apply to every fragment of the module, language §16.1).
-import c as libc
-import io
+import ak
+
+import luce_std.unicode
 import memory
-from memory import Allocator
-import luce
-from luce import Comparable, Equatable
-import os
-import math
-import math32
-import atomic as atomics
-import thread
-import strings as number_strings
-import testing

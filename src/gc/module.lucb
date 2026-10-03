@@ -16,7 +16,7 @@
 #
 #==============================================================================================
 
-import luce_browser_foundation.ak as ak
+import ak
 import memory
 import os
 import luce

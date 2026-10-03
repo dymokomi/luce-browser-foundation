@@ -1,6 +1,6 @@
 #==============================================================================================
 #
-#   web_unicode - the LibUnicode pieces LibWeb uses (segmentation, character types)
+#   web_infra - the WHATWG Infra string and byte-sequence helpers
 #
 #   DESCRIPTION:
 #       Part of the luce-browser port of Ladybird (47c82b38d0) to luce-base, DESIGN.md §4.1.
@@ -13,7 +13,4 @@
 #
 #==============================================================================================
 
-import luce_browser_foundation.ak as ak
-
-import unicode
-import memory
+import ak

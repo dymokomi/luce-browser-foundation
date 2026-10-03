@@ -1,45 +1,22 @@
 #prisma 4.0
 def package "luce-browser-foundation" {
     str owner = "dymokomi"
-    str version = "0.1.0"
+    str version = "0.2.0"
     str kind = "package"
     str language = "luce-base"
     str description = "The foundations of the luce-browser port of Ladybird: the AK subset, LibGC, the LibUnicode pieces LibWeb uses, LibTextCodec, LibURL and the WHATWG Infra helpers, in luce-base."
     str readme = "README.md"
-
-    def export "ak" {
-        str module = "luce_browser_foundation.ak"
-    }
-
-    def export "gc" {
-        str module = "luce_browser_foundation.gc"
-    }
-
-    def export "web_unicode" {
-        str module = "luce_browser_foundation.web_unicode"
-    }
-
-    def export "text_codec" {
-        str module = "luce_browser_foundation.text_codec"
-    }
-
-    def export "web_url" {
-        str module = "luce_browser_foundation.web_url"
-    }
-
-    def export "web_infra" {
-        str module = "luce_browser_foundation.web_infra"
-    }
+    str[] public = ["ak", "gc", "text_codec", "web_infra", "web_unicode", "web_url"]
 
     def dependency "luce-std" {
         str owner = "dymokomi"
-        str version = "^0.1.0"
+        str version = "^0.2.0"
         str path = "../luce-std"
     }
 
     def dependency "luce-regex" {
         str owner = "dymokomi"
-        str version = "^0.2.2"
+        str version = "^0.3.0"
         str path = "../luce-regex"
     }
 }

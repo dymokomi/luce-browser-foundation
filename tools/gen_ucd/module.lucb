@@ -26,7 +26,7 @@
 #           generated_icu_locales.lucb       available locales, likely subtags, RTL scripts
 #
 #       Usage: gen_ucd DATA_DIRECTORY OUTPUT_DIRECTORY, e.g. gen_ucd data
-#       src/luce_browser_foundation/web_unicode. test.sh regenerates into a temporary
+#       src/web_unicode. test.sh regenerates into a temporary
 #       directory and compares with the committed fragments.
 #
 #       The numbering of every enumeration is ICU's (uchar.h, uscript.h), because the C++
@@ -38,7 +38,7 @@
 #==============================================================================================
 
 import c
-import files
+import luce_std.files
 import memory
 import strings
 
