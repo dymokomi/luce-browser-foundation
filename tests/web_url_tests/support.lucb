@@ -10,9 +10,9 @@
 #
 #==============================================================================================
 
-import luce_browser_foundation.ak
+from luce_browser_foundation import ak
 import memory
-import luce_browser_foundation.web_url
+from luce_browser_foundation import web_url
 
 # mark: Parsing ================================================================================
 

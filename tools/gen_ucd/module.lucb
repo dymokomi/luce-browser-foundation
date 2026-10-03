@@ -38,7 +38,7 @@
 #==============================================================================================
 
 import c
-import luce_std.files
+from luce_std import files
 import memory
 import strings
 

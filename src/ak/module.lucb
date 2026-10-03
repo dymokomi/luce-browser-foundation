@@ -21,8 +21,7 @@ from memory import Allocator
 import luce
 from luce import Comparable, Equatable
 import os
-import luce_std.math
-import luce_std.math32
+from luce_std import math, math32
 import atomic as atomics
 import thread
 import strings as number_strings
