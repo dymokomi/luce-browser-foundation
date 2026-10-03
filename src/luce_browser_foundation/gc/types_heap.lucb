@@ -22,7 +22,7 @@ pub struct StackFrameInfo:
 ## The collector's own containers are gc's C-heap shapes (containers.lucb) and the root set is
 ## a GcHashMap keyed by cell address (fixed by hand). The fields after `m_full_weak_blocks` are
 ## additions (DESIGN.md §3.2): the blob allocators, the large-object space, the allocator view
-## for atomic blobs, and the weak-block index used to trace WeakImpl references.
+## for atomic blobs, and the WeakImpl of each cell (weak.lucb).
 pub struct Heap: memory.Allocator:
     pub var m_gc_bytes_threshold: usize  # C++ default: { GC_MIN_BYTES_THRESHOLD }
     pub var m_allocated_bytes_since_last_gc: usize  # C++ default: { 0 }
@@ -48,9 +48,7 @@ pub struct Heap: memory.Allocator:
     pub var m_atomic_blob_allocators: GcVector[CellAllocator*]  # addition: atomic blobs, per size class
     pub var m_large_objects: GcVector[LargeObject*]  # addition: the large-object space, by address
     pub var m_atomic_allocator: HeapAtomicAllocator  # addition: the allocator view for atomic blobs
-    pub var m_weak_blocks: GcHashMap[u8]  # addition: every WeakBlock, by address
-    pub var m_min_weak_block_address: usize  # addition: the range of the weak blocks
-    pub var m_max_weak_block_address: usize  # addition
+    pub var m_weak_impls: GcHashMap[WeakImpl*]  # addition: the WeakImpl of each cell a Weak refers to
     pub var m_stack_scan_start: usize  # addition: where gather_conservative_roots starts (heap_2.lucb)
     pub var m_mutator_registers: usize[16]  # addition: the registers when the collection began
 

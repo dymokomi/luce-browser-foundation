@@ -58,7 +58,7 @@ pub func heap_destroy(this: Heap*):
     gc_vector_clear(&this.m_uprooted_cells)
     gc_vector_clear(&this.m_post_gc_tasks)
     gc_vector_clear(&this.m_sweep_callbacks)
-    gc_hash_map_clear(&this.m_weak_blocks)
+    gc_hash_map_clear(&this.m_weak_impls)
     if s_the == this:
         s_the = none
 

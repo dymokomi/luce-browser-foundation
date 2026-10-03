@@ -3227,13 +3227,13 @@ GC::WeakImpl::WeakImpl	luce-browser-foundation	gc	weak_impl_construct	Libraries/
 GC::WeakImpl::operator!=	luce-browser-foundation	gc	weak_impl_ne	Libraries/LibGC/Weak.h:33	stub
 GC::WeakImpl::operator==	luce-browser-foundation	gc	weak_impl_eq	Libraries/LibGC/Weak.h:32	stub
 GC::WeakImpl::ptr	luce-browser-foundation	gc	weak_impl_ptr	Libraries/LibGC/Weak.h:29	stub
-GC::WeakImpl::ref	luce-browser-foundation	gc	weak_impl_ref	Libraries/LibGC/Weak.h:35	stub
-GC::WeakImpl::ref_count	luce-browser-foundation	gc	weak_impl_ref_count	Libraries/LibGC/Weak.h:42	stub
+GC::WeakImpl::ref	luce-browser-foundation	gc	weak_impl_ref	Libraries/LibGC/Weak.h:35	dropped
+GC::WeakImpl::ref_count	luce-browser-foundation	gc	weak_impl_ref_count	Libraries/LibGC/Weak.h:42	dropped
 GC::WeakImpl::set_ptr	luce-browser-foundation	gc	weak_impl_set_ptr	Libraries/LibGC/Weak.h:30	stub
 GC::WeakImpl::set_state	luce-browser-foundation	gc	weak_impl_set_state	Libraries/LibGC/Weak.h:49	stub
 GC::WeakImpl::state	luce-browser-foundation	gc	weak_impl_state	Libraries/LibGC/Weak.h:50	stub
 GC::WeakImpl::the_null_weak_impl	luce-browser-foundation	gc	weak_impl_the_null_weak_impl	Libraries/LibGC/Weak.h:21	variable
-GC::WeakImpl::unref	luce-browser-foundation	gc	weak_impl_unref	Libraries/LibGC/Weak.h:36	stub
+GC::WeakImpl::unref	luce-browser-foundation	gc	weak_impl_unref	Libraries/LibGC/Weak.h:36	dropped
 GC::add_possible_value	luce-browser-foundation	gc	add_possible_value	Libraries/LibGC/Heap.cpp:80	stub
 GC::create_function	luce-browser-foundation	gc	create_function0	Libraries/LibGC/Function.h:46	ported
 GC::create_function	luce-browser-foundation	gc	create_function1	Libraries/LibGC/Function.h:46	ported

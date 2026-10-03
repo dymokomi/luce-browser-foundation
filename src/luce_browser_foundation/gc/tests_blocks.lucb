@@ -165,6 +165,33 @@ test "GcHashMap: set, replace, get, grow, keys":
     gc_hash_map_clear(&map)
     assert(gc_hash_map_size(&map) == 0 and gc_hash_map_get(&map, 16) == none)
 
+test "GcHashMap: remove keeps every other key reachable":
+    var map: GcHashMap[i64]
+    for i: usize in 1..=1000:
+        gc_hash_map_set(&map, i * 16, (i64)i)
+    # Every third key leaves, then the odd ones of those come back with new values.
+    for i: usize in 1..=1000:
+        if i % 3 == 0:
+            assert(gc_hash_map_remove(&map, i * 16))
+    assert(not gc_hash_map_remove(&map, 48) and not gc_hash_map_remove(&map, 8))
+    assert(gc_hash_map_size(&map) == 1000 - 333)
+    for i: usize in 1..=1000:
+        let value = gc_hash_map_get(&map, i * 16)
+        if i % 3 == 0:
+            assert(value == none)
+        else:
+            assert(*(value else trap("missing")) == (i64)i)
+    for i: usize in 1..=1000:
+        if i % 6 == 3:
+            gc_hash_map_set(&map, i * 16, -(i64)i)
+    assert(gc_hash_map_size(&map) == 1000 - 333 + 167)
+    assert(*(gc_hash_map_get(&map, 48) else trap("missing")) == -3)
+    var count: usize = 0
+    for _ in gc_hash_map_keys(&map):
+        count += 1
+    assert(count == gc_hash_map_size(&map))
+    gc_hash_map_clear(&map)
+
 test "intrusive lists: append moves a node between lists":
     var a: List
     var b: List

@@ -18,12 +18,12 @@ pub func weak_hash_set_set[T: IsCell](this: WeakHashSet[T]*, value: T*):
 ## Ported from Libraries/LibGC/WeakHashSet.h:34 GC::WeakHashSet::remove.
 pub func weak_hash_set_remove[T](this: WeakHashSet[T]*, value: T*) -> bool:
     weak_hash_set_maybe_prune(this)
-    var probe_impl = WeakImpl(m_ref_count = 0, m_state = WeakImplState.allocated, m_ptr = value)
+    var probe_impl = WeakImpl(m_generation = 0, m_state = WeakImplState.allocated, m_ptr = value)
     return ak.hash_table_remove_t(&this.m_table, Weak[T](m_impl = &probe_impl))
 
 ## Ported from Libraries/LibGC/WeakHashSet.h:44 GC::WeakHashSet::contains.
 pub func weak_hash_set_contains[T](this: const WeakHashSet[T]*, value: T*) -> bool:
-    var probe_impl = WeakImpl(m_ref_count = 0, m_state = WeakImplState.allocated, m_ptr = value)
+    var probe_impl = WeakImpl(m_generation = 0, m_state = WeakImplState.allocated, m_ptr = value)
     return ak.hash_table_contains_t(&this.m_table, Weak[T](m_impl = &probe_impl))
 
 ## Ported from Libraries/LibGC/WeakHashSet.h:50 GC::WeakHashSet::is_empty.

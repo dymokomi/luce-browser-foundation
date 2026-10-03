@@ -262,7 +262,6 @@ pub func heap_collect_garbage(this: Heap*, collection_type: HeapCollectionType =
         defer gc_hash_map_clear(&roots)
         var all_live_heap_blocks: GcHashMap[u8]
         defer gc_hash_map_clear(&all_live_heap_blocks)
-        heap_clear_weak_references(this)
         heap_gather_roots(this, &roots, &all_live_heap_blocks)
         heap_mark_live_cells(this, &roots, &all_live_heap_blocks)
     heap_finalize_unmarked_cells(this)
@@ -413,7 +412,6 @@ pub func heap_gather_conservative_roots(this: Heap*, roots: GcHashMap[HeapRoot]*
     heap_find_min_and_max_block_addresses(this, &min_block_address, &max_block_address)
 
     for value in registers:
-        heap_note_possible_weak_reference(this, value)
         add_possible_value(&possible_pointers, value, HeapRoot(type_ = HeapRootType.register_pointer), min_block_address, max_block_address)
 
     # &dummy: the frame of collect_garbage or dump_graph (see above), or else this one
@@ -428,13 +426,11 @@ pub func heap_gather_conservative_roots(this: Heap*, roots: GcHashMap[HeapRoot]*
     let stack = (const usize*?)stack_reference else trap("no stack")
     for i in 0..<((stack_top - stack_reference) // sizeof(usize)):
         let data = stack[i]
-        heap_note_possible_weak_reference(this, data)
         add_possible_value(&possible_pointers, data, HeapRoot(type_ = HeapRootType.stack_pointer), min_block_address, max_block_address)
         heap_gather_asan_fake_stack_roots(this, &possible_pointers, data, min_block_address, max_block_address, stack_reference, stack_top)
 
     for node in list_nodes(&this.m_conservative_vectors):
         for possible_value in conservative_vector_base_possible_values(conservative_vector_base_from_list_node(node)):
-            heap_note_possible_weak_reference(this, (usize)possible_value)
             add_possible_value(&possible_pointers, (usize)possible_value, HeapRoot(type_ = HeapRootType.conservative_vector), min_block_address, max_block_address)
 
     # Addition: the capture contexts of the AK::Functions the heap stores (the embedder's root

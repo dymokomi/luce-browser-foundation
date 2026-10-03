@@ -12,9 +12,10 @@
 
 # mark: WeakImpl ================================================================================
 
-## GC::WeakImpl (Libraries/LibGC/Weak.h:18).
+## GC::WeakImpl (Libraries/LibGC/Weak.h:18). m_generation replaces m_ref_count (fixed by hand,
+## weak.lucb): it counts the times the impl went back to its block's freelist.
 pub struct WeakImpl:
-    pub var m_ref_count: usize  # C++ default: { 0 }
+    pub var m_generation: u64
     pub var m_state: WeakImplState  # C++ default: { State :: Allocated }
     pub var m_ptr: void*?  # C++ default: { nullptr }
 

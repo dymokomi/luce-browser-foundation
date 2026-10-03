@@ -1,48 +1,65 @@
 #==============================================================================================
 #
-#   tests_weak - Weak<T>, WeakImpl and WeakBlock sweeping under the traced reference counts
+#   tests_weak - Weak<T>, WeakImpl and WeakBlock sweeping
 #
 #   DESCRIPTION:
 #       A Weak follows its cell and reads none once the cell died (WeakBlock::sweep clears the
-#       impl); a WeakImpl stays allocated while a scanned word refers to it (the stack, a blob,
-#       the bytes of a live cell) and goes back to its block's freelist once nothing does.
+#       impl); the Weaks of a cell share one WeakImpl, which goes back to its block's freelist
+#       when the cell dies. tests_weak_holders.lucb holds Weaks in every kind of memory.
 #
 #==============================================================================================
 
 ## How many WeakImpls of the heap are allocated.
 func allocated_weak_impl_count(heap: Heap*) -> usize:
     var count: usize = 0
-    for key in gc_hash_map_keys(&heap.m_weak_blocks):
-        let block = (WeakBlock*?)key else continue
-        for impl in &block.m_impls:
-            if impl.m_state == WeakImplState.allocated:
-                count += 1
+    for list in [&heap.m_usable_weak_blocks, &heap.m_full_weak_blocks]:
+        for node in list_nodes(list):
+            for impl in &weak_block_from_list_node(node).m_impls:
+                if impl.m_state == WeakImplState.allocated:
+                    count += 1
+    return count
+
+## How many weak blocks the heap has.
+func weak_block_count(heap: Heap*) -> usize:
+    var count: usize = 0
+    for _ in list_nodes(&heap.m_usable_weak_blocks):
+        count += 1
+    for _ in list_nodes(&heap.m_full_weak_blocks):
+        count += 1
     return count
 
 ## Weaks to `cell` that nothing keeps once this returns.
 noinline func drop_weaks(cell_weak: const Weak[TestCell]*, count: usize):
     let cell = weak_ptr(cell_weak) else trap("dead")
     for _ in 0..<count:
-        discard(make_weak[TestCell](cell))
+        let weak = make_weak[TestCell](cell)
+        assert(weak_impl(&weak) == weak_impl(cell_weak))
 
-test "WeakImpls nothing refers to go back to the freelist":
+## Weaks to `count` new cells nothing keeps.
+noinline func drop_cells_with_weaks(heap: Heap*, count: usize):
+    for i in 0..<count:
+        discard(make_unreferenced_cell(heap, 10 + (i64)i))
+
+test "the Weaks of a cell share its WeakImpl, which goes back when the cell dies":
     clobber_stack()
-    run_weak_impl_reclaimed()
+    run_weak_impl_per_cell()
 
-noinline func run_weak_impl_reclaimed():
+noinline func run_weak_impl_per_cell():
     let heap = create_test_heap()
     var root = root_create[TestCell](new_test_cell(heap, 1))
     let kept = make_weak[TestCell](root_cell(&root))
     drop_weaks(&kept, 100)
+    assert(allocated_weak_impl_count(heap) == 1)
+    drop_cells_with_weaks(heap, 100)
     assert(allocated_weak_impl_count(heap) == 101)
     clobber_stack()
     heap_collect_garbage(heap)
     assert(allocated_weak_impl_count(heap) == 1)
     assert(alive(&kept))
     # the freed impls are handed out again
-    drop_weaks(&kept, 100)
+    drop_cells_with_weaks(heap, 100)
     assert(allocated_weak_impl_count(heap) == 101)
-    assert(gc_hash_map_size(&heap.m_weak_blocks) == 1)
+    assert(weak_block_count(heap) == 1)
     root_release(&root)
     destroy_test_heap(heap)
 
@@ -62,7 +79,7 @@ noinline func store_weak_in_blob(heap: Heap*, target: const Weak[TestCell]*) -> 
     memory.write[Weak[TestCell]](blob.data, make_weak[TestCell](weak_ptr(target)))
     return blob
 
-test "a Weak kept in a cell or a blob is traced and cleared when its cell dies":
+test "a Weak kept in a cell or a blob is cleared when its cell dies":
     clobber_stack()
     run_weak_in_cell_and_blob()
 
@@ -79,8 +96,8 @@ noinline func run_weak_in_cell_and_blob():
     assert(not stored_weak_alive(&owner))
     let in_blob = memory.read[Weak[TestCell]](blob.data)
     assert(weak_ptr(&in_blob) == none)
-    # owner's impl, target's impl, the impl in owner.weak and the one in the blob all stay
-    assert(allocated_weak_impl_count(heap) == 4)
+    # owner's impl stays; target's, which owner.weak and the blob shared, went back
+    assert(allocated_weak_impl_count(heap) == 1)
     root_release(&root)
     destroy_test_heap(heap)
 
@@ -154,13 +171,6 @@ test "a WeakHashSet walks its live cells and forgets the dead ones":
 
 noinline func run_weak_hash_set():
     let heap = create_test_heap()
-    # The set's Weaks must live in scanned memory (its buckets are blobs of the heap).
-    let view: memory.Allocator = heap
-    with view:
-        run_weak_hash_set_in(heap)
-    destroy_test_heap(heap)
-
-noinline func run_weak_hash_set_in(heap: Heap*):
     let kept = make_unreferenced_cell(heap, 1)
     var root = root_of_weak[TestCell](&kept)
     let dropped = make_unreferenced_cell(heap, 2)
@@ -184,3 +194,4 @@ noinline func run_weak_hash_set_in(heap: Heap*):
     weak_hash_set_clear(&set)
     assert(weak_hash_set_is_empty(&set))
     root_release(&root)
+    destroy_test_heap(heap)

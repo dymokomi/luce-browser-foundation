@@ -46,5 +46,6 @@ tests_blocks.lucb
 tests_conservative.lucb
 tests_blobs.lucb
 tests_weak.lucb
+tests_weak_holders.lucb
 tests_visitor.lucb
 tests_stress.lucb

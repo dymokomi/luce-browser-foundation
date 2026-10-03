@@ -6,9 +6,17 @@
 #       Port of Libraries/LibGC/Weak.h (lines 1-186) and WeakInlines.h (lines 1-113). A Weak<T>
 #       holds a WeakImpl from the heap's weak blocks; when the cell dies, WeakBlock::sweep clears
 #       the impl's pointer. A null Weak<T> points at the_null_weak_impl in C++; in the port its
-#       impl is none, which reads the same. Copying a Weak copies the impl pointer: the port has no
-#       destructors to count references with, so the collector traces them instead
-#       (heap_blobs.lucb), and a WeakImpl is freed when no scanned word refers to it.
+#       impl is none, which reads the same.
+#
+#       C++ reference counts the impl: every copy of a Weak refs it, every destructor unrefs it,
+#       and sweep_weak_blocks frees the impls no Weak holds. The port has no destructors and
+#       copies a Weak as plain bytes, wherever it lives (a cell, a blob, the stack, the C heap, a
+#       module global). So a cell has one impl, which every Weak to it shares
+#       (heap_create_weak_impl), and the impl goes back to its block when its cell dies. Each
+#       impl counts how often it went back (its generation) and each Weak remembers the
+#       generation it was made with: a Weak whose impl went back reads none, as the C++ Weak to
+#       a dead cell does. A Weak is therefore valid for as long as anything holds it, and no
+#       memory has to be scanned to find it (DESIGN.md §3.3).
 #
 #==============================================================================================
 
@@ -16,7 +24,7 @@
 
 ## Ported from Libraries/LibGC/Weak.h:24 GC::WeakImpl::WeakImpl.
 pub func weak_impl_construct(this: WeakImpl*, ptr: void*?):
-    this.m_ref_count = 0
+    this.m_generation = 0
     this.m_state = WeakImplState.allocated
     this.m_ptr = ptr
 
@@ -36,21 +44,6 @@ pub func weak_impl_eq(this: const WeakImpl*, other: WeakImpl) -> bool:
 pub func weak_impl_ne(this: const WeakImpl*, other: WeakImpl) -> bool:
     return this.m_ptr != other.m_ptr
 
-## Ported from Libraries/LibGC/Weak.h:35 GC::WeakImpl::ref.
-pub func weak_impl_ref(this: const WeakImpl*):
-    let mutable_this = (WeakImpl*)this  # mutable size_t m_ref_count
-    mutable_this.m_ref_count += 1
-
-## Ported from Libraries/LibGC/Weak.h:36 GC::WeakImpl::unref.
-pub func weak_impl_unref(this: const WeakImpl*):
-    let mutable_this = (WeakImpl*)this
-    assert(mutable_this.m_ref_count != 0)
-    mutable_this.m_ref_count -= 1
-
-## Ported from Libraries/LibGC/Weak.h:42 GC::WeakImpl::ref_count.
-pub func weak_impl_ref_count(this: const WeakImpl*) -> usize:
-    return this.m_ref_count
-
 ## Ported from Libraries/LibGC/Weak.h:49 GC::WeakImpl::set_state.
 pub func weak_impl_set_state(this: WeakImpl*, state: WeakImplState):
     this.m_state = state
@@ -66,10 +59,11 @@ pub func weak_impl_state(this: const WeakImpl*) -> WeakImplState:
 pub func weak_construct[T: IsCell](this: Weak[T]*, ptr: T*?):
     if let cell = ptr:
         let impl = heap_create_weak_impl(cell_heap(cell.cell()), cell.cell())
-        weak_impl_ref(impl)  # NonnullRefPtr<WeakImpl>
         this.m_impl = impl
+        this.m_generation = impl.m_generation
     else:
         this.m_impl = none
+        this.m_generation = 0
 
 ## Ported from Libraries/LibGC/WeakInlines.h:15 GC::Weak::Weak (T const*), as a value.
 pub func make_weak[T: IsCell](ptr: T*?) -> Weak[T]:
@@ -87,9 +81,14 @@ pub func weak_ptr[T](this: const Weak[T]*) -> T*?:
     let impl = weak_impl(this) else return none
     return (T*?)weak_impl_ptr(impl)
 
-## Ported from Libraries/LibGC/Weak.h:131 GC::Weak::impl (none for a null Weak).
+## Ported from Libraries/LibGC/Weak.h:131 GC::Weak::impl: none for a null Weak, and for one
+## whose impl went back to its block with its dead cell (a later generation of the impl may serve
+## another cell).
 pub func weak_impl[T](this: const Weak[T]*) -> WeakImpl*?:
-    return (WeakImpl*?)this.m_impl
+    let impl = (WeakImpl*?)this.m_impl else return none
+    if impl.m_generation != this.m_generation:
+        return none
+    return impl
 
 ## Ported from Libraries/LibGC/Weak.h:154 GC::weak_callback: a callback that runs `callback` on
 ## `obj` while `obj` lives. (C++ forwards any further arguments; the port's has none.)

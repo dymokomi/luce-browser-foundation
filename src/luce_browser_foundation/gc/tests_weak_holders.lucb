@@ -1,0 +1,92 @@
+#==============================================================================================
+#
+#   tests_weak_holders - a Weak stays valid wherever it is held
+#
+#   DESCRIPTION:
+#       In C++ a Weak keeps its WeakImpl for as long as the Weak exists, wherever it is: on the
+#       stack, in a cell, in malloc'd memory or in a static. These tests hold Weaks where the
+#       collector scans (the stack) and where it does not (the C heap, a module global, an
+#       atomic blob). In each place, after a collection that kills one of the two cells and
+#       Weaks made afterwards for other cells, the Weak to the surviving cell still reads it and
+#       the Weak to the dead one reads none.
+#
+#==============================================================================================
+
+## Two Weaks held in a module global (a C++ static).
+var held_global_weaks: Weak[TestCell][2]
+
+## slots[0] = a Weak to a cell the returned Root keeps (id 1), slots[1] = a Weak to a cell
+## nothing keeps (id 2), with neither cell's address left in the caller's frame.
+noinline func hold_weaks(heap: Heap*, slots: Weak[TestCell]*) -> Root[TestCell]:
+    let kept = new_test_cell(heap, 1)
+    slots[0] = make_weak[TestCell](kept)
+    slots[1] = make_weak[TestCell](new_test_cell(heap, 2))
+    return root_create[TestCell](kept)
+
+## Weaks to `count` new cells nothing keeps: the weak blocks hand out the WeakImpls the last
+## collection gave back first (their freelists are last-in first-out).
+noinline func make_weaks_to_new_cells(heap: Heap*, count: usize):
+    for i in 0..<count:
+        discard(make_unreferenced_cell(heap, 100 + (i64)i))
+
+## The id of the cell `weak` reads, or -1 once it died.
+noinline func weak_id(weak: const Weak[TestCell]*) -> i64:
+    let cell = weak_ptr(weak) else return -1
+    return cell.id
+
+## Fill `slots`, collect, make Weaks to new cells, and check both slots.
+noinline func check_weaks_held_in(heap: Heap*, slots: Weak[TestCell]*):
+    var root = hold_weaks(heap, slots)
+    clobber_stack()
+    heap_collect_garbage(heap)
+    make_weaks_to_new_cells(heap, 8)
+    assert(weak_id(&slots[0]) == 1, "the Weak to the live cell reads it")
+    assert(weak_id(&slots[1]) == -1, "the Weak to the dead cell reads none")
+    # A second collection, with the new cells dead too.
+    clobber_stack()
+    heap_collect_garbage(heap)
+    make_weaks_to_new_cells(heap, 8)
+    assert(weak_id(&slots[0]) == 1 and weak_id(&slots[1]) == -1)
+    root_release(&root)
+
+test "a Weak held only on the stack":
+    clobber_stack()
+    run_weaks_on_stack()
+
+noinline func run_weaks_on_stack():
+    let heap = create_test_heap()
+    var slots: Weak[TestCell][2]
+    check_weaks_held_in(heap, &slots[0])
+    destroy_test_heap(heap)
+
+test "a Weak held only in C-heap memory":
+    clobber_stack()
+    run_weaks_in_c_heap()
+
+noinline func run_weaks_in_c_heap():
+    let heap = create_test_heap()
+    let slots = (alloc Weak[TestCell][2] in memory.heap) else trap("out of memory")
+    check_weaks_held_in(heap, slots.data)
+    free(slots) in memory.heap
+    destroy_test_heap(heap)
+
+test "a Weak held only in a module global":
+    clobber_stack()
+    run_weaks_in_global()
+
+noinline func run_weaks_in_global():
+    let heap = create_test_heap()
+    check_weaks_held_in(heap, &held_global_weaks[0])
+    held_global_weaks[0] = Weak[TestCell]()
+    held_global_weaks[1] = Weak[TestCell]()
+    destroy_test_heap(heap)
+
+test "a Weak held only in an atomic blob":
+    clobber_stack()
+    run_weaks_in_atomic_blob()
+
+noinline func run_weaks_in_atomic_blob():
+    let heap = create_test_heap()
+    let blob = heap_allocate_blob(heap, 2 * sizeof(Weak[TestCell]), 16, true) else trap("no blob")
+    check_weaks_held_in(heap, (Weak[TestCell]*)blob.data)
+    destroy_test_heap(heap)

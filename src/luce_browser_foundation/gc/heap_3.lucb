@@ -60,7 +60,6 @@ pub func marking_visitor_visit_possible_values_impl(base: CellVisitor*, bytes: c
 
     let raw_pointer_sized_values = (const usize*)bytes.data
     for i in 0..<(bytes.length // sizeof(usize)):
-        heap_note_possible_weak_reference(this.m_heap, raw_pointer_sized_values[i])
         add_possible_value(&possible_pointers, raw_pointer_sized_values[i], HeapRoot(type_ = HeapRootType.heap_function_captured_pointer), this.m_min_block_address, this.m_max_block_address)
 
     for found in for_each_cell_among_possible_pointers(this.m_heap, this.m_all_live_heap_blocks, &possible_pointers):
@@ -83,13 +82,11 @@ pub func marking_visitor_mark_all_live_cells(this: MarkingVisitor*):
             marking_visitor_visit_blob_pointers(this, cell)
 
 ## Addition: mark the blobs the words of `cell` point into (a blob is marked and queued, so its
-## words are scanned in turn; cells the words point to are left to the precise visit_edges), and
-## note the WeakImpls the words refer to (heap_blobs.lucb).
+## words are scanned in turn; cells the words point to are left to the precise visit_edges).
 func marking_visitor_visit_blob_pointers(this: MarkingVisitor*, cell: Cell*):
     let words = (const usize*)cell
     for i in 0..<(heap_cell_storage_size(this.m_heap, cell) // sizeof(usize)):
         let word = words[i]
-        heap_note_possible_weak_reference(this.m_heap, word)
         if word < this.m_min_block_address or word > this.m_max_block_address:
             continue
         let target = heap_cell_from_possible_pointer(this.m_heap, this.m_all_live_heap_blocks, word) else continue
@@ -129,12 +126,12 @@ pub func heap_finalize_unmarked_cells(this: Heap*):
 ## Ported from Libraries/LibGC/Heap.cpp:709 GC::Heap::sweep_weak_blocks.
 pub func heap_sweep_weak_blocks(this: Heap*):
     for node in list_nodes(&this.m_usable_weak_blocks):
-        weak_block_sweep(weak_block_from_list_node(node))
+        weak_block_sweep(weak_block_from_list_node(node), &this.m_weak_impls)
     var now_usable_weak_blocks: GcVector[WeakBlock*]
     defer gc_vector_clear(&now_usable_weak_blocks)
     for node in list_nodes(&this.m_full_weak_blocks):
         let weak_block = weak_block_from_list_node(node)
-        weak_block_sweep(weak_block)
+        weak_block_sweep(weak_block, &this.m_weak_impls)
         if weak_block_can_allocate(weak_block):
             gc_vector_append(&now_usable_weak_blocks, weak_block)
     for weak_block in gc_vector_span(&now_usable_weak_blocks):
@@ -243,17 +240,24 @@ pub func heap_undefer_gc(this: Heap*):
 pub func heap_uproot_cell(this: Heap*, cell: Cell*?):
     gc_vector_append(&this.m_uprooted_cells, cell)
 
-## Ported from Libraries/LibGC/Heap.cpp:825 GC::Heap::create_weak_impl.
+## Ported from Libraries/LibGC/Heap.cpp:825 GC::Heap::create_weak_impl. The port gives a cell one
+## impl, which all its Weaks share (weak.lucb): while the cell lives, the impl made for it first
+## is answered again.
 pub func heap_create_weak_impl(this: Heap*, ptr: void*?) -> WeakImpl*:
+    if let cell = ptr:
+        if let existing = gc_hash_map_get(&this.m_weak_impls, (usize)cell):
+            return *existing
+
     if list_is_empty(&this.m_usable_weak_blocks):
         # NOTE: These are leaked on Heap destruction, but that's fine since Heap is tied to process lifetime.
         let weak_block = weak_block_create()
         list_append(&this.m_usable_weak_blocks, &weak_block.m_list_node)
-        heap_register_weak_block(this, weak_block)  # addition: the weak-block index (heap_blobs.lucb)
 
     let weak_block = weak_block_from_list_node(list_first(&this.m_usable_weak_blocks) else trap("no usable weak block"))
     let new_weak_impl = weak_block_allocate(weak_block, (Cell*?)ptr) else trap("VERIFY: a usable weak block allocates")
     if not weak_block_can_allocate(weak_block):
         list_append(&this.m_full_weak_blocks, &weak_block.m_list_node)
 
+    if let cell = ptr:
+        gc_hash_map_set(&this.m_weak_impls, (usize)cell, new_weak_impl)
     return new_weak_impl

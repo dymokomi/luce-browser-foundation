@@ -8,9 +8,12 @@
 #
 #==============================================================================================
 
-## GC::Weak<T> (LibGC/Weak.h): a weak reference through a WeakImpl.
+## GC::Weak<T> (LibGC/Weak.h): a weak reference through a WeakImpl. Addition: the generation of
+## the impl when the Weak was made. The impl goes back to its block when its cell dies, and a Weak
+## whose generation no longer matches reads none (weak.lucb).
 pub struct Weak[T]:
     pub var m_impl: void*?
+    pub var m_generation: u64
 
 ## GC::Function<R()>: a cell holding an escaping callback and its captures (scanned conservatively, as LibGC does).
 pub struct Function0[R]: IsCell:

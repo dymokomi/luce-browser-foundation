@@ -109,8 +109,8 @@ pub func gc_vector_span[T](this: const GcVector[T]*) -> T[]:
 
 # mark: GcHashMap ===============================================================================
 
-## A hash map from nonzero addresses to `V` on the C heap (open addressing, linear probing, no
-## removal): the shape of AK's HashMap<Cell*, HeapRoot>, HashMap<FlatPtr, HeapRoot> and
+## A hash map from nonzero addresses to `V` on the C heap (open addressing, linear probing,
+## backward-shift removal): the shape of AK's HashMap<Cell*, HeapRoot>, HashMap<FlatPtr, HeapRoot> and
 ## HashTable<HeapBlock*> in the collector. Iteration order is the slot order; nothing in LibGC
 ## depends on the order of these tables.
 pub struct GcHashMap[V]:
@@ -123,11 +123,15 @@ pub struct GcHashMap[V]:
 pub func gc_hash_map_size[V](this: const GcHashMap[V]*) -> usize:
     return this.m_size
 
+## The slot `key` hashes to, where its probe starts.
+func gc_hash_map_home[V](this: const GcHashMap[V]*, key: usize) -> usize:
+    return (usize)(((u64)key >> 4) *% 0x9E3779B97F4A7C15 >> 17) & (this.m_capacity - 1)
+
 ## The slot of `key` (probing from its hash), holding the key or empty (0).
 func gc_hash_map_slot[V](this: const GcHashMap[V]*, key: usize) -> usize:
     let keys = this.m_keys else trap("GcHashMap: no storage")
     let mask = this.m_capacity - 1
-    var index = (usize)(((u64)key >> 4) *% 0x9E3779B97F4A7C15 >> 17) & mask
+    var index = gc_hash_map_home(this, key)
     while keys[index] != 0 and keys[index] != key:
         index = (index + 1) & mask
     return index
@@ -179,6 +183,30 @@ pub func gc_hash_map_get[V](this: const GcHashMap[V]*, key: usize) -> V*?:
     if keys[slot] == 0:
         return none
     return &values[slot]
+
+## HashMap::remove: `key` and its value leave the map; answers whether it was there. The keys
+## after it in its probe run move back into the hole when their probe starts at or before it,
+## so every key stays reachable from its home slot without tombstones.
+pub func gc_hash_map_remove[V](this: GcHashMap[V]*, key: usize) -> bool:
+    if this.m_size == 0 or key == 0:
+        return false
+    let keys = this.m_keys else return false
+    let values = this.m_values else return false
+    var hole = gc_hash_map_slot(this, key)
+    if keys[hole] == 0:
+        return false
+    let mask = this.m_capacity - 1
+    var index = (hole + 1) & mask
+    while keys[index] != 0:
+        let home = gc_hash_map_home(this, keys[index])
+        if ((index -% home) & mask) >= ((index -% hole) & mask):
+            keys[hole] = keys[index]
+            values[hole] = values[index]
+            hole = index
+        index = (index + 1) & mask
+    keys[hole] = 0
+    this.m_size -= 1
+    return true
 
 ## HashMap::contains.
 pub func gc_hash_map_contains[V](this: const GcHashMap[V]*, key: usize) -> bool:
