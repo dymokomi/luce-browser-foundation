@@ -72,13 +72,15 @@ pub func main(arguments: c.str[]) -> i32!:
     try write_output(output_directory, "generated_icu_locales.lucb", locales)
     return 0
 
-## The bytes of the data file `name` of `directory`; the whole run owns them.
-func read_data(directory: str, name: str) -> u8[]!:
+## The bytes of the data file `name` of `directory`; the whole run owns them, so they are
+## never released.
+func read_data(directory: str, name: str) -> const u8[]!:
     var path = try strings.Builder.create()
     try path.put(directory)
     try path.put("/")
     try path.put(name)
-    return try files.read((c.str)path.view())
+    let data = try files.read((c.str)path.view())
+    return data.value
 
 ## Write `text` to the file `name` of `directory`.
 func write_output(directory: str, name: str, text: str) -> !:

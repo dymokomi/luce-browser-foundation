@@ -142,7 +142,7 @@ struct Database:
 
 # mark: Parsing ppucd.txt =======================================================================
 
-func parse_ppucd(database: Database*, data: u8[]) -> !:
+func parse_ppucd(database: Database*, data: const u8[]) -> !:
     # Pool offset 0 is never a mapping, so that 0 can mean "none".
     try database.pool.append(0)
     # Script extension set 0 is "none".
@@ -373,7 +373,7 @@ func script_extension_set(database: Database*, value: str) -> u16!:
 
 # 231A..231B    ; Basic_Emoji    ; watch..hourglass done    # E0.6   [2] (⌚..⌛)
 # 0023 FE0F 20E3; Emoji_Keycap_Sequence ; keycap: #         # E0.6   [1] (#️⃣)
-func parse_emoji_sequences(database: Database*, data: u8[]) -> !:
+func parse_emoji_sequences(database: Database*, data: const u8[]) -> !:
     var lines = Lines.over(data)
     while let line = lines.next():
         let content = strip_comment(line)
@@ -407,7 +407,7 @@ func add_emoji_sequence(database: Database*, property: usize, sequence: const u3
 ## ICU 78.2 ships), which lacks the classes of a few characters new in Unicode 17 that
 ## ppucd.txt has; the classes are taken from nfc.txt, as ICU's are.
 # 0300..0314:230
-func parse_nfc_combining_classes(database: Database*, data: u8[]):
+func parse_nfc_combining_classes(database: Database*, data: const u8[]):
     for code_point in 0..<code_point_count:
         database.ccc[code_point] = 0
     var lines = Lines.over(data)

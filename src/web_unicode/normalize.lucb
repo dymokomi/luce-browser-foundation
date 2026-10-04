@@ -33,11 +33,13 @@ pub func normalization_form_to_string(form: NormalizationForm) -> ak.StringView:
 pub func normalize(string: ak.StringView, form: NormalizationForm) -> ak.String:
     # A failure of ICU (here: text that is not UTF-8) returns the text unchanged.
     if let normalized = normalize_utf8(view_bytes(string), form):
-        return ak.string_from_utf8(view_of(normalized)) else trap("MUST: StringBuilder::to_string")
+        defer normalized.release()
+        return ak.string_from_utf8(view_of(normalized.value)) else trap("MUST: StringBuilder::to_string")
     return ak.string_from_utf8(string) else trap("MUST: String::from_utf8")
 
-## Normalizer2::normalizeUTF8: `bytes` in `form`, or none when they are not UTF-8.
-func normalize_utf8(bytes: const u8[], form: NormalizationForm) -> str?:
+## Normalizer2::normalizeUTF8: `bytes` in `form`, or none when they are not UTF-8. The caller
+## releases the result.
+func normalize_utf8(bytes: const u8[], form: NormalizationForm) -> interop.Owned[str]?:
     let text = str(bytes) else return none
     let unicode_form = match form:
         .nfd => unicode.NormalizationForm.nfd
@@ -53,7 +55,8 @@ func normalize_code_points(code_points: const u32[], form: NormalizationForm) ->
     let bytes = encode_utf8_all(code_points)
     var out = CodePointBuffer.create(code_points.length + 1)
     if let normalized = normalize_utf8(bytes.view(), form):
-        decode_utf8(normalized.bytes, &out, none)
+        defer normalized.release()
+        decode_utf8(normalized.value.bytes, &out, none)
     else:
         out.append_all(code_points)
     return out

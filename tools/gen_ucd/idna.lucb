@@ -34,7 +34,7 @@ struct IdnaTable:
         discard(try table.pool.intern([0xffffff]))
         return table
 
-func parse_uts46(table: IdnaTable*, data: u8[]) -> !:
+func parse_uts46(table: IdnaTable*, data: const u8[]) -> !:
     var lines = Lines.over(data)
     while let line = lines.next():
         if line.length == 0:
