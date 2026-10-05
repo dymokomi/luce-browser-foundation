@@ -329,15 +329,6 @@ pub func utf16_string_from_ipc_stream(stream: Stream*, length_in_code_units: usi
 
     return utf16_string_from_data(try utf16_string_data_from_ipc_stream(stream, length_in_code_units, is_ascii_))
 
-## Ported from AK/Utf16String.h:257 AK::Utf16String::Utf16String(Badge<Optional<Utf16String>>, nullptr_t):
-## the invalid (null) string, the sentinel of Optional<Utf16String>.
-pub func utf16_string_construct_utf16_string(this: Utf16String*):
-    utf16_string_base_utf16_string_base(&this.utf16_string_base)
-
-## Ported from AK/Utf16String.h:262 AK::Utf16String::is_invalid.
-pub func utf16_string_is_invalid(this: const Utf16String*) -> bool:
-    return utf16_string_base_raw(&this.utf16_string_base) == 0
-
 ## Ported from AK/Utf16String.h:265 AK::Utf16String::Utf16String(NonnullRefPtr<Utf16StringData const>).
 pub func utf16_string_construct_utf16_string_data(this: Utf16String*, value: const Utf16StringData*):
     utf16_string_base_construct_utf16_string_data(&this.utf16_string_base, value)

@@ -135,7 +135,7 @@ pub func fly_string_from_ascii_short_string_without_validation(data: const u8[])
 
 ## Ported from AK/FlyString.cpp:51 AK::FlyString::FlyString(String const&): interns `string`.
 pub func fly_string_construct_string(this: FlyString*, string: const String*):
-    assert(not string_is_invalid(string))
+    # (ASSERT(!string.is_invalid()): the null sentinel of Optional<String> does not exist here.)
 
     if string_base_is_short_string(&string.string_base):
         this.m_data = string.string_base
@@ -294,17 +294,9 @@ pub func fly_string_ends_with_bytes(this: const FlyString*, bytes: StringView, c
     let view = fly_string_bytes_as_string_view(this)
     return string_view_ends_with_string_view(&view, bytes, case_sensitivity)
 
-## Ported from AK/FlyString.h:100 AK::FlyString::FlyString(nullptr_t): the invalid sentinel.
-pub func fly_string_construct_void(this: FlyString*):
-    string_base_construct_void(&this.m_data)
-
 ## Ported from AK/FlyString.h:105 AK::FlyString::FlyString(StringBase).
 pub func fly_string_construct_string_base(this: FlyString*, data: StringBase):
     this.m_data = data
-
-## Ported from AK/FlyString.h:112 AK::FlyString::is_invalid.
-pub func fly_string_is_invalid(this: const FlyString*) -> bool:
-    return string_base_raw_fly_string(&this.m_data) == 0
 
 # mark: Traits and literals =====================================================================
 

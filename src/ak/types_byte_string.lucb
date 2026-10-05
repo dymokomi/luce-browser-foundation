@@ -11,9 +11,11 @@
 
 # mark: ByteString ==============================================================================
 
-## AK::ByteString (AK/ByteString.h:39).
+## AK::ByteString (AK/ByteString.h:39). `m_impl` is none in a zeroed ByteString (memory as a cell or
+## blob is allocated), which is the empty string: read it through byte_string_impl (hand-edited by
+## p2s; the C++ NonnullRefPtr is never null).
 pub struct ByteString:
-    pub var m_impl: const ByteStringImpl*
+    pub var m_impl: const ByteStringImpl*?
 
 # mark: CaseInsensitiveAsciiStringTraits ========================================================
 

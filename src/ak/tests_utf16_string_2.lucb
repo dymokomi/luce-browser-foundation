@@ -344,16 +344,25 @@ test "code_point_at":
     t16s_test_code_point_at(t16("hello 😀 there!"), 14)
 
 test "optional":
-    # Optional<Utf16String> is the null sentinel (is_invalid) in the C++; a `Utf16String?` is a
-    # tagged optional here, so this checks the sentinel directly.
-    var string = utf16_string_new()
-    utf16_string_construct_utf16_string(&string)
-    assert(utf16_string_is_invalid(&string))
+    # Optional<Utf16String> is a Luce optional here (the C++ uses the null sentinel, which does
+    # not exist in the port: a zeroed Utf16String is the empty string).
+    var string: Utf16String? = none
+    assert(string == none)
 
     string = utf16_string_from_str("ascii")
-    assert(not utf16_string_is_invalid(&string))
-    assert(t16s_eq_str(&string, "ascii"))
+    let ascii = string else trap("has_value")
+    assert(t16s_eq_str(&ascii, "ascii"))
+
+    var released = string else trap("release_value")
+    string = none
+    assert(string == none)
+    assert(t16s_eq_str(&released, "ascii"))
 
     string = t16_lit("well 😀 hello")
-    assert(not utf16_string_is_invalid(&string))
-    assert(t16s_eq(&string, t16("well 😀 hello")))
+    let emoji = string else trap("has_value")
+    assert(t16s_eq(&emoji, t16("well 😀 hello")))
+
+    released = string else trap("release_value")
+    string = none
+    assert(string == none)
+    assert(t16s_eq(&released, t16("well 😀 hello")))

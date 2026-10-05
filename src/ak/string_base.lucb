@@ -12,6 +12,13 @@
 #       optional-pointer member the short string wrote is undefined in luce-base; this is the
 #       `__builtin_launder` of the C++.
 #
+#       One addition to the C++: eight zero bytes are the empty string. Cells and blobs are
+#       zeroed when they are allocated where C++ default-constructs their members, so a zeroed
+#       StringBase reads as `StringBase {}` (the empty short string, whose bits are
+#       SHORT_STRING_FLAG): it is a short string, `raw` answers the empty short string's word,
+#       and it equals and hashes as the empty string. The C++ null pointer (`StringBase(nullptr_t)`,
+#       the sentinel of `Optional<String>`) has no counterpart: `String?` is a Luce optional.
+#
 #==============================================================================================
 
 # mark: ShortString =============================================================================
@@ -54,7 +61,10 @@ pub func string_base_construct_string_data(this: StringBase*, data: const String
 ## Ported from AK/StringBase.h:68 AK::Detail::StringBase::is_short_string. NOTE: This is
 ## primarily interesting to unit tests.
 pub func string_base_is_short_string(this: const StringBase*) -> bool:
-    return (string_base_short_string_without_union_member_assertion(this).byte_count_and_short_string_flag & (u8)string_base_short_string_flag) != 0
+    if (string_base_short_string_without_union_member_assertion(this).byte_count_and_short_string_flag & (u8)string_base_short_string_flag) != 0:
+        return true
+    # Zeroed memory is the empty short string (see the header).
+    return memory.read[usize](&this.m_impl) == 0
 
 ## Ported from AK/StringBase.h:211 AK::Detail::StringBase::bytes: the underlying UTF-8 encoded
 ## bytes, inside the StringBase itself for a short string. NOTE: There is no guarantee about
@@ -62,7 +72,7 @@ pub func string_base_is_short_string(this: const StringBase*) -> bool:
 pub func string_base_bytes(this: const StringBase*) -> const u8[]:
     if string_base_is_short_string(this):
         return short_string_bytes(&this.m_impl.short_string)
-    let data = string_base_data_without_union_member_assertion(this) else return b""
+    let data = string_base_data_without_union_member_assertion(this) else trap("unreachable: a long string has data")
     return string_data_bytes(data)
 
 ## Ported from AK/StringBase.h:220 AK::Detail::StringBase::hash.
@@ -70,7 +80,7 @@ pub func string_base_hash(this: const StringBase*) -> u32:
     if string_base_is_short_string(this):
         let bytes = string_base_bytes(this)
         return string_hash(bytes.data, bytes.length)
-    let data = string_base_data_without_union_member_assertion(this) else return string_hash(none, 0)
+    let data = string_base_data_without_union_member_assertion(this) else trap("unreachable: a long string has data")
     return string_data_hash(data)
 
 ## Ported from AK/StringBase.h:231 AK::Detail::StringBase::byte_count.
@@ -78,7 +88,7 @@ pub func string_base_byte_count(this: const StringBase*) -> usize:
     if string_base_is_short_string(this):
         return short_string_byte_count(&this.m_impl.short_string)
 
-    let data = string_base_data_without_union_member_assertion(this) else return 0
+    let data = string_base_data_without_union_member_assertion(this) else trap("unreachable: a long string has data")
     return string_data_byte_count(data)
 
 ## Ported from AK/StringBase.h:83 AK::Detail::StringBase::length_in_code_units.
@@ -91,18 +101,20 @@ pub func string_base_eq(this: const StringBase*, other: const StringBase*) -> bo
         return string_base_raw(this) == string_base_raw(other)
     if string_base_is_short_string(other):
         return false
-    let this_data = string_base_data_without_union_member_assertion(this)
-    let other_data = string_base_data_without_union_member_assertion(other)
-    if this_data == none or other_data == none:
-        return this_data == other_data
-    if string_data_is_fly_string(this_data else trap("unreachable")) and string_data_is_fly_string(other_data else trap("unreachable")):
+    let this_data = string_base_data_without_union_member_assertion(this) else trap("unreachable: a long string has data")
+    let other_data = string_base_data_without_union_member_assertion(other) else trap("unreachable: a long string has data")
+    if string_data_is_fly_string(this_data) and string_data_is_fly_string(other_data):
         return this_data == other_data
     let this_bytes = string_view_from_bytes(string_base_bytes(this))
     return string_view_eq_string_view(&this_bytes, string_view_from_bytes(string_base_bytes(other)))
 
-## `bit_cast<FlatPtr>(m_impl)`: the union's eight bytes as one word.
+## `bit_cast<FlatPtr>(m_impl)`: the union's eight bytes as one word; zeroed memory answers the
+## word of the empty short string, SHORT_STRING_FLAG (see the header).
 func string_base_raw(this: const StringBase*) -> usize:
-    return memory.read[usize](&this.m_impl)
+    let raw = memory.read[usize](&this.m_impl)
+    if raw == 0:
+        return string_base_short_string_flag
+    return raw
 
 ## Ported from AK/StringBase.h:87 AK::Detail::StringBase::raw(Badge<FlyString>).
 pub func string_base_raw_fly_string(this: const StringBase*) -> usize:
@@ -163,11 +175,6 @@ pub func string_base_substring_from_byte_offset_with_shared_superstring(this: co
     string_base_construct_string_data(&result, try string_data_create_substring(data, start, length))
     return result
 
-## Ported from AK/StringBase.h:131 AK::Detail::StringBase::StringBase(nullptr_t): the invalid
-## string (a null data pointer), the sentinel of Optional<String>.
-pub func string_base_construct_void(this: StringBase*):
-    this.m_impl.data = none
-
 ## Ported from AK/StringBase.h:136 AK::Detail::StringBase::StringBase(ShortString).
 pub func string_base_construct_short_string(this: StringBase*, short_string: ShortString):
     this.m_impl.short_string = short_string
@@ -200,9 +207,10 @@ pub func string_base_destroy_string(this: StringBase*):
 pub func string_base_short_string_without_union_member_assertion(this: const StringBase*) -> ShortString:
     return this.m_impl.short_string
 
-## Ported from AK/StringBase.h:179 AK::Detail::StringBase::data_without_union_member_assertion.
+## Ported from AK/StringBase.h:179 AK::Detail::StringBase::data_without_union_member_assertion: the
+## data pointer of a long string (none for zeroed memory, which is the empty short string).
 pub func string_base_data_without_union_member_assertion(this: const StringBase*) -> const StringData*?:
-    return (const StringData*?)string_base_raw(this)
+    return (const StringData*?)memory.read[usize](&this.m_impl)
 
 # mark: Shared callbacks ========================================================================
 

@@ -1,0 +1,176 @@
+#==============================================================================================
+#
+#   tests_zeroed_strings - zeroed String, FlyString, ByteString, Utf16String and Utf16FlyString
+#
+#   DESCRIPTION:
+#       The port's one addition to AK's string representations (string_base, utf16_string_base,
+#       byte_string): eight zero bytes are the empty string. Cells and blobs are zeroed when they
+#       are allocated, where C++ default-constructs their members, so a cell's string members are
+#       valid empty strings without a constructor setting them. These tests read zeroed strings
+#       (on the stack, in a zeroed array and in a managed blob) through every kind of access and
+#       compare them with `T {}` and with non-empty strings both ways.
+#
+#==============================================================================================
+
+## A struct holding one of each string type, as a cell's members are laid out.
+struct ZeroedStringHolder:
+    var string: String
+    var fly_string: FlyString
+    var byte_string: ByteString
+    var utf16_string: Utf16String
+    var utf16_fly_string: Utf16FlyString
+
+## A holder whose eight-byte members are all zero bits.
+func tz_zeroed_holder() -> ZeroedStringHolder:
+    var holder: ZeroedStringHolder = ---
+    memory.set(u8[]((u8*)&holder, memory.size_of(ZeroedStringHolder)), 0)
+    return holder
+
+test "a zeroed String is String {}":
+    let holder = tz_zeroed_holder()
+    let zeroed = holder.string
+    let empty = string_new()
+
+    assert(string_base_is_short_string(&zeroed.string_base))
+    assert(string_is_empty(&zeroed))
+    assert(string_base_byte_count(&zeroed.string_base) == 0)
+    assert(string_base_bytes(&zeroed.string_base).length == 0)
+    assert(string_base_raw_string(&zeroed.string_base) == string_base_raw_string(&empty.string_base))
+    assert(string_equals(&zeroed, &empty))
+    assert(string_equals(&empty, &zeroed))
+    assert(string_equals(&zeroed, &zeroed))
+    assert(string_eq_string_view(&zeroed, sv("")))
+    assert(string_base_hash(&zeroed.string_base) == string_base_hash(&empty.string_base))
+
+    let short_string = string_from_str("short")
+    let long_string = string_from_str("a string longer than seven bytes")
+    assert(not string_equals(&zeroed, &short_string))
+    assert(not string_equals(&short_string, &zeroed))
+    assert(not string_equals(&zeroed, &long_string))
+    assert(not string_equals(&long_string, &zeroed))
+
+    # Writing into a zeroed String replaces it as it replaces String {}.
+    var builder = string_builder_new()
+    string_builder_append(&builder, "built")
+    var written = holder.string
+    string_base_replace_with_string_builder(&written.string_base, &builder)
+    assert(string_eq_string_view(&written, sv("built")))
+
+test "a zeroed FlyString is FlyString {}":
+    let holder = tz_zeroed_holder()
+    let zeroed = holder.fly_string
+    let empty = fly_string_new()
+
+    assert(fly_string_is_empty(&zeroed))
+    assert(fly_string_bytes(&zeroed).length == 0)
+    assert(fly_string_eq_fly_string(&zeroed, &empty))
+    assert(fly_string_eq_fly_string(&empty, &zeroed))
+    assert(fly_string_hash(&zeroed) == fly_string_hash(&empty))
+    let empty_string = string_new()
+    assert(fly_string_eq_string(&zeroed, &empty_string))
+    assert(fly_string_eq_string_view(&zeroed, sv("")))
+    let zeroed_string = holder.string
+    assert(fly_string_eq_string(&empty, &zeroed_string))
+
+    let short_fly = fly_string_from_str("fly")
+    let long_fly = fly_string_from_str("a fly string longer than seven bytes")
+    assert(not fly_string_eq_fly_string(&zeroed, &short_fly))
+    assert(not fly_string_eq_fly_string(&short_fly, &zeroed))
+    assert(not fly_string_eq_fly_string(&zeroed, &long_fly))
+    assert(not fly_string_eq_fly_string(&long_fly, &zeroed))
+
+    # Interning a zeroed String answers the empty FlyString.
+    let interned = fly_string_from_string(holder.string)
+    assert(fly_string_eq_fly_string(&interned, &empty))
+
+test "a zeroed ByteString is ByteString {}":
+    let holder = tz_zeroed_holder()
+    let zeroed = holder.byte_string
+    let empty = byte_string_empty()
+
+    assert(byte_string_is_empty(&zeroed))
+    assert(byte_string_length(&zeroed) == 0)
+    assert(byte_string_bytes(&zeroed).length == 0)
+    assert(byte_string_characters(&zeroed)[0] == 0)  # NUL-terminated, as the empty impl
+    assert(byte_string_impl(&zeroed) == byte_string_impl(&empty))
+    assert(byte_string_eq_byte_string(&zeroed, &empty))
+    assert(byte_string_eq_byte_string(&empty, &zeroed))
+    assert(byte_string_eq_string_view(&zeroed, sv("")))
+    assert(byte_string_hash(&zeroed) == byte_string_hash(&empty))
+    assert(byte_string_traits_hash(&zeroed) == byte_string_traits_hash(&empty))
+    let view = byte_string_view(&zeroed)
+    assert(string_view_is_empty(&view))
+    let buffer = byte_string_to_byte_buffer(&zeroed)
+    assert(byte_buffer_size(&buffer) == 0)
+
+    let text = byte_string_from_str("text")
+    assert(not byte_string_eq_byte_string(&zeroed, &text))
+    assert(not byte_string_eq_byte_string(&text, &zeroed))
+    assert(byte_string_lt(&zeroed, &text))
+    assert(byte_string_gt(&text, &zeroed))
+    let tail = byte_string_substring(&text, 4)
+    assert(byte_string_eq_byte_string(&tail, &zeroed))
+
+test "a zeroed Utf16String is Utf16String {}":
+    let holder = tz_zeroed_holder()
+    let zeroed = holder.utf16_string
+    let empty = utf16_string_new()
+
+    assert(utf16_string_base_has_short_ascii_storage(&zeroed.utf16_string_base))
+    assert(utf16_string_base_has_ascii_storage(&zeroed.utf16_string_base))
+    assert(not utf16_string_base_has_long_storage(&zeroed.utf16_string_base))
+    assert(utf16_string_base_is_empty(&zeroed.utf16_string_base))
+    assert(utf16_string_base_length_in_code_units(&zeroed.utf16_string_base) == 0)
+    assert(utf16_string_base_length_in_code_points(&zeroed.utf16_string_base) == 0)
+    assert(utf16_string_base_raw(&zeroed.utf16_string_base) == utf16_string_base_raw(&empty.utf16_string_base))
+    assert(utf16_string_base_eq_utf16_string_base(&zeroed.utf16_string_base, &empty.utf16_string_base))
+    assert(utf16_string_base_eq_utf16_string_base(&empty.utf16_string_base, &zeroed.utf16_string_base))
+    assert(utf16_string_base_eq_string_view(&zeroed.utf16_string_base, sv("")))
+    assert(utf16_string_base_hash(&zeroed.utf16_string_base) == utf16_string_base_hash(&empty.utf16_string_base))
+
+    let ascii = utf16_string_from_str("ascii")
+    let long_utf16 = utf16_string_from_str("well 😀 hello there")
+    assert(not utf16_string_base_eq_utf16_string_base(&zeroed.utf16_string_base, &ascii.utf16_string_base))
+    assert(not utf16_string_base_eq_utf16_string_base(&ascii.utf16_string_base, &zeroed.utf16_string_base))
+    assert(not utf16_string_base_eq_utf16_string_base(&zeroed.utf16_string_base, &long_utf16.utf16_string_base))
+    assert(not utf16_string_base_eq_utf16_string_base(&long_utf16.utf16_string_base, &zeroed.utf16_string_base))
+
+test "a zeroed Utf16FlyString is Utf16FlyString {}":
+    let holder = tz_zeroed_holder()
+    let zeroed = holder.utf16_fly_string
+    let empty = utf16_fly_string_new()
+
+    assert(utf16_fly_string_eq_utf16_fly_string(&zeroed, &empty))
+    assert(utf16_fly_string_eq_utf16_fly_string(&empty, &zeroed))
+    assert(utf16_fly_string_hash(&zeroed) == utf16_fly_string_hash(&empty))
+    assert(utf16_fly_string_eq_string_view(&zeroed, sv("")))
+    let zeroed_string = holder.utf16_string
+    assert(utf16_fly_string_eq_utf16_string(&zeroed, &zeroed_string))
+
+    let fly = utf16_fly_string_from_utf8_string_view(sv("a utf-16 fly string"))
+    assert(not utf16_fly_string_eq_utf16_fly_string(&zeroed, &fly))
+    assert(not utf16_fly_string_eq_utf16_fly_string(&fly, &zeroed))
+
+test "strings in zeroed allocations are empty":
+    # `new T[n]` is zeroed, as the managed heap's cells and blobs are.
+    let holders = new ZeroedStringHolder[3] else trap("out of memory")
+    let empty_string = string_new()
+    let empty_fly_string = fly_string_new()
+    let empty_byte_string = byte_string_empty()
+    let empty_utf16_string = utf16_string_new()
+    let empty_utf16_fly_string = utf16_fly_string_new()
+    for i in 0..<holders.length:
+        let holder = &holders[i]
+        assert(string_equals(&holder.string, &empty_string))
+        assert(fly_string_eq_fly_string(&holder.fly_string, &empty_fly_string))
+        assert(byte_string_eq_byte_string(&holder.byte_string, &empty_byte_string))
+        assert(utf16_string_base_eq_utf16_string_base(&holder.utf16_string.utf16_string_base, &empty_utf16_string.utf16_string_base))
+        assert(utf16_fly_string_eq_utf16_fly_string(&holder.utf16_fly_string, &empty_utf16_fly_string))
+
+    # A HashMap keyed by String finds the empty key under a zeroed String, and the reverse.
+    var map = HashMap[String, i32, StringTraits]()
+    hash_map_set(&map, empty_string, 7)
+    assert(*(hash_map_get_k(&map, holders[0].string) else trap("found")) == 7)
+    var zeroed_map = HashMap[String, i32, StringTraits]()
+    hash_map_set(&zeroed_map, holders[1].string, 9)
+    assert(*(hash_map_get_k(&zeroed_map, empty_string) else trap("found")) == 9)

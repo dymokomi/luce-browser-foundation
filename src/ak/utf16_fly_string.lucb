@@ -363,15 +363,6 @@ pub func utf16_fly_string_code_unit_offset_of(this: const Utf16FlyString*, code_
 pub func utf16_fly_string_code_point_offset_of(this: const Utf16FlyString*, code_unit_offset: usize) -> usize:
     return utf16_string_base_code_point_offset_of(&this.m_data, code_unit_offset)
 
-## Ported from AK/Utf16FlyString.h:139 AK::Utf16FlyString::Utf16FlyString(Badge<SentinelOptionalTraits>,
-## nullptr_t): the invalid sentinel.
-pub func utf16_fly_string_construct_utf16_fly_string(this: Utf16FlyString*):
-    utf16_string_base_utf16_string_base(&this.m_data)
-
-## Ported from AK/Utf16FlyString.h:144 AK::Utf16FlyString::is_invalid.
-pub func utf16_fly_string_is_invalid(this: const Utf16FlyString*) -> bool:
-    return utf16_string_base_raw_utf16_fly_string(&this.m_data) == 0
-
 ## Ported from AK/Utf16FlyString.cpp:100 AK::Utf16FlyString::number_of_utf16_fly_strings. This
 ## is primarily interesting to unit tests.
 pub func utf16_fly_string_number_of_utf16_fly_strings() -> usize:

@@ -289,6 +289,7 @@ tests_string_2.lucb
 tests_utf8_view.lucb
 tests_byte_string.lucb
 tests_fly_string.lucb
+tests_zeroed_strings.lucb
 tests_text_support.lucb
 tests_floating_point.lucb
 tests_generic_shorthands.lucb

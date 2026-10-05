@@ -16,7 +16,7 @@
 
 # mark: Construction ============================================================================
 
-## `String {}`: the empty string (a zero-initialized String is the invalid sentinel instead).
+## `String {}`: the empty string (a zero-initialized String is the empty string too).
 pub func string_new() -> String:
     return String(string_base = string_base_new())
 

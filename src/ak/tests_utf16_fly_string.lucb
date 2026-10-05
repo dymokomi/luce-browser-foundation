@@ -170,19 +170,28 @@ test "is_one_of (Utf16FlyString)":
 
 test "optional (Utf16FlyString)":
     t16_reset_fly_strings()
-    # Optional<Utf16FlyString> is the null sentinel (is_invalid) in the C++.
-    var string = utf16_fly_string_new()
-    utf16_fly_string_construct_utf16_fly_string(&string)
-    assert(utf16_fly_string_is_invalid(&string))
+    # Optional<Utf16FlyString> is a Luce optional here (the C++ uses the null sentinel).
+    var string: Utf16FlyString? = none
+    assert(string == none)
 
     string = t16f("ascii")
-    assert(not utf16_fly_string_is_invalid(&string))
-    assert(t16f_eq_str(&string, "ascii"))
+    let ascii = string else trap("has_value")
+    assert(t16f_eq_str(&ascii, "ascii"))
+
+    var released = string else trap("release_value")
+    string = none
+    assert(string == none)
+    assert(t16f_eq_str(&released, "ascii"))
 
     string = t16f_lit("well 😀 hello")
-    assert(not utf16_fly_string_is_invalid(&string))
+    let emoji = string else trap("has_value")
     let expected = t16("well 😀 hello")
-    assert(utf16_fly_string_eq_utf16_view(&string, &expected))
+    assert(utf16_fly_string_eq_utf16_view(&emoji, &expected))
+
+    released = string else trap("release_value")
+    string = none
+    assert(string == none)
+    assert(utf16_fly_string_eq_utf16_view(&released, &expected))
 
 test "interned_strings_outlive_the_allocator_that_was_current (Utf16FlyString)":
     # Not in the donor's tests: as FlyString's test of the same name, for ASCII and UTF-16 storage.

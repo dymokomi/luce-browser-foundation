@@ -369,18 +369,9 @@ pub func string_to_byte_string(this: const String*) -> ByteString:
 pub func string_from_byte_string(byte_string: ByteString) -> String!:
     return try string_from_utf8(byte_string_view(&byte_string))
 
-## Ported from AK/String.h:234 AK::String::is_invalid: whether this is the null sentinel of
-## Optional<String>.
-pub func string_is_invalid(this: const String*) -> bool:
-    return string_base_raw_string(&this.string_base) == 0
-
 ## Ported from AK/String.h:239 AK::String::String(StringBase&&).
 pub func string_construct_string_base(this: String*, base_: StringBase):
     this.string_base = base_
-
-## Ported from AK/String.h:244 AK::String::String(nullptr_t): the invalid sentinel.
-pub func string_construct_void(this: String*):
-    string_base_construct_void(&this.string_base)
 
 # mark: Traits and literals =====================================================================
 

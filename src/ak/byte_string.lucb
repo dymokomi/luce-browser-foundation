@@ -6,9 +6,13 @@
 #       Port of AK/ByteString.h (lines 1-332) and AK/ByteString.cpp (lines 1-298), in the
 #       header's order with the .cpp bodies in place of their declarations.
 #
-#       A ByteString points at a ByteStringImpl (never null: the empty string is the static
-#       empty impl). Copies share the impl. Unlike String, a ByteString's bytes always live in
-#       the impl, so views of a ByteString value stay valid while the impl is reachable.
+#       A ByteString points at a ByteStringImpl (the empty string is the static empty impl).
+#       Copies share the impl. Unlike String, a ByteString's bytes always live in the impl, so
+#       views of a ByteString value stay valid while the impl is reachable.
+#
+#       One addition to the C++: a zeroed ByteString (no impl), as a cell or blob is allocated
+#       where C++ default-constructs its members, is the empty string. byte_string_impl answers
+#       the static empty impl for it, and every function reads the impl through it.
 #
 #==============================================================================================
 
@@ -332,7 +336,7 @@ pub func byte_string_substring_usize(this: const ByteString*, start: usize, leng
     if length == 0:
         return byte_string_empty()
     let end = start +? length else trap("VERIFY: substring overflow")
-    assert(end <= byte_string_impl_length(this.m_impl))
+    assert(end <= byte_string_impl_length(byte_string_impl(this)))
     return byte_string_from_string_view(string_view_from_bytes(byte_string_bytes(this)[start..<end]))
 
 ## Ported from AK/ByteString.cpp:60 AK::ByteString::substring(size_t).
@@ -343,7 +347,7 @@ pub func byte_string_substring(this: const ByteString*, start: usize) -> ByteStr
 ## Ported from AK/ByteString.cpp:66 AK::ByteString::substring_view(size_t, size_t).
 pub func byte_string_substring_view_usize(this: const ByteString*, start: usize, length: usize) -> StringView:
     let end = start +? length else trap("VERIFY: substring_view overflow")
-    assert(end <= byte_string_impl_length(this.m_impl))
+    assert(end <= byte_string_impl_length(byte_string_impl(this)))
     return StringView(m_characters = byte_string_characters(this) + start, m_length = length)
 
 ## Ported from AK/ByteString.cpp:73 AK::ByteString::substring_view(size_t).
@@ -359,11 +363,11 @@ pub func byte_string_is_empty(this: const ByteString*) -> bool:
 
 ## Ported from AK/ByteString.h:191 AK::ByteString::length.
 pub func byte_string_length(this: const ByteString*) -> usize:
-    return byte_string_impl_length(this.m_impl)
+    return byte_string_impl_length(byte_string_impl(this))
 
 ## Ported from AK/ByteString.h:193 AK::ByteString::characters: includes the NUL terminator.
 pub func byte_string_characters(this: const ByteString*) -> const u8*:
-    return byte_string_impl_characters(this.m_impl)
+    return byte_string_impl_characters(byte_string_impl(this))
 
 ## Ported from AK/ByteString.cpp:39 AK::ByteString::copy_characters_to_buffer: copies as much as
 ## fits and a NUL; answers whether everything fit.
@@ -380,15 +384,15 @@ pub func byte_string_copy_characters_to_buffer(this: const ByteString*, buffer: 
 
 ## Ported from AK/ByteString.h:197 AK::ByteString::bytes.
 pub func byte_string_bytes(this: const ByteString*) -> const u8[]:
-    return byte_string_impl_bytes(this.m_impl)
+    return byte_string_impl_bytes(byte_string_impl(this))
 
 ## Ported from AK/ByteString.h:200 AK::ByteString::operator[].
 pub func byte_string_at(this: const ByteString*, i: usize) -> u8:
-    return byte_string_impl_at(this.m_impl, i)
+    return byte_string_impl_at(byte_string_impl(this), i)
 
 ## Ported from AK/ByteString.h:205 AK::ByteString::byte_at.
 pub func byte_string_byte_at(this: const ByteString*, i: usize) -> u8:
-    return byte_string_impl_at(this.m_impl, i)
+    return byte_string_impl_at(byte_string_impl(this), i)
 
 ## Ported from AK/ByteString.h:212 AK::ByteString::begin.
 pub func byte_string_begin(this: const ByteString*) -> SimpleIterator[ByteString, u8]:
@@ -422,7 +426,7 @@ pub func byte_string_ends_with_u8(this: const ByteString*, ch: u8) -> bool:
 
 ## Ported from AK/ByteString.cpp:19 AK::ByteString::operator==(ByteString const&).
 pub func byte_string_eq_byte_string(this: const ByteString*, other: const ByteString*) -> bool:
-    if this.m_impl == byte_string_impl(other):
+    if byte_string_impl(this) == byte_string_impl(other):
         return true
     let view = byte_string_view(this)
     return string_view_eq_string_view(&view, byte_string_view(other))
@@ -477,11 +481,11 @@ pub func byte_string_empty() -> ByteString:
 
 ## Ported from AK/ByteString.h:239 AK::ByteString::impl.
 pub func byte_string_impl(this: const ByteString*) -> const ByteStringImpl*:
-    return this.m_impl
+    return this.m_impl else byte_string_impl_the_empty_stringimpl()
 
 ## Ported from AK/ByteString.h:262 AK::ByteString::hash.
 pub func byte_string_hash(this: const ByteString*) -> u32:
-    return byte_string_impl_hash(this.m_impl)
+    return byte_string_impl_hash(byte_string_impl(this))
 
 ## Ported from AK/ByteString.cpp:137 AK::ByteString::to_byte_buffer.
 pub func byte_string_to_byte_buffer(this: const ByteString*) -> ByteBuffer:
