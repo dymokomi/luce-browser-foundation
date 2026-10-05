@@ -165,7 +165,7 @@ pub func eucjp_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byte:
     var iterator = ak.utf8_view_begin(&input)
     while iterator != end:
         var item = ak.utf8_code_point_iterator_deref(&iterator)
-        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        _ = ak.utf8_code_point_iterator_inc(&iterator)
 
         # 1. If code point is end-of-queue, return finished.
 
@@ -327,7 +327,7 @@ pub func iso2022_jp_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_
     var iterator = ak.utf8_view_begin(&input)
     while iterator != end:
         let item = ak.utf8_code_point_iterator_deref(&iterator)
-        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        _ = ak.utf8_code_point_iterator_inc(&iterator)
         state = try iso2022_jp_encoder_process_item(this, item, state, &byte_callback, &error_callback)
 
     # 1. If code point is end-of-queue and ISO-2022-JP encoder state is not ASCII, set ISO-2022-JP

@@ -63,13 +63,13 @@ test "binary_heap: large_populate_reverse":
 test "binary_heap: pop_min_is_min over pseudo-random keys":
     var state: u64 = 12345
     for round in 0..<50:
-        discard(round)
+        _ = round
         var heap: BinaryHeap[u64, u64]
         var values: Vector[u64]
         state = state *% 6364136223846793005 +% 1442695040888963407
         let count = 1 + (state >> 60) % 10
         for k in 0..<count:
-            discard(k)
+            _ = k
             state = state *% 6364136223846793005 +% 1442695040888963407
             binary_heap_insert(&heap, state, state)
             vector_append_t(&values, state)
@@ -213,7 +213,7 @@ test "circular_queue: complex_type and clear":
     var more: CircularQueue[str]
     circular_queue_construct(&more, 5)
     for i in 0..<5:
-        discard(i)
+        _ = i
         circular_queue_enqueue(&more, "xxx")
     assert(circular_queue_size(&more) == 5)
     assert(circular_queue_capacity(&more) == 5)

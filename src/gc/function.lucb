@@ -20,9 +20,9 @@ var function_cell_allocator: TypeIsolatingCellAllocator[Function0[unit]]
 pub let function_vtable: CellVTable = CellVTable(class_info = &function_class, class_name = function_class_name_impl, visit_edges = function_visit_edges_impl)
 
 ## Class information of GC::Function.
-pub let function_class: ak.ClassInfo = ak.ClassInfo(name = "Function", first_id = 0, last_id = 0, size = sizeof(Function0[unit]), vtable = (const void*)&function_vtable)
+pub let function_class: ak.ClassInfo = ak.ClassInfo(name = "Function", first_id = 0, last_id = 0, size = memory.size_of(Function0[unit]), vtable = (const void*)&function_vtable)
 
-assert(sizeof(Function8[u8, u8, u8, u8, u8, u8, u8, u8, u8]) == sizeof(Function0[unit]))
+assert(memory.size_of(Function8[u8, u8, u8, u8, u8, u8, u8, u8, u8]) == memory.size_of(Function0[unit]))
 
 ## GC_CELL(Function, Cell): the class name.
 func function_class_name_impl(this: Cell*) -> ak.StringView:
@@ -31,8 +31,8 @@ func function_class_name_impl(this: Cell*) -> ak.StringView:
 ## Ported from Libraries/LibGC/Function.h:36 GC::Function::visit_edges (override).
 func function_visit_edges_impl(this: Cell*, visitor: CellVisitor*):
     cell_visit_edges_impl(this, visitor)
-    let function = (u8*)this + offsetof(Function0[unit], function)
-    cell_visitor_visit_possible_values(visitor, u8[](function, sizeof(ak.Function0[unit])))
+    let function = (u8*)this + memory.offset_of(Function0[unit], function)
+    cell_visitor_visit_possible_values(visitor, u8[](function, memory.size_of(ak.Function0[unit])))
 
 ## Ported from Libraries/LibGC/Function.h:22 GC::Function::create, up to the construction:
 ## heap.allocate<Function>(...) allocates the cell and holds DeferGC while the caller stores the

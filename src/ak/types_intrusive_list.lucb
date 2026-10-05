@@ -37,7 +37,7 @@ pub struct IntrusiveListIterator[T, TContainer]: luce.Iterable[T*, IntrusiveList
 
     pub func iterator() -> IntrusiveListIterator[T, TContainer]: return self
 
-    pub mutating func next() -> T*?: return intrusive_list_iterator_next(&self)
+    pub func next() -> T*?: return intrusive_list_iterator_next(&self)
 
 ## AK::Detail::IntrusiveList::ReverseIterator (AK/IntrusiveList.h:93): walks backwards; also a
 ## luce-base iterator.
@@ -47,7 +47,7 @@ pub struct IntrusiveListReverseIterator[T, TContainer]: luce.Iterable[T*, Intrus
 
     pub func iterator() -> IntrusiveListReverseIterator[T, TContainer]: return self
 
-    pub mutating func next() -> T*?: return intrusive_list_reverse_iterator_next(&self)
+    pub func next() -> T*?: return intrusive_list_reverse_iterator_next(&self)
 
 # mark: IntrusiveListNode =======================================================================
 

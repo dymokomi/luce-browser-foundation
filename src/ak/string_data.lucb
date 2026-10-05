@@ -23,13 +23,13 @@ pub func string_data_create_uninitialized(byte_count: usize, buffer: (u8*?)*) ->
     assert(byte_count != 0)
 
     let capacity = string_data_allocation_size_for_string_data(byte_count)
-    let slot = alloc(capacity, alignof(StringData)) catch:
+    let slot = memory.allocate(capacity, memory.align_of(StringData)) catch:
         error(ak_errno_error, "ENOMEM")
 
     let new_string_data = (StringData*)slot.data
-    memory.set(slot[..<sizeof(StringData)], 0)
+    memory.set(slot[..<memory.size_of(StringData)], 0)
     string_data_construct_usize(new_string_data, byte_count)
-    *buffer = (u8*)new_string_data + sizeof(StringData)
+    *buffer = (u8*)new_string_data + memory.size_of(StringData)
     return new_string_data
 
 ## Ported from AK/StringData.h:39 AK::Detail::StringData::create_from_string_builder. The C++
@@ -55,8 +55,8 @@ pub func string_data_create_substring(superstring: const StringData*, start: usi
     # short string optimization.
     assert(byte_count > max_short_string_byte_count)
 
-    let capacity = sizeof(StringData) + sizeof(StringDataSubstringData)
-    let slot = alloc(capacity, alignof(StringData)) catch:
+    let capacity = memory.size_of(StringData) + memory.size_of(StringDataSubstringData)
+    let slot = memory.allocate(capacity, memory.align_of(StringData)) catch:
         error(ak_errno_error, "ENOMEM")
 
     let new_string_data = (StringData*)slot.data
@@ -68,7 +68,7 @@ pub func string_data_create_substring(superstring: const StringData*, start: usi
 
 ## Ported from AK/StringData.h:81 AK::Detail::StringData::substring_data.
 pub func string_data_substring_data(this: const StringData*) -> const StringDataSubstringData*:
-    return (const StringDataSubstringData*)((u8*)this + sizeof(StringData))
+    return (const StringDataSubstringData*)((u8*)this + memory.size_of(StringData))
 
 ## Ported from AK/StringData.h:87 AK::Detail::StringData::bytes. NOTE: There is no guarantee
 ## about null-termination.
@@ -77,7 +77,7 @@ pub func string_data_bytes(this: const StringData*) -> const u8[]:
         let data = string_data_substring_data(this)
         let superstring = data.superstring else trap("VERIFY: substring without superstring")
         return string_data_bytes(superstring)[(usize)data.start_offset..<(usize)data.start_offset + (usize)this.m_byte_count]
-    return u8[]((u8*)this + sizeof(StringData), (usize)this.m_byte_count)
+    return u8[]((u8*)this + memory.size_of(StringData), (usize)this.m_byte_count)
 
 ## Ported from AK/StringData.h:96 AK::Detail::StringData::bytes_as_string_view.
 pub func string_data_bytes_as_string_view(this: const StringData*) -> StringView:
@@ -109,7 +109,7 @@ pub func string_data_byte_count(this: const StringData*) -> usize:
 
 ## Ported from AK/StringData.h:116 AK::Detail::StringData::allocation_size_for_string_data.
 func string_data_allocation_size_for_string_data(length: usize) -> usize:
-    return sizeof(StringData) + (sizeof(u8) * length)
+    return memory.size_of(StringData) + (memory.size_of(u8) * length)
 
 # mark: Construction ============================================================================
 

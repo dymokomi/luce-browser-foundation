@@ -92,7 +92,7 @@ pub func json_parser_consume_and_unescape_string(this: JsonParser*) -> String!:
         let ch = generic_lexer_peek(lexer)
 
         if ch == '"':
-            discard(generic_lexer_consume(lexer))
+            _ = generic_lexer_consume(lexer)
             break
 
         generic_lexer_ignore(lexer)  # '\'

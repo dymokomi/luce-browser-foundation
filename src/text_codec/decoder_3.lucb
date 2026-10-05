@@ -22,7 +22,7 @@ pub func utf8_decoder_process_impl(base: Decoder*, input: ak.StringView, on_code
     while iterator != end:
         let c = ak.utf8_code_point_iterator_deref(&iterator)
         ak.function1_call(&on_code_point, c)
-        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        _ = ak.utf8_code_point_iterator_inc(&iterator)
 
 ## Ported from Libraries/LibTextCodec/Decoder.cpp:700 TextCodec::UTF8Decoder::validate (override).
 pub func utf8_decoder_validate_impl(base: Decoder*, input: ak.StringView) -> bool:

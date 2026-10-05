@@ -81,7 +81,7 @@ func fly_string_table_find(data: const StringData*) -> const StringData*?:
 ## header's FIXME).
 pub func did_destroy_fly_string_data(string_data: const StringData*):
     with memory.heap:
-        discard(hash_table_remove_t(all_fly_strings(), string_data))
+        _ = hash_table_remove_t(all_fly_strings(), string_data)
 
 ## Adds a copy of `data`'s bytes to the table and answers it (addition: the C++ adds `data`
 ## itself). The copy and the table's buckets come from `memory.heap`, which outlives any
@@ -93,7 +93,7 @@ func fly_string_table_add(data: const StringData*) -> const StringData*:
         var buffer: u8*? = none
         let interned = string_data_create_uninitialized(bytes.length, &buffer) else trap("MUST: intern a FlyString")
         copy_bytes(u8[](buffer else trap("VERIFY: interned bytes"), bytes.length), bytes)
-        discard(hash_table_set(all_fly_strings(), (const StringData*?)interned))
+        _ = hash_table_set(all_fly_strings(), (const StringData*?)interned)
         string_data_set_fly_string(interned, true)
         return interned
 

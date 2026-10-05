@@ -23,7 +23,7 @@ func ends_in_a_number_checker(input: ak.StringView) -> bool:
             return false
 
         # 2. Remove the last item from parts.
-        discard(ak.vector_take_last(&parts))
+        _ = ak.vector_take_last(&parts)
 
     # 3. Let last be the last item in parts.
     let last = *ak.vector_last(&parts)
@@ -193,7 +193,7 @@ pub func parser_shorten_urls_path(url: Url*):
 
     # 4. Remove path’s last item, if any.
     if not ak.vector_is_empty(path):
-        discard(ak.vector_take_last(path))
+        _ = ak.vector_take_last(path)
 
 # The captures of the two lambdas percent_encode_after_encoding hands to the encoder.
 struct ParserPercentEncodeAfterEncodingOutput:

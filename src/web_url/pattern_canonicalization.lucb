@@ -116,7 +116,7 @@ pub func pattern_canonicalize_an_ipv6_hostname(value: ak.String) -> ak.String!:
 
         # 2. Append the result of running ASCII lowercase given code point to the end of result.
         ak.string_builder_append_code_point(&result, ak.to_ascii_lowercase(code_point))
-        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        _ = ak.utf8_code_point_iterator_inc(&iterator)
 
     # 3. Return result.
     return ak.string_builder_to_string_without_validation(&result)
@@ -176,8 +176,8 @@ pub func pattern_canonicalize_a_pathname(value: ak.String) -> ak.String:
     url_set_paths(&dummy_url, no_paths)
 
     # 7. Run basic URL parser given modified value with dummyURL as url and path start state as state override.
-    discard(parser_basic_parse(ak.string_builder_string_view(&modified_value), url = &dummy_url,
-                               state_override = ParserState.path_start))
+    _ = parser_basic_parse(ak.string_builder_string_view(&modified_value), url = &dummy_url,
+                           state_override = ParserState.path_start)
 
     # 8. Let result be the result of URL path serializing dummyURL.
     var result = url_serialize_path(&dummy_url)
@@ -231,7 +231,7 @@ pub func pattern_canonicalize_a_search(value: ak.String) -> ak.String:
     url_set_query(&dummy_url, empty_string())
 
     # 4. Run basic URL parser given value with dummyURL as url and query state as state override.
-    discard(parser_basic_parse(view_of(value), url = &dummy_url, state_override = ParserState.query))
+    _ = parser_basic_parse(view_of(value), url = &dummy_url, state_override = ParserState.query)
 
     # 5. Return dummyURL’s query.
     return url_query(&dummy_url) else trap("VERIFY: dummy URL's query")
@@ -250,7 +250,7 @@ pub func pattern_canonicalize_a_hash(value: ak.String) -> ak.String:
     url_set_fragment(&dummy_url, empty_string())
 
     # 4. Run basic URL parser given value with dummyURL as url and fragment state as state override.
-    discard(parser_basic_parse(view_of(value), url = &dummy_url, state_override = ParserState.fragment))
+    _ = parser_basic_parse(view_of(value), url = &dummy_url, state_override = ParserState.fragment)
 
     # 5. Return dummyURL’s fragment.
     return url_fragment(&dummy_url) else trap("VERIFY: dummy URL's fragment")

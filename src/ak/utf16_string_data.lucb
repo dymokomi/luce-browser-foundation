@@ -141,7 +141,7 @@ pub func utf16_string_data_from_ipc_stream(stream: Stream*, length_in_code_units
 
     let string = utf16_string_data_create_uninitialized(Utf16StringDataStorageType.utf16, length_in_code_units)
 
-    let bytes = u8[]((u8*)string + utf16_string_data_offset_of_string_storage(), length_in_code_units * sizeof(u16))
+    let bytes = u8[]((u8*)string + utf16_string_data_offset_of_string_storage(), length_in_code_units * memory.size_of(u16))
     try stream_read_until_filled(stream, bytes)
 
     return string
@@ -158,7 +158,7 @@ pub func utf16_string_data_to_well_formed(utf16_string: Utf16View) -> Utf16Strin
 
 ## Ported from AK/Utf16StringData.h:48 AK::Detail::Utf16StringData::offset_of_string_storage.
 pub func utf16_string_data_offset_of_string_storage() -> usize:
-    return sizeof(Utf16StringData)
+    return memory.size_of(Utf16StringData)
 
 # mark: Comparison and accessors ================================================================
 
@@ -267,7 +267,7 @@ func utf16_string_data_construct(this: Utf16StringData*, storage_type: Utf16Stri
 func utf16_string_data_create_uninitialized(storage_type: Utf16StringDataStorageType, code_unit_length: usize) -> Utf16StringData*:
     let allocation_size = utf16_string_data_allocation_size_for_string_data(storage_type == Utf16StringDataStorageType.ascii, code_unit_length)
 
-    let slot = alloc(allocation_size, alignof(Utf16StringData)) else trap("VERIFY: kmalloc")
+    let slot = memory.allocate(allocation_size, memory.align_of(Utf16StringData)) else trap("VERIFY: kmalloc")
 
     let string = (Utf16StringData*)slot.data
     utf16_string_data_construct(string, storage_type, code_unit_length)
@@ -283,7 +283,7 @@ func utf16_string_data_create_from_code_point_iterable_utf8_view(view: Utf8View)
     while not utf8_code_point_iterator_done(&it):
         code_unit_length += unicode_utils_code_unit_length_for_code_point(utf8_code_point_iterator_deref(&it))
         code_point_length += 1
-        discard(utf8_code_point_iterator_inc(&it))
+        _ = utf8_code_point_iterator_inc(&it)
 
     verify_utf16_length(code_unit_length)
 
@@ -294,8 +294,8 @@ func utf16_string_data_create_from_code_point_iterable_utf8_view(view: Utf8View)
 
     it = utf8_view_begin(&view)
     while not utf8_code_point_iterator_done(&it):
-        discard(unicode_utils_code_point_to_utf16(utf8_code_point_iterator_deref(&it), &writer))
-        discard(utf8_code_point_iterator_inc(&it))
+        _ = unicode_utils_code_point_to_utf16(utf8_code_point_iterator_deref(&it), &writer)
+        _ = utf8_code_point_iterator_inc(&it)
 
     return string
 
@@ -317,7 +317,7 @@ func utf16_string_data_create_from_code_point_iterable_utf32_view(view: Utf32Vie
     var writer = Utf16StringDataCodeUnitWriter(storage = utf16_string_data_utf16_storage(string), code_unit_index = 0)
 
     for code_point in utf32_view_span(&view):
-        discard(unicode_utils_code_point_to_utf16(code_point, &writer))
+        _ = unicode_utils_code_point_to_utf16(code_point, &writer)
 
     return string
 
@@ -326,15 +326,15 @@ struct Utf16StringDataCodeUnitWriter: Utf16CodeUnitCallback:
     var storage: u16[]
     var code_unit_index: usize
 
-    mutating func call(code_unit: u16):
+    func call(code_unit: u16):
         self.storage[self.code_unit_index] = code_unit
         self.code_unit_index += 1
 
 ## Ported from AK/Utf16StringData.h:134 AK::Detail::Utf16StringData::allocation_size_for_string_data.
 func utf16_string_data_allocation_size_for_string_data(has_ascii_storage: bool, code_unit_length: usize) -> usize:
     if has_ascii_storage:
-        return sizeof(Utf16StringData) + (sizeof(u8) * code_unit_length)
-    return sizeof(Utf16StringData) + (sizeof(u16) * code_unit_length)
+        return memory.size_of(Utf16StringData) + (memory.size_of(u8) * code_unit_length)
+    return memory.size_of(Utf16StringData) + (memory.size_of(u16) * code_unit_length)
 
 ## Ported from AK/Utf16StringData.cpp:203 AK::Detail::Utf16StringData::calculate_code_point_length.
 func utf16_string_data_calculate_code_point_length(this: const Utf16StringData*) -> usize:
@@ -349,5 +349,5 @@ func utf16_string_data_calculate_code_point_length(this: const Utf16StringData*)
     var it = utf16_view_begin(&view)
     while not utf16_code_point_iterator_done(&it):
         code_points += 1
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
     return code_points

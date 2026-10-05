@@ -37,7 +37,7 @@ pub func root_impl_destroy(this: RootImpl*):
 
 ## The RootImpl whose m_list_node is `node` (IntrusiveList's container_of).
 func root_impl_from_list_node(node: ListNode*) -> RootImpl*:
-    return (RootImpl*)((u8*)node - offsetof(RootImpl, m_list_node))
+    return (RootImpl*)((u8*)node - memory.offset_of(RootImpl, m_list_node))
 
 ## Ported from Libraries/LibGC/Root.h:52 GC::Root::create / Root(T*): a root of `cell`, or a null
 ## root when `cell` is none. `at` is where the root is made (SourceLocation::current()).

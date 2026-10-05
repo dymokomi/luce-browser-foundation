@@ -11,6 +11,8 @@
 #
 #==============================================================================================
 
+import strings
+
 ## The rules under test.
 enum BreakRules:
     grapheme
@@ -42,7 +44,7 @@ extern func fclose(stream: void*) -> i32
 ## read with the C library (the module does not import luce-std's files for its tests).
 func read_test_file(path: str) -> u8[]!:
     let stream = fopen(path.bytes.data, "rb".bytes.data) else error(ak.ak_error, "cannot open a test data file")
-    defer discard(fclose(stream))
+    defer _ = fclose(stream)
     var data = try new u8[1 << 16]
     var used: usize = 0
     while true:
@@ -123,7 +125,7 @@ func run_break_test_file(rules: BreakRules) -> (usize, usize):
                 var got: u8[256]
                 var length: usize = 0
                 for boundary in actual.view():
-                    let text = format(got[length..], f"{boundary} ") else break
+                    let text = strings.format(got[length..], f"{boundary} ") else break
                     length += text.length
                 print(f"  got boundaries: {(str)got[..<length]}")
     return (cases, failures)

@@ -35,4 +35,4 @@ pub func root_hash_map_base_assign_heap(this: RootHashMapBase*, heap: Heap*?):
 
 ## The RootHashMapBase whose m_list_node is `node` (IntrusiveList's container_of).
 func root_hash_map_base_from_list_node(node: ListNode*) -> RootHashMapBase*:
-    return (RootHashMapBase*)((u8*)node - offsetof(RootHashMapBase, m_list_node))
+    return (RootHashMapBase*)((u8*)node - memory.offset_of(RootHashMapBase, m_list_node))

@@ -32,7 +32,7 @@ pub func fill_with_random(bytes: u8[]):
 ## Ported from AK/Random.h:24 AK::get_random.
 pub func get_random[T]() -> T:
     var t: T = ---
-    fill_with_random(u8[]((u8*)&t, sizeof(T)))
+    fill_with_random(u8[]((u8*)&t, memory.size_of(T)))
     return t
 
 ## Ported from AK/Random.cpp:61 AK::get_random_uniform.
@@ -130,7 +130,7 @@ pub func xor_shift128_plus_rng_get(this: XorShift128PlusRng*) -> f64:
 
 ## Ported from AK/Random.cpp:154 AK::XorShift128PlusRNG::splitmix64.
 pub func xor_shift128_plus_rng_splitmix64(this: XorShift128PlusRng*, state: u64*) -> u64:
-    discard(this)
+    _ = this
     *state = *state +% 0x9e3779b97f4a7c15
     var z = *state
     z = (z ^ (z >> 30)) *% 0xbf58476d1ce4e5b9

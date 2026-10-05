@@ -332,7 +332,7 @@ pub func segmenter_create_segmenter_granularity(segmenter_granularity: Segmenter
 ## Ported from Libraries/LibUnicode/Segmenter.cpp:316 Unicode::Segmenter::create.
 ## The port's rules are the root locale's for every locale (ICU tailors a few locales).
 pub func segmenter_create_string_view(locale: ak.StringView, segmenter_granularity: SegmenterGranularity) -> Segmenter*:
-    discard(locale)
+    _ = locale
     # createCharacterInstance, createLineInstance, createSentenceInstance, createWordInstance
     let segmenter = break_iterator_create(segmenter_granularity)
     return segmenter_impl_create(segmenter, segmenter_granularity)

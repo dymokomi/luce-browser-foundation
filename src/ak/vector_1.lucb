@@ -45,7 +45,7 @@ pub func vector_clone[T](other: const Vector[T]*) -> Vector[T]:
     vector_ensure_capacity(&vector, vector_size(other))
     if vector_size(other) > 0:
         let source = other.m_outline_buffer else trap("VERIFY: Vector without storage")
-        discard(typed_transfer_copy(vector_slot(&vector, 0), source, vector_size(other)))
+        _ = typed_transfer_copy(vector_slot(&vector, 0), source, vector_size(other))
     vector.m_size = vector_size(other)
     return vector
 
@@ -53,7 +53,7 @@ pub func vector_clone[T](other: const Vector[T]*) -> Vector[T]:
 pub func vector_construct_opaque_2[T](this: Vector[T]*, other: const T[]):
     vector_ensure_capacity(this, other.length)
     if other.length > 0:
-        discard(typed_transfer_copy(vector_slot(this, 0), other.data, other.length))
+        _ = typed_transfer_copy(vector_slot(this, 0), other.data, other.length)
     this.m_size = other.length
 
 ## Ported from AK/Vector.h:138 AK::Vector::span.
@@ -253,7 +253,7 @@ pub func vector_unchecked_append_opaque[T](this: Vector[T]*, values: const T*?, 
         return
     assert((vector_size(this) + count) <= vector_capacity(this))
     let source = values else trap("VERIFY: unchecked_append from null")
-    discard(typed_transfer_copy(vector_slot(this, this.m_size), source, count))
+    _ = typed_transfer_copy(vector_slot(this, this.m_size), source, count)
     this.m_size += count
     vector_update_metadata(this)  # We have *some* space, since we're appending.
 
@@ -302,7 +302,7 @@ pub func vector_clear_with_capacity[T](this: Vector[T]*):
 pub func vector_remove[T](this: Vector[T]*, index: usize):
     assert(index < this.m_size)
 
-    discard(typed_transfer_copy(vector_slot(this, index), vector_slot(this, index + 1), this.m_size - index - 1))
+    _ = typed_transfer_copy(vector_slot(this, index), vector_slot(this, index + 1), this.m_size - index - 1)
 
     this.m_size -= 1
     vector_update_metadata(this)  # We have *some* space, we just removed something that was there.
@@ -314,7 +314,7 @@ pub func vector_remove_usize[T](this: Vector[T]*, index: usize, count: usize):
     assert(index + count > index)
     assert(index + count <= this.m_size)
 
-    discard(typed_transfer_copy(vector_slot(this, index), vector_slot(this, index + count), this.m_size - index - count))
+    _ = typed_transfer_copy(vector_slot(this, index), vector_slot(this, index + count), this.m_size - index - count)
 
     this.m_size -= count
     vector_update_metadata(this)  # We have *some* space, we just removed something that was there.

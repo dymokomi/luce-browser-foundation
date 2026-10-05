@@ -27,4 +27,4 @@ pub func id_allocator_allocate(this: IdAllocator*) -> i32:
 
 ## Ported from AK/IDAllocator.h:42 AK::IDAllocator::deallocate.
 pub func id_allocator_deallocate(this: IdAllocator*, id: i32):
-    discard(hash_table_remove_t(&this.m_allocated_ids, id))
+    _ = hash_table_remove_t(&this.m_allocated_ids, id)

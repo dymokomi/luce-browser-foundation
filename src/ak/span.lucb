@@ -35,9 +35,9 @@ pub func span_from_slice[T](values: T[]) -> Span[T]:
 ## Ported from AK/Span.h:402 AK::to_readonly_bytes.
 pub func to_readonly_bytes[T](span: Span[T]) -> const u8[]:
     let values = span.m_values else return empty_span[u8]()
-    return u8[]((u8*)values, span.m_size * sizeof(T))
+    return u8[]((u8*)values, span.m_size * memory.size_of(T))
 
 ## Ported from AK/Span.h:409 AK::to_bytes.
 pub func to_bytes[T](span: Span[T]) -> u8[]:
     let values = span.m_values else return empty_span[u8]()
-    return u8[]((u8*)values, span.m_size * sizeof(T))
+    return u8[]((u8*)values, span.m_size * memory.size_of(T))

@@ -42,9 +42,9 @@ pub func utf16_view_iterator_offset(this: const Utf16View*, it: const Utf16CodeP
 
     assert(not utf16_code_point_iterator_has_ascii_storage(it))
     assert(position >= start)
-    assert(position <= start + utf16_view_length_in_code_units(this) * sizeof(u16))
+    assert(position <= start + utf16_view_length_in_code_units(this) * memory.size_of(u16))
 
-    return (position - start) // sizeof(u16)
+    return (position - start) // memory.size_of(u16)
 
 ## Ported from AK/Utf16View.h:428 AK::Utf16View::iterator_at_code_unit_offset.
 pub func utf16_view_iterator_at_code_unit_offset(this: const Utf16View*, code_unit_offset: usize) -> Utf16CodePointIterator:
@@ -104,7 +104,7 @@ pub func utf16_view_escape_html_entities(this: const Utf16View*) -> Utf16String:
             string_builder_append_utf16_view(&builder, utf16_sv("&quot;"))
         else:
             string_builder_append_code_point(&builder, code_point)
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
 
     return string_builder_to_utf16_string(&builder)
 
@@ -145,12 +145,12 @@ pub func utf16_view_unicode_substring_view_usize(this: const Utf16View*, code_po
             code_unit_offset = utf16_view_iterator_offset(this, &it)
 
         if code_point_index == (code_point_offset + code_point_length - 1):
-            discard(utf16_code_point_iterator_inc(&it))
+            _ = utf16_code_point_iterator_inc(&it)
             let code_unit_length = utf16_view_iterator_offset(this, &it) - code_unit_offset
             return utf16_view_substring_view_usize(this, code_unit_offset, code_unit_length)
 
         code_point_index += 1
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
 
     trap("VERIFY_NOT_REACHED")
 
@@ -339,7 +339,7 @@ pub func utf16_view_contains_any_of(this: const Utf16View*, needles: const u32[]
         for needle in needles:
             if needle == code_point:
                 return true
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
 
     return false
 
@@ -398,7 +398,7 @@ pub func utf16_view_ends_with_utf16_view(this: const Utf16View*, needle: Utf16Vi
 struct Utf16ViewSplitViewCollect: Utf16ViewCallback:
     var parts: Vector[Utf16View]*
 
-    mutating func call(part: Utf16View) -> IterationDecision:
+    func call(part: Utf16View) -> IterationDecision:
         vector_append_t(self.parts, part)
         return IterationDecision.continue_
 
@@ -443,7 +443,7 @@ pub func utf16_view_for_each_split_view_utf16_view[TCallback: Utf16ViewCallback]
         view = utf16_view_substring_view(&view, index + utf16_view_length_in_code_units(&separator))
 
     if keep_empty or not utf16_view_is_empty(&view):
-        discard(callback.call(view))
+        _ = callback.call(view)
 
 ## Ported from AK/Utf16View.h:646 AK::Utf16View::is_code_unit_less_than.
 ## https://infra.spec.whatwg.org/#code-unit-less-than
@@ -473,7 +473,7 @@ func utf16_view_calculate_length_in_code_points(this: const Utf16View*) -> usize
     var it = utf16_view_begin(this)
     while not utf16_code_point_iterator_done(&it):
         code_points += 1
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
     return code_points
 
 ## Ported from AK/Utf16View.h:712 operator""sv (char16_t): a view of `length` code units.

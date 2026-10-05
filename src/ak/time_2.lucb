@@ -142,7 +142,7 @@ pub func unix_date_time_from_ordinal_date(year: u32, day: u32) -> UnixDateTime:
 # clockid_t is a 32-bit integer (an enum on macOS) on the supported targets.
 func now_time_from_clock(clock_id: i32) -> Duration:
     var now_spec = Timespec(tv_sec = 0, tv_nsec = 0)
-    discard(clock_gettime(clock_id, &now_spec))
+    _ = clock_gettime(clock_id, &now_spec)
     return duration_from_timespec(now_spec)
 
 ## Ported from AK/Time.h:427 AK::UnixDateTime::from_unix_time_parts.

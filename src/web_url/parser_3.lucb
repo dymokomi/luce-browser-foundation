@@ -39,7 +39,7 @@ func parser_remaining_starts_with_two_ascii_hex_digits(iterator: const ak.Utf8Co
 
 # `++iterator`: increase pointer by 1.
 func parser_advance(iterator: ak.Utf8CodePointIterator*):
-    discard(ak.utf8_code_point_iterator_inc(iterator))
+    _ = ak.utf8_code_point_iterator_inc(iterator)
 
 # The code point substring from pointer to the end of input.
 func parser_substring_from_pointer(input: const ak.Utf8View*, iterator: const ak.Utf8CodePointIterator*) -> ak.StringView:

@@ -27,7 +27,7 @@ func parse_json_fails(text: str) -> bool:
 func parse_json_fails_bytes(bytes: const u8[]) -> bool:
     let result = json_value2_from_string(literalsv_u8(bytes.data, bytes.length)) catch:
         return true
-    discard(result)
+    _ = result
     return false
 
 ## The text of a String.
@@ -35,7 +35,7 @@ func text_of_string(string: String) -> str:
     # A short String keeps its bytes inline, in this frame's copy: copy them out.
     let view = string_bytes_as_string_view(&string)
     let bytes = string_view_bytes(&view)
-    let copy = alloc u8[bytes.length] else trap("out of memory")
+    let copy = new u8[bytes.length] --- else trap("out of memory")
     memory.copy(copy, bytes, bytes.length)
     return (str)copy
 
@@ -70,7 +70,7 @@ let raw_form_json = """
 ## The widget lambda of load_form: reads the class and walks the members.
 func load_form_widget(context: void*?, widget_value: const JsonValue2*):
     let widget_object = json_value2_as_object_const(widget_value)
-    discard(json_object_get_string(widget_object, sv("class")) else trap("VERIFY_NOT_REACHED: no class"))
+    _ = json_object_get_string(widget_object, sv("class")) else trap("VERIFY_NOT_REACHED: no class")
     json_object_for_each_member(widget_object, load_form_member, context)
 
 ## The member lambda of load_form: does nothing.

@@ -38,7 +38,7 @@ pub func root_hash_map_base_gather_roots(this: RootHashMapBase*, arg0: GcHashMap
 pub let root_hash_map_base_vtable: RootHashMapBaseVTable = RootHashMapBaseVTable(class_info = &root_hash_map_base_class)
 
 ## Class information of GC::RootHashMapBase: name, class-id range (pre-order), size, vtable.
-pub let root_hash_map_base_class: ak.ClassInfo = ak.ClassInfo(name = "RootHashMapBase", first_id = 0, last_id = 0, size = sizeof(RootHashMapBase), vtable = (const void*)&root_hash_map_base_vtable)
+pub let root_hash_map_base_class: ak.ClassInfo = ak.ClassInfo(name = "RootHashMapBase", first_id = 0, last_id = 0, size = memory.size_of(RootHashMapBase), vtable = (const void*)&root_hash_map_base_vtable)
 
 ## is<GC::RootHashMapBase>: the class-id range test.
 pub func is_root_hash_map_base[P: IsRootHashMapBase](p: P*) -> bool:

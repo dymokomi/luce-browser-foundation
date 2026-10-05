@@ -72,7 +72,7 @@ pub struct CodePointAsUtf8: Utf8ByteCallback:
     pub var bytes: u8[4]
     pub var length: usize
 
-    pub mutating func call(byte: u8):
+    pub func call(byte: u8):
         self.bytes[self.length] = byte
         self.length += 1
 

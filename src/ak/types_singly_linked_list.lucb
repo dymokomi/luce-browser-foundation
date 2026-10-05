@@ -25,7 +25,7 @@ pub struct SinglyLinkedListIterator[T]: luce.Iterable[T*, SinglyLinkedListIterat
 
     pub func iterator() -> SinglyLinkedListIterator[T]: return self
 
-    pub mutating func next() -> T*?: return singly_linked_list_iterator_next(&self)
+    pub func next() -> T*?: return singly_linked_list_iterator_next(&self)
 
 # mark: SinglyLinkedList ========================================================================
 

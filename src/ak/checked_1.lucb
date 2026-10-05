@@ -239,7 +239,7 @@ pub func checked_inc_usize(this: Checked[usize]*) -> Checked[usize]*:
 
 ## Ported from AK/Checked.h:286 AK::Checked::operator++ (postfix), for usize.
 pub func checked_inc_i32_usize(this: Checked[usize]*, arg0: i32) -> Checked[usize]:
-    discard(arg0)
+    _ = arg0
     let old = *this
     checked_add_usize(this, 1)
     return old
@@ -251,7 +251,7 @@ pub func checked_dec_usize(this: Checked[usize]*) -> Checked[usize]*:
 
 ## Ported from AK/Checked.h:299 AK::Checked::operator-- (postfix), for usize.
 pub func checked_dec_i32_usize(this: Checked[usize]*, arg0: i32) -> Checked[usize]:
-    discard(arg0)
+    _ = arg0
     let old = *this
     checked_sub_usize(this, 1)
     return old
@@ -271,29 +271,29 @@ pub func checked_multiplication_would_overflow_usize(u: usize, v: usize) -> bool
 ## Ported from AK/Checked.h:354 AK::operator+(Checked, Checked), for usize.
 pub func add_usize(a: Checked[usize], b: Checked[usize]) -> Checked[usize]:
     var c = a
-    discard(checked_add_assign_checked_usize(&c, b))
+    _ = checked_add_assign_checked_usize(&c, b)
     return c
 
 ## Ported from AK/Checked.h:362 AK::operator-(Checked, Checked), for usize.
 pub func sub_usize(a: Checked[usize], b: Checked[usize]) -> Checked[usize]:
     var c = a
-    discard(checked_sub_assign_checked_usize(&c, b))
+    _ = checked_sub_assign_checked_usize(&c, b)
     return c
 
 ## Ported from AK/Checked.h:370 AK::operator*(Checked, Checked), for usize.
 pub func mul_usize(a: Checked[usize], b: Checked[usize]) -> Checked[usize]:
     var c = a
-    discard(checked_mul_assign_checked_usize(&c, b))
+    _ = checked_mul_assign_checked_usize(&c, b)
     return c
 
 ## Ported from AK/Checked.h:378 AK::operator/(Checked, Checked), for usize.
 pub func div_usize(a: Checked[usize], b: Checked[usize]) -> Checked[usize]:
     var c = a
-    discard(checked_div_assign_checked_usize(&c, b))
+    _ = checked_div_assign_checked_usize(&c, b)
     return c
 
 ## Ported from AK/Checked.h:386 AK::operator%(Checked, Checked), for usize.
 pub func rem_usize(a: Checked[usize], b: Checked[usize]) -> Checked[usize]:
     var c = a
-    discard(checked_rem_assign_checked_usize(&c, b))
+    _ = checked_rem_assign_checked_usize(&c, b)
     return c

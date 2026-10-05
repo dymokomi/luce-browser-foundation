@@ -17,7 +17,7 @@ pub func circular_queue_construct[T](this: CircularQueue[T]*, capacity: usize):
     this.m_capacity = capacity
     this.m_size = 0
     this.m_head = 0
-    let storage = alloc T[capacity] catch:
+    let storage = new T[capacity] --- catch:
         trap("out of memory")
     this.m_storage = storage.data
 

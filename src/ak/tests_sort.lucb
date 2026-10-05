@@ -14,15 +14,15 @@ struct TestSortPair:
     var id: i32
 
 func test_sort_pair_less(context: void*?, a: const TestSortPair*, b: const TestSortPair*) -> bool:
-    discard(context)
+    _ = context
     return a.key < b.key
 
 func test_sort_int_greater(context: void*?, a: const i32*, b: const i32*) -> bool:
-    discard(context)
+    _ = context
     return *a > *b
 
 func test_sort_int_less(context: void*?, a: const i32*, b: const i32*) -> bool:
-    discard(context)
+    _ = context
     return *a < *b
 
 test "quick_sort: sorts_without_copy":
@@ -75,7 +75,7 @@ test "quick_sort: default comparison":
 
 test "insertion_sort: sorts_ascending and sorts_descending":
     for iteration in 0..<10:
-        discard(iteration)
+        _ = iteration
         var ints: i32[10]
         for j in 0..<10usize:
             ints[j] = (i32)(testing.random() % 2000) - 1000
@@ -138,7 +138,7 @@ test "binary_search: span_rvalue_reference, array_doubles and unsigned_to_signed
 
 test "binary_search: finds present numbers and not absent ones":
     for round in 0..<20:
-        discard(round)
+        _ = round
         var values: u64[16]
         for i in 0..<16usize:
             values[i] = testing.random() % 1000

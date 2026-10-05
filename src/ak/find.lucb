@@ -16,7 +16,7 @@ pub func find_if[T, TContainer: IndexedContainer[T]](first: SimpleIterator[TCont
     while not simple_iterator_eq(&it, last):
         if function1_call(&pred, simple_iterator_arrow(&it)):
             return it
-        discard(simple_iterator_inc(&it))
+        _ = simple_iterator_inc(&it)
     return last
 
 # The predicate of find() and find_index(): `Traits<T>::equals(entry, value)`, with the value

@@ -268,7 +268,7 @@ pub func constructor_string_parser_parse(input: ak.Utf8View) -> Init!:
             # -> "hash", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-hash%E2%91%A4
             .hash_:
                 # 1. Do nothing.
-                discard(())
+                _ = ()
             # -> "done", https://urlpattern.spec.whatwg.org/#ref-for-constructor-string-parser-state-done%E2%91%A0
             .done:
                 # 1. Assert: This step is never reached.

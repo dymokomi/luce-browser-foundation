@@ -13,7 +13,7 @@
 
 # The default comparison `[](auto& a, auto& b) { return a < b; }`.
 func quick_sort_less_than[T: luce.Comparable](context: void*?, a: const T*, b: const T*) -> bool:
-    discard(context)
+    _ = context
     return a.compare(*b) < 0
 
 ## The Function2 comparing with `a < b`, the default comparator of quick_sort and

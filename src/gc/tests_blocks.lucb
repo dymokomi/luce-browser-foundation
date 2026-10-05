@@ -13,11 +13,11 @@
 
 test "layout matches LibGC's: header, cell, freelist entry, weak block":
     assert(heap_block_storage_offset == 64)
-    assert(sizeof(Cell) == 16)
+    assert(memory.size_of(Cell) == 16)
     assert(heap_block_min_possible_cell_size == 24)
-    assert(sizeof(WeakImpl) == 24)
+    assert(memory.size_of(WeakImpl) == 24)
     assert(weak_block_impl_count == 681)
-    assert(sizeof(RootImpl) <= 64)
+    assert(memory.size_of(RootImpl) <= 64)
 
 test "cell counts per size class":
     let heap = create_test_heap()
@@ -104,7 +104,7 @@ test "a weak block's freelist is last-in first-out":
     assert(weak_impl_state(i3) == WeakImplState.allocated)
     assert(weak_block_can_allocate(block))
     for _ in 2..<weak_block_impl_count:
-        discard(weak_block_allocate(block, none))
+        _ = weak_block_allocate(block, none)
     assert(not weak_block_can_allocate(block))
     assert(weak_block_allocate(block, none) == none)
     unmap_aligned_block(block, weak_block_block_size)

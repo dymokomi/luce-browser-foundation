@@ -30,7 +30,7 @@ pub func marking_visitor_visit_impl_cell_impl(base: CellVisitor*, cell: Cell*):
     if cell_is_marked(cell):
         return
     if heap_debug:
-        ak.dbgln(f"  ! 0x{hex((usize)cell)}")
+        ak.dbgln(f"  ! 0x{(usize)cell:x}")
 
     cell_set_marked(cell, true)
     gc_vector_append(&this.m_work_queue, cell)
@@ -47,7 +47,7 @@ pub func marking_visitor_visit_impl_span_nan_boxed_value_impl(base: CellVisitor*
         if cell_is_marked(cell):
             continue
         if heap_debug:
-            ak.dbgln(f"  ! 0x{hex((usize)cell)}")
+            ak.dbgln(f"  ! 0x{(usize)cell:x}")
 
         cell_set_marked(cell, true)
         gc_vector_append(&this.m_work_queue, cell)
@@ -59,7 +59,7 @@ pub func marking_visitor_visit_possible_values_impl(base: CellVisitor*, bytes: c
     defer gc_hash_map_clear(&possible_pointers)
 
     let raw_pointer_sized_values = (const usize*)bytes.data
-    for i in 0..<(bytes.length // sizeof(usize)):
+    for i in 0..<(bytes.length // memory.size_of(usize)):
         add_possible_value(&possible_pointers, raw_pointer_sized_values[i], HeapRoot(type_ = HeapRootType.heap_function_captured_pointer), this.m_min_block_address, this.m_max_block_address)
 
     for found in for_each_cell_among_possible_pointers(this.m_heap, this.m_all_live_heap_blocks, &possible_pointers):
@@ -85,7 +85,7 @@ pub func marking_visitor_mark_all_live_cells(this: MarkingVisitor*):
 ## words are scanned in turn; cells the words point to are left to the precise visit_edges).
 func marking_visitor_visit_blob_pointers(this: MarkingVisitor*, cell: Cell*):
     let words = (const usize*)cell
-    for i in 0..<(heap_cell_storage_size(this.m_heap, cell) // sizeof(usize)):
+    for i in 0..<(heap_cell_storage_size(this.m_heap, cell) // memory.size_of(usize)):
         let word = words[i]
         if word < this.m_min_block_address or word > this.m_max_block_address:
             continue
@@ -101,7 +101,7 @@ pub func heap_mark_live_cells(this: Heap*, roots: const GcHashMap[HeapRoot]*, al
         ak.dbgln("mark_live_cells:")
 
     var visitor: MarkingVisitor = ---
-    memory.set(u8[]((u8*)&visitor, sizeof(MarkingVisitor)), 0)
+    memory.set(u8[]((u8*)&visitor, memory.size_of(MarkingVisitor)), 0)
     marking_visitor_construct(&visitor, this, roots, all_live_heap_blocks)
     marking_visitor_mark_all_live_cells(&visitor)
     gc_vector_clear(&visitor.m_work_queue)
@@ -158,7 +158,7 @@ pub func heap_sweep_dead_cells(this: Heap*, print_report: bool, measurement_star
         for cell in heap_block_for_each_cell_in_state(block, CellState.live):
             if not cell_is_marked(cell):
                 if heap_debug:
-                    ak.dbgln(f"  ~ 0x{hex((usize)cell)}")
+                    ak.dbgln(f"  ~ 0x{(usize)cell:x}")
                 heap_block_deallocate(block, cell)
                 collected_cells += 1
                 collected_cell_bytes += heap_block_cell_size(block)
@@ -188,19 +188,19 @@ pub func heap_sweep_dead_cells(this: Heap*, print_report: bool, measurement_star
 
     for block in gc_vector_span(&empty_blocks):
         if heap_debug:
-            ak.dbgln(f" - HeapBlock empty @ 0x{hex((usize)block)}: cell_size={heap_block_cell_size(block)}")
+            ak.dbgln(f" - HeapBlock empty @ 0x{(usize)block:x}: cell_size={heap_block_cell_size(block)}")
         cell_allocator_block_did_become_empty(heap_block_cell_allocator(block), block)
 
     for block in gc_vector_span(&full_blocks_that_became_usable):
         if heap_debug:
-            ak.dbgln(f" - HeapBlock usable again @ 0x{hex((usize)block)}: cell_size={heap_block_cell_size(block)}")
+            ak.dbgln(f" - HeapBlock usable again @ 0x{(usize)block:x}: cell_size={heap_block_cell_size(block)}")
         cell_allocator_block_did_become_usable(heap_block_cell_allocator(block), block)
 
     let freed_large_objects = heap_release_dead_large_objects(this)
 
     if heap_debug:
         for block in heap_for_each_block(this):
-            ak.dbgln(f" > Live HeapBlock @ 0x{hex((usize)block)}: cell_size={heap_block_cell_size(block)}")
+            ak.dbgln(f" > Live HeapBlock @ 0x{(usize)block:x}: cell_size={heap_block_cell_size(block)}")
 
     this.m_gc_bytes_threshold = live_cell_bytes if live_cell_bytes > heap_gc_min_bytes_threshold else heap_gc_min_bytes_threshold
 

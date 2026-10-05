@@ -17,8 +17,8 @@ extern func isatty(fd: i32) -> i32
 # The donor's branch for builds without cpptrace or <execinfo.h>: luce-base's trap report
 # names the position, and there is no symbolizer to call.
 pub func dump_backtrace(frames_to_skip: u32 = 1, max_depth: u32 = 100):
-    discard(frames_to_skip)
-    discard(max_depth)
+    _ = frames_to_skip
+    _ = max_depth
     io.stderr().write("dump_backtrace() is not supported with the current compilation options.\n") catch:
         recover 0
 

@@ -67,7 +67,7 @@ pub struct CellAllocatorBlockIterator: luce.Iterator[HeapBlock*]:
     pub var next_node: ListNode*?
     pub var in_usable: bool
 
-    mutating func next() -> HeapBlock*?:
+    func next() -> HeapBlock*?:
         while self.next_node == none and not self.in_usable:
             self.in_usable = true
             self.next_node = self.allocator.m_usable_blocks.m_first
@@ -100,4 +100,4 @@ pub func cell_allocator_max_block_address(this: const CellAllocator*) -> usize:
 
 ## Ported from Libraries/LibGC/CellAllocator.h:86 GC::TypeIsolatingCellAllocator::TypeIsolatingCellAllocator<T>.
 pub func type_isolating_cell_allocator_construct[T](this: TypeIsolatingCellAllocator[T]*, class_name: ak.StringView, overrides_must_survive_garbage_collection: bool, overrides_finalize: bool):
-    cell_allocator_construct(&this.allocator, sizeof(T), class_name, overrides_must_survive_garbage_collection, overrides_finalize)
+    cell_allocator_construct(&this.allocator, memory.size_of(T), class_name, overrides_must_survive_garbage_collection, overrides_finalize)

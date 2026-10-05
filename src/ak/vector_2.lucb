@@ -90,7 +90,7 @@ pub func vector_try_extend[T](this: Vector[T]*, other: Vector[T]*) -> !:
 pub func vector_try_extend_2[T](this: Vector[T]*, other: const Vector[T]*) -> !:
     try vector_try_grow_capacity(this, vector_size(this) + vector_size(other))
     if let source = other.m_outline_buffer:
-        discard(typed_transfer_copy(vector_slot(this, this.m_size), source, vector_size(other)))
+        _ = typed_transfer_copy(vector_slot(this, this.m_size), source, vector_size(other))
     this.m_size += other.m_size
     vector_update_metadata(this)  # We have *some* space, try_grow_capacity above ensured nonzero.
 
@@ -111,7 +111,7 @@ pub func vector_try_append_opaque[T](this: Vector[T]*, values: const T*?, count:
         return
     let source = values else trap("VERIFY: try_append from null")
     try vector_try_grow_capacity(this, vector_size(this) + count)
-    discard(typed_transfer_copy(vector_slot(this, this.m_size), source, count))
+    _ = typed_transfer_copy(vector_slot(this, this.m_size), source, count)
     this.m_size += count
     vector_update_metadata(this)  # We have *some* space, try_grow_capacity above ensured nonzero.
 
@@ -147,7 +147,7 @@ pub func vector_try_prepend_opaque[T](this: Vector[T]*, values: const T*?, count
     let source = values else trap("VERIFY: try_prepend from null")
     try vector_try_grow_capacity(this, vector_size(this) + count)
     typed_transfer_move(vector_slot(this, count), vector_slot(this, 0), this.m_size)
-    discard(typed_transfer_copy(vector_slot(this, 0), source, count))
+    _ = typed_transfer_copy(vector_slot(this, 0), source, count)
     this.m_size += count
     vector_update_metadata(this)  # We have *some* space, try_grow_capacity above ensured nonzero.
 
@@ -163,17 +163,17 @@ pub func vector_try_grow_capacity[T](this: Vector[T]*, needed_capacity: usize) -
 pub func vector_try_ensure_capacity[T](this: Vector[T]*, needed_capacity: usize) -> !:
     if this.m_capacity >= needed_capacity:
         return
-    let new_capacity = kmalloc_good_size(needed_capacity * sizeof(T)) // sizeof(T)
+    let new_capacity = kmalloc_good_size(needed_capacity * memory.size_of(T)) // memory.size_of(T)
     var allocation: void*?
     if this.m_atomic:
-        let size = mul_usize(make_checked(new_capacity), make_checked(sizeof(T)))
+        let size = mul_usize(make_checked(new_capacity), make_checked(memory.size_of(T)))
         allocation = kmalloc_atomic(checked_value(&size))
     else:
-        allocation = kmalloc_array(make_checked(new_capacity), make_checked(sizeof(T)))
+        allocation = kmalloc_array(make_checked(new_capacity), make_checked(memory.size_of(T)))
     let new_buffer = (T*)(allocation else return try ak_error_throw(ak_error_from_errno(enomem)))
 
     if let old_buffer = this.m_outline_buffer:
-        discard(typed_transfer_copy(new_buffer, old_buffer, this.m_size))
+        _ = typed_transfer_copy(new_buffer, old_buffer, this.m_size)
         kfree(old_buffer)
     this.m_outline_buffer = new_buffer
     this.m_capacity = new_capacity
@@ -189,7 +189,7 @@ pub func vector_try_resize[T](this: Vector[T]*, new_size: usize, keep_capacity: 
 
     # For trivial types, we can just zero the new memory. (Every luce-base value is one.)
     let old_size = vector_size(this)
-    let bytes = (new_size - old_size) * sizeof(T)
+    let bytes = (new_size - old_size) * memory.size_of(T)
     memory.set(u8[]((u8*)vector_slot(this, old_size), bytes), 0)
     this.m_size = new_size
     vector_update_metadata(this)  # We have *some* space, try_ensure_capacity above ensured nonzero.
@@ -373,12 +373,12 @@ pub func vector_slot_const[T](this: const Vector[T]*, i: usize) -> const T*:
 ## Ported from AK/Vector.h:1088 AK::Vector::inline_buffer: the inline capacity is always 0
 ## here (static_assert(inline_capacity > 0) in the donor).
 pub func vector_inline_buffer[T](this: Vector[T]*) -> T*:
-    discard(this)
+    _ = this
     trap("VERIFY: Vector has no inline buffer (inline capacity is dropped)")
 
 ## Ported from AK/Vector.h:1093 AK::Vector::inline_buffer const.
 pub func vector_inline_buffer_const[T](this: const Vector[T]*) -> const T*:
-    discard(this)
+    _ = this
     trap("VERIFY: Vector has no inline buffer (inline capacity is dropped)")
 
 ## Ported from AK/Vector.h:1099 AK::Vector::raw_last.
@@ -397,7 +397,7 @@ pub func vector_raw_at[T](this: Vector[T]*, index: usize) -> T*:
 ## keep metadata, and the port has none.
 # NOTE: Do *not* call unguarded if m_capacity can be zero.
 pub func vector_update_metadata[T](this: Vector[T]*):
-    discard(this)
+    _ = this
 
 ## Ported from AK/Vector.h:1114 AK::Vector::storage_size.
 pub func vector_storage_size[T]() -> usize:

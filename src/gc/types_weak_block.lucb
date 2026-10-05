@@ -22,6 +22,6 @@ pub struct WeakBlock:
 pub let weak_block_block_size: usize = 16 * 1024
 
 ## GC::WeakBlock::IMPL_COUNT (Libraries/LibGC/WeakBlock.h:39): 681 on 64-bit targets.
-pub let weak_block_impl_count: usize = (weak_block_block_size - sizeof(ListNode) - sizeof(WeakImpl*)) // sizeof(WeakImpl)
+pub let weak_block_impl_count: usize = (weak_block_block_size - memory.size_of(ListNode) - memory.size_of(WeakImpl*)) // memory.size_of(WeakImpl)
 
-assert(sizeof(WeakBlock) <= weak_block_block_size)
+assert(memory.size_of(WeakBlock) <= weak_block_block_size)

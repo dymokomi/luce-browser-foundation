@@ -34,7 +34,7 @@ struct KmallocHeader:
     var padding: u8[7]
 
 let kmalloc_header_size: usize = 32
-assert(sizeof(KmallocHeader) <= 32)
+assert(memory.size_of(KmallocHeader) <= 32)
 
 # alignof(std::max_align_t) on the donor's targets.
 let max_align: usize = 16
@@ -50,22 +50,20 @@ func kmalloc_impl(size: usize, alignment: usize, zeroed: bool, atomic: bool) -> 
     var from_atomic = false
     if atomic:
         if let view = atomic_allocator:
-            var parent = view
-            block = alloc(total, align) in parent catch:
-                return none
+            block = view.allocate(total, align) else return none
             from_atomic = true
     if not from_atomic:
-        block = alloc(total, align) catch:
+        block = memory.allocate(total, align) catch:
             return none
     if zeroed:
         memory.set(block, 0)
     let pointer = (void*)((u8*)block.data + offset)
-    let header = (KmallocHeader*)((u8*)pointer - sizeof(KmallocHeader))
+    let header = (KmallocHeader*)((u8*)pointer - memory.size_of(KmallocHeader))
     *header = KmallocHeader(offset = offset, total = total, atomic = from_atomic)
     return pointer
 
 func kmalloc_header(ptr: void*) -> KmallocHeader*:
-    return (KmallocHeader*)((u8*)ptr - sizeof(KmallocHeader))
+    return (KmallocHeader*)((u8*)ptr - memory.size_of(KmallocHeader))
 
 # The usable size of a block from kmalloc_impl.
 func kmalloc_usable_size(ptr: void*) -> usize:
@@ -146,7 +144,7 @@ pub func ladybird_rust_alloc_zeroed(size: usize, alignment: usize) -> void*?:
 
 ## Ported from AK/kmalloc.cpp:215 ladybird_rust_dealloc.
 pub func ladybird_rust_dealloc(ptr: void*?, alignment: usize):
-    discard(alignment)
+    _ = alignment
     kfree_impl(ptr)
 
 ## Ported from AK/kmalloc.cpp:220 ladybird_rust_realloc.

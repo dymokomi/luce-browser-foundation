@@ -25,7 +25,7 @@ pub interface SentinelOptionalTraits[T]:
 ## Ported from AK/Optional.h:81 AK::OptionalBase::ptr: the value's address, or none.
 pub func optional_base_ptr[T](this: (T?)*) -> T*?:
     if let value = *this:
-        discard(value)
+        _ = value
         return (T*)this
     return none
 
@@ -93,7 +93,7 @@ pub func eq_opaque_tt2[T: luce.Equatable](first: T?, second: T) -> bool:
 
 ## Ported from AK/Optional.h:647 AK::operator==(Optional<T>, OptionalNone).
 pub func eq_opaque_optional_none[T](first: T?, arg1: OptionalNone) -> bool:
-    discard(arg1)
+    _ = arg1
     return first == none
 
 # mark: SentinelOptional ========================================================================
@@ -101,7 +101,7 @@ pub func eq_opaque_optional_none[T](first: T?, arg1: OptionalNone) -> bool:
 ## Ported from AK/Optional.h:673 AK::SentinelOptional::SentinelOptional(OptionalNone), and the
 ## default constructor: no value (the sentinel).
 pub func sentinel_optional_sentinel_optional_t_traits_v[T, TTraits: SentinelOptionalTraits[T]](this: SentinelOptional[T, TTraits]*, arg0: OptionalNone):
-    discard(arg0)
+    _ = arg0
     var traits: TTraits = ---
     this.m_value = traits.sentinel_value()
 

@@ -93,12 +93,12 @@ func for_each_line[TCallback: StringViewCallback](string: StringView, callback: 
                 last_ch_was_cr = false
 
         if split_view:
-            discard(callback.call(string_view_substring_view_usize(&string, substart, i - substart)) else trap("MUST: for_each_line"))
+            _ = callback.call(string_view_substring_view_usize(&string, substart, i - substart)) else trap("MUST: for_each_line")
             substart = i + 1
 
     let taillen = string.m_length - substart
     if taillen != 0:
-        discard(callback.call(string_view_substring_view_usize(&string, substart, taillen)) else trap("MUST: for_each_line"))
+        _ = callback.call(string_view_substring_view_usize(&string, substart, taillen)) else trap("MUST: for_each_line")
 
 # mark: Accessors ===============================================================================
 
@@ -217,7 +217,7 @@ struct StringViewToAsciiCaseCopy: BytesCallback:
     var source: const u8[]
     var to_uppercase: bool
 
-    mutating func call(buffer: u8[]) -> !:
+    func call(buffer: u8[]) -> !:
         for i in 0..<self.source.length:
             let character = (u32)self.source[i]
             buffer[i] = (u8)(to_ascii_uppercase(character) if self.to_uppercase else to_ascii_lowercase(character))
@@ -298,7 +298,7 @@ pub func string_view_substring_view(this: const StringView*, start: usize) -> St
 struct StringViewSplitViewCollect: StringViewCallback:
     var parts: Vector[StringView]*
 
-    mutating func call(part: StringView) -> IterationDecision!:
+    func call(part: StringView) -> IterationDecision!:
         vector_append_t(self.parts, part)
         return IterationDecision.continue_
 
@@ -376,13 +376,13 @@ pub func string_view_for_each_split_view_string_view[TCallback: StringViewCallba
         view = string_view_substring_view_starting_after_substring(&view, part_with_separator)
         maybe_separator_index = string_view_find_string_view(&view, separator)
     if keep_empty or not string_view_is_empty(&view):
-        discard(try callback.call(view))
+        _ = try callback.call(view)
 
 ## The lambda of StringView::lines: appends each line to a vector.
 struct StringViewLinesCollect: StringViewCallback:
     var lines: Vector[StringView]*
 
-    mutating func call(part: StringView) -> IterationDecision!:
+    func call(part: StringView) -> IterationDecision!:
         vector_append_t(self.lines, part)
         return IterationDecision.continue_
 
@@ -390,7 +390,7 @@ struct StringViewLinesCollect: StringViewCallback:
 struct StringViewCountLines: StringViewCallback:
     var lines: usize
 
-    mutating func call(part: StringView) -> IterationDecision!:
+    func call(part: StringView) -> IterationDecision!:
         self.lines += 1
         return IterationDecision.continue_
 

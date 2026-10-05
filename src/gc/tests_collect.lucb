@@ -41,7 +41,7 @@ noinline func run_finalizes_garbage():
     let second = first.left else trap("no left")
     second.right = new_test_cell(heap, 3)
     make_garbage(heap, 1000)
-    discard(new_test_cell(heap, -5))  # must survive garbage collection
+    _ = new_test_cell(heap, -5)  # must survive garbage collection
 
     clobber_stack()
     heap_collect_garbage(heap)
@@ -295,7 +295,7 @@ func test_weak_container_remove_dead_cells_impl(this: WeakContainer*):
     var i: usize = 0
     while i < gc_vector_size(&container.cells):
         if cell_state(gc_vector_at(&container.cells, i).cell()) != CellState.live:
-            discard(gc_vector_unstable_take(&container.cells, i))
+            _ = gc_vector_unstable_take(&container.cells, i)
         else:
             i += 1
 
@@ -334,7 +334,7 @@ noinline func run_threshold():
     let heap = create_test_heap()
     assert(heap.m_gc_bytes_threshold == heap_gc_min_bytes_threshold)
     # 4 MiB of garbage: the allocations past the threshold collect by themselves
-    make_garbage(heap, (i64)(heap_gc_min_bytes_threshold // sizeof(TestCell)) + 100)
+    make_garbage(heap, (i64)(heap_gc_min_bytes_threshold // memory.size_of(TestCell)) + 100)
     assert(finalized_count > 0)
     assert(heap.m_allocated_bytes_since_last_gc < heap_gc_min_bytes_threshold)
     destroy_test_heap(heap)

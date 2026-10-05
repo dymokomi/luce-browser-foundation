@@ -64,4 +64,4 @@ pub func weak_block_sweep(this: WeakBlock*, impls_by_cell: GcHashMap[WeakImpl*]*
 
 ## The WeakBlock whose m_list_node is `node` (IntrusiveList's container_of).
 func weak_block_from_list_node(node: ListNode*) -> WeakBlock*:
-    return (WeakBlock*)((u8*)node - offsetof(WeakBlock, m_list_node))
+    return (WeakBlock*)((u8*)node - memory.offset_of(WeakBlock, m_list_node))

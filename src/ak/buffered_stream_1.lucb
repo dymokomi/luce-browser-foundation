@@ -44,7 +44,7 @@ pub func buffered_helper_read[T: IsSeekableStream](this: BufferedHelper[T]*, buf
 
     # Fill the internal buffer if it has run dry.
     if circular_buffer_used_space(&this.m_buffer) == 0:
-        discard(try buffered_helper_populate_read_buffer(this))
+        _ = try buffered_helper_populate_read_buffer(this)
 
     # Let's try to take all we can from the buffer first.
     return circular_buffer_read(&this.m_buffer, buffer)
@@ -137,7 +137,7 @@ pub func buffered_helper_read_until_any_of_with_resize[T: IsSeekableStream](this
     # Once the candidate has been found, read the contents of m_buffer into the buffer,
     # offset by how many bytes have already been read in.
     try byte_buffer_try_resize(buffer, bytes_read_to_user_buffer + found.offset)
-    discard(circular_buffer_read(&this.m_buffer, byte_buffer_span(buffer)[bytes_read_to_user_buffer..]))
+    _ = circular_buffer_read(&this.m_buffer, byte_buffer_span(buffer)[bytes_read_to_user_buffer..])
     try circular_buffer_discard(&this.m_buffer, found.size)
     return byte_buffer_span(buffer)
 

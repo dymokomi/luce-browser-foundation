@@ -12,6 +12,8 @@
 
 # mark: Decoder =================================================================================
 
+import memory
+
 ## TextCodec::Decoder (Libraries/LibTextCodec/Decoder.h:21).
 pub struct Decoder: IsDecoder:
     pub var vtable: const DecoderVTable*
@@ -51,7 +53,7 @@ pub func decoder_process(this: Decoder*, arg0: ak.StringView, on_code_point: ak.
 pub let decoder_vtable: DecoderVTable = DecoderVTable(class_info = &decoder_class)
 
 ## Class information of TextCodec::Decoder: name, class-id range (pre-order), size, vtable.
-pub let decoder_class: ak.ClassInfo = ak.ClassInfo(name = "Decoder", first_id = 0, last_id = 14, size = sizeof(Decoder), vtable = (const void*)&decoder_vtable)
+pub let decoder_class: ak.ClassInfo = ak.ClassInfo(name = "Decoder", first_id = 0, last_id = 14, size = memory.size_of(Decoder), vtable = (const void*)&decoder_vtable)
 
 ## is<TextCodec::Decoder>: the class-id range test.
 pub func is_decoder[P: IsDecoder](p: P*) -> bool:
@@ -92,7 +94,7 @@ pub struct Utf8DecoderVTable:
 pub let utf8_decoder_vtable: Utf8DecoderVTable = Utf8DecoderVTable(decoder_vtable = DecoderVTable(class_info = &utf8_decoder_class, validate = utf8_decoder_validate_impl, to_utf8 = utf8_decoder_to_utf8_impl, incomplete_tail_length = utf8_decoder_incomplete_tail_length_impl, process = utf8_decoder_process_impl))
 
 ## Class information of TextCodec::UTF8Decoder: name, class-id range (pre-order), size, vtable.
-pub let utf8_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "UTF8Decoder", first_id = 12, last_id = 12, size = sizeof(Utf8Decoder), vtable = (const void*)&utf8_decoder_vtable)
+pub let utf8_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "UTF8Decoder", first_id = 12, last_id = 12, size = memory.size_of(Utf8Decoder), vtable = (const void*)&utf8_decoder_vtable)
 
 ## is<TextCodec::UTF8Decoder>: the class-id range test.
 pub func is_utf8_decoder[P: IsDecoder](p: P*) -> bool:
@@ -130,7 +132,7 @@ pub struct Utf16BeDecoderVTable:
 pub let utf16_be_decoder_vtable: Utf16BeDecoderVTable = Utf16BeDecoderVTable(decoder_vtable = DecoderVTable(class_info = &utf16_be_decoder_class, validate = utf16_be_decoder_validate_impl, to_utf8 = utf16_be_decoder_to_utf8_impl, incomplete_tail_length = utf16_be_decoder_incomplete_tail_length_impl, process = utf16_be_decoder_process_impl))
 
 ## Class information of TextCodec::UTF16BEDecoder: name, class-id range (pre-order), size, vtable.
-pub let utf16_be_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "UTF16BEDecoder", first_id = 10, last_id = 10, size = sizeof(Utf16BeDecoder), vtable = (const void*)&utf16_be_decoder_vtable)
+pub let utf16_be_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "UTF16BEDecoder", first_id = 10, last_id = 10, size = memory.size_of(Utf16BeDecoder), vtable = (const void*)&utf16_be_decoder_vtable)
 
 ## is<TextCodec::UTF16BEDecoder>: the class-id range test.
 pub func is_utf16_be_decoder[P: IsDecoder](p: P*) -> bool:
@@ -168,7 +170,7 @@ pub struct Utf16LeDecoderVTable:
 pub let utf16_le_decoder_vtable: Utf16LeDecoderVTable = Utf16LeDecoderVTable(decoder_vtable = DecoderVTable(class_info = &utf16_le_decoder_class, validate = utf16_le_decoder_validate_impl, to_utf8 = utf16_le_decoder_to_utf8_impl, incomplete_tail_length = utf16_le_decoder_incomplete_tail_length_impl, process = utf16_le_decoder_process_impl))
 
 ## Class information of TextCodec::UTF16LEDecoder: name, class-id range (pre-order), size, vtable.
-pub let utf16_le_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "UTF16LEDecoder", first_id = 11, last_id = 11, size = sizeof(Utf16LeDecoder), vtable = (const void*)&utf16_le_decoder_vtable)
+pub let utf16_le_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "UTF16LEDecoder", first_id = 11, last_id = 11, size = memory.size_of(Utf16LeDecoder), vtable = (const void*)&utf16_le_decoder_vtable)
 
 ## is<TextCodec::UTF16LEDecoder>: the class-id range test.
 pub func is_utf16_le_decoder[P: IsDecoder](p: P*) -> bool:
@@ -204,7 +206,7 @@ pub struct SingleByteDecoderVTable:
 pub let single_byte_decoder_vtable: SingleByteDecoderVTable = SingleByteDecoderVTable(decoder_vtable = DecoderVTable(class_info = &single_byte_decoder_class, process = single_byte_decoder_process_impl))
 
 ## Class information of TextCodec::SingleByteDecoder: name, class-id range (pre-order), size, vtable.
-pub let single_byte_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "SingleByteDecoder", first_id = 14, last_id = 14, size = sizeof(SingleByteDecoder[u16]), vtable = (const void*)&single_byte_decoder_vtable)
+pub let single_byte_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "SingleByteDecoder", first_id = 14, last_id = 14, size = memory.size_of(SingleByteDecoder[u16]), vtable = (const void*)&single_byte_decoder_vtable)
 
 ## is<TextCodec::SingleByteDecoder>: the class-id range test.
 pub func is_single_byte_decoder[P: IsDecoder](p: P*) -> bool:
@@ -233,7 +235,7 @@ pub struct Latin1DecoderVTable:
 pub let latin1_decoder_vtable: Latin1DecoderVTable = Latin1DecoderVTable(decoder_vtable = DecoderVTable(class_info = &latin1_decoder_class, validate = latin1_decoder_validate_impl, process = latin1_decoder_process_impl))
 
 ## Class information of TextCodec::Latin1Decoder: name, class-id range (pre-order), size, vtable.
-pub let latin1_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "Latin1Decoder", first_id = 6, last_id = 6, size = sizeof(Latin1Decoder), vtable = (const void*)&latin1_decoder_vtable)
+pub let latin1_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "Latin1Decoder", first_id = 6, last_id = 6, size = memory.size_of(Latin1Decoder), vtable = (const void*)&latin1_decoder_vtable)
 
 ## is<TextCodec::Latin1Decoder>: the class-id range test.
 pub func is_latin1_decoder[P: IsDecoder](p: P*) -> bool:
@@ -271,7 +273,7 @@ pub struct PdfDocEncodingDecoderVTable:
 pub let pdf_doc_encoding_decoder_vtable: PdfDocEncodingDecoderVTable = PdfDocEncodingDecoderVTable(decoder_vtable = DecoderVTable(class_info = &pdf_doc_encoding_decoder_class, validate = pdf_doc_encoding_decoder_validate_impl, process = pdf_doc_encoding_decoder_process_impl))
 
 ## Class information of TextCodec::PDFDocEncodingDecoder: name, class-id range (pre-order), size, vtable.
-pub let pdf_doc_encoding_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "PDFDocEncodingDecoder", first_id = 7, last_id = 7, size = sizeof(PdfDocEncodingDecoder), vtable = (const void*)&pdf_doc_encoding_decoder_vtable)
+pub let pdf_doc_encoding_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "PDFDocEncodingDecoder", first_id = 7, last_id = 7, size = memory.size_of(PdfDocEncodingDecoder), vtable = (const void*)&pdf_doc_encoding_decoder_vtable)
 
 ## is<TextCodec::PDFDocEncodingDecoder>: the class-id range test.
 pub func is_pdf_doc_encoding_decoder[P: IsDecoder](p: P*) -> bool:
@@ -309,7 +311,7 @@ pub struct XUserDefinedDecoderVTable:
 pub let x_user_defined_decoder_vtable: XUserDefinedDecoderVTable = XUserDefinedDecoderVTable(decoder_vtable = DecoderVTable(class_info = &x_user_defined_decoder_class, validate = x_user_defined_decoder_validate_impl, process = x_user_defined_decoder_process_impl))
 
 ## Class information of TextCodec::XUserDefinedDecoder: name, class-id range (pre-order), size, vtable.
-pub let x_user_defined_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "XUserDefinedDecoder", first_id = 13, last_id = 13, size = sizeof(XUserDefinedDecoder), vtable = (const void*)&x_user_defined_decoder_vtable)
+pub let x_user_defined_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "XUserDefinedDecoder", first_id = 13, last_id = 13, size = memory.size_of(XUserDefinedDecoder), vtable = (const void*)&x_user_defined_decoder_vtable)
 
 ## is<TextCodec::XUserDefinedDecoder>: the class-id range test.
 pub func is_x_user_defined_decoder[P: IsDecoder](p: P*) -> bool:
@@ -347,7 +349,7 @@ pub struct Gb18030DecoderVTable:
 pub let gb18030_decoder_vtable: Gb18030DecoderVTable = Gb18030DecoderVTable(decoder_vtable = DecoderVTable(class_info = &gb18030_decoder_class, incomplete_tail_length = gb18030_decoder_incomplete_tail_length_impl, process = gb18030_decoder_process_impl))
 
 ## Class information of TextCodec::GB18030Decoder: name, class-id range (pre-order), size, vtable.
-pub let gb18030_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "GB18030Decoder", first_id = 4, last_id = 4, size = sizeof(Gb18030Decoder), vtable = (const void*)&gb18030_decoder_vtable)
+pub let gb18030_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "GB18030Decoder", first_id = 4, last_id = 4, size = memory.size_of(Gb18030Decoder), vtable = (const void*)&gb18030_decoder_vtable)
 
 ## is<TextCodec::GB18030Decoder>: the class-id range test.
 pub func is_gb18030_decoder[P: IsDecoder](p: P*) -> bool:
@@ -385,7 +387,7 @@ pub struct Big5DecoderVTable:
 pub let big5_decoder_vtable: Big5DecoderVTable = Big5DecoderVTable(decoder_vtable = DecoderVTable(class_info = &big5_decoder_class, incomplete_tail_length = big5_decoder_incomplete_tail_length_impl, process = big5_decoder_process_impl))
 
 ## Class information of TextCodec::Big5Decoder: name, class-id range (pre-order), size, vtable.
-pub let big5_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "Big5Decoder", first_id = 1, last_id = 1, size = sizeof(Big5Decoder), vtable = (const void*)&big5_decoder_vtable)
+pub let big5_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "Big5Decoder", first_id = 1, last_id = 1, size = memory.size_of(Big5Decoder), vtable = (const void*)&big5_decoder_vtable)
 
 ## is<TextCodec::Big5Decoder>: the class-id range test.
 pub func is_big5_decoder[P: IsDecoder](p: P*) -> bool:
@@ -423,7 +425,7 @@ pub struct EucjpDecoderVTable:
 pub let eucjp_decoder_vtable: EucjpDecoderVTable = EucjpDecoderVTable(decoder_vtable = DecoderVTable(class_info = &eucjp_decoder_class, incomplete_tail_length = eucjp_decoder_incomplete_tail_length_impl, process = eucjp_decoder_process_impl))
 
 ## Class information of TextCodec::EUCJPDecoder: name, class-id range (pre-order), size, vtable.
-pub let eucjp_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "EUCJPDecoder", first_id = 2, last_id = 2, size = sizeof(EucjpDecoder), vtable = (const void*)&eucjp_decoder_vtable)
+pub let eucjp_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "EUCJPDecoder", first_id = 2, last_id = 2, size = memory.size_of(EucjpDecoder), vtable = (const void*)&eucjp_decoder_vtable)
 
 ## is<TextCodec::EUCJPDecoder>: the class-id range test.
 pub func is_eucjp_decoder[P: IsDecoder](p: P*) -> bool:
@@ -461,7 +463,7 @@ pub struct Iso2022JpDecoderVTable:
 pub let iso2022_jp_decoder_vtable: Iso2022JpDecoderVTable = Iso2022JpDecoderVTable(decoder_vtable = DecoderVTable(class_info = &iso2022_jp_decoder_class, incomplete_tail_length = iso2022_jp_decoder_incomplete_tail_length_impl, process = iso2022_jp_decoder_process_impl))
 
 ## Class information of TextCodec::ISO2022JPDecoder: name, class-id range (pre-order), size, vtable.
-pub let iso2022_jp_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "ISO2022JPDecoder", first_id = 5, last_id = 5, size = sizeof(Iso2022JpDecoder), vtable = (const void*)&iso2022_jp_decoder_vtable)
+pub let iso2022_jp_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "ISO2022JPDecoder", first_id = 5, last_id = 5, size = memory.size_of(Iso2022JpDecoder), vtable = (const void*)&iso2022_jp_decoder_vtable)
 
 ## is<TextCodec::ISO2022JPDecoder>: the class-id range test.
 pub func is_iso2022_jp_decoder[P: IsDecoder](p: P*) -> bool:
@@ -499,7 +501,7 @@ pub struct ShiftJisDecoderVTable:
 pub let shift_jis_decoder_vtable: ShiftJisDecoderVTable = ShiftJisDecoderVTable(decoder_vtable = DecoderVTable(class_info = &shift_jis_decoder_class, incomplete_tail_length = shift_jis_decoder_incomplete_tail_length_impl, process = shift_jis_decoder_process_impl))
 
 ## Class information of TextCodec::ShiftJISDecoder: name, class-id range (pre-order), size, vtable.
-pub let shift_jis_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "ShiftJISDecoder", first_id = 9, last_id = 9, size = sizeof(ShiftJisDecoder), vtable = (const void*)&shift_jis_decoder_vtable)
+pub let shift_jis_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "ShiftJISDecoder", first_id = 9, last_id = 9, size = memory.size_of(ShiftJisDecoder), vtable = (const void*)&shift_jis_decoder_vtable)
 
 ## is<TextCodec::ShiftJISDecoder>: the class-id range test.
 pub func is_shift_jis_decoder[P: IsDecoder](p: P*) -> bool:
@@ -537,7 +539,7 @@ pub struct EuckrDecoderVTable:
 pub let euckr_decoder_vtable: EuckrDecoderVTable = EuckrDecoderVTable(decoder_vtable = DecoderVTable(class_info = &euckr_decoder_class, incomplete_tail_length = euckr_decoder_incomplete_tail_length_impl, process = euckr_decoder_process_impl))
 
 ## Class information of TextCodec::EUCKRDecoder: name, class-id range (pre-order), size, vtable.
-pub let euckr_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "EUCKRDecoder", first_id = 3, last_id = 3, size = sizeof(EuckrDecoder), vtable = (const void*)&euckr_decoder_vtable)
+pub let euckr_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "EUCKRDecoder", first_id = 3, last_id = 3, size = memory.size_of(EuckrDecoder), vtable = (const void*)&euckr_decoder_vtable)
 
 ## is<TextCodec::EUCKRDecoder>: the class-id range test.
 pub func is_euckr_decoder[P: IsDecoder](p: P*) -> bool:
@@ -575,7 +577,7 @@ pub struct ReplacementDecoderVTable:
 pub let replacement_decoder_vtable: ReplacementDecoderVTable = ReplacementDecoderVTable(decoder_vtable = DecoderVTable(class_info = &replacement_decoder_class, validate = replacement_decoder_validate_impl, process = replacement_decoder_process_impl))
 
 ## Class information of TextCodec::ReplacementDecoder: name, class-id range (pre-order), size, vtable.
-pub let replacement_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "ReplacementDecoder", first_id = 8, last_id = 8, size = sizeof(ReplacementDecoder), vtable = (const void*)&replacement_decoder_vtable)
+pub let replacement_decoder_class: ak.ClassInfo = ak.ClassInfo(name = "ReplacementDecoder", first_id = 8, last_id = 8, size = memory.size_of(ReplacementDecoder), vtable = (const void*)&replacement_decoder_vtable)
 
 ## is<TextCodec::ReplacementDecoder>: the class-id range test.
 pub func is_replacement_decoder[P: IsDecoder](p: P*) -> bool:

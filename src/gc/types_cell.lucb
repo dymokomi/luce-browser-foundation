@@ -53,7 +53,7 @@ pub func cell_must_survive_garbage_collection(this: Cell*) -> bool:
 pub let cell_vtable: CellVTable = CellVTable(class_info = &cell_class)
 
 ## Class information of GC::Cell: name, class-id range (pre-order), size, vtable.
-pub let cell_class: ak.ClassInfo = ak.ClassInfo(name = "Cell", first_id = 0, last_id = 359, size = sizeof(Cell), vtable = (const void*)&cell_vtable)
+pub let cell_class: ak.ClassInfo = ak.ClassInfo(name = "Cell", first_id = 0, last_id = 359, size = memory.size_of(Cell), vtable = (const void*)&cell_vtable)
 
 ## is<GC::Cell>: the class-id range test.
 pub func is_cell[P: IsCell](p: P*) -> bool:
@@ -117,7 +117,7 @@ pub func cell_visitor_visit_impl_span_nan_boxed_value(this: CellVisitor*, arg0: 
 pub let cell_visitor_vtable: CellVisitorVTable = CellVisitorVTable(class_info = &cell_visitor_class)
 
 ## Class information of GC::Cell::Visitor: name, class-id range (pre-order), size, vtable.
-pub let cell_visitor_class: ak.ClassInfo = ak.ClassInfo(name = "Visitor", first_id = 0, last_id = 2, size = sizeof(CellVisitor), vtable = (const void*)&cell_visitor_vtable)
+pub let cell_visitor_class: ak.ClassInfo = ak.ClassInfo(name = "Visitor", first_id = 0, last_id = 2, size = memory.size_of(CellVisitor), vtable = (const void*)&cell_visitor_vtable)
 
 ## is<GC::Cell::Visitor>: the class-id range test.
 pub func is_cell_visitor[P: IsCellVisitor](p: P*) -> bool:

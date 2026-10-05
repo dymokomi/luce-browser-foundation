@@ -27,7 +27,7 @@ pub struct HeapBlock:
 
 ## sizeof(HeapBlock) in C++: the header rounded up to __BIGGEST_ALIGNMENT__ (16), where
 ## `m_storage` begins (64 bytes on 64-bit targets, as in C++).
-pub let heap_block_storage_offset: usize = (sizeof(HeapBlock) + 15) // 16 * 16
+pub let heap_block_storage_offset: usize = (memory.size_of(HeapBlock) + 15) // 16 * 16
 
 ## GC::HeapBlock::FreelistEntry (Libraries/LibGC/HeapBlock.h:103): a dead cell on the freelist.
 pub struct HeapBlockFreelistEntry: IsCell:
@@ -40,7 +40,7 @@ pub struct HeapBlockFreelistEntry: IsCell:
 pub let heap_block_freelist_entry_vtable: CellVTable = CellVTable(class_info = &heap_block_freelist_entry_class, class_name = heap_block_freelist_entry_class_name_impl)
 
 ## Class information of GC::HeapBlock::FreelistEntry.
-pub let heap_block_freelist_entry_class: ak.ClassInfo = ak.ClassInfo(name = "FreelistEntry", first_id = 0, last_id = 0, size = sizeof(HeapBlockFreelistEntry), vtable = (const void*)&heap_block_freelist_entry_vtable)
+pub let heap_block_freelist_entry_class: ak.ClassInfo = ak.ClassInfo(name = "FreelistEntry", first_id = 0, last_id = 0, size = memory.size_of(HeapBlockFreelistEntry), vtable = (const void*)&heap_block_freelist_entry_vtable)
 
 ## GC::HeapBlock::min_possible_cell_size (Libraries/LibGC/HeapBlock.h:125).
-pub let heap_block_min_possible_cell_size: usize = sizeof(HeapBlockFreelistEntry)
+pub let heap_block_min_possible_cell_size: usize = memory.size_of(HeapBlockFreelistEntry)

@@ -154,7 +154,7 @@ func break_iterator_preceding(this: BreakIterator*, offset: i32) -> i32:
 ## moves to the following boundary.
 func break_iterator_is_boundary(this: BreakIterator*, offset: i32) -> bool:
     if offset < 0:
-        discard(break_iterator_first(this))
+        _ = break_iterator_first(this)
         return false
     let aligned = break_iterator_align(this, (usize)offset)
     this.position = break_iterator_seek(this, aligned)
@@ -163,7 +163,7 @@ func break_iterator_is_boundary(this: BreakIterator*, offset: i32) -> bool:
         # The offset is beyond the end of the text; the position stays at its end.
         return false
     if not result:
-        discard(break_iterator_next(this))
+        _ = break_iterator_next(this)
     return result
 
 ## BreakIterator::getRuleStatus: the status of the current boundary (word iterators).

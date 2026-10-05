@@ -13,7 +13,7 @@
 ## Ported from Libraries/LibGC/WeakHashSet.h:28 GC::WeakHashSet::set.
 pub func weak_hash_set_set[T: IsCell](this: WeakHashSet[T]*, value: T*):
     weak_hash_set_maybe_prune(this)
-    discard(ak.hash_table_set(&this.m_table, make_weak[T](value)))
+    _ = ak.hash_table_set(&this.m_table, make_weak[T](value))
 
 ## Ported from Libraries/LibGC/WeakHashSet.h:34 GC::WeakHashSet::remove.
 pub func weak_hash_set_remove[T](this: WeakHashSet[T]*, value: T*) -> bool:
@@ -55,7 +55,7 @@ func weak_hash_set_iterator_next[T](this: WeakHashSetIterator[T]*) -> T*?:
 
 # The predicate of maybe_prune's remove_all_matching: `[](Weak<T> const& entry) { return !entry.ptr(); }`.
 func weak_hash_set_entry_is_dead[T](context: void*?, entry: const Weak[T]*) -> bool:
-    discard(context)
+    _ = context
     return weak_ptr(entry) == none
 
 ## Ported from Libraries/LibGC/WeakHashSet.h:142 GC::WeakHashSet::maybe_prune.
@@ -65,5 +65,5 @@ pub func weak_hash_set_maybe_prune[T](this: WeakHashSet[T]*):
     if this.m_mutations_since_last_prune < (size if size > 64 else 64):
         return
     let is_dead: func(void*?, const Weak[T]*) -> bool = weak_hash_set_entry_is_dead
-    discard(ak.hash_table_remove_all_matching(&this.m_table, ak.Function1[const Weak[T]*, bool](call = is_dead, context = none)))
+    _ = ak.hash_table_remove_all_matching(&this.m_table, ak.Function1[const Weak[T]*, bool](call = is_dead, context = none))
     this.m_mutations_since_last_prune = 0

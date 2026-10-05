@@ -238,7 +238,7 @@ func t16s_test_equals_ignoring_ascii_case(string1_value: Utf16String, inequal_va
         let code_point = utf16_code_point_iterator_deref(&it)
         string_builder_append_code_point(&builder, to_ascii_uppercase(code_point) if i % 2 == 0 else code_point)
         i += 1
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
 
     let string2 = utf16_string_from_utf8_string_view(string_builder_string_view(&builder))
 
@@ -303,7 +303,7 @@ func t16s_test_iteration(string_value: Utf16String, code_points: const u32[]):
         assert(code_points.length != 0)
         assert(utf16_code_point_iterator_deref(&it) == code_points[i])
         i += 1
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
 
 test "iteration":
     let no_code_points: u32[1] = [0]

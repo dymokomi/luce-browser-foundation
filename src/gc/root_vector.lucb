@@ -36,4 +36,4 @@ pub func root_vector_base_assign_heap(this: RootVectorBase*, heap: Heap*?):
 
 ## The RootVectorBase whose m_list_node is `node` (IntrusiveList's container_of).
 func root_vector_base_from_list_node(node: ListNode*) -> RootVectorBase*:
-    return (RootVectorBase*)((u8*)node - offsetof(RootVectorBase, m_list_node))
+    return (RootVectorBase*)((u8*)node - memory.offset_of(RootVectorBase, m_list_node))

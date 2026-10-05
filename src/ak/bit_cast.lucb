@@ -9,6 +9,6 @@
 
 ## Ported from AK/BitCast.h:14 AK::bit_cast.
 pub func bit_cast[T, U](a: U) -> T:
-    assert(sizeof(T) == sizeof(U))
+    assert(memory.size_of(T) == memory.size_of(U))
     var source = a
     return memory.read[T](&source)

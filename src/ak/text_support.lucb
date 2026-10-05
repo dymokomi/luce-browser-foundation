@@ -16,41 +16,41 @@
 
 ## The `Callback` of UnicodeUtils::code_point_to_utf8: receives one UTF-8 byte.
 pub interface Utf8ByteCallback:
-    mutating func call(byte: u8)
+    func call(byte: u8)
 
 ## The `Callback` of UnicodeUtils::try_code_point_to_utf8: receives one UTF-8 byte, may fail.
 pub interface FallibleUtf8ByteCallback:
-    mutating func call(byte: u8) -> !
+    func call(byte: u8) -> !
 
 ## The `Callback` of UnicodeUtils::code_point_to_utf16: receives one UTF-16 code unit.
 pub interface Utf16CodeUnitCallback:
-    mutating func call(code_unit: u16)
+    func call(code_unit: u16)
 
 ## The `Callback` of UnicodeUtils::try_code_point_to_utf16: receives one code unit, may fail.
 pub interface FallibleUtf16CodeUnitCallback:
-    mutating func call(code_unit: u16) -> !
+    func call(code_unit: u16) -> !
 
 ## The `Func` of StringBase::replace_with_new_string: fills the new string's bytes.
 pub interface BytesCallback:
-    mutating func call(buffer: u8[]) -> !
+    func call(buffer: u8[]) -> !
 
 ## The `Func` of StringBase::replace_with_new_short_string: fills a short string's bytes.
 pub interface ShortStringBytesCallback:
-    mutating func call(buffer: u8[])
+    func call(buffer: u8[])
 
 ## The `Callback` of StringView::for_each_split_view: receives each part. The C++ callback may
 ## return nothing, an IterationDecision or an ErrorOr of either; here it returns an
 ## IterationDecision and may fail, and a callback that returns `continue_` is the void form.
 pub interface StringViewCallback:
-    mutating func call(part: StringView) -> IterationDecision!
+    func call(part: StringView) -> IterationDecision!
 
 ## The `Callback` of Utf8View::for_each_split_view: receives each part.
 pub interface Utf8ViewCallback:
-    mutating func call(part: Utf8View)
+    func call(part: Utf8View)
 
 ## The `Callback` of Utf16View::for_each_split_view: receives each part, answers whether to go on.
 pub interface Utf16ViewCallback:
-    mutating func call(part: Utf16View) -> IterationDecision
+    func call(part: Utf16View) -> IterationDecision
 
 ## A `Function<bool(u32)>`-shaped predicate over code points (Utf8View::for_each_split_view's
 ## splitter, GenericLexer's predicates).

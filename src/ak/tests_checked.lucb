@@ -40,7 +40,7 @@ test "checked: operator_decr":
     assert(checked_value(&old) == 1)
     assert(eq_checked(a, 0))
     assert(not checked_has_overflow(&a))
-    discard(checked_dec_i32_u32(&a, 0))
+    _ = checked_dec_i32_u32(&a, 0)
     assert(checked_has_overflow(&a))
 
 test "checked: operator_cmp":

@@ -87,7 +87,7 @@ pub func utf16_code_point_iterator_peek(this: const Utf16CodePointIterator*, cod
     var it = *this
 
     for _index in 0..<code_point_offset:
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
         if utf16_code_point_iterator_remaining_code_units(&it) == 0:
             return none
 
@@ -208,7 +208,7 @@ pub func utf16_sv(text: str) -> Utf16View:
 struct Utf16ViewToUtf8Transcode: BytesCallback:
     var code_units: const u16[]
 
-    mutating func call(buffer: u8[]) -> !:
+    func call(buffer: u8[]) -> !:
         let result = simdutf_convert_utf16_to_utf8(self.code_units, buffer)
         assert(result == buffer.length)
 
@@ -405,8 +405,8 @@ pub func utf16_view_eq_string_view(this: const Utf16View*, other: StringView) ->
     while not utf16_code_point_iterator_done(&this_it) and not utf8_code_point_iterator_done(&other_it):
         if utf16_code_point_iterator_deref(&this_it) != utf8_code_point_iterator_deref(&other_it):
             return false
-        discard(utf16_code_point_iterator_inc(&this_it))
-        discard(utf8_code_point_iterator_inc(&other_it))
+        _ = utf16_code_point_iterator_inc(&this_it)
+        _ = utf8_code_point_iterator_inc(&other_it)
 
     return utf16_code_point_iterator_done(&this_it) and utf8_code_point_iterator_done(&other_it)
 
@@ -575,7 +575,7 @@ pub func utf16_view_code_unit_offset_of(this: const Utf16View*, code_point_offse
 
         code_unit_offset += utf16_code_point_iterator_length_in_code_units(&it)
         remaining -= 1
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
 
     return code_unit_offset
 
@@ -593,8 +593,8 @@ pub func utf16_view_code_point_offset_of(this: const Utf16View*, code_unit_offse
     let start = (usize)(utf16_view_utf16_pointer(this) else trap("VERIFY: UTF-16 view without storage"))
     var it = utf16_view_begin(this)
     while not utf16_code_point_iterator_done(&it):
-        discard(utf16_code_point_iterator_inc(&it))
-        if utf16_code_point_iterator_raw(&it) > start + code_unit_offset * sizeof(u16):
+        _ = utf16_code_point_iterator_inc(&it)
+        if utf16_code_point_iterator_raw(&it) > start + code_unit_offset * memory.size_of(u16):
             break
         code_point_offset += 1
 

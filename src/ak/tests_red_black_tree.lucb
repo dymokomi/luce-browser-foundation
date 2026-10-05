@@ -91,7 +91,7 @@ test "red_black_tree: find_smallest_not_below_iterator":
         assert(red_black_tree_iterator_key(&only_just_added_i_is_not_below) == i)
     let smallest_not_below_two = red_black_tree_find_smallest_not_below_iterator(&tree, 2)
     assert(red_black_tree_iterator_key(&smallest_not_below_two) == 2)
-    discard(red_black_tree_remove(&tree, 2))
+    _ = red_black_tree_remove(&tree, 2)
     let without_two = red_black_tree_find_smallest_not_below_iterator(&tree, 2)
     assert(not red_black_tree_iterator_is_end(&without_two))
     assert(red_black_tree_iterator_key(&without_two) == 3)
@@ -104,7 +104,7 @@ test "red_black_tree: find_smallest_not_below_iterator":
 test "red_black_tree: iterators_on_emptied_tree":
     var tree: RedBlackTree[usize, usize]
     red_black_tree_insert(&tree, 1, 1)
-    discard(red_black_tree_remove(&tree, 1))
+    _ = red_black_tree_remove(&tree, 1)
     assert(base_red_black_tree_size(&tree.base) == 0)
     let begin_iterator = red_black_tree_begin(&tree)
     let end_iterator = red_black_tree_end(&tree)
@@ -118,9 +118,9 @@ test "red_black_tree: unsafe_remove and reverse steps":
     assert(red_black_tree_unsafe_remove(&tree, 7) == 14)
     var it = red_black_tree_find_largest_not_above_iterator(&tree, 7)
     assert(red_black_tree_iterator_key(&it) == 6)
-    discard(red_black_tree_iterator_inc(&it))
+    _ = red_black_tree_iterator_inc(&it)
     assert(*red_black_tree_iterator_deref(&it) == 16)
-    discard(red_black_tree_iterator_dec(&it))
+    _ = red_black_tree_iterator_dec(&it)
     assert(*red_black_tree_iterator_deref(&it) == 12)
 
 # mark: IntrusiveRedBlackTree ===================================================================
@@ -132,7 +132,7 @@ struct IntrusiveTest:
 type IntrusiveRBTree = IntrusiveRedBlackTree[i32, IntrusiveTest, IntrusiveTest*?]
 
 func test_irbt_member() -> usize:
-    return offsetof(IntrusiveTest, m_tree_node)
+    return memory.offset_of(IntrusiveTest, m_tree_node)
 
 func test_irbt_new(value: i32) -> IntrusiveTest*:
     let entry = new IntrusiveTest else trap("out of memory")
@@ -204,7 +204,7 @@ test "intrusive_red_black_tree: clear and begin_from":
             vector_append_t(&entries, entry)
         var it = intrusive_red_black_tree_begin_from_k(&tree, 500)
         assert(base_iterator_deref(&it).m_some_value == 500)
-        discard(base_iterator_inc(&it))
+        _ = base_iterator_inc(&it)
         assert(base_iterator_key(&it) == 501)
         var from_value = intrusive_red_black_tree_begin_from_v(&tree, *vector_at(&entries, 10))
         assert(base_iterator_deref(&from_value).m_some_value == 10)

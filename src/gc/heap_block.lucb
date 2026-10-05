@@ -23,7 +23,7 @@ pub func heap_block_create_with_cell_size(heap: Heap*, cell_allocator: CellAlloc
 ## Ported from Libraries/LibGC/HeapBlock.cpp:28 GC::HeapBlock::HeapBlock.
 pub func heap_block_construct(this: HeapBlock*, heap: Heap*, cell_allocator: CellAllocator*, cell_size: usize, overrides_must_survive_garbage_collection: bool, overrides_finalize: bool):
     *this = HeapBlock(heap_block_base = HeapBlockBase(m_heap = heap), m_list_node = ListNode(), m_cell_allocator = cell_allocator, m_cell_size = u32(cell_size), m_next_lazy_freelist_index = 0, m_overrides_must_survive_garbage_collection = overrides_must_survive_garbage_collection, m_overrides_finalize = overrides_finalize, m_freelist = none)
-    assert(cell_size >= sizeof(HeapBlockFreelistEntry))
+    assert(cell_size >= memory.size_of(HeapBlockFreelistEntry))
 
 ## Ported from Libraries/LibGC/HeapBlock.h:31 GC::HeapBlock::cell_size.
 pub func heap_block_cell_size(this: const HeapBlock*) -> usize:
@@ -96,7 +96,7 @@ pub struct HeapBlockCellIterator: luce.Iterator[Cell*]:
     pub var end: usize
     pub var state: CellState?
 
-    mutating func next() -> Cell*?:
+    func next() -> Cell*?:
         while self.index < self.end:
             let cell = heap_block_cell(self.block, self.index)
             self.index += 1
@@ -162,4 +162,4 @@ pub func heap_block_storage(this: const HeapBlock*) -> u8*:
 
 ## The HeapBlock whose m_list_node is `node` (IntrusiveList's container_of).
 func heap_block_from_list_node(node: ListNode*) -> HeapBlock*:
-    return (HeapBlock*)((u8*)node - offsetof(HeapBlock, m_list_node))
+    return (HeapBlock*)((u8*)node - memory.offset_of(HeapBlock, m_list_node))

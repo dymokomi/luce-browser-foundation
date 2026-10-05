@@ -14,7 +14,7 @@ pub func explode_byte(b: u8) -> usize:
     let value: usize = b
     return value << 56 | value << 48 | value << 40 | value << 32 | value << 24 | value << 16 | value << 8 | value
 
-assert(sizeof(usize) == 8)
+assert(memory.size_of(usize) == 8)
 
 ## Ported from AK/Types.h:177 AK::align_up_to.
 pub func align_up_to(value: usize, alignment: usize) -> usize:

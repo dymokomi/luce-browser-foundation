@@ -91,7 +91,7 @@ struct Database:
     var emoji_sequences: U32List
     var emoji_sequence_properties: U32List
 
-    static func create() -> Database!:
+    func create() -> Database!:
         let n = code_point_count
         return Database(
             gc = try new u8[n], bc = try new u8[n], lb = try new u8[n], ea = try new u8[n],
@@ -110,7 +110,7 @@ struct Database:
         let word = self.bits[(usize)code_point * 2 + property // 64]
         return (word >> (u64)(property % 64)) & 1 != 0
 
-    mutating func set_bit(code_point: u32, property: usize, value: bool):
+    func set_bit(code_point: u32, property: usize, value: bool):
         let index = (usize)code_point * 2 + property // 64
         let mask = (u64)1 << (u64)(property % 64)
         if value:
@@ -170,7 +170,7 @@ func parse_ppucd(database: Database*, data: const u8[]) -> !:
 # property;Binary;Alpha;Alphabetic[;additional]
 func parse_property_line(database: Database*, line: str) -> !:
     var fields = Fields.over(line, ';')
-    discard(fields.next())
+    _ = fields.next()
     let type_ = fields.next() else return
     if type_ != "Binary":
         return
@@ -192,7 +192,7 @@ func add_binary_alias(database: Database*, name: str, index: usize):
 # value;gc;Lu;Uppercase_Letter[;additional]
 func parse_value_line(database: Database*, line: str) -> !:
     var fields = Fields.over(line, ';')
-    discard(fields.next())
+    _ = fields.next()
     let property = fields.next() else return
     let short_name = fields.next() else return
     let long_name = fields.next() else ""
@@ -240,8 +240,8 @@ func reset_to_defaults(database: Database*, range: CodePointRange) -> !:
         for kind in 0..<mapping_kind_count:
             database.mapping_offset[(usize)code_point * mapping_kind_count + kind] = 0
     var fields = Fields.over(database.defaults, ';')
-    discard(fields.next())
-    discard(fields.next())
+    _ = fields.next()
+    _ = fields.next()
     while let token = fields.next():
         try apply_token(database, token, range)
 

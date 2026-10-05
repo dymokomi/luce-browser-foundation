@@ -29,7 +29,7 @@ func emit_casing(database: const Database*) -> str!:
     ])
     var pool = try SequencePool.create()
     # Pool offset 0 holds nothing; a real mapping never starts there.
-    discard(try pool.intern([0xffffffff]))
+    _ = try pool.intern([0xffffffff])
     var buffer: u32[1]
 
     try out.put("\nlet ucd_case_mappings: str = \"")
@@ -104,8 +104,8 @@ func emit_casing(database: const Database*) -> str!:
     for value in pool.values.view():
         try put_hex(&out, (u64)value & 0xffffff, 6)
     try out.put("\"\n")
-    discard(buffer)
-    discard(mapping_count)
+    _ = buffer
+    _ = mapping_count
     return out.view()
 
 ## ICU's case closure (ucase_addCaseClosure, UnicodeSet::closeOver(USET_CASE_INSENSITIVE)):

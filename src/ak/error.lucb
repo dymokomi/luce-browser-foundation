@@ -70,7 +70,7 @@ pub func ak_error_from_string_view_string_view(string_literal: StringView) -> Ak
 # `Error::from_string_view(ByteString::formatted(...))` is a somewhat common mistake, which leads to a UAF
 # situation. The donor rejects it at compile time (static_assert); here it traps.
 pub func ak_error_from_string_view_t[T](arg0: T) -> AkError:
-    discard(arg0)
+    _ = arg0
     trap("VERIFY_NOT_REACHED: Error::from_string_view(String) is almost always a use-after-free")
 
 ## Ported from AK/Error.h:67 AK::Error::copy.

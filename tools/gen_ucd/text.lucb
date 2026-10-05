@@ -15,10 +15,10 @@ struct Lines:
     var data: const u8[]
     var offset: usize
 
-    static func over(data: const u8[]) -> Lines:
+    func over(data: const u8[]) -> Lines:
         return Lines(data = data, offset = 0)
 
-    mutating func next() -> str?:
+    func next() -> str?:
         if self.offset >= self.data.length:
             return none
         let start = self.offset
@@ -38,10 +38,10 @@ struct Fields:
     var separator: u8
     var done: bool
 
-    static func over(text: str, separator: u8) -> Fields:
+    func over(text: str, separator: u8) -> Fields:
         return Fields(text = text, offset = 0, separator = separator, done = false)
 
-    mutating func next() -> str?:
+    func next() -> str?:
         if self.done:
             return none
         let bytes = self.text.bytes
@@ -108,10 +108,10 @@ struct U32List:
     var items: u32[]
     var count: usize
 
-    static func create() -> U32List!:
+    func create() -> U32List!:
         return U32List(items = try new u32[256], count = 0)
 
-    mutating func append(value: u32) -> !:
+    func append(value: u32) -> !:
         if self.count == self.items.length:
             let grown = try new u32[self.items.length * 2]
             memory.copy(grown, self.items, self.count)
@@ -140,11 +140,11 @@ func same_u32s(a: const u32[], b: const u32[]) -> bool:
 struct SequencePool:
     var values: U32List
 
-    static func create() -> SequencePool!:
+    func create() -> SequencePool!:
         return SequencePool(values = try U32List.create())
 
     ## The offset of `sequence` in the pool, adding it when it is not there yet.
-    mutating func intern(sequence: const u32[]) -> u32!:
+    func intern(sequence: const u32[]) -> u32!:
         if sequence.length == 0:
             return 0
         let all = self.values.view()

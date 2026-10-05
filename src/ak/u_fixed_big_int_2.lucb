@@ -41,17 +41,17 @@ pub type U4096 = UFixedBigInt[u64[64]]
 
 # The words of a UFixedBigInt (get_storage_of).
 func fbi_words[TStorage](this: const UFixedBigInt[TStorage]*) -> u64[]:
-    assert(sizeof(TStorage) % 8 == 0)
-    return u64[]((u64*)&this.m_data, sizeof(TStorage) // 8)
+    assert(memory.size_of(TStorage) % 8 == 0)
+    return u64[]((u64*)&this.m_data, memory.size_of(TStorage) // 8)
 
 # BigIntBase.h:170 get_storage_of for a UFixedInt value: its words, least significant first. A
 # builtin integer narrower than a word is widened into `small`.
 func storage_of[T](value: const T*, small: u64*) -> u64[]:
-    if sizeof(T) % 8 == 0:
-        return u64[]((u64*)value, sizeof(T) // 8)
+    if memory.size_of(T) % 8 == 0:
+        return u64[]((u64*)value, memory.size_of(T) // 8)
     else:
         *small = 0
-        memory.copy(u8[]((u8*)small, sizeof(T)), u8[]((u8*)value, sizeof(T)), sizeof(T))
+        memory.copy(u8[]((u8*)small, memory.size_of(T)), u8[]((u8*)value, memory.size_of(T)), memory.size_of(T))
         return u64[](small, 1)
 
 # The words of an IntegerWrapper.
@@ -80,7 +80,7 @@ pub func u_fixed_big_int_u_fixed_big_int_bit_size_storage[TStorage, T](this: UFi
 ## two halves, each a u64 (for u128) or a UFixedBigInt of half the size.
 pub func u_fixed_big_int_construct_opaque[TStorage, TPart](this: UFixedBigInt[TStorage]*, low: TPart, high: TPart):
     let words = fbi_words(this)
-    assert(words.length % 2 == 0 and sizeof(TPart) * 2 == sizeof(TStorage))
+    assert(words.length % 2 == 0 and memory.size_of(TPart) * 2 == memory.size_of(TStorage))
     let part_size = words.length // 2
     var small_low: u64
     var small_high: u64
@@ -95,30 +95,30 @@ pub func u_fixed_big_int_construct_opaque[TStorage, TPart](this: UFixedBigInt[TS
 ## integer (the low bits) or another UFixedBigInt (truncated or zero-extended).
 pub func u_fixed_big_int_to_t[TStorage, T](this: const UFixedBigInt[TStorage]*) -> T:
     var result: T = ---
-    let bytes = u8[]((u8*)&result, sizeof(T))
+    let bytes = u8[]((u8*)&result, memory.size_of(T))
     memory.set(bytes, 0)
-    let count = sizeof(T) if sizeof(T) < sizeof(TStorage) else sizeof(TStorage)
+    let count = memory.size_of(T) if memory.size_of(T) < memory.size_of(TStorage) else memory.size_of(TStorage)
     memory.copy(bytes[0..<count], u8[]((u8*)&this.m_data, count), count)
     return result
 
 ## Ported from AK/UFixedBigInt.h:156 AK::Detail::UFixedBigInt::low: the low half, as `TPart`
 ## (u64 for a u128, the UFixedBigInt of half the size otherwise).
 pub func u_fixed_big_int_low[TStorage, TPart](this: const UFixedBigInt[TStorage]*) -> TPart:
-    assert(sizeof(TPart) * 2 == sizeof(TStorage))
+    assert(memory.size_of(TPart) * 2 == memory.size_of(TStorage))
     return memory.read[TPart]((void*)&this.m_data)
 
 ## Ported from AK/UFixedBigInt.h:170 AK::Detail::UFixedBigInt::high: the high half, as `TPart`.
 pub func u_fixed_big_int_high[TStorage, TPart](this: const UFixedBigInt[TStorage]*) -> TPart:
-    assert(sizeof(TPart) * 2 == sizeof(TStorage))
-    return memory.read[TPart]((void*)((u8*)&this.m_data + sizeof(TPart)))
+    assert(memory.size_of(TPart) * 2 == memory.size_of(TStorage))
+    return memory.read[TPart]((void*)((u8*)&this.m_data + memory.size_of(TPart)))
 
 ## Ported from AK/UFixedBigInt.h:184 AK::Detail::UFixedBigInt::bytes.
 pub func u_fixed_big_int_bytes[TStorage](this: UFixedBigInt[TStorage]*) -> u8[]:
-    return u8[]((u8*)this, sizeof(TStorage))
+    return u8[]((u8*)this, memory.size_of(TStorage))
 
 ## Ported from AK/UFixedBigInt.h:189 AK::Detail::UFixedBigInt::bytes.
 pub func u_fixed_big_int_bytes_const[TStorage](this: const UFixedBigInt[TStorage]*) -> const u8[]:
-    return u8[]((u8*)this, sizeof(TStorage))
+    return u8[]((u8*)this, memory.size_of(TStorage))
 
 ## Ported from AK/UFixedBigInt.h:194 AK::Detail::UFixedBigInt::span: the words.
 pub func u_fixed_big_int_span[TStorage](this: UFixedBigInt[TStorage]*) -> u64[]:
@@ -287,7 +287,7 @@ pub func u_fixed_big_int_shr_assign[TStorage](this: UFixedBigInt[TStorage]*, shi
 ## Ported from AK/UFixedBigInt.h:349 AK::Detail::UFixedBigInt::addc: this + other + carry, the
 ## carry out stored back.
 pub func u_fixed_big_int_addc[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T, carry: bool*) -> UFixedBigInt[TStorage]:
-    assert(sizeof(T) <= sizeof(TStorage))
+    assert(memory.size_of(T) <= memory.size_of(TStorage))
     var result: UFixedBigInt[TStorage] = ---
     var small: u64
     *carry = storage_add(false, fbi_words(this), storage_of(&other, &small), fbi_words(&result), *carry) != 0
@@ -296,7 +296,7 @@ pub func u_fixed_big_int_addc[TStorage, T](this: const UFixedBigInt[TStorage]*, 
 ## Ported from AK/UFixedBigInt.h:357 AK::Detail::UFixedBigInt::subc: this - other - borrow, the
 ## borrow out stored back.
 pub func u_fixed_big_int_subc[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T, borrow: bool*) -> UFixedBigInt[TStorage]:
-    assert(sizeof(T) <= sizeof(TStorage))
+    assert(memory.size_of(T) <= memory.size_of(TStorage))
     var result: UFixedBigInt[TStorage] = ---
     var small: u64
     *borrow = storage_add(true, fbi_words(this), storage_of(&other, &small), fbi_words(&result), *borrow) != 0
@@ -340,26 +340,26 @@ pub func u_fixed_big_int_sub_assign_opaque[TStorage, T](this: UFixedBigInt[TStor
 
 ## Ported from AK/UFixedBigInt.h:369 AK::Detail::UFixedBigInt::operator++ (prefix).
 pub func u_fixed_big_int_inc[TStorage](this: UFixedBigInt[TStorage]*) -> UFixedBigInt[TStorage]*:
-    discard(storage_increment(false, fbi_words(this)))
+    _ = storage_increment(false, fbi_words(this))
     return this
 
 ## Ported from AK/UFixedBigInt.h:375 AK::Detail::UFixedBigInt::operator-- (prefix).
 pub func u_fixed_big_int_dec[TStorage](this: UFixedBigInt[TStorage]*) -> UFixedBigInt[TStorage]*:
-    discard(storage_increment(true, fbi_words(this)))
+    _ = storage_increment(true, fbi_words(this))
     return this
 
 ## Ported from AK/UFixedBigInt.h:381 AK::Detail::UFixedBigInt::operator++ (postfix).
 pub func u_fixed_big_int_inc_i32[TStorage](this: UFixedBigInt[TStorage]*, arg0: i32) -> UFixedBigInt[TStorage]:
-    discard(arg0)
+    _ = arg0
     let result = *this
-    discard(storage_increment(false, fbi_words(this)))
+    _ = storage_increment(false, fbi_words(this))
     return result
 
 ## Ported from AK/UFixedBigInt.h:388 AK::Detail::UFixedBigInt::operator-- (postfix).
 pub func u_fixed_big_int_dec_i32[TStorage](this: UFixedBigInt[TStorage]*, arg0: i32) -> UFixedBigInt[TStorage]:
-    discard(arg0)
+    _ = arg0
     let result = *this
-    discard(storage_increment(true, fbi_words(this)))
+    _ = storage_increment(true, fbi_words(this))
     return result
 
 ## Ported from AK/UFixedBigInt.h:395 AK::Detail::UFixedBigInt::operator*(IntegerWrapper).
@@ -394,7 +394,7 @@ pub func u_fixed_big_int_div_mod[TStorage, T](this: const UFixedBigInt[TStorage]
     var quotient: UFixedBigInt[TStorage] = ---
     var resulting_remainder: T = ---
     var small: u64
-    div_mod_internal(true, fbi_words(this), storage_of(&divisor, &small), fbi_words(&quotient), u64[]((u64*)&resulting_remainder, sizeof(T) // 8))
+    div_mod_internal(true, fbi_words(this), storage_of(&divisor, &small), fbi_words(&quotient), u64[]((u64*)&resulting_remainder, memory.size_of(T) // 8))
     *remainder = resulting_remainder
     return quotient
 
@@ -416,7 +416,7 @@ pub func u_fixed_big_int_rem_t[TStorage, T](this: const UFixedBigInt[TStorage]*,
     var remainder_storage: u64[64]
     div_mod_internal(true, fbi_words(this), divisor, fbi_words(&quotient), remainder_storage[0..<divisor.length])
     var remainder: T = ---
-    memory.copy(u8[]((u8*)&remainder, sizeof(T)), u8[]((u8*)&remainder_storage[0], sizeof(T)), sizeof(T))
+    memory.copy(u8[]((u8*)&remainder, memory.size_of(T)), u8[]((u8*)&remainder_storage[0], memory.size_of(T)), memory.size_of(T))
     return remainder
 
 ## Ported from AK/UFixedBigInt.h:436 AK::Detail::UFixedBigInt::operator/(IntegerWrapper).
@@ -485,22 +485,22 @@ func storage_or(a: const u64[], b: const u64[], c: u64[]):
     storage_compute_bitwise(StorageBitwise.or_, a, b, c)
 
 func storage_inplace_xor(a: const u64[], b: const u64[], c: u64[]):
-    discard(a)
+    _ = a
     storage_compute_inplace_bitwise(StorageBitwise.xor_, b, c)
 
 func storage_inplace_and(a: const u64[], b: const u64[], c: u64[]):
-    discard(a)
+    _ = a
     storage_compute_inplace_bitwise(StorageBitwise.and_, b, c)
 
 func storage_inplace_or(a: const u64[], b: const u64[], c: u64[]):
-    discard(a)
+    _ = a
     storage_compute_inplace_bitwise(StorageBitwise.or_, b, c)
 
 func storage_plus(a: const u64[], b: const u64[], c: u64[]):
-    discard(storage_add(false, a, b, c))
+    _ = storage_add(false, a, b, c)
 
 func storage_minus(a: const u64[], b: const u64[], c: u64[]):
-    discard(storage_add(true, a, b, c))
+    _ = storage_add(true, a, b, c)
 
 ## Ported from AK/UFixedBigInt.h:60 AK::Detail::mul_internal: result = operand1 * operand2,
 ## truncated to the result's words (StorageOperations::baseline_mul).
@@ -510,7 +510,7 @@ pub func mul_internal(operand1: const u64[], operand2: const u64[], result: u64[
 ## Ported from AK/UFixedBigInt.h:472 AK::Detail::UFixedBigInt::do_standard_binary_operation:
 ## `function(this, other, result)` into a new value (the operand must not be wider).
 pub func u_fixed_big_int_do_standard_binary_operation[TStorage, T](this: const UFixedBigInt[TStorage]*, other: T, function: StorageBinaryFunction) -> UFixedBigInt[TStorage]:
-    assert(sizeof(T) <= sizeof(TStorage), "Requested operation requires integer size to be expanded.")
+    assert(memory.size_of(T) <= memory.size_of(TStorage), "Requested operation requires integer size to be expanded.")
     var result: UFixedBigInt[TStorage] = ---
     var small: u64
     function(fbi_words(this), storage_of(&other, &small), fbi_words(&result))
@@ -518,7 +518,7 @@ pub func u_fixed_big_int_do_standard_binary_operation[TStorage, T](this: const U
 
 ## Ported from AK/UFixedBigInt.h:480 AK::Detail::UFixedBigInt::do_standard_compound_assignment.
 pub func u_fixed_big_int_do_standard_compound_assignment[TStorage, T](this: UFixedBigInt[TStorage]*, other: T, function: StorageBinaryFunction):
-    assert(sizeof(T) <= sizeof(TStorage), "Requested operation requires integer size to be expanded.")
+    assert(memory.size_of(T) <= memory.size_of(TStorage), "Requested operation requires integer size to be expanded.")
     var small: u64
     function(fbi_words(this), storage_of(&other, &small), fbi_words(this))
 

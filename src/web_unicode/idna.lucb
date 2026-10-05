@@ -279,7 +279,7 @@ func uts46_process_unicode(source: const u32[], label_start_: usize, mapping_sta
             continue
         elif c < 0xdf:
             # pass
-            discard(c)
+            _ = c
         elif c <= 0x200d and (c == 0xdf or c == 0x3c2 or c >= 0x200c):
             info.is_trans_diff = true
             if do_map_dev_chars:
@@ -293,7 +293,7 @@ func uts46_process_unicode(source: const u32[], label_start_: usize, mapping_sta
     # but not an empty label elsewhere nor a completely empty domain name.
     # processLabel() sets UIDNA_ERROR_EMPTY_LABEL when labelLength==0.
     if label_start == 0 or label_start < label_limit:
-        discard(uts46_process_label(dest, label_start, label_limit - label_start, to_ascii, options, info))
+        _ = uts46_process_label(dest, label_start, label_limit - label_start, to_ascii, options, info)
         info.errors |= info.label_errors
 
 ## UTS46::mapDevChars: transitional processing of ß, ς, ZWJ and ZWNJ from `mapping_start`.

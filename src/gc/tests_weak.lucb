@@ -38,7 +38,7 @@ noinline func drop_weaks(cell_weak: const Weak[TestCell]*, count: usize):
 ## Weaks to `count` new cells nothing keeps.
 noinline func drop_cells_with_weaks(heap: Heap*, count: usize):
     for i in 0..<count:
-        discard(make_unreferenced_cell(heap, 10 + (i64)i))
+        _ = make_unreferenced_cell(heap, 10 + (i64)i)
 
 test "the Weaks of a cell share its WeakImpl, which goes back when the cell dies":
     clobber_stack()
@@ -75,7 +75,7 @@ noinline func stored_weak_alive(owner: const Weak[TestCell]*) -> bool:
 
 ## A blob holding a Weak to the cell of `target`.
 noinline func store_weak_in_blob(heap: Heap*, target: const Weak[TestCell]*) -> u8[]:
-    let blob = heap_allocate_blob(heap, sizeof(Weak[TestCell]), 16, false) else trap("no blob")
+    let blob = heap_allocate_blob(heap, memory.size_of(Weak[TestCell]), 16, false) else trap("no blob")
     memory.write[Weak[TestCell]](blob.data, make_weak[TestCell](weak_ptr(target)))
     return blob
 

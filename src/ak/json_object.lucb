@@ -30,7 +30,7 @@ pub func json_object_clone(this: const JsonObject*) -> JsonObject:
     for i in 0..<vector_size(&keys):
         let key = *vector_at_const(&keys, i)
         let value = ordered_hash_map_get_k_const(&this.m_members, key) else trap("VERIFY_NOT_REACHED")
-        discard(ordered_hash_map_set(&copy.m_members, key, json_value2_clone(value)))
+        _ = ordered_hash_map_set(&copy.m_members, key, json_value2_clone(value))
     return copy
 
 ## The String for a StringView key (the C++ lookups take the StringView itself).
@@ -256,7 +256,7 @@ pub func json_object_has_object(this: const JsonObject*, key: StringView) -> boo
 
 ## Ported from AK/JsonObject.cpp:265 AK::JsonObject::set(String, JsonValue).
 pub func json_object_set_string(this: JsonObject*, key: String, value: JsonValue2):
-    discard(ordered_hash_map_set(&this.m_members, key, value))
+    _ = ordered_hash_map_set(&this.m_members, key, value)
 
 ## Ported from AK/JsonObject.cpp:270 AK::JsonObject::set(StringView, JsonValue).
 pub func json_object_set_string_view(this: JsonObject*, key: StringView, value: JsonValue2):

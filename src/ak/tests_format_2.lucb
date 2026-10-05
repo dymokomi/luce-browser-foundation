@@ -148,14 +148,14 @@ func format_value_i32_span(params: TypeErasedFormatParams*, builder: FormatBuild
     let span = *(const (const i32[])*)format_value_target(value)
     var formatter = standard_formatter_create()
     standard_formatter_parse(&formatter, params, parser)
-    try formatter_span_format(&formatter, builder, (const void*?)span.data, span.length, sizeof(i32), span_element_i32)
+    try formatter_span_format(&formatter, builder, (const void*?)span.data, span.length, memory.size_of(i32), span_element_i32)
 
 ## __format_value<ReadonlySpan<StringView>>: `value` points at a `const StringView[]`.
 func format_value_string_view_span(params: TypeErasedFormatParams*, builder: FormatBuilder*, parser: FormatParser*, value: const void*?) -> !:
     let span = *(const (const StringView[])*)format_value_target(value)
     var formatter = standard_formatter_create()
     standard_formatter_parse(&formatter, params, parser)
-    try formatter_span_format(&formatter, builder, (const void*?)span.data, span.length, sizeof(StringView), span_element_string_view)
+    try formatter_span_format(&formatter, builder, (const void*?)span.data, span.length, memory.size_of(StringView), span_element_string_view)
 
 ## A ReadonlySpan<StringView> element for Formatter<ReadonlySpan<ReadonlySpan<StringView>>>.
 func span_element_string_view_span(element: const void*) -> TypeErasedParameter:
@@ -166,7 +166,7 @@ func format_value_string_view_span_span(params: TypeErasedFormatParams*, builder
     let span = *(const (const (const StringView[])[])*)format_value_target(value)
     var formatter = standard_formatter_create()
     standard_formatter_parse(&formatter, params, parser)
-    try formatter_span_format(&formatter, builder, (const void*?)span.data, span.length, sizeof(const StringView[]), span_element_string_view_span)
+    try formatter_span_format(&formatter, builder, (const void*?)span.data, span.length, memory.size_of(const StringView[]), span_element_string_view_span)
 
 test "span_format":
     let ints: i32[4] = [1, 2, 3, 4]
@@ -188,7 +188,7 @@ func format_value_i32_vector(params: TypeErasedFormatParams*, builder: FormatBui
     let vector = (const Vector[i32]*)format_value_target(value)
     var formatter = standard_formatter_create()
     standard_formatter_parse(&formatter, params, parser)
-    try formatter_span_format(&formatter, builder, (const void*?)vector.m_outline_buffer, vector_size(vector), sizeof(i32), span_element_i32)
+    try formatter_span_format(&formatter, builder, (const void*?)vector.m_outline_buffer, vector_size(vector), memory.size_of(i32), span_element_i32)
 
 test "vector_format":
     var v: Vector[i32]

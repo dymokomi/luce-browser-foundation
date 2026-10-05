@@ -135,7 +135,7 @@ pub func heap_is_gc_deferred(this: const Heap*) -> bool:
 ## its size when `allocator` is none (GC_DECLARE_SIZE_BASED_ALLOCATOR). The compile-time check
 ## has_own_gc_allocator_marker<T>() has no counterpart: the allocator is an argument.
 pub func heap_allocate_cell[T](this: Heap*, allocator: CellAllocator*?) -> Cell*:
-    return heap_allocate_cell_of_size(this, sizeof(T), allocator)
+    return heap_allocate_cell_of_size(this, memory.size_of(T), allocator)
 
 ## heap_allocate_cell for a size known at run time (a ClassInfo's size): the allocation seam of
 ## the engine's creation helpers (DESIGN.md §2.3). A cell too large for a heap block goes to the
@@ -189,7 +189,7 @@ pub struct HeapBlockIterator: luce.Iterator[HeapBlock*]:
     pub var next_allocator: ListNode*?
     pub var blocks: CellAllocatorBlockIterator?
 
-    mutating func next() -> HeapBlock*?:
+    func next() -> HeapBlock*?:
         while true:
             if let current = self.blocks:
                 var iterator = current
@@ -204,7 +204,7 @@ pub struct HeapBlockIterator: luce.Iterator[HeapBlock*]:
 
 ## The CellAllocator whose m_list_node is `node` (IntrusiveList's container_of).
 func cell_allocator_from_list_node(node: ListNode*) -> CellAllocator*:
-    return (CellAllocator*)((u8*)node - offsetof(CellAllocator, m_list_node))
+    return (CellAllocator*)((u8*)node - memory.offset_of(CellAllocator, m_list_node))
 
 # mark: Heap.cpp ================================================================================
 
@@ -271,7 +271,7 @@ struct PossibleCellIterator: luce.Iterator[(Cell*, usize)]:
     var all_live_heap_blocks: const GcHashMap[u8]*
     var keys: GcHashMapKeyIterator[HeapRoot]
 
-    mutating func next() -> (Cell*, usize)?:
+    func next() -> (Cell*, usize)?:
         while let possible_pointer = self.keys.next():
             if possible_pointer == 0:
                 continue

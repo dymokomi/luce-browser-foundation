@@ -87,11 +87,11 @@ test "std_lib_extras: swap, exchange, min, max, clamp":
 
 test "typed_transfer: overlapping source and destination, relocate":
     var actual: i32[6] = [1, 2, 3, 4, 5, 6]
-    discard(typed_transfer_copy(&actual[0], &actual[2], 4))
+    _ = typed_transfer_copy(&actual[0], &actual[2], 4)
     let expected_1: i32[6] = [3, 4, 5, 6, 5, 6]
     assert(actual == expected_1)
     actual = [1, 2, 3, 4, 5, 6]
-    discard(typed_transfer_copy(&actual[2], &actual[0], 4))
+    _ = typed_transfer_copy(&actual[2], &actual[0], 4)
     let expected_2: i32[6] = [1, 2, 1, 2, 3, 4]
     assert(actual == expected_2)
     var source: i32[4] = [10, 20, 30, 40]
@@ -104,7 +104,7 @@ test "typed_transfer: overlapping source and destination, relocate":
     assert(not typed_transfer_compare(&destination[0], &source[0], 4))
 
 func test_find_greater_than_five(context: void*?, value: const i32*) -> bool:
-    discard(context)
+    _ = context
     return *value > 5
 
 func test_find_equals(context: void*?, value: const i32*) -> bool:

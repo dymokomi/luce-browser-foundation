@@ -37,7 +37,7 @@ pub func intrusive_list_is_empty[T, TContainer](this: const IntrusiveList[T, TCo
 pub func intrusive_list_size_slow[T, TContainer](this: const IntrusiveList[T, TContainer]*) -> usize:
     var size: usize = 0
     for it in intrusive_list_begin_const(this):
-        discard(it)
+        _ = it
         size += 1
     return size
 
@@ -92,7 +92,7 @@ pub func intrusive_list_insert_before[T, TContainer](this: IntrusiveList[T, TCon
 
 ## Ported from AK/IntrusiveList.h:275 AK::Detail::IntrusiveList::remove.
 pub func intrusive_list_remove[T, TContainer](this: IntrusiveList[T, TContainer]*, n: T*, member: usize):
-    discard(this)
+    _ = this
     let nnode = intrusive_list_node_of[T, TContainer](n, member)
     if nnode.m_storage != none:
         intrusive_list_node_remove(nnode)

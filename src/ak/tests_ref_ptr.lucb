@@ -24,7 +24,7 @@ test "ref_ptr: basics":
     assert(ref_counted_base_ref_count(base) == 1)
     ref_counted_base_ref(base)
     assert(ref_counted_base_ref_count(base) == 2)
-    discard(ref_counted_unref(&object.ref_counted))
+    _ = ref_counted_unref(&object.ref_counted)
     assert(ref_counted_base_ref_count(base) == 1)
     # NonnullRefPtr another = *object;
     ref_if_not_null(base)

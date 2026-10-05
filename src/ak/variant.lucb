@@ -18,8 +18,8 @@ pub func index_of[T, TIndexType, TTs]() -> TIndexType:
 
 ## Ported from AK/Variant.h:135 AK::Detail::VariantConstructors::VariantConstructors<T, Base> (T&&).
 pub func variant_constructors_construct[T, TBase](this: VariantConstructors[T, TBase]*, t: T):
-    discard(this)
-    discard(t)
+    _ = this
+    _ = t
     trap("VERIFY_NOT_REACHED: a Variant is constructed by naming its generated enum case")
 
 ## Ported from AK/Variant.h:142 AK::Detail::VariantConstructors::VariantConstructors<T, Base> (T const&).

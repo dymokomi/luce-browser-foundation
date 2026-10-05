@@ -246,8 +246,8 @@ pub func i_pv6_address_from_string(string: StringView) -> IPv6Address?:
             return none
 
         assert(piece < 8)
-        addr[(usize)piece * sizeof(u16)] = (u8)(part >> 8)
-        addr[(usize)piece * sizeof(u16) + 1] = (u8)part
+        addr[(usize)piece * memory.size_of(u16)] = (u8)(part >> 8)
+        addr[(usize)piece * memory.size_of(u16) + 1] = (u8)part
         piece += 1
 
     var address = IPv6Address()
@@ -292,4 +292,4 @@ pub func i_pv6_address_loopback() -> IPv6Address:
 ## Ported from AK/IPv6Address.h:288 AK::IPv6Address::piece.
 func i_pv6_address_piece(this: const IPv6Address*, i: usize) -> u16:
     assert(i < 8)
-    return ((u16)this.m_data[i * sizeof(u16)] << 8) | (u16)this.m_data[i * sizeof(u16) + 1]
+    return ((u16)this.m_data[i * memory.size_of(u16)] << 8) | (u16)this.m_data[i * memory.size_of(u16) + 1]

@@ -78,7 +78,7 @@ pub func utf16_string_from_utf8_with_replacement_character(utf8_string: StringVi
             string_builder_append_code_point(&builder, unicode_utils_replacement_code_point)
         else:
             string_builder_append_code_point(&builder, code_point)
-        discard(utf8_code_point_iterator_inc(&it))
+        _ = utf8_code_point_iterator_inc(&it)
 
     return string_builder_to_utf16_string(&builder)
 
@@ -150,14 +150,14 @@ struct Utf16StringCodeUnits: Utf16CodeUnitCallback:
     var code_units: u16[2]
     var length_in_code_units: usize
 
-    mutating func call(code_unit: u16):
+    func call(code_unit: u16):
         self.code_units[self.length_in_code_units] = code_unit
         self.length_in_code_units += 1
 
 ## Ported from AK/Utf16String.h:117 AK::Utf16String::from_code_point.
 pub func utf16_string_from_code_point(code_point: u32) -> Utf16String:
     var code_units = Utf16StringCodeUnits()
-    discard(unicode_utils_code_point_to_utf16(code_point, &code_units))
+    _ = unicode_utils_code_point_to_utf16(code_point, &code_units)
 
     return utf16_string_from_utf16(utf16_view_from_utf16(code_units.code_units[..<code_units.length_in_code_units]))
 
@@ -194,7 +194,7 @@ pub func utf16_string_repeated(code_point: u32, count: usize) -> Utf16String:
         return utf16_string_from_short_ascii(bytes[..<count])
 
     var code_units = Utf16StringCodeUnits()
-    discard(unicode_utils_code_point_to_utf16(code_point, &code_units))
+    _ = unicode_utils_code_point_to_utf16(code_point, &code_units)
 
     var builder = string_builder_new_mode(StringBuilderMode.utf16)
     string_builder_append_repeated_utf16_view(&builder, utf16_view_from_utf16(code_units.code_units[..<code_units.length_in_code_units]), count)

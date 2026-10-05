@@ -18,7 +18,7 @@
 
 # ensure_child's default provider: `[] { return OptionalNone {}; }`.
 func trie_no_metadata[M](context: void*?) -> M?:
-    discard(context)
+    _ = context
     return none
 
 # insert's per-level provider: `[&] { return invoke_provide_missing_metadata(*last_root_node, it); }`.
@@ -29,7 +29,7 @@ struct TrieProvideMetadata[V, M, VT: Traits[V]]:
     var node: Trie2[V, M, VT]*
     var it: usize
 
-    static func call(context: void*?) -> M?:
+    func call(context: void*?) -> M?:
         let captures = (const TrieProvideMetadata[V, M, VT]*)(context else trap("Trie: no captures"))
         return function2_call(&captures.provide, captures.node, captures.it)
 
@@ -50,7 +50,7 @@ pub func trie2_construct[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, value: V, 
 # The storage of an Optional<MetadataType>: none, or a managed cell holding the metadata.
 func trie2_metadata_cell[M](metadata: M?) -> M*?:
     let value = metadata else return none
-    let cell = alloc M[1] else trap("out of memory")
+    let cell = new M[1] --- else trap("out of memory")
     cell[0] = value
     return cell.data
 
@@ -118,7 +118,7 @@ pub func trie2_ensure_child[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*, value: 
     let missing_metadata = function0_call(&metadata_if_missing)
     let node = new Trie2[V, M, VT](m_value = value, m_metadata = trie2_metadata_cell(missing_metadata), m_children = HashMap[V, Trie2[V, M, VT]*, VT]()) catch:
         return try ak_error_throw(ak_error_from_errno(enomem))
-    discard(try hash_map_try_set(&this.m_children, value, node))
+    _ = try hash_map_try_set(&this.m_children, value, node)
     return node
 
 # ensure_child with the donor's default provider (no metadata).
@@ -192,11 +192,11 @@ pub func trie2_deep_copy[V, M, VT: Traits[V]](this: Trie2[V, M, VT]*) -> Trie2[V
     var root = Trie2[V, M, VT](m_value = this.m_value, m_metadata = trie2_metadata_cell(try trie2_copy_metadata[V, M, VT](trie2_metadata(this))), m_children = HashMap[V, Trie2[V, M, VT]*, VT]())
     for it in hash_map_begin(&this.m_children):
         let copy = try trie2_deep_copy(it.value)
-        let cell = alloc Trie2[V, M, VT][1] catch:
+        let cell = new Trie2[V, M, VT][1] --- catch:
             return try ak_error_throw(ak_error_from_errno(enomem))
         cell[0] = copy
         let child = cell.data
-        discard(try hash_map_try_set(&root.m_children, it.key, child))
+        _ = try hash_map_try_set(&root.m_children, it.key, child)
     return root
 
 ## Ported from AK/Trie.h:234 AK::Detail::Trie::copy_metadata.
@@ -220,7 +220,7 @@ pub func trie2_skip_to_next_iterator[V, M, VT: Traits[V]](state: Vector[TrieStat
 
 ## Ported from AK/Trie.h:262 AK::Detail::Trie::pop_and_get_next_iterator.
 pub func trie2_pop_and_get_next_iterator[V, M, VT: Traits[V]](state: Vector[TrieState[V, M, VT]]*, current_node: (const Trie2[V, M, VT]*?)*) -> !:
-    discard(vector_take_last(state))
+    _ = vector_take_last(state)
     if vector_is_empty(state):
         *current_node = none
         return

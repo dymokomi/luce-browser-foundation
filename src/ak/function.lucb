@@ -48,20 +48,20 @@ pub func block_size(arg0: const void*?) -> usize:
 
 ## Ported from AK/Function.h:206 AK::Function::CallableWrapperBase::call (virtual).
 pub func callable_wrapper_base_call_impl(this: CallableWrapperBase*, arg0: void*?) -> void*?:
-    discard(this)
-    discard(arg0)
+    _ = this
+    _ = arg0
     trap("pure virtual: AK::Function::CallableWrapperBase::call")
 
 ## Ported from AK/Function.h:207 AK::Function::CallableWrapperBase::init_and_swap (virtual).
 pub func callable_wrapper_base_init_and_swap_impl(this: CallableWrapperBase*, arg0: u8*?, arg1: usize):
-    discard(this)
-    discard(arg0)
-    discard(arg1)
+    _ = this
+    _ = arg0
+    _ = arg1
     trap("pure virtual: AK::Function::CallableWrapperBase::init_and_swap")
 
 ## Ported from AK/Function.h:208 AK::Function::CallableWrapperBase::raw_callable (virtual).
 pub func callable_wrapper_base_raw_callable_impl(this: CallableWrapperBase*) -> const void*?:
-    discard(this)
+    _ = this
     trap("pure virtual: AK::Function::CallableWrapperBase::raw_callable")
 
 ## Ported from AK/Function.h:217 AK::Function::CallableWrapper::CallableWrapper<CallableType>.
@@ -71,7 +71,7 @@ pub func callable_wrapper_construct[TCallableType](this: CallableWrapper[TCallab
 ## Ported from AK/Function.h:238 AK::Function::CallableWrapper::init_and_swap.
 # NOLINTNEXTLINE(readability-non-const-parameter) False positive; destination is used in a placement new expression
 pub func callable_wrapper_init_and_swap[TCallableType](this: CallableWrapper[TCallableType]*, destination: u8*?, size: usize):
-    assert(size >= sizeof(CallableWrapper[TCallableType]))
+    assert(size >= memory.size_of(CallableWrapper[TCallableType]))
     let target = (CallableWrapper[TCallableType]*)(destination else trap("init_and_swap: null destination"))
     *target = *this
 

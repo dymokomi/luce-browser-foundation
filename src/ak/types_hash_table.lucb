@@ -47,7 +47,7 @@ pub struct HashTableIterator[T]: luce.Iterable[T*, HashTableIterator[T]], luce.I
 
     pub func iterator() -> HashTableIterator[T]: return self
 
-    pub mutating func next() -> T*?: return hash_table_iterator_next(&self)
+    pub func next() -> T*?: return hash_table_iterator_next(&self)
 
 # mark: OrderedHashTableIterator ================================================================
 
@@ -65,7 +65,7 @@ pub struct ReverseOrderedHashTableIterator[T]: luce.Iterable[T*, ReverseOrderedH
 
     pub func iterator() -> ReverseOrderedHashTableIterator[T]: return self
 
-    pub mutating func next() -> T*?: return reverse_ordered_hash_table_iterator_next(&self)
+    pub func next() -> T*?: return reverse_ordered_hash_table_iterator_next(&self)
 
 ## AK::HashTable::LookupForWritingResult (AK/HashTable.h:700).
 pub struct LookupForWritingResult[T]:

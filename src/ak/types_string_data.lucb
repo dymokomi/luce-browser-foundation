@@ -11,7 +11,7 @@
 
 ## AK::Detail::MAX_SHORT_STRING_BYTE_COUNT (AK/StringData.h:17).
 # C++ initializer: sizeof ( StringData * ) - sizeof ( u8 )
-pub let max_short_string_byte_count: usize = sizeof(StringData*) - sizeof(u8)
+pub let max_short_string_byte_count: usize = memory.size_of(StringData*) - memory.size_of(u8)
 
 # mark: StringData ==============================================================================
 

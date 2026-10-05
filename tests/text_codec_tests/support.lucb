@@ -83,7 +83,7 @@ struct CodePoints:
     var items: u32[64]
     var count: usize
 
-    mutating func append(code_point: u32):
+    func append(code_point: u32):
         self.items[self.count] = code_point
         self.count += 1
 

@@ -60,7 +60,7 @@ func t16_expect_code_points(view: Utf16View, expected: const u32[]):
     while not utf16_code_point_iterator_done(&it):
         assert(utf16_code_point_iterator_deref(&it) == expected[i])
         i += 1
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
     assert(i == expected.length)
 
 ## Checks that `view.to_utf8(allow)` equals `expected`.
@@ -72,9 +72,9 @@ func t16_to_utf8_is(view: Utf16View, allow: AllowLonelySurrogates, expected: con
 ## Whether `view.to_utf8(allow)` fails.
 func t16_to_utf8_fails(view: Utf16View, allow: AllowLonelySurrogates) -> bool:
     var failed = false
-    discard(utf16_view_to_utf8(&view, allow) catch:
+    _ = utf16_view_to_utf8(&view, allow) catch:
         failed = true
-        recover string_new())
+        recover string_new()
     return failed
 
 # mark: Decoding ================================================================================

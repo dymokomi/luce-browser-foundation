@@ -46,7 +46,7 @@ test "iterator_offset":
     while not utf16_code_point_iterator_done(&it):
         assert(utf16_view_iterator_offset(&view, &it) == expected_offset)
         expected_offset += utf16_code_point_iterator_length_in_code_units(&it)
-        discard(utf16_code_point_iterator_inc(&it))
+        _ = utf16_code_point_iterator_inc(&it)
 
     let end = utf16_view_end(&view)
     assert(utf16_view_iterator_offset(&view, &end) == utf16_view_length_in_code_units(&view))

@@ -195,7 +195,7 @@ func formatter_integral_format(this: StandardFormatter*, builder: FormatBuilder*
 
         this.m_mode = StandardFormatterMode.hexadecimal
         this.m_alternative_form = true
-        this.m_width = (u64)(2 * sizeof(void*))
+        this.m_width = (u64)(2 * memory.size_of(void*))
         this.m_zero_pad = true
 
     var base_: u8 = 0

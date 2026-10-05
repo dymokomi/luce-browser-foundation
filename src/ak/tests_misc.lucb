@@ -15,7 +15,7 @@ test "random: csprng_generates_unique_values":
     let max_failures: usize = 3
     var failures: usize = 0
     for i in 0..<3:
-        discard(i)
+        _ = i
         var first_buffer: u8[800]
         var second_buffer: u8[800]
         fill_with_random(first_buffer)
@@ -184,7 +184,7 @@ test "id_allocator: unique ids at or above the minimum":
     id_allocator_construct(&allocator, 100)
     var ids: HashTable[i32, I32Traits]
     for i in 0..<50:
-        discard(i)
+        _ = i
         let id = id_allocator_allocate(&allocator)
         assert(id >= 100)
         assert(hash_table_set(&ids, id) == HashSetResult.inserted_new_entry)

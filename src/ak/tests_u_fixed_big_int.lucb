@@ -133,9 +133,9 @@ test "u_fixed_big_int: bit utilities, comparisons and increments":
     let y = u_fixed_big_int_bit_not(&x)
     assert(y.m_data[0] == 0xffffffffffffff0f and y.m_data[1] == 0xfffffffffffffffe)
     var max_ = U128(m_data = [u64_max, u64_max])
-    discard(u_fixed_big_int_inc(&max_))
+    _ = u_fixed_big_int_inc(&max_)
     assert(u_fixed_big_int_is_zero_constant_time(&max_))
-    discard(u_fixed_big_int_dec(&max_))
+    _ = u_fixed_big_int_dec(&max_)
     assert(max_.m_data[0] == u64_max and max_.m_data[1] == u64_max)
     let old = u_fixed_big_int_inc_i32(&x, 0)
     assert(old.m_data[0] == 0xf0 and x.m_data[0] == 0xf1)
@@ -144,9 +144,9 @@ test "u_fixed_big_int: bit utilities, comparisons and increments":
     assert(carry and u_fixed_big_int_eq_integer_wrapper(&sum, integer_wrapper(1)))
     assert(cmp_opaque(5u64, x) < 0 and cmp_integer_wrapper(integer_wrapper(7), x) < 0)
     assert(u_fixed_big_int_is_equal_to_constant_time(&x, x))
-    discard(u_fixed_big_int_or_assign_integer_wrapper(&x, integer_wrapper(0x100)))
+    _ = u_fixed_big_int_or_assign_integer_wrapper(&x, integer_wrapper(0x100))
     assert(x.m_data[0] == 0x1f1)
-    discard(u_fixed_big_int_rem_assign_u(&x, 10u64))
+    _ = u_fixed_big_int_rem_assign_u(&x, 10u64)
     # (2^64 + 0x1f1) % 10 == (6 + 497) % 10
     assert(x.m_data[0] == 3 and x.m_data[1] == 0)
 

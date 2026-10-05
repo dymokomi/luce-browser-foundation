@@ -17,7 +17,7 @@ func text_of(string: ak.String) -> str:
     # A short String keeps its bytes inline, in this frame's copy: copy them out.
     let view = ak.string_bytes_as_string_view(&string)
     let bytes = ak.string_view_bytes(&view)
-    let copy = alloc u8[bytes.length] else trap("out of memory")
+    let copy = new u8[bytes.length] --- else trap("out of memory")
     for i in 0..<bytes.length:
         copy[i] = bytes[i]
     return (str)copy

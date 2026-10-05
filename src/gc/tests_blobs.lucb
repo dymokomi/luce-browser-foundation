@@ -27,7 +27,7 @@ func live_blob_count(heap: Heap*) -> usize:
 
 ## A blob of `size` bytes nothing refers to once this returns.
 noinline func make_garbage_blob(heap: Heap*, size: usize, atomic: bool):
-    discard(heap_allocate_blob(heap, size, 16, atomic) else trap("no blob"))
+    _ = heap_allocate_blob(heap, size, 16, atomic) else trap("no blob")
 
 test "new and alloc under `with heap` make zeroed blobs in the size classes":
     clobber_stack()
@@ -43,7 +43,7 @@ noinline func run_allocator_conformance():
     with view:
         let pair = new Pair(first = 7, second = none) else trap("no pair")
         let bytes = new u8[100] else trap("no bytes")
-        let raw = alloc(40, 16) else trap("no raw")
+        let raw = memory.allocate(40, 16) else trap("no raw")
         let empty = new u8[0] else trap("no empty")
         assert(pair.first == 7)
         for b in bytes:
@@ -206,7 +206,7 @@ func large_test_cell_visit_edges_impl(this: Cell*, visitor: CellVisitor*):
 
 ## A large cell with a child, nothing referring to either once this returns but the weaks.
 noinline func make_large_cell(heap: Heap*, weak_child: Weak[TestCell]*) -> Weak[LargeTestCell]:
-    let cell = (LargeTestCell*)heap_allocate_cell_of_size(heap, sizeof(LargeTestCell), &test_cell_allocator.allocator)
+    let cell = (LargeTestCell*)heap_allocate_cell_of_size(heap, memory.size_of(LargeTestCell), &test_cell_allocator.allocator)
     cell.cell_base.vtable = &large_test_cell_vtable
     cell.id = 1000
     let child = new_test_cell(heap, 1)

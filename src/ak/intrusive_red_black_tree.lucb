@@ -101,7 +101,7 @@ pub func base_iterator_construct[K, V, TContainer](this: BaseIterator[K, V, TCon
 ## protocol over `*it` and `++it`).
 pub func base_iterator_next[K, V, TContainer](this: BaseIterator[K, V, TContainer]*) -> V*?:
     let node = this.m_node else return none
-    discard(base_iterator_inc(this))
+    _ = base_iterator_inc(this)
     return intrusive_red_black_tree_node_to_value(node, this.m_member)
 
 # mark: Iteration and removal ===================================================================

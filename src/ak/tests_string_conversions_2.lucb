@@ -10,6 +10,8 @@
 #
 #==============================================================================================
 
+from strings import format
+
 ## `parse_number<double>` of `text` over a StringView and over UTF-16 storage; both must agree.
 func test_parse_complete_double(text: str) -> f64?:
     with memory.heap:

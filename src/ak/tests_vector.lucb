@@ -23,7 +23,7 @@ func test_vector_equals(context: void*?, value: const i32*) -> bool:
     return *value == captures.limit
 
 func test_vector_always(context: void*?, value: const i32*) -> bool:
-    discard(value)
+    _ = value
     return context != none
 
 func test_vector_make(values: const i32[]) -> Vector[i32]:
@@ -32,7 +32,7 @@ func test_vector_make(values: const i32[]) -> Vector[i32]:
     return v
 
 func test_vector_is_even(context: void*?, value: const i32*) -> bool:
-    discard(context)
+    _ = context
     return *value % 2 == 0
 
 test "vector: construct":
@@ -80,7 +80,7 @@ test "vector: strings_insert_ordered":
     assert(*vector_at(&strings, 3) == "ghi")
 
 func test_vector_after_f_g(context: void*?, entry: const str*) -> bool:
-    discard(context)
+    _ = context
     return "f-g".compare(*entry) < 0
 
 test "vector: prepend_vector":
@@ -150,7 +150,7 @@ test "vector: grow_and_clear":
     assert(vector_size(&strings) == 0)
     assert(vector_capacity(&strings) == 0)
     for i in 0..<32:
-        discard(i)
+        _ = i
         vector_append_t(&strings, "y")
     vector_clear_with_capacity(&strings)
     assert(vector_size(&strings) == 0)
@@ -181,10 +181,10 @@ test "vector: vector_remove":
     vector_remove(&ints, 0)
     assert(vector_size(&ints) == 3)
     assert(*vector_at(&ints, 0) == 3)
-    discard(vector_take_last(&ints))
+    _ = vector_take_last(&ints)
     assert(vector_size(&ints) == 2)
     assert(*vector_at(&ints, 1) == 4)
-    discard(vector_take_first(&ints))
+    _ = vector_take_first(&ints)
     assert(vector_size(&ints) == 1)
     assert(*vector_at(&ints, 0) == 4)
     var more = test_vector_make([1, 2, 3, 4, 5, 6])
@@ -248,7 +248,7 @@ test "vector: should_compare_vectors":
     vector_append_t(&a, 42)
     vector_append_t(&b, 17)
     assert(not vector_eq(&a, &b))
-    discard(vector_take_last(&a))
+    _ = vector_take_last(&a)
     assert(not vector_eq(&a, &b))
 
 test "vector: should_find":
@@ -312,7 +312,7 @@ test "vector: rbegin, rend and reverse loops":
     while simple_reverse_iterator_ne(&rev, vector_rend(&w)):
         assert(simple_reverse_iterator_deref_const(&rev) == index)
         index -= 1
-        discard(simple_reverse_iterator_inc(&rev))
+        _ = simple_reverse_iterator_inc(&rev)
     assert(index == -1)
     let wrapper = vector_in_reverse(&w)
     var item = reverse_wrapper_begin[i32, Vector[i32]](wrapper)
@@ -320,7 +320,7 @@ test "vector: rbegin, rend and reverse loops":
     while simple_reverse_iterator_ne(&item, reverse_wrapper_end[Vector[i32], i32](wrapper)):
         assert(*simple_reverse_iterator_deref(&item) == index)
         index -= 1
-        discard(simple_reverse_iterator_inc(&item))
+        _ = simple_reverse_iterator_inc(&item)
     assert(index == -1)
 
 test "vector: remove_all":

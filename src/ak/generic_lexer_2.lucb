@@ -179,8 +179,8 @@ pub func utf16_generic_lexer_consume_line(this: GenericLexer[u16]*) -> Utf16View
         this.m_index += 1
 
     let length = this.m_index - start
-    discard(utf16_generic_lexer_consume_specific_u8(this, '\r'))
-    discard(utf16_generic_lexer_consume_specific_u8(this, '\n'))
+    _ = utf16_generic_lexer_consume_specific_u8(this, '\r')
+    _ = utf16_generic_lexer_consume_specific_u8(this, '\n')
 
     return utf16_view_substring_view_usize(&this.m_utf16_input, start, length)
 

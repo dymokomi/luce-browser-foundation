@@ -187,8 +187,8 @@ pub func generic_lexer_consume_line(this: GenericLexer[u8]*) -> StringView:
         this.m_index += 1
 
     let length = this.m_index - start
-    discard(generic_lexer_consume_specific_t_char_type(this, '\r'))
-    discard(generic_lexer_consume_specific_t_char_type(this, '\n'))
+    _ = generic_lexer_consume_specific_t_char_type(this, '\r')
+    _ = generic_lexer_consume_specific_t_char_type(this, '\n')
 
     return string_view_substring_view_usize(&this.m_input, start, length)
 

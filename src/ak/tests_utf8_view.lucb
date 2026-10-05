@@ -26,7 +26,7 @@ func tc_check_decoding(raw: const u8[], expected_characters: const u32[], expect
         assert(utf8_code_point_iterator_deref(&it) == expected_characters[i])
         assert(tc_bytes_equal(utf8_code_point_iterator_underlying_code_point_bytes(&it), expected_underlying_bytes[i]))
         i += 1
-        discard(utf8_code_point_iterator_inc(&it))
+        _ = utf8_code_point_iterator_inc(&it)
     assert(i == expected_characters.length)
 
 test "decode_ascii":
@@ -41,7 +41,7 @@ test "decode_ascii":
         assert(i < expected.length)
         assert(utf8_code_point_iterator_deref(&it) == expected[i])
         i += 1
-        discard(utf8_code_point_iterator_inc(&it))
+        _ = utf8_code_point_iterator_inc(&it)
     assert(i == expected.length)
 
 test "decode_utf8":
@@ -60,7 +60,7 @@ test "decode_utf8":
         assert(utf8_code_point_iterator_deref(&it) == expected[i])
         assert(tc_bytes_equal(utf8_code_point_iterator_underlying_code_point_bytes(&it), expected_underlying_bytes[i].bytes))
         i += 1
-        discard(utf8_code_point_iterator_inc(&it))
+        _ = utf8_code_point_iterator_inc(&it)
     assert(i == expected.length)
 
 test "null_view":
@@ -151,20 +151,20 @@ test "iterate_utf8":
     assert(utf8_code_point_iterator_peek(&iterator, 24) == 0xa755)
     assert(utf8_code_point_iterator_peek(&iterator, 25) == none)
 
-    discard(utf8_code_point_iterator_inc(&iterator))
+    _ = utf8_code_point_iterator_inc(&iterator)
 
     assert(utf8_code_point_iterator_deref(&iterator) == (u32)'o')
     assert(utf8_code_point_iterator_peek(&iterator, 23) == 0xa755)
 
     for _i in 0..<23:
-        discard(utf8_code_point_iterator_inc(&iterator))
+        _ = utf8_code_point_iterator_inc(&iterator)
 
     assert(not utf8_code_point_iterator_done(&iterator))
     assert(utf8_code_point_iterator_deref(&iterator) == 0xa755)
     assert(utf8_code_point_iterator_peek(&iterator) == 0xa755)
     assert(utf8_code_point_iterator_peek(&iterator, 1) == none)
 
-    discard(utf8_code_point_iterator_inc(&iterator))
+    _ = utf8_code_point_iterator_inc(&iterator)
 
     assert(utf8_code_point_iterator_done(&iterator))
     assert(utf8_code_point_iterator_peek(&iterator, 0) == none)
@@ -225,7 +225,7 @@ struct TcGatherParts: Utf8ViewCallback:
     var parts: StringView[10]
     var count: usize
 
-    mutating func call(part: Utf8View):
+    func call(part: Utf8View):
         self.parts[self.count] = utf8_view_as_string(&part)
         self.count += 1
 

@@ -37,7 +37,7 @@ test "an interior pointer on the stack keeps its cell":
 noinline func run_interior_pointer_survives():
     let heap = create_test_heap()
     let weak = make_unreferenced_cell(heap, 1)
-    let inner = interior_address(&weak, sizeof(TestCell) - 8)
+    let inner = interior_address(&weak, memory.size_of(TestCell) - 8)
     clobber_stack()
     heap_collect_garbage(heap)
     assert(alive(&weak))
@@ -71,7 +71,7 @@ noinline func run_stray_addresses():
     let weak = make_unreferenced_cell(heap, 1)
     # the next cell of the block has not been handed out yet (the lazy freelist), and the block
     # header holds no cell
-    let past = interior_address(&weak, sizeof(TestCell) + 8) + test_cell_allocator.allocator.m_cell_size
+    let past = interior_address(&weak, memory.size_of(TestCell) + 8) + test_cell_allocator.allocator.m_cell_size
     let header = interior_address(&weak, 0) & ~(heap_block_base_block_size - 1)
     clobber_stack()
     heap_collect_garbage(heap)

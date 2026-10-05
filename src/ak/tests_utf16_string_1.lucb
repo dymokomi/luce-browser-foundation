@@ -162,7 +162,7 @@ struct T16CodeUnits: Utf16CodeUnitCallback:
     var units: u16[2]
     var count: usize
 
-    mutating func call(code_unit: u16):
+    func call(code_unit: u16):
         self.units[self.count] = code_unit
         self.count += 1
 
@@ -185,7 +185,7 @@ test "from_code_point":
             assert(utf16_string_base_code_point_at(&string.utf16_string_base, 0) == code_point)
 
             var units = T16CodeUnits()
-            discard(unicode_utils_code_point_to_utf16(code_point, &units))
+            _ = unicode_utils_code_point_to_utf16(code_point, &units)
             assert(units.count == 2)
             for i in 0..<units.count:
                 assert(utf16_string_base_code_unit_at(&string.utf16_string_base, i) == units.units[i])
@@ -258,9 +258,9 @@ func t16_from_ipc_stream(bytes: const u8[], length_in_code_units: usize, is_asci
 ## Whether from_ipc_stream fails.
 func t16_from_ipc_stream_fails(bytes: const u8[], length_in_code_units: usize, is_ascii_: bool) -> bool:
     var failed = false
-    discard(t16_from_ipc_stream(bytes, length_in_code_units, is_ascii_) catch:
+    _ = t16_from_ipc_stream(bytes, length_in_code_units, is_ascii_) catch:
         failed = true
-        recover utf16_string_new())
+        recover utf16_string_new()
     return failed
 
 ## The bytes of a UTF-16 builder holding `view` (`builder.to_byte_buffer()`).

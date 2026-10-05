@@ -22,7 +22,7 @@ pub struct EnumeratorCursor[T, TContainer: IndexedContainer[T]]: luce.Iterable[E
 
     pub func iterator() -> EnumeratorCursor[T, TContainer]: return self
 
-    pub mutating func next() -> EnumeratorItem[T]?: return enumerator_cursor_next(&self)
+    pub func next() -> EnumeratorItem[T]?: return enumerator_cursor_next(&self)
 
 ## Enumerator::Iterator::operator* and operator++: the current pair, and the cursor advanced;
 ## none past the end.

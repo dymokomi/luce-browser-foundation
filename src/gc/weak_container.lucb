@@ -31,4 +31,4 @@ pub func weak_container_deregister(this: WeakContainer*):
 
 ## The WeakContainer whose m_list_node is `node` (IntrusiveList's container_of).
 func weak_container_from_list_node(node: ListNode*) -> WeakContainer*:
-    return (WeakContainer*)((u8*)node - offsetof(WeakContainer, m_list_node))
+    return (WeakContainer*)((u8*)node - memory.offset_of(WeakContainer, m_list_node))

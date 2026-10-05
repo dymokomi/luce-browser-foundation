@@ -44,7 +44,7 @@ pub func gc_vector_ensure_capacity[T](this: GcVector[T]*, capacity: usize):
     var new_capacity = this.m_capacity * 2 if this.m_capacity > 0 else 8
     if new_capacity < capacity:
         new_capacity = capacity
-    let fresh = (alloc T[new_capacity] in memory.heap) else trap("out of memory")
+    let fresh = (new T[new_capacity] --- in memory.heap) else trap("out of memory")
     if let old = this.m_data:
         memory.copy(fresh, T[](old, this.m_size), this.m_size)
         free(T[](old, this.m_capacity)) in memory.heap
@@ -147,7 +147,7 @@ pub func gc_hash_map_ensure_capacity[V](this: GcHashMap[V]*, capacity: usize):
     let old_values = this.m_values
     let old_capacity = this.m_capacity
     let keys = (new usize[new_capacity] in memory.heap) else trap("out of memory")
-    let values = (alloc V[new_capacity] in memory.heap) else trap("out of memory")
+    let values = (new V[new_capacity] --- in memory.heap) else trap("out of memory")
     this.m_keys = keys.data
     this.m_values = values.data
     this.m_capacity = new_capacity
@@ -239,7 +239,7 @@ pub struct GcHashMapKeyIterator[V]: luce.Iterator[usize]:
     pub var map: const GcHashMap[V]*
     pub var index: usize
 
-    mutating func next() -> usize?:
+    func next() -> usize?:
         let keys = self.map.m_keys else return none
         while self.index < self.map.m_capacity:
             let key = keys[self.index]
@@ -329,7 +329,7 @@ pub struct ListNodes: luce.Iterable[ListNode*, ListNodeIterator]:
 pub struct ListNodeIterator: luce.Iterator[ListNode*]:
     pub var next_node: ListNode*?
 
-    mutating func next() -> ListNode*?:
+    func next() -> ListNode*?:
         let node = self.next_node else return none
         self.next_node = node.m_next
         return node

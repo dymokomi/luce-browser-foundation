@@ -38,7 +38,7 @@ pub func conservative_vector_base_possible_values(this: ConservativeVectorBase*)
 pub let conservative_vector_base_vtable: ConservativeVectorBaseVTable = ConservativeVectorBaseVTable(class_info = &conservative_vector_base_class)
 
 ## Class information of GC::ConservativeVectorBase: name, class-id range (pre-order), size, vtable.
-pub let conservative_vector_base_class: ak.ClassInfo = ak.ClassInfo(name = "ConservativeVectorBase", first_id = 0, last_id = 0, size = sizeof(ConservativeVectorBase), vtable = (const void*)&conservative_vector_base_vtable)
+pub let conservative_vector_base_class: ak.ClassInfo = ak.ClassInfo(name = "ConservativeVectorBase", first_id = 0, last_id = 0, size = memory.size_of(ConservativeVectorBase), vtable = (const void*)&conservative_vector_base_vtable)
 
 ## is<GC::ConservativeVectorBase>: the class-id range test.
 pub func is_conservative_vector_base[P: IsConservativeVectorBase](p: P*) -> bool:

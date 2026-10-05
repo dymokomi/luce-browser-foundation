@@ -67,7 +67,7 @@ pub func red_black_tree_iterator_construct[K, V](this: RedBlackTreeIterator[K, V
 ## protocol over `*it` and `++it`).
 pub func red_black_tree_iterator_next[K, V](this: RedBlackTreeIterator[K, V]*) -> V*?:
     let node = this.m_node else return none
-    discard(red_black_tree_iterator_inc(this))
+    _ = red_black_tree_iterator_inc(this)
     return &node.value
 
 # mark: RedBlackTree ============================================================================
@@ -113,7 +113,7 @@ pub func red_black_tree_begin[K, V](this: RedBlackTree[K, V]*) -> RedBlackTreeIt
 
 ## Ported from AK/RedBlackTree.h:505 AK::RedBlackTree::end.
 pub func red_black_tree_end[K, V](this: RedBlackTree[K, V]*) -> RedBlackTreeIterator[K, V]:
-    discard(this)
+    _ = this
     return RedBlackTreeIterator[K, V](m_node = none, m_prev = none)
 
 ## Ported from AK/RedBlackTree.h:506 AK::RedBlackTree::begin_from.

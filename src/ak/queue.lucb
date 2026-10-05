@@ -14,7 +14,7 @@ let queue_segment_size: usize = 1000
 
 # offsetof(QueueSegment<T>, node): the IntrusiveList's `member` (intrusive_list.lucb).
 func queue_segment_member[T]() -> usize:
-    return offsetof(QueueSegment[T], node)
+    return memory.offset_of(QueueSegment[T], node)
 
 ## Ported from AK/Queue.h:26 AK::Queue::size.
 pub func queue_size[T](this: const Queue[T]*) -> usize:

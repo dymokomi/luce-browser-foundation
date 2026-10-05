@@ -36,12 +36,12 @@ extern func FormatMessageA(flags: u32, source: const void*?, message_id: u32, la
 pub struct SFileWriter: io.Writer:
     pub var file: SFile*?
 
-    pub mutating func write(bytes: const u8[]) -> usize!:
+    pub func write(bytes: const u8[]) -> usize!:
         return fwrite((const void*?)bytes.data, 1, bytes.length, self.file)
 
 ## Writes `text` to standard error, ignoring a failed write (`write(STDERR_FILENO, ...)`).
 func write_to_stderr(text: StringView):
-    discard(io.stderr().write(string_view_bytes(&text)) else 0)
+    _ = io.stderr().write(string_view_bytes(&text)) else 0
 
 ## The length of the NUL-terminated text at `text` (strlen).
 func c_string_length(text: const u8*) -> usize:
@@ -153,7 +153,7 @@ func process_name_for_logging() -> StringView:
         lexical_path_construct(&path, process_name_helper())
         process_name_retrieved = true
         let title = lexical_path_title(&path)
-        discard(string_view_copy_characters_to_buffer(&title, process_name_buf))
+        _ = string_view_copy_characters_to_buffer(&title, process_name_buf)
         string_view_construct_span_u8(&process_name, process_name_buf[0..<c_string_length(&process_name_buf[0])])
     return process_name
 
@@ -180,7 +180,7 @@ func current_thread_id() -> u64:
         return (u64)GetCurrentThreadId()
     else:
         var thread_id: u64 = 0
-        discard(pthread_threadid_np(none, &thread_id))
+        _ = pthread_threadid_np(none, &thread_id)
         return thread_id
 
 # mark: vdbg ====================================================================================
@@ -239,34 +239,34 @@ pub func vdbg(fmtstr: StringView, params: TypeErasedFormatParams*, newline: bool
 ## Ported from AK/Format.h:618 AK::out(FILE*, ...): writes `message` to `file`.
 pub func out_s_file(file: SFile*?, message: fmt):
     var writer = SFileWriter(file = file)
-    discard(writer.write(message) else 0)
+    _ = writer.write(message) else 0
 
 ## Ported from AK/Format.h:625 AK::outln(FILE*, ...) and AK/Format.h:636 AK::outln(FILE*):
 ## writes `message` and a newline to `file`.
 pub func outln_s_file(file: SFile*?, message: fmt = ""):
     var writer = SFileWriter(file = file)
-    discard(writer.write(message) else 0)
-    discard(writer.write(b"\n") else 0)
+    _ = writer.write(message) else 0
+    _ = writer.write(b"\n") else 0
 
 ## Ported from AK/Format.h:639 AK::out: writes `message` to standard output.
 pub func out(message: fmt):
-    discard(io.stdout().write(message) else 0)
+    _ = io.stdout().write(message) else 0
 
 ## Ported from AK/Format.h:645 AK::outln and AK/Format.h:648 AK::outln(): writes `message` and a
 ## newline to standard output.
 pub func outln(message: fmt = ""):
-    discard(io.stdout().write(message) else 0)
-    discard(io.stdout().write(b"\n") else 0)
+    _ = io.stdout().write(message) else 0
+    _ = io.stdout().write(b"\n") else 0
 
 ## Ported from AK/Format.h:651 AK::warn: writes `message` to standard error.
 pub func warn(message: fmt):
-    discard(io.stderr().write(message) else 0)
+    _ = io.stderr().write(message) else 0
 
 ## Ported from AK/Format.h:656 AK::warnln and AK/Format.h:659 AK::warnln(): writes `message` and a
 ## newline to standard error.
 pub func warnln(message: fmt = ""):
-    discard(io.stderr().write(message) else 0)
-    discard(io.stderr().write(b"\n") else 0)
+    _ = io.stderr().write(message) else 0
+    _ = io.stderr().write(b"\n") else 0
 
 ## Ported from AK/Format.h:735 AK::dbg: a debug message (see vdbg) without a newline.
 pub func dbg(message: fmt):
@@ -277,7 +277,7 @@ pub func dbg(message: fmt):
     if is_rich_debug_enabled:
         vdbg_append_rich_prefix(&builder)
     write_to_stderr(string_builder_string_view(&builder))
-    discard(io.stderr().write(message) else 0)
+    _ = io.stderr().write(message) else 0
 
 ## Ported from AK/Format.h:741 AK::dbgln and AK/Format.h:743 AK::dbgln(): a debug message (see
 ## vdbg) and a newline.
@@ -289,5 +289,5 @@ pub func dbgln(message: fmt = ""):
     if is_rich_debug_enabled:
         vdbg_append_rich_prefix(&builder)
     write_to_stderr(string_builder_string_view(&builder))
-    discard(io.stderr().write(message) else 0)
-    discard(io.stderr().write(b"\n") else 0)
+    _ = io.stderr().write(message) else 0
+    _ = io.stderr().write(b"\n") else 0

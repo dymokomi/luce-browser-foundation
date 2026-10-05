@@ -56,18 +56,18 @@ struct TestCollisionStrTraits: Traits[str]:
     func equals(a: const str*, b: const str*) -> bool: return *a == *b
 
 func test_zero_hash(key: str) -> u32:
-    discard(key)
+    _ = key
     return 0
 
 # ByteString::number(i) for the tests' keys: the decimal text of `i` in a table of spellings.
 let test_number_texts: str[16] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]
 
 func test_int_greater_than_two(context: void*?, value: const i32*) -> bool:
-    discard(context)
+    _ = context
     return *value > 2
 
 func test_int_bool(context: void*?, value: const i32*) -> bool:
-    discard(value)
+    _ = value
     return context != none
 
 type IntTable = HashTable[i32, I32Traits]
@@ -82,14 +82,14 @@ test "hash_table: construct":
 
 test "hash_table: basic_move and move_is_not_swap":
     var foo: IntTable
-    discard(hash_table_set(&foo, 1))
+    _ = hash_table_set(&foo, 1)
     assert(hash_table_size(&foo) == 1)
     var bar = foo
     foo = IntTable()
     assert(hash_table_size(&bar) == 1)
     assert(hash_table_size(&foo) == 0)
     var baz: IntTable
-    discard(hash_table_set(&baz, 2))
+    _ = hash_table_set(&baz, 2)
     foo = baz
     baz = IntTable()
     assert(hash_table_contains_t(&foo, 2))
@@ -133,7 +133,7 @@ test "hash_table: range_loop_reverse":
 test "hash_table: remove_all_matching and take_all_matching":
     var ints: IntTable
     for i: i32 in 1..=4:
-        discard(hash_table_set(&ints, i))
+        _ = hash_table_set(&ints, i)
     assert(hash_table_size(&ints) == 4)
     assert(hash_table_remove_all_matching(&ints, Function1[const i32*, bool](call = test_int_greater_than_two, context = none)))
     assert(not hash_table_remove_all_matching(&ints, Function1[const i32*, bool](call = test_int_bool, context = none)))
@@ -146,7 +146,7 @@ test "hash_table: remove_all_matching and take_all_matching":
     assert(not hash_table_remove_all_matching(&ints, Function1[const i32*, bool](call = test_int_bool, context = &yes)))
 
     for i: i32 in 1..=4:
-        discard(hash_table_set(&ints, i))
+        _ = hash_table_set(&ints, i)
     let first_values = hash_table_take_all_matching(&ints, Function1[const i32*, bool](call = test_int_greater_than_two, context = none))
     assert(vector_size(&first_values) == 2)
     assert(vector_contains_slow[i32, I32Traits](&first_values, 3))
@@ -199,9 +199,9 @@ test "hash_table: many_collisions and space_reuse":
 
 test "hash_table: basic_remove and basic_contains":
     var table: IntTable
-    discard(hash_table_set(&table, 1))
-    discard(hash_table_set(&table, 2))
-    discard(hash_table_set(&table, 3))
+    _ = hash_table_set(&table, 1)
+    _ = hash_table_set(&table, 2)
+    _ = hash_table_set(&table, 3)
     assert(hash_table_contains_t(&table, 1))
     assert(hash_table_contains_t(&table, 3))
     assert(not hash_table_contains_t(&table, 4))
@@ -220,36 +220,36 @@ test "hash_table: capacity_leak":
     with memory.heap:
         var table: IntTable
         for i: i32 in 0..<10000:
-            discard(hash_table_set(&table, i))
-            discard(hash_table_remove_t(&table, i))
+            _ = hash_table_set(&table, i)
+            _ = hash_table_remove_t(&table, i)
         assert(hash_table_capacity(&table) < 100)
 
 test "hash_table: floats and doubles":
     var floats: HashTable[f32, F32Traits]
-    discard(hash_table_set(&floats, 0.0))
-    discard(hash_table_set(&floats, 1.0))
-    discard(hash_table_set(&floats, 2.0))
+    _ = hash_table_set(&floats, 0.0)
+    _ = hash_table_set(&floats, 1.0)
+    _ = hash_table_set(&floats, 2.0)
     assert(hash_table_size(&floats) == 3)
     assert(hash_table_contains_t(&floats, 0.0))
     assert(hash_table_contains_t(&floats, 2.0))
     var doubles: HashTable[f64, F64Traits]
-    discard(hash_table_set(&doubles, 0.0))
-    discard(hash_table_set(&doubles, 1.0))
-    discard(hash_table_set(&doubles, 2.0))
+    _ = hash_table_set(&doubles, 0.0)
+    _ = hash_table_set(&doubles, 1.0)
+    _ = hash_table_set(&doubles, 2.0)
     assert(hash_table_size(&doubles) == 3)
     assert(hash_table_contains_t(&doubles, 1.0))
 
 test "hash_table: reinsertion and clear_with_capacity":
     var map: OrderedHashTable[str, TestStrTraits]
-    discard(ordered_hash_table_set(&map, "ytidb::LAST_RESULT_ENTRY_KEY"))
-    discard(ordered_hash_table_set(&map, "__sak"))
-    discard(ordered_hash_table_remove_t(&map, "__sak"))
-    discard(ordered_hash_table_set(&map, "__sak"))
+    _ = ordered_hash_table_set(&map, "ytidb::LAST_RESULT_ENTRY_KEY")
+    _ = ordered_hash_table_set(&map, "__sak")
+    _ = ordered_hash_table_remove_t(&map, "__sak")
+    _ = ordered_hash_table_set(&map, "__sak")
     assert(ordered_hash_table_size(&map) == 2)
     var ints: IntTable
     hash_table_clear_with_capacity(&ints)
-    discard(hash_table_set(&ints, 0))
-    discard(hash_table_set(&ints, 1))
+    _ = hash_table_set(&ints, 0)
+    _ = hash_table_set(&ints, 1)
     assert(hash_table_size(&ints) == 2)
     hash_table_clear_with_capacity(&ints)
     assert(hash_table_size(&ints) == 0)
@@ -257,8 +257,8 @@ test "hash_table: reinsertion and clear_with_capacity":
 
 test "hash_table: iterator_removal":
     var map: IntTable
-    discard(hash_table_set(&map, 0))
-    discard(hash_table_set(&map, 1))
+    _ = hash_table_set(&map, 0)
+    _ = hash_table_set(&map, 1)
     var it = hash_table_begin(&map)
     hash_table_remove_opaque(&map, &it)
     assert(hash_table_iterator_eq(&it, hash_table_end(&map)))
@@ -297,38 +297,38 @@ test "hash_table: ordered_insertion_and_deletion":
 
 test "hash_table: ordered_deletion_and_reinsertion":
     var table: OrderedIntTable
-    discard(ordered_hash_table_set(&table, 1))
-    discard(ordered_hash_table_set(&table, 3))
-    discard(ordered_hash_table_remove_t(&table, 1))
+    _ = ordered_hash_table_set(&table, 1)
+    _ = ordered_hash_table_set(&table, 3)
+    _ = ordered_hash_table_remove_t(&table, 1)
     assert(ordered_hash_table_size(&table) == 1)
     # By adding 1 again but this time in a different position, we
     # test whether the bucket's neighbors are reset properly.
-    discard(ordered_hash_table_set(&table, 1))
+    _ = ordered_hash_table_set(&table, 1)
     assert(ordered_hash_table_size(&table) == 2)
     let expected: i32[2] = [3, 1]
     test_expect_ordered(&table, expected)
 
 test "hash_table: ordered take_last, iterator_removal, remove_from_head":
     var table: OrderedIntTable
-    discard(ordered_hash_table_set(&table, 1))
-    discard(ordered_hash_table_set(&table, 2))
-    discard(ordered_hash_table_set(&table, 3))
+    _ = ordered_hash_table_set(&table, 1)
+    _ = ordered_hash_table_set(&table, 2)
+    _ = ordered_hash_table_set(&table, 3)
     assert(ordered_hash_table_take_last(&table) == 3)
     assert(ordered_hash_table_take_last(&table) == 2)
     assert(ordered_hash_table_take_first(&table) == 1)
     assert(ordered_hash_table_is_empty(&table))
-    discard(ordered_hash_table_set(&table, 0))
-    discard(ordered_hash_table_set(&table, 1))
+    _ = ordered_hash_table_set(&table, 0)
+    _ = ordered_hash_table_set(&table, 1)
     var it = ordered_hash_table_begin(&table)
     ordered_hash_table_remove_opaque(&table, &it)
     assert(hash_table_iterator_eq(&it, ordered_hash_table_end(&table)))
     assert(ordered_hash_table_size(&table) == 1)
     var map: OrderedIntTable
     for i: i32 in 1..=6:
-        discard(ordered_hash_table_set(&map, i))
+        _ = ordered_hash_table_set(&map, i)
     assert(ordered_hash_table_size(&map) == 6)
     for i in 0..<6:
-        discard(i)
+        _ = i
         var head = ordered_hash_table_begin(&map)
         ordered_hash_table_remove_opaque(&map, &head)
     assert(ordered_hash_table_size(&map) == 0)
@@ -337,23 +337,23 @@ test "hash_table: ordered_infinite_loop_clang_regression":
     var map: OrderedHashTable[str, TestStrTraits]
     let keys: str[7] = ["", "1", "_cb", "2", "3", "_cb_svref", "_cb_svref_expires"]
     for key in keys:
-        discard(ordered_hash_table_set(&map, key))
-    discard(ordered_hash_table_remove_t(&map, "_cb_svref"))
-    discard(ordered_hash_table_remove_t(&map, "_cb_svref_expires"))
-    discard(ordered_hash_table_set(&map, "_cb_svref"))
+        _ = ordered_hash_table_set(&map, key)
+    _ = ordered_hash_table_remove_t(&map, "_cb_svref")
+    _ = ordered_hash_table_remove_t(&map, "_cb_svref_expires")
+    _ = ordered_hash_table_set(&map, "_cb_svref")
     var iterations: usize = 0
     let size = ordered_hash_table_size(&map)
     for it in ordered_hash_table_begin(&map):
-        discard(it)
+        _ = it
         iterations += 1
         assert(iterations <= size)
     assert(iterations == 6)
 
 test "hash_table: values":
     var table: OrderedIntTable
-    discard(ordered_hash_table_set(&table, 10))
-    discard(ordered_hash_table_set(&table, 30))
-    discard(ordered_hash_table_set(&table, 20))
+    _ = ordered_hash_table_set(&table, 10)
+    _ = ordered_hash_table_set(&table, 30)
+    _ = ordered_hash_table_set(&table, 20)
     let values = ordered_hash_table_values(&table)
     assert(vector_size(&values) == ordered_hash_table_size(&table))
     assert(*vector_at_const(&values, 0) == 10)
@@ -364,10 +364,10 @@ test "hash_table: iteration order matches the donor":
     with memory.heap:
         var t: IntTable
         for i: i32 in 0..<40:
-            discard(hash_table_set(&t, i * 7 - 50))
+            _ = hash_table_set(&t, i * 7 - 50)
         var i: i32 = 0
         while i < 40:
-            discard(hash_table_remove_t(&t, i * 7 - 50))
+            _ = hash_table_remove_t(&t, i * 7 - 50)
             i += 3
         let expected: i32[26] = [-43, 6, -15, 153, 195, 132, 167, 41, 48, 216, 146, 104, 188, 111, -22, 20, 209, 69, 83, 90, 27, -36, 174, 62, 125, -1]
         var index: usize = 0
@@ -378,7 +378,7 @@ test "hash_table: iteration order matches the donor":
         assert(hash_table_capacity(&t) == 64)
         var big: HashTable[u64, U64Traits]
         for k: u64 in 0..<30:
-            discard(hash_table_set(&big, k << 32))
+            _ = hash_table_set(&big, k << 32)
         let expected_big: u64[30] = [0, 5, 11, 2, 22, 20, 23, 6, 25, 12, 24, 26, 21, 13, 7, 8, 1, 4, 15, 28, 16, 17, 9, 27, 14, 19, 29, 10, 3, 18]
         index = 0
         for value in hash_table_begin(&big):
@@ -388,10 +388,10 @@ test "hash_table: iteration order matches the donor":
 
 test "hash_table: clone":
     var table: IntTable
-    discard(hash_table_set(&table, 5))
-    discard(hash_table_set(&table, 6))
+    _ = hash_table_set(&table, 5)
+    _ = hash_table_set(&table, 6)
     var copy = hash_table_clone(&table)
-    discard(hash_table_set(&copy, 7))
+    _ = hash_table_set(&copy, 7)
     assert(hash_table_size(&table) == 2)
     assert(hash_table_size(&copy) == 3)
     assert(not hash_table_contains_t(&table, 7))

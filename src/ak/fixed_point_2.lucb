@@ -160,17 +160,17 @@ pub func fixed_point_log2_u32[P: FixedPointPrecision](this: const FixedPoint[u32
     if fixed_point_ne_i_u32(&x, 1):
         let shift_amount = (i32)log2_u32(x.m_value) - (i32)precision
         if shift_amount > 0:
-            discard(fixed_point_shr_assign_u32(&x, (i64)shift_amount))
+            _ = fixed_point_shr_assign_u32(&x, (i64)shift_amount)
         else:
-            discard(fixed_point_shl_assign_u32(&x, (i64)-shift_amount))
-        discard(fixed_point_add_assign_i_u32(&y, (i64)shift_amount))
+            _ = fixed_point_shl_assign_u32(&x, (i64)-shift_amount)
+        _ = fixed_point_add_assign_i_u32(&y, (i64)shift_amount)
 
     for _i in 0..<precision:
-        discard(fixed_point_mul_assign_fixed_point_u32(&x, x))
+        _ = fixed_point_mul_assign_fixed_point_u32(&x, x)
         if fixed_point_ge_i_u32(&x, 2):
-            discard(fixed_point_shr_assign_u32(&x, 1))
-            discard(fixed_point_add_assign_fixed_point_u32(&y, b))
-        discard(fixed_point_shr_assign_u32(&b, 1))
+            _ = fixed_point_shr_assign_u32(&x, 1)
+            _ = fixed_point_add_assign_fixed_point_u32(&y, b)
+        _ = fixed_point_shr_assign_u32(&b, 1)
 
     return y
 

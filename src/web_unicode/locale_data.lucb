@@ -194,9 +194,9 @@ func locale_data_canonicalize(locale: ak.StringView) -> ak.String:
                         continue
                     let key = case_view(string_view_of(&keyword.key), 0)
                     if not is_key_with_yes_alias(string_view_of(&key)):
-                        discard(ak.hash_table_set(&keywords_with_yes, key))
+                        _ = ak.hash_table_set(&keywords_with_yes, key)
             _:
-                discard(0)
+                _ = 0
 
     canonicalize_locale_id(&parsed)
 
@@ -212,7 +212,7 @@ func locale_data_canonicalize(locale: ak.StringView) -> ak.String:
                         if string_bytes(&keyword_list[keyword_index].value).length == 0 and ak.hash_table_contains_k[ak.String, ak.StringTraits, ak.StringView, ak.StringStringViewTraits](&keywords_with_yes, string_view_of(&keyword_list[keyword_index].key)):
                             keyword_list[keyword_index].value = string_of(view_of("yes"))
                 _:
-                    discard(0)
+                    _ = 0
 
     return locale_id_to_string(&parsed)
 
@@ -229,7 +229,7 @@ pub func canonicalize_unicode_locale_id(locale: ak.StringView) -> ak.String:
 ## icu::LocaleBuilder::setUnicodeLocaleKeyword and getUnicodeKeywordValue: the value in
 ## lowercase, "yes" as "true" (without CLDR's type aliases).
 pub func canonicalize_unicode_extension_values(key: ak.StringView, value: ak.StringView) -> ak.String:
-    discard(key)
+    _ = key
     let result = case_view(value, 0)
     if view_equals(string_view_of(&result), "yes"):
         return string_of(view_of("true"))
@@ -259,7 +259,7 @@ func define_locales_without_scripts(locales: ak.HashTable[ak.String, ak.StringTr
         ak.string_builder_append_u8(&builder, '-')
         ak.string_builder_append_string_view(&builder, string_view_of(&region))
         let locale_without_script = ak.string_builder_to_string(&builder) else trap("MUST: String::formatted")
-        discard(ak.hash_table_set(locales, locale_without_script))
+        _ = ak.hash_table_set(locales, locale_without_script)
 
 # The static available_locales of is_locale_available.
 var available_locales: ak.HashTable[ak.String, ak.StringTraits]
@@ -277,7 +277,7 @@ pub func is_locale_available(locale: ak.StringView) -> bool:
                 ak.vector_append_t(&list, string_of(view_of_bytes(bytes[start..<index])))
                 start = index + 1
         for tag in ak.vector_span_const(&list):
-            discard(ak.hash_table_set(&available_locales, tag))
+            _ = ak.hash_table_set(&available_locales, tag)
         define_locales_without_scripts(&available_locales, ak.vector_span_const(&list))
         available_locales_initialized = true
 

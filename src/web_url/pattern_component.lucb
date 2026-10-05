@@ -307,9 +307,9 @@ pub func component_create_match_result(this: const Component*, input: ak.String,
         # 3. Set groups[name] to value.
         let capture = *ak.vector_at_const(&exec_result.captures, index - 1)
         if let value = capture:
-            discard(ak.ordered_hash_map_set(&groups, name, ak.StringOrEmpty.string(value = value)))
+            _ = ak.ordered_hash_map_set(&groups, name, ak.StringOrEmpty.string(value = value))
         else:
-            discard(ak.ordered_hash_map_set(&groups, name, ak.StringOrEmpty.empty))
+            _ = ak.ordered_hash_map_set(&groups, name, ak.StringOrEmpty.empty)
 
     # 4. Increment index by 1.
 

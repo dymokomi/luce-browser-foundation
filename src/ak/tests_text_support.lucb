@@ -139,7 +139,7 @@ struct TcCodeUnits: Utf16CodeUnitCallback:
     var units: u16[2]
     var count: usize
 
-    mutating func call(code_unit: u16):
+    func call(code_unit: u16):
         self.units[self.count] = code_unit
         self.count += 1
 
@@ -307,7 +307,7 @@ test "utf32 view":
     var it = utf32_view_begin(&view)
     assert(utf32_code_point_iterator_peek(&it, 3) == 0x1f600)
     assert(utf32_code_point_iterator_peek(&it, 4) == none)
-    discard(utf32_code_point_iterator_inc(&it))
+    _ = utf32_code_point_iterator_inc(&it)
     assert(utf32_view_iterator_offset(&view, &it) == 1)
     assert(utf32_code_point_iterator_deref(&it) == 0xe9)
     let begin = utf32_view_begin(&view)
@@ -319,7 +319,7 @@ test "utf32 view":
     let end = utf32_view_end(&view)
     while not utf32_code_point_iterator_eq(&walker, &end):
         count += 1
-        discard(utf32_code_point_iterator_inc(&walker))
+        _ = utf32_code_point_iterator_inc(&walker)
     assert(count == 4)
     assert(utf32_code_point_iterator_done(&walker))
 

@@ -43,7 +43,7 @@ pub func weak_container_remove_dead_cells(this: WeakContainer*):
 pub let weak_container_vtable: WeakContainerVTable = WeakContainerVTable(class_info = &weak_container_class)
 
 ## Class information of GC::WeakContainer: name, class-id range (pre-order), size, vtable.
-pub let weak_container_class: ak.ClassInfo = ak.ClassInfo(name = "WeakContainer", first_id = 0, last_id = 0, size = sizeof(WeakContainer), vtable = (const void*)&weak_container_vtable)
+pub let weak_container_class: ak.ClassInfo = ak.ClassInfo(name = "WeakContainer", first_id = 0, last_id = 0, size = memory.size_of(WeakContainer), vtable = (const void*)&weak_container_vtable)
 
 ## is<GC::WeakContainer>: the class-id range test.
 pub func is_weak_container[P: IsWeakContainer](p: P*) -> bool:

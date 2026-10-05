@@ -56,7 +56,7 @@ pub func simple_reverse_iterator_inc[TContainer, TValueType](this: SimpleReverse
 
 ## Ported from AK/ReverseIterator.h:37 AK::SimpleReverseIterator::operator++ (postfix).
 pub func simple_reverse_iterator_inc_i32[TContainer, TValueType](this: SimpleReverseIterator[TContainer, TValueType]*, arg0: i32) -> SimpleReverseIterator[TContainer, TValueType]:
-    discard(arg0)
+    _ = arg0
     this.m_index -= 1
     return SimpleReverseIterator[TContainer, TValueType](m_container = this.m_container, m_index = this.m_index + 1)
 
@@ -67,7 +67,7 @@ pub func simple_reverse_iterator_dec[TContainer, TValueType](this: SimpleReverse
 
 ## Ported from AK/ReverseIterator.h:48 AK::SimpleReverseIterator::operator-- (postfix).
 pub func simple_reverse_iterator_dec_i32[TContainer, TValueType](this: SimpleReverseIterator[TContainer, TValueType]*, arg0: i32) -> SimpleReverseIterator[TContainer, TValueType]:
-    discard(arg0)
+    _ = arg0
     this.m_index += 1
     return SimpleReverseIterator[TContainer, TValueType](m_container = this.m_container, m_index = this.m_index - 1)
 

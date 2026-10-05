@@ -29,7 +29,7 @@ test "empty_string":
 
     # Short strings do not get stored in the fly string table.
     let before = fly_string_number_of_fly_strings()
-    discard(tc_fly(""))
+    _ = tc_fly("")
     assert(fly_string_number_of_fly_strings() == before)
 
 test "short_ascii_literal_is_constexpr":

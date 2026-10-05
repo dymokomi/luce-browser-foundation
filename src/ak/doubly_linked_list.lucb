@@ -164,7 +164,7 @@ pub func doubly_linked_list_begin[T](this: DoublyLinkedList[T]*) -> DoublyLinked
 
 ## Ported from AK/DoublyLinkedList.h:182 AK::DoublyLinkedList::end.
 pub func doubly_linked_list_end[T](this: DoublyLinkedList[T]*) -> DoublyLinkedListIterator[T]:
-    discard(this)
+    _ = this
     return doubly_linked_list_iterator_universal_end[T]()
 
 ## Ported from AK/DoublyLinkedList.h:186 AK::DoublyLinkedList::begin const.
@@ -173,7 +173,7 @@ pub func doubly_linked_list_begin_const[T](this: const DoublyLinkedList[T]*) -> 
 
 ## Ported from AK/DoublyLinkedList.h:187 AK::DoublyLinkedList::end const.
 pub func doubly_linked_list_end_const[T](this: const DoublyLinkedList[T]*) -> DoublyLinkedListIterator[T]:
-    discard(this)
+    _ = this
     return doubly_linked_list_iterator_universal_end[T]()
 
 ## Ported from AK/DoublyLinkedList.h:189 AK::DoublyLinkedList::find const (AK::find over
@@ -243,17 +243,17 @@ pub func doubly_linked_list_size[T](this: const DoublyLinkedList[T]*) -> usize:
 ## Ported from AK/DoublyLinkedList.h:256 AK::DoublyLinkedList::ensure_capacity: with no node
 ## cache (node_cache_size == 0) there is nothing to prepare.
 pub func doubly_linked_list_ensure_capacity[T](this: DoublyLinkedList[T]*, new_capacity: usize, make_default_value: Function0[T]):
-    discard(this)
-    discard(new_capacity)
-    discard(make_default_value)
+    _ = this
+    _ = new_capacity
+    _ = make_default_value
 
 ## Ported from AK/DoublyLinkedList.h:269 AK::DoublyLinkedList::drop_node.
 pub func doubly_linked_list_drop_node[T](this: DoublyLinkedList[T]*, node: DoublyLinkedListNode[T]*):
-    discard(this)
+    _ = this
     free(node)
 
 ## Ported from AK/DoublyLinkedList.h:284 AK::DoublyLinkedList::make_node (`new (nothrow)`).
 pub func doubly_linked_list_make_node[T](this: DoublyLinkedList[T]*, value: T) -> DoublyLinkedListNode[T]*?:
-    discard(this)
+    _ = this
     return new DoublyLinkedListNode[T](next = none, prev = none, m_value = value) catch:
         recover none

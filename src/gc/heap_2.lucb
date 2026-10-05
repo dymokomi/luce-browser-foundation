@@ -13,6 +13,8 @@
 #==============================================================================================
 
 # AK/Debug.h HEAP_DEBUG (off in the reference build).
+import strings
+
 let heap_debug: bool = false
 
 # mark: GraphConstructorVisitor =================================================================
@@ -67,7 +69,7 @@ pub func graph_constructor_visitor_visit_possible_values_impl(base: CellVisitor*
     defer gc_hash_map_clear(&possible_pointers)
 
     let raw_pointer_sized_values = (const usize*)bytes.data
-    for i in 0..<(bytes.length // sizeof(usize)):
+    for i in 0..<(bytes.length // memory.size_of(usize)):
         add_possible_value(&possible_pointers, raw_pointer_sized_values[i], HeapRoot(type_ = HeapRootType.heap_function_captured_pointer), this.m_min_block_address, this.m_max_block_address)
 
     for found in for_each_cell_among_possible_pointers(this.m_heap, &this.m_all_live_heap_blocks, &possible_pointers):
@@ -124,7 +126,7 @@ pub func graph_constructor_visitor_dump(this: GraphConstructorVisitor*) -> ak.Js
                     ak.string_builder_append_string_view(&label, ak.source_location_filename(location))
                     ak.string_builder_append_string_view(&label, ak.sv(":"))
                     var digits: u8[16]
-                    let line_number = format(digits, f"{ak.source_location_line_number(location)}") else ""
+                    let line_number = strings.format(digits, f"{ak.source_location_line_number(location)}") else ""
                     ak.string_builder_append_string_view(&label, ak.sv(line_number))
                     ak.json_object_set_string_view(&node, ak.sv("root"), json_string(ak.string_builder_to_string(&label) else trap("MUST: String::formatted")))
                 .root_vector:
@@ -204,7 +206,7 @@ pub func heap_dump_graph(this: Heap*) -> ak.JsonObject:
     heap_gather_roots(this, &roots, &all_live_heap_blocks, &stack_frames)
     this.m_stack_scan_start = 0
     var visitor: GraphConstructorVisitor = ---
-    memory.set(u8[]((u8*)&visitor, sizeof(GraphConstructorVisitor)), 0)
+    memory.set(u8[]((u8*)&visitor, memory.size_of(GraphConstructorVisitor)), 0)
     graph_constructor_visitor_construct(&visitor, this, &roots)
     defer graph_constructor_visitor_destroy(&visitor)
     graph_constructor_visitor_visit_all_cells(&visitor)
@@ -329,7 +331,7 @@ pub func heap_dump_allocators(this: Heap*):
             ak.dbgln(f"{name} ({cell_allocator_cell_size(allocator)}b) x {total_live_cells}, cost: {cost} KiB, reserved: {reserved} KiB")
 
         for block in gc_vector_span(&blocks):
-            ak.dbgln(f"  block at 0x{hex((usize)block.block)}: live {block.live_cells} / dead {block.dead_cells} / total {heap_block_cell_count(block.block)} cells")
+            ak.dbgln(f"  block at 0x{(usize)block.block:x}: live {block.live_cells} / dead {block.dead_cells} / total {heap_block_cell_count(block.block)} cells")
     ak.dbgln(f"Total allocated: {total_in_committed_blocks // 1024} KiB")
     ak.dbgln(f"Total wasted on fragmentation: {total_waste // 1024} KiB")
 
@@ -378,7 +380,7 @@ pub func heap_gather_roots(this: Heap*, roots: GcHashMap[HeapRoot]*, all_live_he
     if heap_debug:
         ak.dbgln("gather_roots:")
         for root in gc_hash_map_keys(roots):
-            ak.dbgln(f"  + 0x{hex(root)}")
+            ak.dbgln(f"  + 0x{root:x}")
 
 ## Ported from Libraries/LibGC/Heap.cpp:472 GC::Heap::gather_asan_fake_stack_roots (the build
 ## without the address sanitizer, which the port has no counterpart of).
@@ -424,7 +426,7 @@ pub func heap_gather_conservative_roots(this: Heap*, roots: GcHashMap[HeapRoot]*
     # frame index and out_stack_frames stays empty, as in a build without cpptrace.
 
     let stack = (const usize*?)stack_reference else trap("no stack")
-    for i in 0..<((stack_top - stack_reference) // sizeof(usize)):
+    for i in 0..<((stack_top - stack_reference) // memory.size_of(usize)):
         let data = stack[i]
         add_possible_value(&possible_pointers, data, HeapRoot(type_ = HeapRootType.stack_pointer), min_block_address, max_block_address)
         heap_gather_asan_fake_stack_roots(this, &possible_pointers, data, min_block_address, max_block_address, stack_reference, stack_top)
@@ -442,11 +444,11 @@ pub func heap_gather_conservative_roots(this: Heap*, roots: GcHashMap[HeapRoot]*
         let (cell, possible_pointer) = found
         if cell_state(cell) == CellState.live:
             if heap_debug:
-                ak.dbgln(f"  ?-> 0x{hex((usize)cell)}")
+                ak.dbgln(f"  ?-> 0x{(usize)cell:x}")
             gc_hash_map_set(roots, (usize)cell, *(gc_hash_map_get(&possible_pointers, possible_pointer) else trap("possible pointer without an origin")))
         else:
             if heap_debug:
-                ak.dbgln(f"  #-> 0x{hex((usize)cell)}")
+                ak.dbgln(f"  #-> 0x{(usize)cell:x}")
 
 ## Addition: the AK::Function contexts the heap holds, as possible pointers (see above).
 func heap_add_function_contexts(this: Heap*, possible_pointers: GcHashMap[HeapRoot]*, min_block_address: usize, max_block_address: usize):

@@ -40,15 +40,15 @@ test "hex: decode and encode":
     assert(compare_bytes(bytes, b"Hello\x00\xff") == 0 and bytes.length == 7)
 
     var odd_failed = false
-    discard(decode_hex(sv("abc")) catch:
+    _ = decode_hex(sv("abc")) catch:
         odd_failed = true
-        recover ByteBuffer())
+        recover ByteBuffer()
     assert(odd_failed)
 
     var digit_failed = false
-    discard(decode_hex(sv("zz")) catch:
+    _ = decode_hex(sv("zz")) catch:
         digit_failed = true
-        recover ByteBuffer())
+        recover ByteBuffer()
     assert(digit_failed)
 
     let encoded = encode_hex(b"\xde\xad\x0f\x00")

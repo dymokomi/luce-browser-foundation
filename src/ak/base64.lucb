@@ -75,7 +75,7 @@ func encode_base64_impl(input: const u8[], options: SimdutfBase64Options) -> Str
     let length = simdutf_base64_length_from_binary(input.length, options)
     let output = try string_data_create_uninitialized(length, &buffer)
 
-    discard(simdutf_binary_to_base64(input, u8[](buffer else trap("VERIFY: buffer"), length), options))
+    _ = simdutf_binary_to_base64(input, u8[](buffer else trap("VERIFY: buffer"), length), options)
 
     var result = String(string_base = StringBase())
     string_base_construct_string_data(&result.string_base, output)

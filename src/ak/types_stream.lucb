@@ -75,7 +75,7 @@ pub func stream_close(this: Stream*):
 pub let stream_vtable: StreamVTable = StreamVTable(class_info = &stream_class)
 
 ## Class information of AK::Stream: name, class-id range (pre-order), size, vtable.
-pub let stream_class: ClassInfo = ClassInfo(name = "Stream", first_id = 0, last_id = 5, size = sizeof(Stream), vtable = (const void*)&stream_vtable)
+pub let stream_class: ClassInfo = ClassInfo(name = "Stream", first_id = 0, last_id = 5, size = memory.size_of(Stream), vtable = (const void*)&stream_vtable)
 
 ## is<AK::Stream>: the class-id range test.
 pub func is_stream[P: IsStream](p: P*) -> bool:
@@ -139,7 +139,7 @@ pub func seekable_stream_truncate(this: SeekableStream*, length: usize) -> !:
 pub let seekable_stream_vtable: SeekableStreamVTable = SeekableStreamVTable(stream_vtable = StreamVTable(class_info = &seekable_stream_class, discard = seekable_stream_discard_impl))
 
 ## Class information of AK::SeekableStream: name, class-id range (pre-order), size, vtable.
-pub let seekable_stream_class: ClassInfo = ClassInfo(name = "SeekableStream", first_id = 2, last_id = 5, size = sizeof(SeekableStream), vtable = (const void*)&seekable_stream_vtable)
+pub let seekable_stream_class: ClassInfo = ClassInfo(name = "SeekableStream", first_id = 2, last_id = 5, size = memory.size_of(SeekableStream), vtable = (const void*)&seekable_stream_vtable)
 
 ## is<AK::SeekableStream>: the class-id range test.
 pub func is_seekable_stream[P: IsStream](p: P*) -> bool:

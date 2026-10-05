@@ -32,7 +32,7 @@ func expect_addition(s1: i64, ns1: i64, s2: i64, ns2: i64, sr: i64, nsr: i64):
     expect_duration(duration_add(&a, b), sr, nsr)
     expect_duration(duration_add(&b, a), sr, nsr)
     var t = duration_of(s1, ns1)
-    discard(duration_add_assign(&t, b))
+    _ = duration_add_assign(&t, b)
     expect_duration(t, sr, nsr)
 
 # EXPECT_SUBTRACTION(s1, ns1, s2, ns2, sr, nsr).
@@ -41,7 +41,7 @@ func expect_subtraction(s1: i64, ns1: i64, s2: i64, ns2: i64, sr: i64, nsr: i64)
     let b = duration_of(s2, ns2)
     expect_duration(duration_sub(&a, b), sr, nsr)
     var t = duration_of(s1, ns1)
-    discard(duration_sub_assign(&t, b))
+    _ = duration_sub_assign(&t, b)
     expect_duration(t, sr, nsr)
 
 # UnixDateTime::parse with string literals.
@@ -53,7 +53,7 @@ func expect_parsed(format_: str, text: str, year: i32, month: i32, day: i32, hou
     let result = parse_of(format_, text) else trap("parse failed")
     let result_time = unaware_time_to_timespec(&result.unaware_time)
     var tm = zeroed_tm()
-    discard(gmtime_r(&result_time.tv_sec, &tm) else trap("gmtime_r failed"))
+    _ = gmtime_r(&result_time.tv_sec, &tm) else trap("gmtime_r failed")
     assert(year == tm.tm_year + 1900)
     assert(month == tm.tm_mon + 1)
     assert(day == tm.tm_mday)

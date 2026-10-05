@@ -44,7 +44,7 @@ func all_utf16_fly_strings() -> HashTable[const Utf16StringData*?, Utf16FlyStrin
 ## will make it).
 pub func did_destroy_utf16_fly_string_data(data: const Utf16StringData*):
     with memory.heap:
-        discard(hash_table_remove_t(all_utf16_fly_strings(), data))
+        _ = hash_table_remove_t(all_utf16_fly_strings(), data)
 
 ## Adds a copy of `data` to the table and answers it (addition: the C++ adds `data` itself). The
 ## copy and the table's buckets come from `memory.heap`, which outlives any allocator scope, so
@@ -53,10 +53,10 @@ pub func did_destroy_utf16_fly_string_data(data: const Utf16StringData*):
 func utf16_fly_string_table_add(data: const Utf16StringData*) -> const Utf16StringData*:
     let size = utf16_string_data_allocation_size_for_string_data(utf16_string_data_has_ascii_storage(data), utf16_string_data_length_in_code_units(data))
     with memory.heap:
-        let slot = alloc(size, alignof(Utf16StringData)) else trap("VERIFY: kmalloc")
+        let slot = memory.allocate(size, memory.align_of(Utf16StringData)) else trap("VERIFY: kmalloc")
         memory.copy(slot, u8[]((u8*)data, size), size)
         let interned = (const Utf16StringData*)slot.data
-        discard(hash_table_set(all_utf16_fly_strings(), (const Utf16StringData*?)interned))
+        _ = hash_table_set(all_utf16_fly_strings(), (const Utf16StringData*?)interned)
         utf16_string_data_mark_as_fly_string(interned)
         return interned
 

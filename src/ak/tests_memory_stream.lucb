@@ -58,7 +58,7 @@ test "memory_stream: allocating_memory_stream_offset_of_oob":
     var stream = test_allocating_stream()
     # First, fill exactly one chunk (in groups of 16 bytes).
     for i in 0..<(allocating_memory_stream_chunk_size // 16):
-        discard(i)
+        _ = i
         stream_write_until_depleted_span_u8(stream.stream(), "AAAAAAAAAAAAAAAA".bytes) else trap("write failed")
     # Then discard it all.
     stream_discard(stream.stream(), allocating_memory_stream_chunk_size) else trap("discard failed")
@@ -68,7 +68,7 @@ test "memory_stream: allocating_memory_stream_offset_of_oob":
 test "memory_stream: allocating_memory_stream_offset_of_after_chunk_reorder":
     var stream = test_allocating_stream()
     for i in 0..<(allocating_memory_stream_chunk_size // 16):
-        discard(i)
+        _ = i
         stream_write_until_depleted_span_u8(stream.stream(), "AAAAAAAAAAAAAAAA".bytes) else trap("write failed")
     # Append a few additional bytes to create a second chunk.
     stream_write_until_depleted_span_u8(stream.stream(), "BCDEFGHIJKLMNOPQ".bytes) else trap("write failed")
@@ -80,7 +80,7 @@ test "memory_stream: allocating_memory_stream_offset_of_after_chunk_reorder":
 test "memory_stream: allocating_memory_stream_offset_of_with_write_offset_multiple_of_chunk_size":
     var stream = test_allocating_stream()
     for i in 0..<((allocating_memory_stream_chunk_size // 16) - 1):
-        discard(i)
+        _ = i
         stream_write_until_depleted_span_u8(stream.stream(), "AAAAAAAAAAAAAAAA".bytes) else trap("write failed")
     stream_write_until_depleted_span_u8(stream.stream(), "BCDEFGHIJKLMNOPQ".bytes) else trap("write failed")
     # Read a few bytes from the beginning to ensure that we are trying to slice into the zero-sized block.
@@ -91,7 +91,7 @@ test "memory_stream: allocating_memory_stream_offset_of_with_write_offset_multip
 test "memory_stream: allocating stream read, peek and read_until_eof":
     var stream = test_allocating_stream()
     for i in 0..<300:
-        discard(i)
+        _ = i
         stream_write_until_depleted_span_u8(stream.stream(), "0123456789abcdef".bytes) else trap("write failed")
     assert(allocating_memory_stream_used_buffer_size(&stream) == 4800)
     var peeked: u8[20]
@@ -112,10 +112,10 @@ test "memory_stream: fixed_memory_read_write":
     let some_words = "These are some words"
     var empty = byte_buffer_create_uninitialized(some_words.length) else trap("create failed")
     var stream = test_fixed_stream_mode(byte_buffer_bytes(&empty), FixedMemoryStreamMode.read_write)
-    discard(stream_write_some(stream.stream(), some_words.bytes) else trap("write failed"))
+    _ = stream_write_some(stream.stream(), some_words.bytes) else trap("write failed")
     assert((seekable_stream_tell(stream.seekable_stream()) else trap("tell failed")) == some_words.length)
     assert(stream_is_eof(stream.stream()))
-    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    _ = seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     let contents = stream_read_until_eof(stream.stream(), 4096) else trap("read_until_eof failed")
     assert(bytes_equal(byte_buffer_bytes_const(&contents), some_words.bytes))
 
@@ -131,11 +131,11 @@ test "memory_stream: fixed_memory_read_only":
     var stream = test_fixed_stream(some_words.bytes)
     let contents = stream_read_until_eof(stream.stream(), 4096) else trap("read_until_eof failed")
     assert(bytes_equal(byte_buffer_bytes_const(&contents), some_words.bytes))
-    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    _ = seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     var failed = false
-    discard(stream_write_some(stream.stream(), some_words.bytes) catch:
+    _ = stream_write_some(stream.stream(), some_words.bytes) catch:
         failed = true
-        recover 0)
+        recover 0
     assert(failed)
     assert(ak_pending_error.m_code == ebadf)
     assert((seekable_stream_tell(stream.seekable_stream()) else trap("tell failed")) == 0)
@@ -146,13 +146,13 @@ test "memory_stream: fixed_memory_seeking_around":
         var stream_buffer = byte_buffer_create_zeroed(8702) else trap("create failed")
         var stream = test_fixed_stream(byte_buffer_bytes(&stream_buffer))
         var buffer = byte_buffer_create_uninitialized(16) else trap("create failed")
-        discard(seekable_stream_seek(stream.seekable_stream(), 500, SeekMode.set_position) else trap("seek failed"))
+        _ = seekable_stream_seek(stream.seekable_stream(), 500, SeekMode.set_position) else trap("seek failed")
         assert((seekable_stream_tell(stream.seekable_stream()) else trap("tell failed")) == 500)
         stream_read_until_filled(stream.stream(), byte_buffer_bytes(&buffer)) else trap("read failed")
-        discard(seekable_stream_seek(stream.seekable_stream(), 234, SeekMode.from_current_position) else trap("seek failed"))
+        _ = seekable_stream_seek(stream.seekable_stream(), 234, SeekMode.from_current_position) else trap("seek failed")
         assert((seekable_stream_tell(stream.seekable_stream()) else trap("tell failed")) == 750)
         stream_read_until_filled(stream.stream(), byte_buffer_bytes(&buffer)) else trap("read failed")
-        discard(seekable_stream_seek(stream.seekable_stream(), -105, SeekMode.from_end_position) else trap("seek failed"))
+        _ = seekable_stream_seek(stream.seekable_stream(), -105, SeekMode.from_end_position) else trap("seek failed")
         assert((seekable_stream_tell(stream.seekable_stream()) else trap("tell failed")) == 8597)
         stream_read_until_filled(stream.stream(), byte_buffer_bytes(&buffer)) else trap("read failed")
         assert((seekable_stream_size(stream.seekable_stream()) else trap("size failed")) == 8702)
@@ -165,12 +165,12 @@ test "memory_stream: fixed_memory_tell":
         var expected_fixed_memory_offset: usize = 0
         var one_byte: u8[1]
         for i in 0..<4000:
-            discard(i)
+            _ = i
             stream_read_until_filled(stream.stream(), one_byte) else trap("read failed")
             expected_fixed_memory_offset += 1
             assert(expected_fixed_memory_offset == (seekable_stream_tell(stream.seekable_stream()) else trap("tell failed")))
         for i in 0..<4000:
-            discard(i)
+            _ = i
             let seek_fixed_memory_offset = seekable_stream_seek(stream.seekable_stream(), -1, SeekMode.from_current_position) else trap("seek failed")
             expected_fixed_memory_offset -= 1
             assert(seek_fixed_memory_offset == (seekable_stream_tell(stream.seekable_stream()) else trap("tell failed")))
@@ -190,9 +190,9 @@ test "memory_stream: fixed_memory_read_in_place":
     var readonly_stream = test_fixed_stream(some_words.bytes)
     # Trying to read mutable values from a read-only stream should fail.
     var failed = false
-    discard(fixed_memory_stream_read_in_place_usize[u8](&readonly_stream, 1) catch:
+    _ = fixed_memory_stream_read_in_place_usize[u8](&readonly_stream, 1) catch:
         failed = true
-        recover empty_span[u8]())
+        recover empty_span[u8]()
     assert(failed)
     assert(fixed_memory_stream_offset(&readonly_stream) == 0)
     # Reading const values should succeed.
@@ -207,7 +207,7 @@ test "memory_stream: fixed_memory_read_in_place":
     let one = fixed_memory_stream_read_in_place[u8](&mutable_stream) else trap("read failed")
     assert(*one == 'T')
     assert(fixed_memory_stream_offset(&mutable_stream) == 1)
-    discard(seekable_stream_seek(mutable_stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    _ = seekable_stream_seek(mutable_stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     let characters_again = fixed_memory_stream_read_in_place_const_usize[u8](&mutable_stream, 20) else trap("read failed")
     assert(bytes_equal(characters_again, some_words.bytes))
     assert(stream_is_eof(mutable_stream.stream()))
@@ -218,7 +218,7 @@ test "memory_stream: read_value, write_value and discard":
     stream_write_value[u32](stream.stream(), 0x04030201) else trap("write failed")
     stream_write_value[u16](stream.stream(), 0xbeef) else trap("write failed")
     assert(storage[0] == 1 and storage[3] == 4 and storage[4] == 0xef)
-    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    _ = seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     assert((stream_read_value[u32](stream.stream()) else trap("read failed")) == 0x04030201)
     stream_discard(stream.stream(), 1) else trap("discard failed")
     assert((stream_read_value[u8](stream.stream()) else trap("read failed")) == 0xbe)
@@ -246,9 +246,9 @@ test "memory_stream: buffered_memory_stream_read_line":
     let read_bytes = input_buffered_seekable_read_line(buffered_stream, byte_buffer_bytes(&buffer)) else trap("read_line failed")
     assert(test_ms_sv_equals(read_bytes, "AAAAAAA"))
     var failed = false
-    discard(input_buffered_seekable_read_line(buffered_stream, byte_buffer_bytes(&buffer)) catch:
+    _ = input_buffered_seekable_read_line(buffered_stream, byte_buffer_bytes(&buffer)) catch:
         failed = true
-        recover StringView())
+        recover StringView()
     assert(failed)
     assert(ak_pending_error.m_code == emsgsize())
 

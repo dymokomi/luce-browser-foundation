@@ -179,7 +179,7 @@ test "bitmap: byte_aligned_access":
 
 test "bitmap: randomized set_get and set_range":
     for round in 0..<200:
-        discard(round)
+        _ = round
         let init = (testing.random() & 1) == 1
         let new_value = (testing.random() & 1) == 1
         let size = (usize)(testing.random() % 64) + 1

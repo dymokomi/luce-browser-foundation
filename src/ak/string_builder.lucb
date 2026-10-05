@@ -20,7 +20,7 @@
 ## front of the buffer for a string data header.
 func string_builder_prefix_size(mode: StringBuilderMode) -> usize:
     match mode:
-        .utf8: return sizeof(StringData)
+        .utf8: return memory.size_of(StringData)
         .utf16: return utf16_string_data_offset_of_string_storage()
         _: trap("VERIFY_NOT_REACHED")
 
@@ -186,14 +186,14 @@ func string_builder_append_code_unit_bytes(this: StringBuilder*, ch: u16) -> !:
 struct StringBuilderAppendUtf8Byte: FallibleUtf8ByteCallback:
     var builder: StringBuilder*
 
-    mutating func call(byte: u8) -> !:
+    func call(byte: u8) -> !:
         try string_builder_try_append_u8(self.builder, byte)
 
 ## The second lambda of StringBuilder::try_append_code_point: `m_buffer.try_append(&c, 2)`.
 struct StringBuilderAppendUtf16CodeUnit: FallibleUtf16CodeUnitCallback:
     var builder: StringBuilder*
 
-    mutating func call(code_unit: u16) -> !:
+    func call(code_unit: u16) -> !:
         try string_builder_append_code_unit_bytes(self.builder, code_unit)
 
 ## Ported from AK/StringBuilder.cpp:367 AK::StringBuilder::try_append_code_point.
@@ -204,12 +204,12 @@ pub func string_builder_try_append_code_point(this: StringBuilder*, code_point: 
 
     if this.m_mode == StringBuilderMode.utf8 or (this.m_utf16_builder_is_ascii and is_ascii(code_point)):
         var append_byte = StringBuilderAppendUtf8Byte(builder = this)
-        discard(try unicode_utils_try_code_point_to_utf8(code_point, &append_byte))
+        _ = try unicode_utils_try_code_point_to_utf8(code_point, &append_byte)
     else:
         try string_builder_ensure_storage_is_utf16(this)
 
         var append_code_unit = StringBuilderAppendUtf16CodeUnit(builder = this)
-        discard(try unicode_utils_try_code_point_to_utf16(code_point, &append_code_unit))
+        _ = try unicode_utils_try_code_point_to_utf16(code_point, &append_code_unit)
 
 ## Ported from AK/StringBuilder.cpp:254 AK::StringBuilder::try_append(char const*, size_t).
 pub func string_builder_try_append_u8_usize(this: StringBuilder*, characters: const u8*?, length: usize) -> !:
@@ -333,13 +333,13 @@ pub func string_builder_append_code_point(this: StringBuilder*, code_point: u32)
 
     if not append_as_utf8:
         string_builder_ensure_storage_is_utf16(this) else trap("MUST: ensure_storage_is_utf16")
-        discard(string_builder_will_append(this, 2) catch: recover ())
+        _ = string_builder_will_append(this, 2) catch: recover ()
 
         if code_point < unicode_utils_first_supplementary_plane_code_point:
             string_builder_append_code_unit_bytes(this, (u16)code_point) else trap("MUST: append_code_point")
             return
 
-        discard(string_builder_will_append(this, 2) catch: recover ())
+        _ = string_builder_will_append(this, 2) catch: recover ()
         let supplementary = code_point - unicode_utils_first_supplementary_plane_code_point
 
         var code_unit = (u16)((u32)unicode_utils_high_surrogate_min | (supplementary >> 10))
@@ -353,16 +353,16 @@ pub func string_builder_append_code_point(this: StringBuilder*, code_point: u32)
     if code_point <= 0x7f:
         byte_buffer_append_u8(&this.m_buffer, (u8)code_point)
     elif code_point <= 0x07ff:
-        discard(string_builder_will_append(this, 2) catch: recover ())
+        _ = string_builder_will_append(this, 2) catch: recover ()
         byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 6) & 0x1f) | 0xc0))
         byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 0) & 0x3f) | 0x80))
     elif code_point <= 0xffff:
-        discard(string_builder_will_append(this, 3) catch: recover ())
+        _ = string_builder_will_append(this, 3) catch: recover ()
         byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 12) & 0x0f) | 0xe0))
         byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 6) & 0x3f) | 0x80))
         byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 0) & 0x3f) | 0x80))
     else:
-        discard(string_builder_will_append(this, 4) catch: recover ())
+        _ = string_builder_will_append(this, 4) catch: recover ()
         byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 18) & 0x07) | 0xf0))
         byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 12) & 0x3f) | 0x80))
         byte_buffer_append_u8(&this.m_buffer, (u8)(((code_point >> 6) & 0x3f) | 0x80))

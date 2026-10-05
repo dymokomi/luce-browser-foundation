@@ -16,7 +16,7 @@ struct IntrusiveTestItem:
 type IntrusiveTestList = IntrusiveList[IntrusiveTestItem, IntrusiveTestItem*?]
 
 func test_item_member() -> usize:
-    return offsetof(IntrusiveTestItem, m_list_node)
+    return memory.offset_of(IntrusiveTestItem, m_list_node)
 
 func test_new_item(value: i32) -> IntrusiveTestItem*:
     let item = new IntrusiveTestItem else trap("out of memory")
@@ -70,7 +70,7 @@ test "intrusive_list: enumeration":
 
     var actual_size: usize = 0
     for elem in intrusive_list_begin(&list):
-        discard(elem)
+        _ = elem
         actual_size += 1
     assert(expected_size == actual_size)
     assert(expected_size == intrusive_list_size_slow(&list))
@@ -79,7 +79,7 @@ test "intrusive_list: enumeration":
     var it = intrusive_list_rbegin(&list)
     while it.m_value != none:
         reverse_actual_size += 1
-        discard(intrusive_list_reverse_iterator_inc(&it))
+        _ = intrusive_list_reverse_iterator_inc(&it)
     assert(expected_size == reverse_actual_size)
 
     while let elem = intrusive_list_take_first(&list):
@@ -98,7 +98,7 @@ test "intrusive_list: remove, prepend, erase and clear":
     intrusive_list_append(&list, items[3], test_item_member())
     assert((intrusive_list_last(&list) else trap("empty")).value == 3)
     var it = intrusive_list_begin(&list)
-    discard(intrusive_list_iterator_erase(&it))
+    _ = intrusive_list_iterator_erase(&it)
     assert(intrusive_list_iterator_deref(&it).value == 0)
     assert(intrusive_list_size_slow(&list) == 2)
     intrusive_list_clear(&list)

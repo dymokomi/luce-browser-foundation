@@ -51,7 +51,7 @@ pub func callable_wrapper_base_raw_callable(this: CallableWrapperBase*) -> const
 pub let callable_wrapper_base_vtable: CallableWrapperBaseVTable = CallableWrapperBaseVTable(class_info = &callable_wrapper_base_class)
 
 ## Class information of AK::Function::CallableWrapperBase: name, class-id range (pre-order), size, vtable.
-pub let callable_wrapper_base_class: ClassInfo = ClassInfo(name = "CallableWrapperBase", first_id = 0, last_id = 0, size = sizeof(CallableWrapperBase), vtable = (const void*)&callable_wrapper_base_vtable)
+pub let callable_wrapper_base_class: ClassInfo = ClassInfo(name = "CallableWrapperBase", first_id = 0, last_id = 0, size = memory.size_of(CallableWrapperBase), vtable = (const void*)&callable_wrapper_base_vtable)
 
 ## is<AK::Function::CallableWrapperBase>: the class-id range test.
 pub func is_callable_wrapper_base[P: IsCallableWrapperBase](p: P*) -> bool:

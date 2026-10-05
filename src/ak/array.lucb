@@ -11,11 +11,11 @@
 ## Ported from AK/Array.h:23 AK::Detail::EmptyArrayStorage::operator[].
 # This type serves as the storage of 0-sized `AK::Array`s: there is no element to index.
 pub func empty_array_storage_at[T](this: const EmptyArrayStorage[T]*, arg0: usize) -> T*:
-    discard(this)
-    discard(arg0)
+    _ = this
+    _ = arg0
     trap("VERIFY_NOT_REACHED")
 
 ## Ported from AK/Array.h:24 AK::Detail::EmptyArrayStorage::operator T*.
 pub func empty_array_storage_to_t[T](this: const EmptyArrayStorage[T]*) -> T*?:
-    discard(this)
+    _ = this
     return none

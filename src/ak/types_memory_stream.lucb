@@ -42,7 +42,7 @@ pub struct FixedMemoryStreamVTable:
 pub let fixed_memory_stream_vtable: FixedMemoryStreamVTable = FixedMemoryStreamVTable(seekable_stream_vtable = SeekableStreamVTable(stream_vtable = StreamVTable(class_info = &fixed_memory_stream_class, read_some = fixed_memory_stream_read_some_impl, read_until_filled = fixed_memory_stream_read_until_filled_impl, discard = seekable_stream_discard_impl, write_some = fixed_memory_stream_write_some_impl, write_until_depleted_span_u8 = fixed_memory_stream_write_until_depleted_span_u8_impl, is_eof = fixed_memory_stream_is_eof_impl, is_open = fixed_memory_stream_is_open_impl, close = fixed_memory_stream_close_impl), seek = fixed_memory_stream_seek_impl, truncate = fixed_memory_stream_truncate_impl))
 
 ## Class information of AK::FixedMemoryStream: name, class-id range (pre-order), size, vtable.
-pub let fixed_memory_stream_class: ClassInfo = ClassInfo(name = "FixedMemoryStream", first_id = 3, last_id = 3, size = sizeof(FixedMemoryStream), vtable = (const void*)&fixed_memory_stream_vtable)
+pub let fixed_memory_stream_class: ClassInfo = ClassInfo(name = "FixedMemoryStream", first_id = 3, last_id = 3, size = memory.size_of(FixedMemoryStream), vtable = (const void*)&fixed_memory_stream_vtable)
 
 ## is<AK::FixedMemoryStream>: the class-id range test.
 pub func is_fixed_memory_stream[P: IsStream](p: P*) -> bool:
@@ -90,7 +90,7 @@ pub struct AllocatingMemoryStreamVTable:
 pub let allocating_memory_stream_vtable: AllocatingMemoryStreamVTable = AllocatingMemoryStreamVTable(stream_vtable = StreamVTable(class_info = &allocating_memory_stream_class, read_some = allocating_memory_stream_read_some_impl, discard = allocating_memory_stream_discard_impl, write_some = allocating_memory_stream_write_some_impl, is_eof = allocating_memory_stream_is_eof_impl, is_open = allocating_memory_stream_is_open_impl, close = allocating_memory_stream_close_impl))
 
 ## Class information of AK::AllocatingMemoryStream: name, class-id range (pre-order), size, vtable.
-pub let allocating_memory_stream_class: ClassInfo = ClassInfo(name = "AllocatingMemoryStream", first_id = 1, last_id = 1, size = sizeof(AllocatingMemoryStream), vtable = (const void*)&allocating_memory_stream_vtable)
+pub let allocating_memory_stream_class: ClassInfo = ClassInfo(name = "AllocatingMemoryStream", first_id = 1, last_id = 1, size = memory.size_of(AllocatingMemoryStream), vtable = (const void*)&allocating_memory_stream_vtable)
 
 ## is<AK::AllocatingMemoryStream>: the class-id range test.
 pub func is_allocating_memory_stream[P: IsStream](p: P*) -> bool:

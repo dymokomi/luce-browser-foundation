@@ -45,7 +45,7 @@ pub func stack_info_construct(this: StackInfo*):
             # Apparently the main thread's stack size is not reported correctly on macOS
             # but we can use getrlimit to get the correct value.
             var limit: StackInfoRlimit
-            discard(getrlimit(stack_info_rlimit_stack, &limit))
+            _ = getrlimit(stack_info_rlimit_stack, &limit)
             if limit.rlim_cur == stack_info_rlim_infinity_macos:
                 this.m_size = (usize)(8 * mi_b)
             else:
@@ -54,7 +54,7 @@ pub func stack_info_construct(this: StackInfo*):
     else:
         # pthread_attr_t is 56 bytes on 64-bit glibc.
         var attr: u8[64]
-        discard(pthread_attr_init(&attr[0]))
+        _ = pthread_attr_init(&attr[0])
         let rc = pthread_getattr_np(pthread_self(), &attr[0])
         if rc != 0:
             trap(f"pthread_getattr_np: {rc}")
@@ -65,7 +65,7 @@ pub func stack_info_construct(this: StackInfo*):
             trap(f"pthread_attr_getstack: {rc2}")
         this.m_base = base
         this.m_size = size
-        discard(pthread_attr_destroy(&attr[0]))
+        _ = pthread_attr_destroy(&attr[0])
     this.m_top = this.m_base + this.m_size
 
 ## Ported from AK/StackInfo.h:17 AK::StackInfo::base.

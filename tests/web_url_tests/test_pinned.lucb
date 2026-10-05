@@ -129,7 +129,7 @@ test "tokenizer":
     let strict_error = web_url.tokenizer_tokenize(web_url.utf8_view_of(web_url.sv("(a(b))")), web_url.TokenizerPolicy.strict) catch:
         expect_string(web_url.pattern_take_error_info().message, "Error processing a token")
         return
-    discard(strict_error)
+    _ = strict_error
     trap("expected a tokenizing error")
 
 # The encoding callback that leaves text as it is.
@@ -152,7 +152,7 @@ func expect_component_error(input: str, options: web_url.Options, message: str):
     let component = web_url.component_compile(web_url.utf8_view_of(web_url.sv(input)), identity_callback, options) catch:
         expect_string(web_url.pattern_take_error_info().message, message)
         return
-    discard(component)
+    _ = component
     trap("expected Component::compile to fail")
 
 test "component_compile":
@@ -223,7 +223,7 @@ func expect_create_error(text: str, base_url: ak.String?, message: str):
     let pattern = web_url.pattern_create(web_url.Input.string(value = web_url.string_lit(text)), base_url) catch:
         expect_string(web_url.pattern_take_error_info().message, message)
         return
-    discard(pattern)
+    _ = pattern
     trap("expected Pattern::create to fail")
 
 test "pattern_errors":

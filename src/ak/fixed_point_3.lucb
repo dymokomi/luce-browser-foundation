@@ -160,17 +160,17 @@ pub func fixed_point_log2_u64[P: FixedPointPrecision](this: const FixedPoint[u64
     if fixed_point_ne_i_u64(&x, 1):
         let shift_amount = (i32)log2_u64(x.m_value) - (i32)precision
         if shift_amount > 0:
-            discard(fixed_point_shr_assign_u64(&x, (i64)shift_amount))
+            _ = fixed_point_shr_assign_u64(&x, (i64)shift_amount)
         else:
-            discard(fixed_point_shl_assign_u64(&x, (i64)-shift_amount))
-        discard(fixed_point_add_assign_i_u64(&y, (i64)shift_amount))
+            _ = fixed_point_shl_assign_u64(&x, (i64)-shift_amount)
+        _ = fixed_point_add_assign_i_u64(&y, (i64)shift_amount)
 
     for _i in 0..<precision:
-        discard(fixed_point_mul_assign_fixed_point_u64(&x, x))
+        _ = fixed_point_mul_assign_fixed_point_u64(&x, x)
         if fixed_point_ge_i_u64(&x, 2):
-            discard(fixed_point_shr_assign_u64(&x, 1))
-            discard(fixed_point_add_assign_fixed_point_u64(&y, b))
-        discard(fixed_point_shr_assign_u64(&b, 1))
+            _ = fixed_point_shr_assign_u64(&x, 1)
+            _ = fixed_point_add_assign_fixed_point_u64(&y, b)
+        _ = fixed_point_shr_assign_u64(&b, 1)
 
     return y
 
@@ -188,7 +188,7 @@ pub func fixed_point_mul_fixed_point_u64[P: FixedPointPrecision](this: const Fix
     let precision = fixed_point_precision[P]()
     # FIXME: Figure out a nicer way to use more narrow types and avoid __int128
     var value = U128(m_data = [this.m_value, 0])
-    discard(u_fixed_big_int_mul_assign_opaque(&value, other.m_value))
+    _ = u_fixed_big_int_mul_assign_opaque(&value, other.m_value)
 
     let shifted = u_fixed_big_int_shr(&value, precision)
     var ret = fixed_point_create_raw_u64[P](shifted.m_data[0])
@@ -211,8 +211,8 @@ pub func fixed_point_div_fixed_point_u64[P: FixedPointPrecision](this: const Fix
     let precision = fixed_point_precision[P]()
     # FIXME: Figure out a nicer way to use more narrow types and avoid __int128
     var value = U128(m_data = [this.m_value, 0])
-    discard(u_fixed_big_int_shl_assign(&value, precision))
-    discard(u_fixed_big_int_div_assign_t(&value, other.m_value))
+    _ = u_fixed_big_int_shl_assign(&value, precision)
+    _ = u_fixed_big_int_div_assign_t(&value, other.m_value)
 
     return fixed_point_create_raw_u64[P](value.m_data[0])
 

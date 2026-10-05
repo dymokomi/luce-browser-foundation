@@ -275,14 +275,14 @@ pub func duration_to_truncated_seconds(this: const Duration*) -> i64:
 pub func duration_to_truncated_milliseconds(this: const Duration*) -> i64:
     assert(this.m_nanoseconds < 1000000000)
     var milliseconds = make_checked[i64]((this.m_seconds + 1) if this.m_seconds < 0 else this.m_seconds)
-    discard(checked_mul_assign_t_i64(&milliseconds, 1000))
-    discard(checked_add_assign_t_i64(&milliseconds, (i64)(this.m_nanoseconds // 1000000)))
+    _ = checked_mul_assign_t_i64(&milliseconds, 1000)
+    _ = checked_add_assign_t_i64(&milliseconds, (i64)(this.m_nanoseconds // 1000000))
     if this.m_seconds < 0:
         if this.m_nanoseconds % 1000000 != 0:
             # Does not overflow: milliseconds <= 1'999.
-            discard(checked_inc_i32_i64(&milliseconds, 0))
+            _ = checked_inc_i32_i64(&milliseconds, 0)
         # We dropped one second previously, put it back in now that we have handled the rounding.
-        discard(checked_sub_assign_t_i64(&milliseconds, 1000))
+        _ = checked_sub_assign_t_i64(&milliseconds, 1000)
     if not checked_has_overflow(&milliseconds):
         return checked_value(&milliseconds)
     return i64_min if this.m_seconds < 0 else i64_max
@@ -291,14 +291,14 @@ pub func duration_to_truncated_milliseconds(this: const Duration*) -> i64:
 pub func duration_to_truncated_microseconds(this: const Duration*) -> i64:
     assert(this.m_nanoseconds < 1000000000)
     var microseconds = make_checked[i64]((this.m_seconds + 1) if this.m_seconds < 0 else this.m_seconds)
-    discard(checked_mul_assign_t_i64(&microseconds, 1000000))
-    discard(checked_add_assign_t_i64(&microseconds, (i64)(this.m_nanoseconds // 1000)))
+    _ = checked_mul_assign_t_i64(&microseconds, 1000000)
+    _ = checked_add_assign_t_i64(&microseconds, (i64)(this.m_nanoseconds // 1000))
     if this.m_seconds < 0:
         if this.m_nanoseconds % 1000 != 0:
             # Does not overflow: microseconds <= 1'999'999.
-            discard(checked_inc_i32_i64(&microseconds, 0))
+            _ = checked_inc_i32_i64(&microseconds, 0)
         # We dropped one second previously, put it back in now that we have handled the rounding.
-        discard(checked_sub_assign_t_i64(&microseconds, 1000000))
+        _ = checked_sub_assign_t_i64(&microseconds, 1000000)
     if not checked_has_overflow(&microseconds):
         return checked_value(&microseconds)
     return i64_min if this.m_seconds < 0 else i64_max
@@ -309,7 +309,7 @@ pub func duration_to_seconds(this: const Duration*) -> i64:
     assert(this.m_nanoseconds < 1000000000)
     if this.m_seconds >= 0 and this.m_nanoseconds != 0:
         var seconds = make_checked[i64](this.m_seconds)
-        discard(checked_inc_i32_i64(&seconds, 0))
+        _ = checked_inc_i32_i64(&seconds, 0)
         return i64_max if checked_has_overflow(&seconds) else checked_value(&seconds)
     return this.m_seconds
 
@@ -322,13 +322,13 @@ pub func duration_to_seconds_f64(this: const Duration*) -> f64:
 pub func duration_to_milliseconds(this: const Duration*) -> i64:
     assert(this.m_nanoseconds < 1000000000)
     var milliseconds = make_checked[i64]((this.m_seconds + 1) if this.m_seconds < 0 else this.m_seconds)
-    discard(checked_mul_assign_t_i64(&milliseconds, 1000))
-    discard(checked_add_assign_t_i64(&milliseconds, (i64)(this.m_nanoseconds // 1000000)))
+    _ = checked_mul_assign_t_i64(&milliseconds, 1000)
+    _ = checked_add_assign_t_i64(&milliseconds, (i64)(this.m_nanoseconds // 1000000))
     if this.m_seconds >= 0 and this.m_nanoseconds % 1000000 != 0:
-        discard(checked_inc_i32_i64(&milliseconds, 0))
+        _ = checked_inc_i32_i64(&milliseconds, 0)
     if this.m_seconds < 0:
         # We dropped one second previously, put it back in now that we have handled the rounding.
-        discard(checked_sub_assign_t_i64(&milliseconds, 1000))
+        _ = checked_sub_assign_t_i64(&milliseconds, 1000)
     if not checked_has_overflow(&milliseconds):
         return checked_value(&milliseconds)
     return i64_min if this.m_seconds < 0 else i64_max
@@ -337,13 +337,13 @@ pub func duration_to_milliseconds(this: const Duration*) -> i64:
 pub func duration_to_microseconds(this: const Duration*) -> i64:
     assert(this.m_nanoseconds < 1000000000)
     var microseconds = make_checked[i64]((this.m_seconds + 1) if this.m_seconds < 0 else this.m_seconds)
-    discard(checked_mul_assign_t_i64(&microseconds, 1000000))
-    discard(checked_add_assign_t_i64(&microseconds, (i64)(this.m_nanoseconds // 1000)))
+    _ = checked_mul_assign_t_i64(&microseconds, 1000000)
+    _ = checked_add_assign_t_i64(&microseconds, (i64)(this.m_nanoseconds // 1000))
     if this.m_seconds >= 0 and this.m_nanoseconds % 1000 != 0:
-        discard(checked_inc_i32_i64(&microseconds, 0))
+        _ = checked_inc_i32_i64(&microseconds, 0)
     if this.m_seconds < 0:
         # We dropped one second previously, put it back in now that we have handled the rounding.
-        discard(checked_sub_assign_t_i64(&microseconds, 1000000))
+        _ = checked_sub_assign_t_i64(&microseconds, 1000000)
     if not checked_has_overflow(&microseconds):
         return checked_value(&microseconds)
     return i64_min if this.m_seconds < 0 else i64_max
@@ -352,11 +352,11 @@ pub func duration_to_microseconds(this: const Duration*) -> i64:
 pub func duration_to_nanoseconds(this: const Duration*) -> i64:
     assert(this.m_nanoseconds < 1000000000)
     var nanoseconds = make_checked[i64]((this.m_seconds + 1) if this.m_seconds < 0 else this.m_seconds)
-    discard(checked_mul_assign_t_i64(&nanoseconds, 1000000000))
-    discard(checked_add_assign_t_i64(&nanoseconds, (i64)this.m_nanoseconds))
+    _ = checked_mul_assign_t_i64(&nanoseconds, 1000000000)
+    _ = checked_add_assign_t_i64(&nanoseconds, (i64)this.m_nanoseconds)
     if this.m_seconds < 0:
         # We dropped one second previously, put it back in now that we have handled the rounding.
-        discard(checked_sub_assign_t_i64(&nanoseconds, 1000000000))
+        _ = checked_sub_assign_t_i64(&nanoseconds, 1000000000)
     if not checked_has_overflow(&nanoseconds):
         return checked_value(&nanoseconds)
     return i64_min if this.m_seconds < 0 else i64_max
@@ -428,7 +428,7 @@ pub func duration_add(this: const Duration*, other: Duration) -> Duration:
             return duration_max()
 
     var new_secs = make_checked[i64](this_secs)
-    discard(checked_add_assign_t_i64(&new_secs, other_secs))
+    _ = checked_add_assign_t_i64(&new_secs, other_secs)
     if checked_has_overflow(&new_secs):
         if other_secs > 0:
             return duration_max()

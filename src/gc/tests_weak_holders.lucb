@@ -27,7 +27,7 @@ noinline func hold_weaks(heap: Heap*, slots: Weak[TestCell]*) -> Root[TestCell]:
 ## collection gave back first (their freelists are last-in first-out).
 noinline func make_weaks_to_new_cells(heap: Heap*, count: usize):
     for i in 0..<count:
-        discard(make_unreferenced_cell(heap, 100 + (i64)i))
+        _ = make_unreferenced_cell(heap, 100 + (i64)i)
 
 ## The id of the cell `weak` reads, or -1 once it died.
 noinline func weak_id(weak: const Weak[TestCell]*) -> i64:
@@ -65,7 +65,7 @@ test "a Weak held only in C-heap memory":
 
 noinline func run_weaks_in_c_heap():
     let heap = create_test_heap()
-    let slots = (alloc Weak[TestCell][2] in memory.heap) else trap("out of memory")
+    let slots = (new Weak[TestCell][2] --- in memory.heap) else trap("out of memory")
     check_weaks_held_in(heap, slots.data)
     free(slots) in memory.heap
     destroy_test_heap(heap)
@@ -87,6 +87,6 @@ test "a Weak held only in an atomic blob":
 
 noinline func run_weaks_in_atomic_blob():
     let heap = create_test_heap()
-    let blob = heap_allocate_blob(heap, 2 * sizeof(Weak[TestCell]), 16, true) else trap("no blob")
+    let blob = heap_allocate_blob(heap, 2 * memory.size_of(Weak[TestCell]), 16, true) else trap("no blob")
     check_weaks_held_in(heap, (Weak[TestCell]*)blob.data)
     destroy_test_heap(heap)

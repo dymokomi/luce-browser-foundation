@@ -123,7 +123,7 @@ pub func checked_inc_i64(this: Checked[i64]*) -> Checked[i64]*:
 
 ## Ported from AK/Checked.h:286 AK::Checked::operator++ (postfix), for i64.
 pub func checked_inc_i32_i64(this: Checked[i64]*, arg0: i32) -> Checked[i64]:
-    discard(arg0)
+    _ = arg0
     let old = *this
     checked_add_i64(this, 1)
     return old
@@ -135,7 +135,7 @@ pub func checked_dec_i64(this: Checked[i64]*) -> Checked[i64]*:
 
 ## Ported from AK/Checked.h:299 AK::Checked::operator-- (postfix), for i64.
 pub func checked_dec_i32_i64(this: Checked[i64]*, arg0: i32) -> Checked[i64]:
-    discard(arg0)
+    _ = arg0
     let old = *this
     checked_sub_i64(this, 1)
     return old
@@ -155,31 +155,31 @@ pub func checked_multiplication_would_overflow_i64(u: i64, v: i64) -> bool:
 ## Ported from AK/Checked.h:354 AK::operator+(Checked, Checked), for i64.
 pub func add_i64(a: Checked[i64], b: Checked[i64]) -> Checked[i64]:
     var c = a
-    discard(checked_add_assign_checked_i64(&c, b))
+    _ = checked_add_assign_checked_i64(&c, b)
     return c
 
 ## Ported from AK/Checked.h:362 AK::operator-(Checked, Checked), for i64.
 pub func sub_i64(a: Checked[i64], b: Checked[i64]) -> Checked[i64]:
     var c = a
-    discard(checked_sub_assign_checked_i64(&c, b))
+    _ = checked_sub_assign_checked_i64(&c, b)
     return c
 
 ## Ported from AK/Checked.h:370 AK::operator*(Checked, Checked), for i64.
 pub func mul_i64(a: Checked[i64], b: Checked[i64]) -> Checked[i64]:
     var c = a
-    discard(checked_mul_assign_checked_i64(&c, b))
+    _ = checked_mul_assign_checked_i64(&c, b)
     return c
 
 ## Ported from AK/Checked.h:378 AK::operator/(Checked, Checked), for i64.
 pub func div_i64(a: Checked[i64], b: Checked[i64]) -> Checked[i64]:
     var c = a
-    discard(checked_div_assign_checked_i64(&c, b))
+    _ = checked_div_assign_checked_i64(&c, b)
     return c
 
 ## Ported from AK/Checked.h:386 AK::operator%(Checked, Checked), for i64.
 pub func rem_i64(a: Checked[i64], b: Checked[i64]) -> Checked[i64]:
     var c = a
-    discard(checked_rem_assign_checked_i64(&c, b))
+    _ = checked_rem_assign_checked_i64(&c, b)
     return c
 
 # mark: i32 =====================================================================================
@@ -298,7 +298,7 @@ pub func checked_inc_i32(this: Checked[i32]*) -> Checked[i32]*:
 
 ## Ported from AK/Checked.h:286 AK::Checked::operator++ (postfix), for i32.
 pub func checked_inc_i32_i32(this: Checked[i32]*, arg0: i32) -> Checked[i32]:
-    discard(arg0)
+    _ = arg0
     let old = *this
     checked_add_i32(this, 1)
     return old
@@ -310,7 +310,7 @@ pub func checked_dec_i32(this: Checked[i32]*) -> Checked[i32]*:
 
 ## Ported from AK/Checked.h:299 AK::Checked::operator-- (postfix), for i32.
 pub func checked_dec_i32_i32(this: Checked[i32]*, arg0: i32) -> Checked[i32]:
-    discard(arg0)
+    _ = arg0
     let old = *this
     checked_sub_i32(this, 1)
     return old
@@ -330,29 +330,29 @@ pub func checked_multiplication_would_overflow_i32(u: i32, v: i32) -> bool:
 ## Ported from AK/Checked.h:354 AK::operator+(Checked, Checked), for i32.
 pub func add_i32(a: Checked[i32], b: Checked[i32]) -> Checked[i32]:
     var c = a
-    discard(checked_add_assign_checked_i32(&c, b))
+    _ = checked_add_assign_checked_i32(&c, b)
     return c
 
 ## Ported from AK/Checked.h:362 AK::operator-(Checked, Checked), for i32.
 pub func sub_i32(a: Checked[i32], b: Checked[i32]) -> Checked[i32]:
     var c = a
-    discard(checked_sub_assign_checked_i32(&c, b))
+    _ = checked_sub_assign_checked_i32(&c, b)
     return c
 
 ## Ported from AK/Checked.h:370 AK::operator*(Checked, Checked), for i32.
 pub func mul_i32(a: Checked[i32], b: Checked[i32]) -> Checked[i32]:
     var c = a
-    discard(checked_mul_assign_checked_i32(&c, b))
+    _ = checked_mul_assign_checked_i32(&c, b)
     return c
 
 ## Ported from AK/Checked.h:378 AK::operator/(Checked, Checked), for i32.
 pub func div_i32(a: Checked[i32], b: Checked[i32]) -> Checked[i32]:
     var c = a
-    discard(checked_div_assign_checked_i32(&c, b))
+    _ = checked_div_assign_checked_i32(&c, b)
     return c
 
 ## Ported from AK/Checked.h:386 AK::operator%(Checked, Checked), for i32.
 pub func rem_i32(a: Checked[i32], b: Checked[i32]) -> Checked[i32]:
     var c = a
-    discard(checked_rem_assign_checked_i32(&c, b))
+    _ = checked_rem_assign_checked_i32(&c, b)
     return c

@@ -123,7 +123,7 @@ pub func format_value_duration(params: TypeErasedFormatParams*, builder: FormatB
 
 ## Ported from AK/Time.h:669 AK::Formatter<UnixDateTime>::format: "YYYY-MM-DD hh:mm:ss" in UTC.
 pub func formatter_unix_date_time_format(this: StandardFormatter*, builder: FormatBuilder*, value: const UnixDateTime*) -> !:
-    discard(this)
+    _ = this
     let result_time = unaware_time_to_timespec(&value.unaware_time).tv_sec
     var tm: Tm
     if gmtime_r(&result_time, &tm) == none:

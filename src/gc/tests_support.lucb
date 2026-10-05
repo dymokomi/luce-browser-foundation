@@ -28,7 +28,7 @@ struct TestCell: IsCell:
 
 let test_cell_vtable: CellVTable = CellVTable(class_info = &test_cell_class, class_name = test_cell_class_name_impl, visit_edges = test_cell_visit_edges_impl, finalize = test_cell_finalize_impl, must_survive_garbage_collection = test_cell_must_survive_garbage_collection_impl)
 
-let test_cell_class: ak.ClassInfo = ak.ClassInfo(name = "TestCell", first_id = 0, last_id = 0, size = sizeof(TestCell), vtable = (const void*)&test_cell_vtable)
+let test_cell_class: ak.ClassInfo = ak.ClassInfo(name = "TestCell", first_id = 0, last_id = 0, size = memory.size_of(TestCell), vtable = (const void*)&test_cell_vtable)
 
 ## GC_DECLARE_ALLOCATOR(TestCell) with OVERRIDES_FINALIZE and OVERRIDES_MUST_SURVIVE_GARBAGE_COLLECTION.
 var test_cell_allocator: TypeIsolatingCellAllocator[TestCell]
@@ -133,7 +133,7 @@ noinline func set_id(weak: const Weak[TestCell]*, id: i64):
 ## `count` cells nothing refers to once this returns.
 noinline func make_garbage(heap: Heap*, count: i64):
     for i in 0..<count:
-        discard(new_test_cell(heap, i))
+        _ = new_test_cell(heap, i)
 
 ## Overwrite the stack below the caller, so that dead frames hold no stale cell addresses.
 noinline func clobber_stack():

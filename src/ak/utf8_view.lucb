@@ -82,7 +82,7 @@ pub func utf8_code_point_iterator_peek(this: const Utf8CodePointIterator*, offse
 
     var new_iterator = *this
     for _index in 0..<offset:
-        discard(utf8_code_point_iterator_inc(&new_iterator))
+        _ = utf8_code_point_iterator_inc(&new_iterator)
         if utf8_code_point_iterator_done(&new_iterator):
             return none
     return utf8_code_point_iterator_deref(&new_iterator)
@@ -174,7 +174,7 @@ pub func utf8_view_iterator_at_byte_offset(this: const Utf8View*, byte_offset: u
         if current_offset >= byte_offset:
             return iterator
         current_offset += utf8_code_point_iterator_underlying_code_point_length_in_bytes(&iterator)
-        discard(utf8_code_point_iterator_inc(&iterator))
+        _ = utf8_code_point_iterator_inc(&iterator)
     return utf8_view_end(this)
 
 ## Ported from AK/Utf8View.cpp:26 AK::Utf8View::iterator_at_byte_offset_without_validation.
@@ -210,7 +210,7 @@ pub func utf8_view_code_point_offset_of(this: const Utf8View*, byte_offset: usiz
     var code_point_offset: usize = 0
     var it = utf8_view_begin(this)
     while not utf8_code_point_iterator_done(&it):
-        discard(utf8_code_point_iterator_inc(&it))
+        _ = utf8_code_point_iterator_inc(&it)
         if (usize)(it.m_ptr else trap("VERIFY: iterator without bytes")) > limit:
             break
         code_point_offset += 1
@@ -243,7 +243,7 @@ pub func utf8_view_byte_offset_of_usize(this: const Utf8View*, code_point_offset
 
         byte_offset += utf8_code_point_iterator_underlying_code_point_length_in_bytes(&it)
         remaining -= 1
-        discard(utf8_code_point_iterator_inc(&it))
+        _ = utf8_code_point_iterator_inc(&it)
     return byte_offset
 
 ## Ported from AK/Utf8View.h:109 AK::Utf8View::substring_view(size_t, size_t).
@@ -266,11 +266,11 @@ pub func utf8_view_unicode_substring_view_usize(this: const Utf8View*, code_poin
         if code_point_index == code_point_offset:
             offset_in_bytes = utf8_view_byte_offset_of_utf8_code_point_iterator(this, iterator)
         if code_point_index == code_point_offset + code_point_length - 1:
-            discard(utf8_code_point_iterator_inc(&iterator))
+            _ = utf8_code_point_iterator_inc(&iterator)
             let length_in_bytes = utf8_view_byte_offset_of_utf8_code_point_iterator(this, iterator) - offset_in_bytes
             return utf8_view_substring_view_usize(this, offset_in_bytes, length_in_bytes)
         code_point_index += 1
-        discard(utf8_code_point_iterator_inc(&iterator))
+        _ = utf8_code_point_iterator_inc(&iterator)
 
     trap("VERIFY_NOT_REACHED")
 
@@ -298,8 +298,8 @@ pub func utf8_view_starts_with(this: const Utf8View*, start: const Utf8View*) ->
     while not utf8_code_point_iterator_done(&l):
         if utf8_code_point_iterator_deref(&k) != utf8_code_point_iterator_deref(&l):
             return false
-        discard(utf8_code_point_iterator_inc(&k))
-        discard(utf8_code_point_iterator_inc(&l))
+        _ = utf8_code_point_iterator_inc(&k)
+        _ = utf8_code_point_iterator_inc(&l)
     return true
 
 ## Ported from AK/Utf8View.cpp:126 AK::Utf8View::contains.
@@ -314,7 +314,7 @@ pub func utf8_view_contains(this: const Utf8View*, needle: u32) -> bool:
         while not utf8_code_point_iterator_done(&it):
             if utf8_code_point_iterator_deref(&it) == needle:
                 return true
-            discard(utf8_code_point_iterator_inc(&it))
+            _ = utf8_code_point_iterator_inc(&it)
 
     return false
 
@@ -326,7 +326,7 @@ pub func utf8_view_contains_any_of(this: const Utf8View*, needles: const u32[]) 
         for needle in needles:
             if code_point == needle:
                 return true
-        discard(utf8_code_point_iterator_inc(&it))
+        _ = utf8_code_point_iterator_inc(&it)
 
     return false
 
@@ -345,7 +345,7 @@ pub func utf8_view_trim(this: const Utf8View*, characters: Utf8View, mode: TrimM
                 break
             substring_start += utf8_code_point_iterator_underlying_code_point_length_in_bytes(&code_point)
             substring_length -= utf8_code_point_iterator_underlying_code_point_length_in_bytes(&code_point)
-            discard(utf8_code_point_iterator_inc(&code_point))
+            _ = utf8_code_point_iterator_inc(&code_point)
 
     if mode == TrimMode.right or mode == TrimMode.both:
         var seen_whitespace_length: usize = 0
@@ -355,7 +355,7 @@ pub func utf8_view_trim(this: const Utf8View*, characters: Utf8View, mode: TrimM
                 seen_whitespace_length += utf8_code_point_iterator_underlying_code_point_length_in_bytes(&code_point)
             else:
                 seen_whitespace_length = 0
-            discard(utf8_code_point_iterator_inc(&code_point))
+            _ = utf8_code_point_iterator_inc(&code_point)
         if seen_whitespace_length >= substring_length:
             return Utf8View()
         substring_length -= seen_whitespace_length
@@ -418,11 +418,11 @@ pub func utf8_view_for_each_split_view[P: CodePointPredicate, TCallback: Utf8Vie
                 offset += 1
 
             start_offset = offset
-            discard(utf8_code_point_iterator_inc(&iterator))
+            _ = utf8_code_point_iterator_inc(&iterator)
             continue
 
         offset += 1
-        discard(utf8_code_point_iterator_inc(&iterator))
+        _ = utf8_code_point_iterator_inc(&iterator)
     utf8_view_for_each_split_view_run_callback(this, splitter, callback, start_offset, offset, keep_empty, keep_trailing_separator)
 
 ## The `run_callback` lambda of Utf8View::for_each_split_view.

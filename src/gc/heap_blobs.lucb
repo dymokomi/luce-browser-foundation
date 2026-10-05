@@ -19,7 +19,7 @@
 #==============================================================================================
 
 ## The bytes before a blob's payload: its Cell header.
-pub let blob_header_size: usize = sizeof(Cell)
+pub let blob_header_size: usize = memory.size_of(Cell)
 
 ## The alignment of a blob's payload in a heap block (cells are 16-aligned, the header is 16).
 let blob_alignment: usize = 16
@@ -28,13 +28,13 @@ let blob_alignment: usize = 16
 pub let blob_vtable: CellVTable = CellVTable(class_info = &blob_class, class_name = blob_class_name_impl, visit_edges = blob_visit_edges_impl)
 
 ## Class information of a blob.
-pub let blob_class: ak.ClassInfo = ak.ClassInfo(name = "Blob", first_id = 0, last_id = 0, size = sizeof(Cell), vtable = (const void*)&blob_vtable)
+pub let blob_class: ak.ClassInfo = ak.ClassInfo(name = "Blob", first_id = 0, last_id = 0, size = memory.size_of(Cell), vtable = (const void*)&blob_vtable)
 
 ## The vtable of an atomic blob: nothing to visit.
 pub let atomic_blob_vtable: CellVTable = CellVTable(class_info = &atomic_blob_class, class_name = atomic_blob_class_name_impl)
 
 ## Class information of an atomic blob.
-pub let atomic_blob_class: ak.ClassInfo = ak.ClassInfo(name = "AtomicBlob", first_id = 0, last_id = 0, size = sizeof(Cell), vtable = (const void*)&atomic_blob_vtable)
+pub let atomic_blob_class: ak.ClassInfo = ak.ClassInfo(name = "AtomicBlob", first_id = 0, last_id = 0, size = memory.size_of(Cell), vtable = (const void*)&atomic_blob_vtable)
 
 ## A blob's class name.
 func blob_class_name_impl(this: Cell*) -> ak.StringView:
@@ -159,7 +159,7 @@ func heap_allocate_large_cell(this: Heap*, cell_size: usize, allocator: CellAllo
 func heap_allocate_large_object(this: Heap*, cell_size: usize, alignment: usize, overrides_must_survive_garbage_collection: bool, overrides_finalize: bool) -> Cell*:
     heap_will_allocate(this, cell_size)
     let payload_alignment = alignment if alignment > blob_alignment else blob_alignment
-    let cell_offset = (sizeof(LargeObject) + blob_header_size + payload_alignment - 1) // payload_alignment * payload_alignment - blob_header_size
+    let cell_offset = (memory.size_of(LargeObject) + blob_header_size + payload_alignment - 1) // payload_alignment * payload_alignment - blob_header_size
     let mapping_size = (cell_offset + cell_size + heap_block_base_block_size - 1) // heap_block_base_block_size * heap_block_base_block_size
     let object = (LargeObject*)map_aligned_block(mapping_size)
     object.heap_block_base.m_heap = this

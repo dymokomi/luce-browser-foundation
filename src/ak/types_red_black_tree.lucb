@@ -46,7 +46,7 @@ pub struct RedBlackTreeIterator[K, V]: luce.Iterable[V*, RedBlackTreeIterator[K,
 
     pub func iterator() -> RedBlackTreeIterator[K, V]: return self
 
-    pub mutating func next() -> V*?: return red_black_tree_iterator_next(&self)
+    pub func next() -> V*?: return red_black_tree_iterator_next(&self)
 
 # mark: RedBlackTree ============================================================================
 

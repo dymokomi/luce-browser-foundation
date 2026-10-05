@@ -18,13 +18,13 @@ func tests_base64_decode_fails(input: const u8[], url: bool) -> bool:
     var failed = false
     let view = string_view_from_bytes(input)
     if url:
-        discard(decode_base64url(view) catch:
+        _ = decode_base64url(view) catch:
             failed = true
-            recover ByteBuffer())
+            recover ByteBuffer()
     else:
-        discard(decode_base64(view) catch:
+        _ = decode_base64(view) catch:
             failed = true
-            recover ByteBuffer())
+            recover ByteBuffer()
     return failed
 
 test "base64: decode":
@@ -48,7 +48,7 @@ func tests_base64_decode_into_equal(input: str, expected: str, buffer_size: usiz
 
     match decode_base64_into(sv(input), &buffer):
         .invalid(_): trap("decode_base64_into failed")
-        .decoded(_): discard(0)
+        .decoded(_): _ = 0
 
     let decoded = string_view_from_bytes(byte_buffer_span_const(&buffer))
     assert(string_view_equals(&decoded, expected))

@@ -22,7 +22,7 @@ pub func ordered_hash_map_clone[K, V, KT: Traits[K]](this: const OrderedHashMap[
     clone_.m_table.m_table.m_ordered = true
     try ordered_hash_map_try_ensure_capacity(&clone_, ordered_hash_map_size(this))
     for entry in ordered_hash_map_begin_const(this):
-        discard(ordered_hash_map_set(&clone_, entry.key, entry.value))
+        _ = ordered_hash_map_set(&clone_, entry.key, entry.value)
     return clone_
 
 ## AK::OrderedHashMap::is_empty (IsOrdered = true).

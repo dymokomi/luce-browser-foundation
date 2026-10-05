@@ -27,7 +27,7 @@ func formatted(fmtstr: str, arguments: const TypeErasedParameter[]) -> str:
     let view = string_builder_string_view(&builder)
     # A short result lives in the builder's inline buffer, in this frame: copy it out.
     let bytes = string_view_bytes(&view)
-    let copy = alloc u8[bytes.length] else trap("out of memory")
+    let copy = new u8[bytes.length] --- else trap("out of memory")
     memory.copy(copy, bytes, bytes.length)
     return (str)copy
 
@@ -266,4 +266,4 @@ test "file_descriptor":
 
     assert((str)buffer[0..<nread] == "Hello, World!\nfoobar\n")
 
-    discard(fclose(file))
+    _ = fclose(file)

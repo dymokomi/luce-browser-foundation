@@ -56,7 +56,7 @@ func index_gb18030_ranges_code_point(pointer: u32) -> u32?:
     # 3. Let offset be the last pointer in index gb18030 ranges that is less than or equal to pointer and let code point offset be its corresponding code point.
     var last_index: usize = 0
     let comparator = ak.Function2[const u32*, const Gb18030RangeEntry*, i32](call = gb18030_ranges_compare_pointer, context = none)
-    discard(ak.binary_search(s_gb18030_ranges, pointer, &last_index, comparator))
+    _ = ak.binary_search(s_gb18030_ranges, pointer, &last_index, comparator)
     let offset = s_gb18030_ranges[last_index].pointer
     let code_point_offset = s_gb18030_ranges[last_index].code_point
 

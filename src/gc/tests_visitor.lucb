@@ -71,17 +71,17 @@ test "the visit overloads reach every cell of every shape":
 
     # AK's HashTable: every value in the table is visited once per visit.
     var table: ak.HashTable[TestCell*, ak.PtrTraits[TestCell]]
-    discard(ak.hash_table_set(&table, cells[3]))
+    _ = ak.hash_table_set(&table, cells[3])
     cell_visitor_visit_hash_table(visitor, &table)
     assert(times_seen(&recorder, cells[3]) == 3)
     assert(times_seen(&recorder, cells[0]) == 8)
     var ordered: ak.OrderedHashTable[TestCell*, ak.PtrTraits[TestCell]]
-    discard(ak.ordered_hash_table_set(&ordered, cells[3]))
+    _ = ak.ordered_hash_table_set(&ordered, cells[3])
     cell_visitor_visit_opaque_2(visitor, &ordered)
     assert(times_seen(&recorder, cells[3]) == 4)
 
     var map: ak.HashMap[TestCell*, TestCell*, ak.PtrTraits[TestCell]]
-    discard(ak.hash_map_set(&map, cells[1], cells[2]))
+    _ = ak.hash_map_set(&map, cells[1], cells[2])
     cell_visitor_visit_hash_map(visitor, &map)
     assert(times_seen(&recorder, cells[2]) == 3 and times_seen(&recorder, cells[1]) == 5)
     cell_visitor_visit_hash_map_keys(visitor, &map)
@@ -117,7 +117,7 @@ test "the graph visitor follows the edges from the roots":
     var roots: GcHashMap[HeapRoot]
     gc_hash_map_set(&roots, (usize)first, HeapRoot(type_ = HeapRootType.root))
     var visitor: GraphConstructorVisitor = ---
-    memory.set(u8[]((u8*)&visitor, sizeof(GraphConstructorVisitor)), 0)
+    memory.set(u8[]((u8*)&visitor, memory.size_of(GraphConstructorVisitor)), 0)
     graph_constructor_visitor_construct(&visitor, heap, &roots)
     graph_constructor_visitor_visit_all_cells(&visitor)
     assert(gc_hash_map_size(&visitor.m_graph) == 3)
@@ -158,8 +158,8 @@ test "the collection report and the allocator dump run":
     let heap = create_test_heap()
     var root = root_create[TestCell](new_test_cell(heap, 1))
     make_garbage(heap, 300)
-    discard(heap_allocate_blob(heap, 100, 16, false))
-    discard(heap_allocate_blob(heap, 50000, 16, true))
+    _ = heap_allocate_blob(heap, 100, 16, false)
+    _ = heap_allocate_blob(heap, 50000, 16, true)
     let view: memory.Allocator = heap
     with view:
         # the reports allocate nothing: printing them while the heap is current is fine

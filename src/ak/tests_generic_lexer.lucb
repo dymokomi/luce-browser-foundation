@@ -80,28 +80,28 @@ test "GenericLexer: should_constexpr_next_is":
 
 test "GenericLexer: should_constexpr_retreat":
     var sut = generic_lexer_new(sv("abcdef"))
-    discard(generic_lexer_consume(&sut))
+    _ = generic_lexer_consume(&sut)
     generic_lexer_retreat(&sut)
     assert(generic_lexer_peek(&sut) == 'a')
     var utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
-    discard(utf16_generic_lexer_consume(&utf16_sut))
+    _ = utf16_generic_lexer_consume(&utf16_sut)
     utf16_generic_lexer_retreat(&utf16_sut)
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'a')
 
 test "GenericLexer: should_constexpr_consume_1":
     var sut = generic_lexer_new(sv("abcdef"))
-    discard(generic_lexer_consume(&sut))
+    _ = generic_lexer_consume(&sut)
     assert(generic_lexer_peek(&sut) == 'b')
     var utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
-    discard(utf16_generic_lexer_consume(&utf16_sut))
+    _ = utf16_generic_lexer_consume(&utf16_sut)
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'b')
 
 test "GenericLexer: should_constexpr_consume_specific_char":
     var sut = generic_lexer_new(sv("abcdef"))
-    discard(generic_lexer_consume_specific_t_char_type(&sut, 'a'))
+    _ = generic_lexer_consume_specific_t_char_type(&sut, 'a')
     assert(generic_lexer_peek(&sut) == 'b')
     var utf16_sut = utf16_generic_lexer_new(utf16_sv("abcdef"))
-    discard(utf16_generic_lexer_consume_specific_u8(&utf16_sut, 'a'))
+    _ = utf16_generic_lexer_consume_specific_u8(&utf16_sut, 'a')
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'b')
 
 test "GenericLexer: should_constexpr_consume_specific_string_view":
@@ -116,12 +116,12 @@ test "GenericLexer: should_constexpr_consume_specific_with_predicate":
     var sut = generic_lexer_new(sv("h e l l o !"))
     let pred = TestLexerAlphaOrSpace(unused = 0)
     for _i in 0..<100:
-        discard(generic_lexer_consume_specific_with_predicate(&sut, &pred))
+        _ = generic_lexer_consume_specific_with_predicate(&sut, &pred)
     assert(generic_lexer_peek(&sut) == '!')
     var utf16_sut = utf16_generic_lexer_new(utf16_sv("h e l l o !"))
     let utf16_pred = TestLexerAlphaOrSpaceCodePoint(unused = 0)
     for _i in 0..<100:
-        discard(utf16_generic_lexer_consume_specific_with_predicate(&utf16_sut, &utf16_pred))
+        _ = utf16_generic_lexer_consume_specific_with_predicate(&utf16_sut, &utf16_pred)
     assert(utf16_generic_lexer_peek(&utf16_sut) == (u16)'!')
 
 test "GenericLexer: should_constexpr_ignore_until":
@@ -282,61 +282,61 @@ func test_decimal_integer_error(text: str, type_name: str) -> (str, str):
     var char_error = ""
     var utf16_error = ""
     if type_name == "u8":
-        discard(generic_lexer_consume_decimal_integer_u8(&lexer) catch failure:
+        _ = generic_lexer_consume_decimal_integer_u8(&lexer) catch failure:
             char_error = failure.message
-            recover 0)
-        discard(utf16_generic_lexer_consume_decimal_integer_u8(&utf16_lexer) catch failure:
+            recover 0
+        _ = utf16_generic_lexer_consume_decimal_integer_u8(&utf16_lexer) catch failure:
             utf16_error = failure.message
-            recover 0)
+            recover 0
     elif type_name == "u16":
-        discard(generic_lexer_consume_decimal_integer_u16(&lexer) catch failure:
+        _ = generic_lexer_consume_decimal_integer_u16(&lexer) catch failure:
             char_error = failure.message
-            recover 0)
-        discard(utf16_generic_lexer_consume_decimal_integer_u16(&utf16_lexer) catch failure:
+            recover 0
+        _ = utf16_generic_lexer_consume_decimal_integer_u16(&utf16_lexer) catch failure:
             utf16_error = failure.message
-            recover 0)
+            recover 0
     elif type_name == "u32":
-        discard(generic_lexer_consume_decimal_integer_u32(&lexer) catch failure:
+        _ = generic_lexer_consume_decimal_integer_u32(&lexer) catch failure:
             char_error = failure.message
-            recover 0)
-        discard(utf16_generic_lexer_consume_decimal_integer_u32(&utf16_lexer) catch failure:
+            recover 0
+        _ = utf16_generic_lexer_consume_decimal_integer_u32(&utf16_lexer) catch failure:
             utf16_error = failure.message
-            recover 0)
+            recover 0
     elif type_name == "u64":
-        discard(generic_lexer_consume_decimal_integer_u64(&lexer) catch failure:
+        _ = generic_lexer_consume_decimal_integer_u64(&lexer) catch failure:
             char_error = failure.message
-            recover 0)
-        discard(utf16_generic_lexer_consume_decimal_integer_u64(&utf16_lexer) catch failure:
+            recover 0
+        _ = utf16_generic_lexer_consume_decimal_integer_u64(&utf16_lexer) catch failure:
             utf16_error = failure.message
-            recover 0)
+            recover 0
     elif type_name == "i8":
-        discard(generic_lexer_consume_decimal_integer_i8(&lexer) catch failure:
+        _ = generic_lexer_consume_decimal_integer_i8(&lexer) catch failure:
             char_error = failure.message
-            recover 0)
-        discard(utf16_generic_lexer_consume_decimal_integer_i8(&utf16_lexer) catch failure:
+            recover 0
+        _ = utf16_generic_lexer_consume_decimal_integer_i8(&utf16_lexer) catch failure:
             utf16_error = failure.message
-            recover 0)
+            recover 0
     elif type_name == "i16":
-        discard(generic_lexer_consume_decimal_integer_i16(&lexer) catch failure:
+        _ = generic_lexer_consume_decimal_integer_i16(&lexer) catch failure:
             char_error = failure.message
-            recover 0)
-        discard(utf16_generic_lexer_consume_decimal_integer_i16(&utf16_lexer) catch failure:
+            recover 0
+        _ = utf16_generic_lexer_consume_decimal_integer_i16(&utf16_lexer) catch failure:
             utf16_error = failure.message
-            recover 0)
+            recover 0
     elif type_name == "i32":
-        discard(generic_lexer_consume_decimal_integer_i32(&lexer) catch failure:
+        _ = generic_lexer_consume_decimal_integer_i32(&lexer) catch failure:
             char_error = failure.message
-            recover 0)
-        discard(utf16_generic_lexer_consume_decimal_integer_i32(&utf16_lexer) catch failure:
+            recover 0
+        _ = utf16_generic_lexer_consume_decimal_integer_i32(&utf16_lexer) catch failure:
             utf16_error = failure.message
-            recover 0)
+            recover 0
     else:
-        discard(generic_lexer_consume_decimal_integer_i64(&lexer) catch failure:
+        _ = generic_lexer_consume_decimal_integer_i64(&lexer) catch failure:
             char_error = failure.message
-            recover 0)
-        discard(utf16_generic_lexer_consume_decimal_integer_i64(&utf16_lexer) catch failure:
+            recover 0
+        _ = utf16_generic_lexer_consume_decimal_integer_i64(&utf16_lexer) catch failure:
             utf16_error = failure.message
-            recover 0)
+            recover 0
     # The position is rolled back on failure.
     test_check_lexer_position(&lexer, &utf16_lexer, 0)
     return (char_error, utf16_error)

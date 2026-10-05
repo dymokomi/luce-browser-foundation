@@ -389,37 +389,37 @@ pub func atomic_fetch_xor_i64(var_: i64*, val: i64, order: MemoryOrder = MemoryO
 
 ## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for u8: every luce-base `@T` is lock-free.
 pub func atomic_is_lock_free_u8(ptr: u8*? = none) -> bool:
-    discard(ptr)
+    _ = ptr
     return true
 
 ## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for u16: every luce-base `@T` is lock-free.
 pub func atomic_is_lock_free_u16(ptr: u16*? = none) -> bool:
-    discard(ptr)
+    _ = ptr
     return true
 
 ## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for u32: every luce-base `@T` is lock-free.
 pub func atomic_is_lock_free_u32(ptr: u32*? = none) -> bool:
-    discard(ptr)
+    _ = ptr
     return true
 
 ## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for u64: every luce-base `@T` is lock-free.
 pub func atomic_is_lock_free_u64(ptr: u64*? = none) -> bool:
-    discard(ptr)
+    _ = ptr
     return true
 
 ## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for usize: every luce-base `@T` is lock-free.
 pub func atomic_is_lock_free_usize(ptr: usize*? = none) -> bool:
-    discard(ptr)
+    _ = ptr
     return true
 
 ## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for i32: every luce-base `@T` is lock-free.
 pub func atomic_is_lock_free_i32(ptr: i32*? = none) -> bool:
-    discard(ptr)
+    _ = ptr
     return true
 
 ## Ported from AK/Atomic.h:143 AK::atomic_is_lock_free, for i64: every luce-base `@T` is lock-free.
 pub func atomic_is_lock_free_i64(ptr: i64*? = none) -> bool:
-    discard(ptr)
+    _ = ptr
     return true
 
 # mark: Pointer locations =======================================================================

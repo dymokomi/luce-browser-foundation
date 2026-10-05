@@ -9,25 +9,25 @@
 #==============================================================================================
 
 func test_leb_u32(stream: FixedMemoryStream*) -> u32?:
-    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    _ = seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     let value = leb128_read_from_stream_u32(stream.stream()) catch:
         return none
     return leb128_to_t(&value)
 
 func test_leb_i32(stream: FixedMemoryStream*) -> i32?:
-    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    _ = seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     let value = leb128_read_from_stream_i32(stream.stream()) catch:
         return none
     return leb128_to_t(&value)
 
 func test_leb_u64(stream: FixedMemoryStream*) -> u64?:
-    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    _ = seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     let value = leb128_read_from_stream_u64(stream.stream()) catch:
         return none
     return leb128_to_t(&value)
 
 func test_leb_i64(stream: FixedMemoryStream*) -> i64?:
-    discard(seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed"))
+    _ = seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     let value = leb128_read_from_stream_i64(stream.stream()) catch:
         return none
     return leb128_to_t(&value)

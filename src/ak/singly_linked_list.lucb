@@ -16,11 +16,11 @@
 ## The size policy of a SinglyLinkedList (SinglyLinkedListSizePolicy.h): told of every
 ## insertion, removal and clear, and asked for the size given the head node.
 pub interface SizeCalculationPolicy[T]:
-    mutating func increase_size(value: const T*)
+    func increase_size(value: const T*)
 
-    mutating func decrease_size(value: const T*)
+    func decrease_size(value: const T*)
 
-    mutating func reset()
+    func reset()
 
     func size(head: const SinglyLinkedListNode[T]*?) -> usize
 
@@ -29,11 +29,11 @@ pub interface SizeCalculationPolicy[T]:
 pub struct DefaultSizeCalculationPolicy[T]: SizeCalculationPolicy[T]:
     var empty_: u8
 
-    mutating func increase_size(value: const T*): discard(value)
+    func increase_size(value: const T*): _ = value
 
-    mutating func decrease_size(value: const T*): discard(value)
+    func decrease_size(value: const T*): _ = value
 
-    mutating func reset(): return
+    func reset(): return
 
     func size(head: const SinglyLinkedListNode[T]*?) -> usize: return default_size_calculation_policy_size(head)
 
@@ -51,20 +51,20 @@ func default_size_calculation_policy_size[T](head: const SinglyLinkedListNode[T]
 pub struct CountingSizeCalculationPolicy[T]: SizeCalculationPolicy[T]:
     var m_size: usize
 
-    mutating func increase_size(value: const T*): self.m_size = counting_size_calculation_policy_step(self.m_size, value, 1)
+    func increase_size(value: const T*): self.m_size = counting_size_calculation_policy_step(self.m_size, value, 1)
 
-    mutating func decrease_size(value: const T*): self.m_size = counting_size_calculation_policy_step(self.m_size, value, -1)
+    func decrease_size(value: const T*): self.m_size = counting_size_calculation_policy_step(self.m_size, value, -1)
 
-    mutating func reset(): self.m_size = 0
+    func reset(): self.m_size = 0
 
     func size(head: const SinglyLinkedListNode[T]*?) -> usize: return counting_size_calculation_policy_size(self.m_size, head)
 
 func counting_size_calculation_policy_step[T](size: usize, value: const T*, delta: isize) -> usize:
-    discard(value)
+    _ = value
     return (usize)((isize)size + delta)
 
 func counting_size_calculation_policy_size[T](size: usize, head: const SinglyLinkedListNode[T]*?) -> usize:
-    discard(head)
+    _ = head
     return size
 
 # mark: SinglyLinkedListIterator ================================================================
@@ -114,7 +114,7 @@ pub func singly_linked_list_iterator_construct[T](this: SinglyLinkedListIterator
 ## protocol over `*it` and `++it`).
 pub func singly_linked_list_iterator_next[T](this: SinglyLinkedListIterator[T]*) -> T*?:
     let node = this.m_node else return none
-    discard(singly_linked_list_iterator_inc(this))
+    _ = singly_linked_list_iterator_inc(this)
     return &node.value
 
 # The iterator at `node`, `prev` before it (the private constructor).
@@ -235,7 +235,7 @@ pub func singly_linked_list_begin[T, P: SizeCalculationPolicy[T]](this: SinglyLi
 
 ## Ported from AK/SinglyLinkedList.h:194 AK::SinglyLinkedList::end.
 pub func singly_linked_list_end[T, P: SizeCalculationPolicy[T]](this: SinglyLinkedList[T, P]*) -> SinglyLinkedListIterator[T]:
-    discard(this)
+    _ = this
     var end: SinglyLinkedListIterator[T]
     return end
 
@@ -245,7 +245,7 @@ pub func singly_linked_list_begin_const[T, P: SizeCalculationPolicy[T]](this: co
 
 ## Ported from AK/SinglyLinkedList.h:199 AK::SinglyLinkedList::end const.
 pub func singly_linked_list_end_const[T, P: SizeCalculationPolicy[T]](this: const SinglyLinkedList[T, P]*) -> SinglyLinkedListIterator[T]:
-    discard(this)
+    _ = this
     var end: SinglyLinkedListIterator[T]
     return end
 
@@ -257,7 +257,7 @@ pub func singly_linked_list_find_if_const[T, P: SizeCalculationPolicy[T]](this: 
     while singly_linked_list_iterator_ne(&it, end):
         if function1_call(&pred, singly_linked_list_iterator_deref(&it)):
             return it
-        discard(singly_linked_list_iterator_inc(&it))
+        _ = singly_linked_list_iterator_inc(&it)
     return end
 
 ## Ported from AK/SinglyLinkedList.h:208 AK::SinglyLinkedList::find_if.

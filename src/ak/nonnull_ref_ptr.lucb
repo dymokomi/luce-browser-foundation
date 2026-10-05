@@ -19,7 +19,7 @@ pub func ref_if_not_null(ptr: RefCountedBase*?):
 # RefCounted<T>::unref: the object is not deleted at zero (managed memory).
 pub func unref_if_not_null(ptr: RefCountedBase*?):
     if let object = ptr:
-        discard(ref_counted_base_deref_base(object))
+        _ = ref_counted_base_deref_base(object)
 
 ## Ported from AK/NonnullRefPtr.h:223 AK::adopt_ref.
 pub func adopt_ref[T](object: T*) -> T*:

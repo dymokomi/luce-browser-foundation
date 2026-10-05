@@ -15,16 +15,16 @@
 
 ## Ported from AK/ByteStringImpl.h:97 AK::allocation_size_for_stringimpl: header, characters and NUL.
 pub func allocation_size_for_stringimpl(length: usize) -> usize:
-    return sizeof(ByteStringImpl) + (sizeof(u8) * length) + sizeof(u8)
+    return memory.size_of(ByteStringImpl) + (memory.size_of(u8) * length) + memory.size_of(u8)
 
 ## Ported from AK/ByteStringImpl.cpp:47 AK::ByteStringImpl::create_uninitialized: an impl of
 ## `length` uninitialized characters (NUL-terminated); `buffer` receives their address.
 pub func byte_string_impl_create_uninitialized(length: usize, buffer: (u8*?)*) -> const ByteStringImpl*:
     assert(length != 0)
-    let slot = alloc(allocation_size_for_stringimpl(length), alignof(ByteStringImpl)) else trap("VERIFY: kmalloc")
+    let slot = memory.allocate(allocation_size_for_stringimpl(length), memory.align_of(ByteStringImpl)) else trap("VERIFY: kmalloc")
     let new_stringimpl = (ByteStringImpl*)slot.data
     byte_string_impl_construct_byte_string_impl_construct_wit(new_stringimpl, ByteStringImplConstructWithInlineBufferTag.construct_with_inline_buffer, length)
-    let characters = (u8*)new_stringimpl + sizeof(ByteStringImpl)
+    let characters = (u8*)new_stringimpl + memory.size_of(ByteStringImpl)
     characters[length] = 0
     *buffer = characters
     return new_stringimpl
@@ -80,7 +80,7 @@ pub func byte_string_impl_length(this: const ByteStringImpl*) -> usize:
 
 ## Ported from AK/ByteStringImpl.h:42 AK::ByteStringImpl::characters: includes the NUL terminator.
 pub func byte_string_impl_characters(this: const ByteStringImpl*) -> const u8*:
-    return (const u8*)((u8*)this + sizeof(ByteStringImpl))
+    return (const u8*)((u8*)this + memory.size_of(ByteStringImpl))
 
 ## Ported from AK/ByteStringImpl.h:44 AK::ByteStringImpl::bytes.
 pub func byte_string_impl_bytes(this: const ByteStringImpl*) -> const u8[]:

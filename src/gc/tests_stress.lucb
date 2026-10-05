@@ -112,11 +112,11 @@ noinline func run_stress(heap: Heap*, seed: u64, steps: usize, slot_count: usize
                     cell.right = none
             _:
                 # garbage: cells and blobs nothing keeps
-                discard(new_stress_cell(heap, next_id, (usize)(r >> 44) % 3000, true))
+                _ = new_stress_cell(heap, next_id, (usize)(r >> 44) % 3000, true)
                 next_id += 1
         if collect_every != 0 and step % collect_every == collect_every - 1:
             heap_collect_garbage(heap)
-            discard(check_stress_graph(roots))
+            _ = check_stress_graph(roots)
     heap_collect_garbage(heap)
     let reachable = check_stress_graph(roots)
     # everything unreachable was collected, but for the odd stale word the stack may still hold

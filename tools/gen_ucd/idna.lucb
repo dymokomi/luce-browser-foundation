@@ -24,14 +24,14 @@ struct IdnaTable:
     var mapping_length: u8[]
     var pool: SequencePool
 
-    static func create() -> IdnaTable!:
+    func create() -> IdnaTable!:
         var table = IdnaTable(status = try new u8[code_point_count],
                               mapping_offset = try new u32[code_point_count],
                               mapping_length = try new u8[code_point_count], pool = try SequencePool.create())
         # Code points the table does not list are disallowed.
         for code_point in 0..<code_point_count:
             table.status[code_point] = idna_disallowed
-        discard(try table.pool.intern([0xffffff]))
+        _ = try table.pool.intern([0xffffff])
         return table
 
 func parse_uts46(table: IdnaTable*, data: const u8[]) -> !:
@@ -123,5 +123,5 @@ func emit_idna(table: const IdnaTable*) -> str!:
     for value in table.pool.values.view():
         try put_hex(&out, (u64)value, 6)
     try out.put("\"\n")
-    discard(range_count)
+    _ = range_count
     return out.view()

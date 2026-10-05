@@ -31,7 +31,7 @@ pub struct BaseIterator[K, V, TContainer]: luce.Iterable[V*, BaseIterator[K, V, 
 
     pub func iterator() -> BaseIterator[K, V, TContainer]: return self
 
-    pub mutating func next() -> V*?: return base_iterator_next(&self)
+    pub func next() -> V*?: return base_iterator_next(&self)
 
 # mark: IntrusiveRedBlackTreeNode ===============================================================
 

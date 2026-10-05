@@ -247,7 +247,7 @@ test "time: parse_time_from_gmt":
     let test_gmt3 = parse_of("%Y-%m-%d %H:%M:%S", "2023-06-15 18:30:45", true) else trap("none")
     let result_time = unaware_time_to_timespec(&test_gmt3.unaware_time)
     var tm = zeroed_tm()
-    discard(gmtime_r(&result_time.tv_sec, &tm) else trap("gmtime_r failed"))
+    _ = gmtime_r(&result_time.tv_sec, &tm) else trap("gmtime_r failed")
     assert(tm.tm_year + 1900 == 2023)
     assert(tm.tm_mon + 1 == 6)
     assert(tm.tm_mday == 15)
@@ -316,7 +316,7 @@ test "time: clocks and timeval helpers":
     let a = monotonic_time_now()
     let b = monotonic_time_now_coarse()
     assert(monotonic_time_nanoseconds_within_second(&a) < 1000000000)
-    discard(monotonic_time_sub_monotonic_time(&b, a))
+    _ = monotonic_time_sub_monotonic_time(&b, a)
     let now = unix_date_time_now()
     assert(unix_date_time_seconds_since_epoch(&now) > 1600000000)
     var tv: Timeval

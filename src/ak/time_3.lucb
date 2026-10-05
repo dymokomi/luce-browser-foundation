@@ -63,9 +63,9 @@ pub func unix_date_time_to_string_impl(this: const UnixDateTime*, builder: Strin
 
     let timestamp = duration_to_timespec(&this.unaware_time.m_offset).tv_sec
     if local_time == UnixDateTimeLocalTime.yes:
-        discard(localtime_r(&timestamp, &tm))
+        _ = localtime_r(&timestamp, &tm)
     else:
-        discard(gmtime_r(&timestamp, &tm))
+        _ = gmtime_r(&timestamp, &tm)
 
     let format_len = format_.m_length
     var i: usize = 0
@@ -375,7 +375,7 @@ pub func unix_date_time_parse(format_: StringView, string: StringView, from_gmt:
                 # yday is not used so setting it is pointless.
                 tm.tm_mday = time_parse_number(&state)
                 tm.tm_mon = 0
-                discard(mktime(&tm))
+                _ = mktime(&tm)
             'm':
                 let num = time_parse_number(&state)
                 tm.tm_mon = num - 1
@@ -430,7 +430,7 @@ pub func unix_date_time_parse(format_: StringView, string: StringView, from_gmt:
                 if not time_lexer_consume_specific(&state.lexer, '.'):
                     return none
                 # NOTE: the tm structure does not support sub second precision, so drop this value.
-                discard(time_parse_number(&state))
+                _ = time_parse_number(&state)
             '+':
                 var next_format_character: u8? = none
 

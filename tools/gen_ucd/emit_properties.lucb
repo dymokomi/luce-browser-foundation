@@ -59,7 +59,7 @@ struct HashIndex:
     var values: u32[]
     var used: bool[]
 
-    static func create(capacity: usize) -> HashIndex!:
+    func create(capacity: usize) -> HashIndex!:
         return HashIndex(keys = try new u64[capacity], values = try new u32[capacity], used = try new bool[capacity])
 
     ## The slot of `key` with `equal(value)`, or the free slot where it belongs.
@@ -71,7 +71,7 @@ struct HashIndex:
             slot = (slot + 1) % self.keys.length
         return slot
 
-    mutating func insert(slot: usize, key: u64, value: u32):
+    func insert(slot: usize, key: u64, value: u32):
         self.keys[slot] = key
         self.values[slot] = value
         self.used[slot] = true

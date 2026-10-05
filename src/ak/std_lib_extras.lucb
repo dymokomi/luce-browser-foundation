@@ -173,7 +173,7 @@ pub func exchange[T](slot: T*, value: T) -> T:
 ## Ported from AK/StdLibExtras.h:119 AK::to_underlying: the representation of an integer-backed
 ## enum, `R` being its backing type (`(u8)kind` is the same thing written directly).
 pub func to_underlying[V, R](value: V) -> R:
-    assert(sizeof(V) == sizeof(R))
+    assert(memory.size_of(V) == memory.size_of(R))
     var copy = value
     return memory.read[R](&copy)
 
@@ -181,7 +181,7 @@ pub func to_underlying[V, R](value: V) -> R:
 # An empty `asm volatile` in the donor that only hides the value from the optimizer; there is
 # nothing to hide it from here.
 pub func taint_for_optimizer[T](value: T*):
-    discard(value)
+    _ = value
 
 # mark: abs =====================================================================================
 

@@ -36,18 +36,18 @@ pub func fixed_memory_stream_is_eof_impl(base: Stream*) -> bool:
 
 ## Ported from AK/MemoryStream.cpp:31 AK::FixedMemoryStream::is_open (override).
 pub func fixed_memory_stream_is_open_impl(base: Stream*) -> bool:
-    discard(base)
+    _ = base
     return true
 
 ## Ported from AK/MemoryStream.cpp:36 AK::FixedMemoryStream::close (override).
 pub func fixed_memory_stream_close_impl(base: Stream*):
     # FIXME: It doesn't make sense to close a memory stream. Therefore, we don't do anything here. Is that fine?
-    discard(base)
+    _ = base
 
 ## Ported from AK/MemoryStream.cpp:41 AK::FixedMemoryStream::truncate (override).
 pub func fixed_memory_stream_truncate_impl(base: SeekableStream*, arg0: usize) -> !:
-    discard(base)
-    discard(arg0)
+    _ = base
+    _ = arg0
     try ak_error_throw(ak_error_from_errno(ebadf))
 
 ## Ported from AK/MemoryStream.h:33 AK::FixedMemoryStream::read_some (override).
@@ -63,7 +63,7 @@ pub func fixed_memory_stream_read_until_filled_impl(base: Stream*, bytes: u8[]) 
     if fixed_memory_stream_remaining(this) < bytes.length:
         error(ak_error, "Can't read past the end of the stream memory")
 
-    discard(bytes_copy_trimmed_to(this.m_bytes[this.m_offset..], bytes))
+    _ = bytes_copy_trimmed_to(this.m_bytes[this.m_offset..], bytes)
     this.m_offset += bytes.length
 
 ## Ported from AK/MemoryStream.cpp:57 AK::FixedMemoryStream::seek (override).
@@ -109,7 +109,7 @@ pub func fixed_memory_stream_write_until_depleted_span_u8_impl(base: Stream*, by
     if fixed_memory_stream_remaining(this) < bytes.length:
         error(ak_error, "Write of entire buffer ends past the memory area")
 
-    discard(try stream_write_some(base, bytes))
+    _ = try stream_write_some(base, bytes)
 
 ## Ported from AK/MemoryStream.cpp:105 AK::FixedMemoryStream::offset.
 pub func fixed_memory_stream_offset(this: FixedMemoryStream*) -> usize:
@@ -129,7 +129,7 @@ pub func fixed_memory_stream_read_in_place[T](this: FixedMemoryStream*) -> T*!:
         error(ak_error, "Tried to obtain a non-const reference from a read-only FixedMemoryStream")
 
     let value = (T*)(this.m_bytes.data + this.m_offset)
-    try stream_discard(this.stream(), sizeof(T))
+    try stream_discard(this.stream(), memory.size_of(T))
     return value
 
 ## Ported from AK/MemoryStream.h:70 AK::FixedMemoryStream::read_in_place(size_t): a span of
@@ -140,20 +140,20 @@ pub func fixed_memory_stream_read_in_place_usize[T](this: FixedMemoryStream*, co
         error(ak_error, "Tried to obtain a non-const span from a read-only FixedMemoryStream")
 
     let span = T[]((T*)(this.m_bytes.data + this.m_offset), count)
-    try stream_discard(this.stream(), sizeof(T) * count)
+    try stream_discard(this.stream(), memory.size_of(T) * count)
     return span
 
 ## FixedMemoryStream::read_in_place<T const>(): the const form, allowed on read-only streams.
 pub func fixed_memory_stream_read_in_place_const[T](this: FixedMemoryStream*) -> const T*!:
     let value = (const T*)(this.m_bytes.data + this.m_offset)
-    try stream_discard(this.stream(), sizeof(T))
+    try stream_discard(this.stream(), memory.size_of(T))
     return value
 
 ## FixedMemoryStream::read_in_place<T const>(size_t): the const form, allowed on read-only
 ## streams.
 pub func fixed_memory_stream_read_in_place_const_usize[T](this: FixedMemoryStream*, count: usize) -> const T[]!:
     let span = T[]((T*)(this.m_bytes.data + this.m_offset), count)
-    try stream_discard(this.stream(), sizeof(T) * count)
+    try stream_discard(this.stream(), memory.size_of(T) * count)
     return span
 
 # mark: AllocatingMemoryStream ==================================================================
@@ -180,12 +180,12 @@ pub func allocating_memory_stream_is_eof_impl(base: Stream*) -> bool:
 
 ## Ported from AK/MemoryStream.cpp:132 AK::AllocatingMemoryStream::is_open (override).
 pub func allocating_memory_stream_is_open_impl(base: Stream*) -> bool:
-    discard(base)
+    _ = base
     return true
 
 ## Ported from AK/MemoryStream.cpp:137 AK::AllocatingMemoryStream::close (override).
 pub func allocating_memory_stream_close_impl(base: Stream*):
-    discard(base)
+    _ = base
 
 ## Ported from AK/MemoryStream.cpp:141 AK::AllocatingMemoryStream::append_new_chunk.
 pub func allocating_memory_stream_append_new_chunk(this: AllocatingMemoryStream*) -> !:

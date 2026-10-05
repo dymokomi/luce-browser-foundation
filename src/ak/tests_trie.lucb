@@ -13,15 +13,15 @@ type TestDictionary = Trie2[u8, usize, U8Traits]
 
 # The missing-metadata provider: the parent's prefix length plus one.
 func test_trie_provide(context: void*?, parent: TestDictionary*, it: usize) -> usize?:
-    discard(context)
-    discard(it)
+    _ = context
+    _ = it
     return trie2_metadata_value_const(parent) + 1
 
 struct TestTrieCounter:
     var count: usize
 
 func test_trie_count(context: void*?, node: const TestDictionary*) -> IterationDecision:
-    discard(node)
+    _ = node
     let captures = (TestTrieCounter*)(context else trap("no captures"))
     captures.count += 1
     return IterationDecision.continue_
@@ -33,7 +33,7 @@ test "trie: normal_behavior":
     let total_chars: usize = 18  # root (1), 'test' (4), 'example' (7), 'foo' (3), 'foobar' (3, "foo" already stored).
     for view in data:
         var it: usize = 0
-        discard(trie2_insert_t_metadata_t_t_provide_metadata_function(&dictionary.base, &it, view.bytes, view.length, Function2[TestDictionary*, usize, usize?](call = test_trie_provide, context = none)) else trap("MUST"))
+        _ = trie2_insert_t_metadata_t_t_provide_metadata_function(&dictionary.base, &it, view.bytes, view.length, Function2[TestDictionary*, usize, usize?](call = test_trie_provide, context = none)) else trap("MUST")
 
     var counter = TestTrieCounter(count = 0)
     trie2_for_each_node_in_tree_order(&dictionary.base, Function1[const TestDictionary*, IterationDecision](call = test_trie_count, context = &counter)) else trap("MUST")
@@ -73,7 +73,7 @@ test "trie: iterate":
     var input: i32[64]
     for i in 0..<64usize:
         input[i] = (i32)i
-    discard(trie2_insert_2(&bunch_of_numbers.base, 0, input) else trap("MUST"))
+    _ = trie2_insert_2(&bunch_of_numbers.base, 0, input) else trap("MUST")
     # Iteration order is preorder (order between adjacent nodes is not defined, but parents come before children)
     # in this case, the tree is linear.
     var walk = TestTrieWalk(index = 0, is_root = true)

@@ -211,12 +211,12 @@ pub func string_base_data_without_union_member_assertion(this: const StringBase*
 pub struct CopyBytesToBuffer: BytesCallback:
     pub var source: const u8[]
 
-    pub mutating func call(buffer: u8[]) -> !:
+    pub func call(buffer: u8[]) -> !:
         copy_bytes(buffer, self.source)
 
 ## The same lambda for replace_with_new_short_string.
 pub struct CopyBytesToShortString: ShortStringBytesCallback:
     pub var source: const u8[]
 
-    pub mutating func call(buffer: u8[]):
+    pub func call(buffer: u8[]):
         copy_bytes(buffer, self.source)

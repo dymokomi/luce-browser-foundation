@@ -36,8 +36,8 @@ pub struct BinaryHeapNoIndexSetter[K, V]: BinaryHeapIndexSetter[BinaryHeapNode[K
     func set_index(node: BinaryHeapNode[K, V]*, index: usize): binary_heap_no_index(node, index)
 
 func binary_heap_no_index[K, V](node: BinaryHeapNode[K, V]*, index: usize):
-    discard(node)
-    discard(index)
+    _ = node
+    _ = index
 
 # mark: IntrusiveBinaryHeap =====================================================================
 

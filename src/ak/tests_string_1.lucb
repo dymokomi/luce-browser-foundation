@@ -32,7 +32,7 @@ func string_test_stream_read_until_filled(base: Stream*, buffer: u8[]) -> !:
 let string_test_stream_vtable: StreamVTable = StreamVTable(class_info = &string_test_stream_class, read_until_filled = string_test_stream_read_until_filled)
 
 ## Class information of StringTestStream.
-let string_test_stream_class: ClassInfo = ClassInfo(name = "StringTestStream", first_id = 0, last_id = 0, size = sizeof(StringTestStream), vtable = (const void*)&string_test_stream_vtable)
+let string_test_stream_class: ClassInfo = ClassInfo(name = "StringTestStream", first_id = 0, last_id = 0, size = memory.size_of(StringTestStream), vtable = (const void*)&string_test_stream_vtable)
 
 ## A StringTestStream over `bytes`.
 func string_test_stream(bytes: const u8[]) -> StringTestStream:
@@ -148,31 +148,31 @@ test "long_streams":
     # The donor writes the u32 0xffffffff three times.
     var stream4 = string_test_stream(b"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff")
     var is_error = false
-    discard(string_from_stream(&stream4.stream_base, 12) catch:
+    _ = string_from_stream(&stream4.stream_base, 12) catch:
         is_error = true
-        recover string_new())
+        recover string_new()
     assert(is_error == true)
 
 test "invalid_utf8":
     var message_ok = false
     # U+110000
-    discard(string_from_utf8(string_view_from_bytes(b"long string \xf4\x8f\xbf\xc0")) catch failure:
+    _ = string_from_utf8(string_view_from_bytes(b"long string \xf4\x8f\xbf\xc0")) catch failure:
         message_ok = string_error_contains(failure, "Input was not valid UTF-8")
-        recover string_new())
+        recover string_new()
     assert(message_ok)
 
     message_ok = false
     # U+121C3D
-    discard(string_from_utf8(string_view_from_bytes(b"\xf4\xa1\xb0\xbd")) catch failure:
+    _ = string_from_utf8(string_view_from_bytes(b"\xf4\xa1\xb0\xbd")) catch failure:
         message_ok = string_error_contains(failure, "Input was not valid UTF-8")
-        recover string_new())
+        recover string_new()
     assert(message_ok)
 
     var stream = string_test_stream(b"\xf4\xa1\xb0\xbd")
     message_ok = false
-    discard(string_from_stream(&stream.stream_base, 4) catch failure:
+    _ = string_from_stream(&stream.stream_base, 4) catch failure:
         message_ok = string_error_contains(failure, "Input was not valid UTF-8")
-        recover string_new())
+        recover string_new()
     assert(message_ok)
 
 test "with_replacement_character":
@@ -251,7 +251,7 @@ test "code_points":
     while not utf8_code_point_iterator_done(&it):
         code_points[count] = utf8_code_point_iterator_deref(&it)
         count += 1
-        discard(utf8_code_point_iterator_inc(&it))
+        _ = utf8_code_point_iterator_inc(&it)
 
     assert(count == 2)
     assert(code_points[0] == 0x1f9ac)

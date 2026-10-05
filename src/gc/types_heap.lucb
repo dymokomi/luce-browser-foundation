@@ -53,13 +53,13 @@ pub struct Heap: memory.Allocator:
     pub var m_mutator_registers: usize[16]  # addition: the registers when the collection began
 
     ## Allocator: a scanned blob of `size` bytes (DESIGN.md §3.3); `new` and `alloc` under `with heap`.
-    pub mutating func allocate(size: usize, alignment: usize) -> u8[]?: return heap_allocate_blob(&self, size, alignment, false)
+    pub func allocate(size: usize, alignment: usize) -> u8[]?: return heap_allocate_blob(&self, size, alignment, false)
 
     ## Allocator: whether `block` can hold `size` bytes where it is.
-    pub mutating func resize(block: u8[], size: usize) -> bool: return heap_resize_blob(&self, block, size)
+    pub func resize(block: u8[], size: usize) -> bool: return heap_resize_blob(&self, block, size)
 
     ## Allocator: nothing; the collector reclaims blobs nothing refers to (DESIGN.md §3.3 rule 3).
-    pub mutating func release(block: u8[]): heap_release_blob(&self, block)
+    pub func release(block: u8[]): heap_release_blob(&self, block)
 
 ## The allocator view for atomic blobs (DESIGN.md §3.3 rule 5): memory the collector never scans
 ## (string bytes, pixels), made current where AK allocates atomic storage. Addition.
@@ -67,13 +67,13 @@ pub struct HeapAtomicAllocator: memory.Allocator:
     pub var m_heap: Heap*?
 
     ## Allocator: an atomic blob of `size` bytes.
-    pub mutating func allocate(size: usize, alignment: usize) -> u8[]?: return heap_allocate_blob(self.m_heap else trap("atomic allocator without a heap"), size, alignment, true)
+    pub func allocate(size: usize, alignment: usize) -> u8[]?: return heap_allocate_blob(self.m_heap else trap("atomic allocator without a heap"), size, alignment, true)
 
     ## Allocator: whether `block` can hold `size` bytes where it is.
-    pub mutating func resize(block: u8[], size: usize) -> bool: return heap_resize_blob(self.m_heap else trap("atomic allocator without a heap"), block, size)
+    pub func resize(block: u8[], size: usize) -> bool: return heap_resize_blob(self.m_heap else trap("atomic allocator without a heap"), block, size)
 
     ## Allocator: nothing; the collector reclaims blobs nothing refers to.
-    pub mutating func release(block: u8[]): return
+    pub func release(block: u8[]): return
 
 ## The non-zero default member initializers of GC::Heap; the constructor runs them first.
 pub func heap_init_fields(this: Heap*):
@@ -116,7 +116,7 @@ pub struct GraphConstructorVisitorVTable:
 pub let graph_constructor_visitor_vtable: GraphConstructorVisitorVTable = GraphConstructorVisitorVTable(visitor_vtable = CellVisitorVTable(class_info = &graph_constructor_visitor_class, visit_possible_values = graph_constructor_visitor_visit_possible_values_impl, visit_impl_cell = graph_constructor_visitor_visit_impl_cell_impl, visit_impl_span_nan_boxed_value = graph_constructor_visitor_visit_impl_span_nan_boxed_value_impl))
 
 ## Class information of GC::GraphConstructorVisitor: name, class-id range (pre-order), size, vtable.
-pub let graph_constructor_visitor_class: ak.ClassInfo = ak.ClassInfo(name = "GraphConstructorVisitor", first_id = 1, last_id = 1, size = sizeof(GraphConstructorVisitor), vtable = (const void*)&graph_constructor_visitor_vtable)
+pub let graph_constructor_visitor_class: ak.ClassInfo = ak.ClassInfo(name = "GraphConstructorVisitor", first_id = 1, last_id = 1, size = memory.size_of(GraphConstructorVisitor), vtable = (const void*)&graph_constructor_visitor_vtable)
 
 ## is<GC::GraphConstructorVisitor>: the class-id range test.
 pub func is_graph_constructor_visitor[P: IsCellVisitor](p: P*) -> bool:
@@ -168,7 +168,7 @@ pub struct MarkingVisitorVTable:
 pub let marking_visitor_vtable: MarkingVisitorVTable = MarkingVisitorVTable(visitor_vtable = CellVisitorVTable(class_info = &marking_visitor_class, visit_possible_values = marking_visitor_visit_possible_values_impl, visit_impl_cell = marking_visitor_visit_impl_cell_impl, visit_impl_span_nan_boxed_value = marking_visitor_visit_impl_span_nan_boxed_value_impl))
 
 ## Class information of GC::MarkingVisitor: name, class-id range (pre-order), size, vtable.
-pub let marking_visitor_class: ak.ClassInfo = ak.ClassInfo(name = "MarkingVisitor", first_id = 2, last_id = 2, size = sizeof(MarkingVisitor), vtable = (const void*)&marking_visitor_vtable)
+pub let marking_visitor_class: ak.ClassInfo = ak.ClassInfo(name = "MarkingVisitor", first_id = 2, last_id = 2, size = memory.size_of(MarkingVisitor), vtable = (const void*)&marking_visitor_vtable)
 
 ## is<GC::MarkingVisitor>: the class-id range test.
 pub func is_marking_visitor[P: IsCellVisitor](p: P*) -> bool:

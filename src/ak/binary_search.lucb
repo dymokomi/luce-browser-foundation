@@ -12,7 +12,7 @@
 ## Ported from AK/BinarySearch.h:16 AK::DefaultComparator::operator(): 1 when lhs > rhs, -1 when
 ## lhs < rhs, else 0.
 pub func default_comparator_call[T: luce.Comparable](this: DefaultComparator*, lhs: const T*, rhs: const T*) -> i32:
-    discard(this)
+    _ = this
     let order = lhs.compare(*rhs)
     if order > 0:
         return 1
@@ -22,7 +22,7 @@ pub func default_comparator_call[T: luce.Comparable](this: DefaultComparator*, l
 
 # DefaultComparator as a callback.
 func binary_search_default_comparator[T: luce.Comparable](context: void*?, lhs: const T*, rhs: const T*) -> i32:
-    discard(context)
+    _ = context
     var comparator = DefaultComparator(empty_ = 0)
     return default_comparator_call(&comparator, lhs, rhs)
 

@@ -182,7 +182,7 @@ pub func lexical_path_canonicalized_path(path: ByteString) -> ByteString:
                 let last = lexical_path_vector_at(&canonical_parts, vector_size(&canonical_parts) - 1)
                 if not byte_string_eq_string_view(&last, sv("..")):
                     # A .. and a previous non-.. part cancel each other.
-                    discard(vector_take_last(&canonical_parts))
+                    _ = vector_take_last(&canonical_parts)
                     continue
         approximate_canonical_length += string_view_length(&part) + 1
         vector_append_t(&canonical_parts, byte_string_from_string_view(part))

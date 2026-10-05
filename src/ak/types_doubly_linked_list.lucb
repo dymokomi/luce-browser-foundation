@@ -23,7 +23,7 @@ pub struct DoublyLinkedListIterator[T]: luce.Iterable[T*, DoublyLinkedListIterat
 
     pub func iterator() -> DoublyLinkedListIterator[T]: return self
 
-    pub mutating func next() -> T*?: return doubly_linked_list_iterator_next(&self)
+    pub func next() -> T*?: return doubly_linked_list_iterator_next(&self)
 
 # mark: DoublyLinkedList ========================================================================
 

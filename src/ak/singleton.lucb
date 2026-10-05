@@ -43,7 +43,7 @@ pub func singleton_get[T](this: const Singleton[T]*) -> T*:
             obj = observed
         # Someone else was faster, wait until they're done
         while singleton_address(obj) == singleton_creating:
-            discard(sched_yield())
+            _ = sched_yield()
             obj = obj_var.load(.acquire)
         # We should always return an instance if we allow creating one
         assert(obj != none)
@@ -77,4 +77,4 @@ pub func singleton_is_initialized[T](this: const Singleton[T]*) -> bool:
 
 ## Ported from AK/Singleton.h:104 AK::Singleton::ensure_instance.
 pub func singleton_ensure_instance[T](this: Singleton[T]*):
-    discard(singleton_ptr(this))
+    _ = singleton_ptr(this)

@@ -150,7 +150,7 @@ pub func hash_table_write_value[T, TT: Traits[T]](this: HashTable[T, TT]*, value
             bucket.storage = value
             hash_table_commit_inserted_bucket(this, bucket, hash_, lookup.probe_length)
         .kept_existing_entry:
-            discard(bucket)
+            _ = bucket
         _:
             trap("VERIFY_NOT_REACHED")
     return lookup.result
@@ -220,5 +220,5 @@ pub func hash_table_delete_bucket[T, TT: Traits[T]](this: HashTable[T, TT]*, buc
     # Addition (DESIGN.md §3.3): C++ destroys the value it removes or moves out; here the storage
     # stays in scanned memory, so the freed slot is cleared, or the conservative scan would keep
     # whatever the removed value pointed to alive.
-    memory.set(u8[]((u8*)&freed_bucket.storage, sizeof(T)), 0)
+    memory.set(u8[]((u8*)&freed_bucket.storage, memory.size_of(T)), 0)
     freed_bucket.state = (u8)BucketState.free_

@@ -24,7 +24,7 @@ pub func utf32_code_point_iterator_inc(this: Utf32CodePointIterator*) -> Utf32Co
 pub func utf32_code_point_iterator_sub(this: const Utf32CodePointIterator*, other: const Utf32CodePointIterator*) -> isize:
     let this_address = (isize)(usize)(this.m_ptr else trap("VERIFY: iterator without code points"))
     let other_address = (isize)(usize)(other.m_ptr else trap("VERIFY: iterator without code points"))
-    return (this_address - other_address) // (isize)sizeof(u32)
+    return (this_address - other_address) // (isize)memory.size_of(u32)
 
 ## Ported from AK/Utf32View.h:42 AK::Utf32CodePointIterator::operator*.
 pub func utf32_code_point_iterator_deref(this: const Utf32CodePointIterator*) -> u32:
@@ -41,7 +41,7 @@ pub func utf32_code_point_iterator_peek(this: const Utf32CodePointIterator*, off
 
     var new_iterator = *this
     for _index in 0..<offset:
-        discard(utf32_code_point_iterator_inc(&new_iterator))
+        _ = utf32_code_point_iterator_inc(&new_iterator)
         if utf32_code_point_iterator_done(&new_iterator):
             return none
 
@@ -49,7 +49,7 @@ pub func utf32_code_point_iterator_peek(this: const Utf32CodePointIterator*, off
 
 ## Ported from AK/Utf32View.h:51 AK::Utf32CodePointIterator::code_point_length_in_bytes.
 pub func utf32_code_point_iterator_code_point_length_in_bytes(this: const Utf32CodePointIterator*) -> i32:
-    return (i32)sizeof(u32)
+    return (i32)memory.size_of(u32)
 
 ## Ported from AK/Utf32View.h:52 AK::Utf32CodePointIterator::done.
 pub func utf32_code_point_iterator_done(this: const Utf32CodePointIterator*) -> bool:
@@ -140,8 +140,8 @@ pub func utf32_view_iterator_offset(this: const Utf32View*, it: const Utf32CodeP
     let position = (usize)(it.m_ptr else trap("VERIFY: iterator without code points"))
     let start = (usize)(this.m_code_points else trap("VERIFY: view without code points"))
     assert(position >= start)
-    assert(position < start + this.m_length * sizeof(u32))
-    return (position - start) // sizeof(u32)
+    assert(position < start + this.m_length * memory.size_of(u32))
+    return (position - start) // memory.size_of(u32)
 
 ## Ported from AK/Utf32View.h:116 AK::Utf32View::substring_view(size_t, size_t).
 pub func utf32_view_substring_view_usize(this: const Utf32View*, offset: usize, length: usize) -> Utf32View:

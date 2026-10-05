@@ -109,9 +109,9 @@ pub func searchable_circular_buffer_find_copy_in_seekback_usize(this: Searchable
                 let found_chunk_hash = searchable_chunk_hash(hash_chunk_at_offset)
                 if needle_hash != found_chunk_hash:
                     if let previous = previous_buffer_offset:
-                        discard(hash_map_remove_k(&this.m_location_chain_map, previous))
+                        _ = hash_map_remove_k(&this.m_location_chain_map, previous)
                     else:
-                        discard(hash_map_remove_k(&this.m_hash_location_map, needle_hash))
+                        _ = hash_map_remove_k(&this.m_hash_location_map, needle_hash)
                     break
 
                 # Validate the match through the set-distance-based implementation.
@@ -257,16 +257,16 @@ pub func searchable_circular_buffer_insert_location_hash(this: SearchableCircula
 
     # Discard any old entries for this offset first. This should eliminate accidental loops by breaking the chain.
     # The actual cleanup is done on access, since we can only remove invalid references when actually walking the chain.
-    discard(hash_map_remove_k(&this.m_location_chain_map, raw_offset))
+    _ = hash_map_remove_k(&this.m_location_chain_map, raw_offset)
 
     # Check if we have any existing entries for this hash.
     # If so, we need to add it to the location chain map instead, as we will soon replace the entry in the hash location map.
     let existing_entry = hash_map_get_k(&this.m_hash_location_map, value_hash)
 
     if let existing = existing_entry:
-        discard(try hash_map_try_set(&this.m_location_chain_map, raw_offset, *existing))
+        _ = try hash_map_try_set(&this.m_location_chain_map, raw_offset, *existing)
 
-    discard(try hash_map_try_set(&this.m_hash_location_map, value_hash, raw_offset))
+    _ = try hash_map_try_set(&this.m_hash_location_map, value_hash, raw_offset)
 
 ## Ported from AK/CircularBuffer.cpp:538 AK::SearchableCircularBuffer::hash_last_bytes.
 pub func searchable_circular_buffer_hash_last_bytes(this: SearchableCircularBuffer*, count: usize) -> !:

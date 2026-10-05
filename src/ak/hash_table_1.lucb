@@ -102,7 +102,7 @@ pub func ordered_hash_table_iterator_dec[T](this: OrderedHashTableIterator[T]*):
 
 ## Ported from AK/HashTable.h:90 AK::OrderedHashTableIterator::OrderedHashTableIterator.
 pub func ordered_hash_table_iterator_construct[T](this: OrderedHashTableIterator[T]*, bucket: HashTableBucket[T]*?, arg1: HashTableBucket[T]*?):
-    discard(arg1)
+    _ = arg1
     this.m_bucket = bucket
 
 # mark: ReverseOrderedHashTableIterator =========================================================
@@ -157,7 +157,7 @@ pub func hash_table_clone[T, TT: Traits[T]](other: const HashTable[T, TT]*) -> H
     table.m_ordered = other.m_ordered
     hash_table_rehash(&table, hash_table_capacity(other))
     for it in hash_table_begin_const(other):
-        discard(hash_table_set(&table, *it))
+        _ = hash_table_set(&table, *it)
     return table
 
 ## Ported from AK/HashTable.h:240 AK::HashTable::is_empty.
@@ -290,7 +290,7 @@ pub func hash_table_set[T, TT: Traits[T]](this: HashTable[T, TT]*, value: T, exi
 ## Ported from AK/HashTable.h:398 AK::HashTable::ensure(U&&): the stored value equal to `value`,
 ## inserting `value` first when there is none.
 pub func hash_table_ensure_u[T, TT: Traits[T]](this: HashTable[T, TT]*, value: T, existing_entry_behavior: HashSetExistingEntryBehavior = HashSetExistingEntryBehavior.replace) -> T*:
-    discard(hash_table_set(this, value, existing_entry_behavior))
+    _ = hash_table_set(this, value, existing_entry_behavior)
     let it = hash_table_find_t(this, value)
     let bucket = it.m_bucket else trap("VERIFY: HashTable::ensure")
     return &bucket.storage
@@ -313,7 +313,7 @@ pub func hash_table_ensure_u32[T, TT: Traits[T]](this: HashTable[T, TT]*, hash_:
         .replaced_existing_entry:
             bucket.storage = function0_call(&initialization_callback)
         .kept_existing_entry:
-            discard(bucket)
+            _ = bucket
         _:
             trap("VERIFY_NOT_REACHED")
     return &bucket.storage
@@ -330,7 +330,7 @@ pub func hash_table_find_u32_tt_unary_predicate[T, TT: Traits[T]](this: HashTabl
 struct HashTableEqualsValue[T, TT: Traits[T]]:
     var value: T
 
-    static func call(context: void*?, entry: const T*) -> bool:
+    func call(context: void*?, entry: const T*) -> bool:
         let captures = (const HashTableEqualsValue[T, TT]*)(context else trap("HashTable: no captures"))
         var traits: TT = ---
         return traits.equals(entry, &captures.value)
@@ -357,7 +357,7 @@ pub func hash_table_find_t_const[T, TT: Traits[T]](this: const HashTable[T, TT]*
 struct HashTableEqualsKey[T, K, KT: HashCompatibleTraits[T, K]]:
     var value: K
 
-    static func call(context: void*?, entry: const T*) -> bool:
+    func call(context: void*?, entry: const T*) -> bool:
         let captures = (const HashTableEqualsKey[T, K, KT]*)(context else trap("HashTable: no captures"))
         var traits: KT = ---
         return traits.equals(entry, &captures.value)

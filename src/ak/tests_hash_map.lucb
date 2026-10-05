@@ -12,12 +12,12 @@
 type IntIntMap = HashMap[i32, i32, I32Traits]
 
 func test_map_key_one_or_value_two(context: void*?, key: const i32*, value: const str*) -> bool:
-    discard(context)
+    _ = context
     return *key == 1 or *value == "Two"
 
 func test_map_bool(context: void*?, key: const i32*, value: const str*) -> bool:
-    discard(key)
-    discard(value)
+    _ = key
+    _ = value
     return context != none
 
 test "hash_map: construct, populate and range_loop":
@@ -66,10 +66,10 @@ test "hash_map: a removed entry's bucket keeps none of its bytes":
 
 test "hash_map: remove_all_matching and take_all_matching":
     var map: HashMap[i32, str, I32Traits]
-    discard(hash_map_set(&map, 1, "One"))
-    discard(hash_map_set(&map, 2, "Two"))
-    discard(hash_map_set(&map, 3, "Three"))
-    discard(hash_map_set(&map, 4, "Four"))
+    _ = hash_map_set(&map, 1, "One")
+    _ = hash_map_set(&map, 2, "Two")
+    _ = hash_map_set(&map, 3, "Three")
+    _ = hash_map_set(&map, 4, "Four")
     assert(hash_map_remove_all_matching(&map, Function2[const i32*, const str*, bool](call = test_map_key_one_or_value_two, context = none)))
     assert(hash_map_size(&map) == 2)
     assert(not hash_map_remove_all_matching(&map, Function2[const i32*, const str*, bool](call = test_map_bool, context = none)))
@@ -79,10 +79,10 @@ test "hash_map: remove_all_matching and take_all_matching":
     assert(hash_map_remove_all_matching(&map, Function2[const i32*, const str*, bool](call = test_map_bool, context = &yes)))
     assert(hash_map_is_empty(&map))
 
-    discard(hash_map_set(&map, 1, "One"))
-    discard(hash_map_set(&map, 2, "Two"))
-    discard(hash_map_set(&map, 3, "Three"))
-    discard(hash_map_set(&map, 4, "Four"))
+    _ = hash_map_set(&map, 1, "One")
+    _ = hash_map_set(&map, 2, "Two")
+    _ = hash_map_set(&map, 3, "Three")
+    _ = hash_map_set(&map, 4, "Four")
     let first_entries = hash_map_take_all_matching(&map, Function2[const i32*, const str*, bool](call = test_map_key_one_or_value_two, context = none))
     assert(vector_size(&first_entries) == 2)
     let low = 1usize if vector_at_const(&first_entries, 0).key > vector_at_const(&first_entries, 1).key else 0
@@ -109,9 +109,9 @@ test "hash_map: hashmap_of_pointers_get":
     let one = new TestMapObject(string = "One") else trap("out of memory")
     let two = new TestMapObject(string = "Two") else trap("out of memory")
     let three = new TestMapObject(string = "Three") else trap("out of memory")
-    discard(hash_map_set(&objects, 1, one))
-    discard(hash_map_set(&objects, 2, two))
-    discard(hash_map_set(&objects, 3, three))
+    _ = hash_map_set(&objects, 1, one)
+    _ = hash_map_set(&objects, 2, two)
+    _ = hash_map_set(&objects, 3, three)
     let x = hash_map_get_k(&objects, 2) else trap("missing")
     assert((*x).string == "Two")
     # Do it again to make sure that peeking into the map above didn't
@@ -122,9 +122,9 @@ test "hash_map: hashmap_of_pointers_get":
 
 test "hash_map: basic_remove and basic_contains":
     var map: IntIntMap
-    discard(hash_map_set(&map, 1, 10))
-    discard(hash_map_set(&map, 2, 20))
-    discard(hash_map_set(&map, 3, 30))
+    _ = hash_map_set(&map, 1, 10)
+    _ = hash_map_set(&map, 2, 20)
+    _ = hash_map_set(&map, 3, 30)
     assert(hash_map_contains_k(&map, 1))
     assert(not hash_map_contains_k(&map, 4))
     assert(hash_map_remove_k(&map, 3))
@@ -138,10 +138,10 @@ test "hash_map: basic_remove and basic_contains":
 
 test "hash_map: in_place_rehashing_ordered_loop_bug":
     var map: OrderedHashMap[str, str, TestStrTraits]
-    discard(ordered_hash_map_set(&map, "yt.innertube::nextId", ""))
-    discard(ordered_hash_map_set(&map, "yt.innertube::requests", ""))
-    discard(ordered_hash_map_remove_k(&map, "yt.innertube::nextId"))
-    discard(ordered_hash_map_set(&map, "yt.innertube::nextId", ""))
+    _ = ordered_hash_map_set(&map, "yt.innertube::nextId", "")
+    _ = ordered_hash_map_set(&map, "yt.innertube::requests", "")
+    _ = ordered_hash_map_remove_k(&map, "yt.innertube::nextId")
+    _ = ordered_hash_map_set(&map, "yt.innertube::nextId", "")
     let keys = ordered_hash_map_keys(&map)
     assert(vector_size(&keys) == 2)
     assert(*vector_at_const(&keys, 0) == "yt.innertube::requests")
@@ -151,9 +151,9 @@ test "hash_map: in_place_rehashing_ordered_loop_bug":
 test "hash_map: take":
     var map: HashMap[str, i32, TestStrTraits]
     assert(hash_map_take_k(&map, "foo") == none)
-    discard(hash_map_set(&map, "foo", 1))
-    discard(hash_map_set(&map, "bar", 2))
-    discard(hash_map_set(&map, "baz", 3))
+    _ = hash_map_set(&map, "foo", 1)
+    _ = hash_map_set(&map, "bar", 2)
+    _ = hash_map_set(&map, "baz", 3)
     assert(hash_map_take_k(&map, "foo") == 1)
     assert(hash_map_take_k(&map, "foo") == none)
     assert(hash_map_take_k(&map, "bar") == 2)
@@ -163,9 +163,9 @@ test "hash_map: take":
 
 test "hash_map: clone, move and update":
     var orig: IntIntMap
-    discard(hash_map_set(&orig, 1, 10))
-    discard(hash_map_set(&orig, 2, 20))
-    discard(hash_map_set(&orig, 3, 30))
+    _ = hash_map_set(&orig, 1, 10)
+    _ = hash_map_set(&orig, 2, 20)
+    _ = hash_map_set(&orig, 3, 30)
     let second = hash_map_clone(&orig) else trap("clone failed")
     assert(hash_map_size(&orig) == 3)
     assert(*(hash_map_get_k_const(&orig, 2) else trap("missing")) == 20)
@@ -174,11 +174,11 @@ test "hash_map: clone, move and update":
 
     var first: IntIntMap
     var other: IntIntMap
-    discard(hash_map_set(&first, 1, 10))
-    discard(hash_map_set(&first, 2, 20))
-    discard(hash_map_set(&other, 1, 9))
-    discard(hash_map_set(&other, 3, 30))
-    discard(hash_map_set(&other, 4, 40))
+    _ = hash_map_set(&first, 1, 10)
+    _ = hash_map_set(&first, 2, 20)
+    _ = hash_map_set(&other, 1, 9)
+    _ = hash_map_set(&other, 3, 30)
+    _ = hash_map_set(&other, 4, 40)
     hash_map_update(&first, &other)
     assert(hash_map_size(&first) == 4)
     assert(hash_map_size(&other) == 3)
@@ -193,10 +193,10 @@ test "hash_map: compare":
     var first: IntIntMap
     var second: IntIntMap
     assert(hash_map_eq(&first, &second))
-    discard(hash_map_set(&first, 1, 10))
-    discard(hash_map_set(&second, 1, 10))
+    _ = hash_map_set(&first, 1, 10)
+    _ = hash_map_set(&second, 1, 10)
     assert(hash_map_eq(&first, &second))
-    discard(hash_map_set(&first, 2, 20))
+    _ = hash_map_set(&first, 2, 20)
     assert(hash_map_ne(&second, &first))
 
 struct TestSentinel:
@@ -220,7 +220,7 @@ test "hash_map: ensure_callback_sees_consistent_table":
     # target bucket is invisible to iterators.
     var map: HashMap[i32, TestSentinel, I32Traits]
     for i: i32 in 0..<100:
-        discard(hash_map_set(&map, i, TestSentinel(magic = test_sentinel_magic)))
+        _ = hash_map_set(&map, i, TestSentinel(magic = test_sentinel_magic))
     var captures = TestEnsureCaptures(map = &map, visited = 0)
     let value = hash_map_ensure_t_callback(&map, 9999, Function0[TestSentinel](call = test_ensure_callback, context = &captures))
     assert(value.magic == test_sentinel_magic)
@@ -233,9 +233,9 @@ test "hash_map: ensure_callback_sees_consistent_table":
 test "hash_map: iteration order matches the donor":
     var m: HashMap[u32, u32, U32Traits]
     for i: u32 in 0..<25:
-        discard(hash_map_set(&m, i * 1000003, i))
-    discard(hash_map_remove_k(&m, 5 * 1000003))
-    discard(hash_map_remove_k(&m, 17 * 1000003))
+        _ = hash_map_set(&m, i * 1000003, i)
+    _ = hash_map_remove_k(&m, 5 * 1000003)
+    _ = hash_map_remove_k(&m, 17 * 1000003)
     let expected: u32[23] = [0, 9, 11, 16, 12, 7, 19, 23, 4, 13, 24, 22, 1, 21, 18, 8, 20, 6, 10, 15, 2, 14, 3]
     var index: usize = 0
     for entry in hash_map_begin(&m):

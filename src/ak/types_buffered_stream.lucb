@@ -40,7 +40,7 @@ pub struct InputBufferedSeekable[T]: IsSeekableStream, IsStream:
 
 pub let input_buffered_seekable_vtable: SeekableStreamVTable = SeekableStreamVTable(stream_vtable = StreamVTable(class_info = &input_buffered_seekable_class, read_some = input_buffered_seekable_read_some_impl, discard = seekable_stream_discard_impl, write_some = input_buffered_seekable_write_some_impl, is_eof = input_buffered_seekable_is_eof_impl, is_open = input_buffered_seekable_is_open_impl, close = input_buffered_seekable_close_impl), seek = input_buffered_seekable_seek_impl, truncate = input_buffered_seekable_truncate_impl)
 
-pub let input_buffered_seekable_class: ClassInfo = ClassInfo(name = "InputBufferedSeekable", first_id = 4, last_id = 4, size = sizeof(InputBufferedSeekable[SeekableStream]), vtable = (const void*)&input_buffered_seekable_vtable)
+pub let input_buffered_seekable_class: ClassInfo = ClassInfo(name = "InputBufferedSeekable", first_id = 4, last_id = 4, size = memory.size_of(InputBufferedSeekable[SeekableStream]), vtable = (const void*)&input_buffered_seekable_vtable)
 
 # mark: OutputBufferedSeekable ==================================================================
 
@@ -56,4 +56,4 @@ pub struct OutputBufferedSeekable[T]: IsSeekableStream, IsStream:
 
 pub let output_buffered_seekable_vtable: SeekableStreamVTable = SeekableStreamVTable(stream_vtable = StreamVTable(class_info = &output_buffered_seekable_class, read_some = output_buffered_seekable_read_some_impl, discard = seekable_stream_discard_impl, write_some = output_buffered_seekable_write_some_impl, is_eof = output_buffered_seekable_is_eof_impl, is_open = output_buffered_seekable_is_open_impl, close = output_buffered_seekable_close_impl), seek = output_buffered_seekable_seek_impl, tell = output_buffered_seekable_tell_impl, truncate = output_buffered_seekable_truncate_impl)
 
-pub let output_buffered_seekable_class: ClassInfo = ClassInfo(name = "OutputBufferedSeekable", first_id = 5, last_id = 5, size = sizeof(OutputBufferedSeekable[SeekableStream]), vtable = (const void*)&output_buffered_seekable_vtable)
+pub let output_buffered_seekable_class: ClassInfo = ClassInfo(name = "OutputBufferedSeekable", first_id = 5, last_id = 5, size = memory.size_of(OutputBufferedSeekable[SeekableStream]), vtable = (const void*)&output_buffered_seekable_vtable)

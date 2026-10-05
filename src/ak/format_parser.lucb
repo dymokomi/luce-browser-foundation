@@ -120,7 +120,7 @@ pub func format_parser_consume_literal(this: FormatParser*) -> StringView:
         if generic_lexer_next_is_t_char_type(lexer, '{') or generic_lexer_next_is_t_char_type(lexer, '}'):
             return string_view_substring_view_usize(&lexer.m_input, begin, generic_lexer_tell(lexer) - begin)
 
-        discard(generic_lexer_consume(lexer))
+        _ = generic_lexer_consume(lexer)
 
     return string_view_substring_view(&lexer.m_input, begin)
 
@@ -164,7 +164,7 @@ pub func format_parser_consume_specifier(this: FormatParser*, specifier: FormatP
                 level -= 1
                 continue
 
-            discard(generic_lexer_consume(lexer))
+            _ = generic_lexer_consume(lexer)
 
         specifier.flags = string_view_substring_view_usize(&lexer.m_input, begin, generic_lexer_tell(lexer) - begin - 1)
     else:

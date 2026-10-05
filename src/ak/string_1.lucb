@@ -106,7 +106,7 @@ pub func string_from_string_builder_without_validation(builder: StringBuilder*) 
 struct StringFromUtf16Transcode: BytesCallback:
     var utf16_data: const u16[]
 
-    mutating func call(buffer: u8[]) -> !:
+    func call(buffer: u8[]) -> !:
         let result = simdutf_convert_utf16_to_utf8(self.utf16_data, buffer)
         assert(result == buffer.length)
 
@@ -141,7 +141,7 @@ pub func string_from_utf16_be_with_replacement_character(bytes: const u8[]) -> S
 struct StringFromStreamRead: BytesCallback:
     var stream: Stream*
 
-    mutating func call(buffer: u8[]) -> !:
+    func call(buffer: u8[]) -> !:
         try stream_read_until_filled(self.stream, buffer)
         let utf8 = Utf8View(m_string = string_view_from_bytes(buffer))
         if not utf8_view_validate_allow_lonely_surrogates(&utf8):
@@ -159,9 +159,9 @@ pub func string_from_stream(stream: Stream*, byte_count: usize) -> String!:
 struct StringFromCodePointEncode: ShortStringBytesCallback:
     var code_point: u32
 
-    mutating func call(buffer: u8[]):
+    func call(buffer: u8[]):
         var utf8 = CodePointAsUtf8()
-        discard(unicode_utils_code_point_to_utf8(self.code_point, &utf8))
+        _ = unicode_utils_code_point_to_utf8(self.code_point, &utf8)
         copy_bytes(buffer, utf8.bytes[..<utf8.length])
 
 ## Ported from AK/String.h:80 AK::String::from_code_point: a String of a single code point.
@@ -179,7 +179,7 @@ struct StringRepeatedCodePoint: BytesCallback:
     var code_point_as_utf8: const u8[]
     var count: usize
 
-    mutating func call(buffer: u8[]) -> !:
+    func call(buffer: u8[]) -> !:
         let code_point_byte_length = self.code_point_as_utf8.length
         if code_point_byte_length == 1:
             memory.set(buffer, self.code_point_as_utf8[0])
@@ -207,7 +207,7 @@ struct StringRepeatedString: BytesCallback:
     var input: const u8[]
     var count: usize
 
-    mutating func call(buffer: u8[]) -> !:
+    func call(buffer: u8[]) -> !:
         let input_size = self.input.length
         if input_size == 1:
             memory.set(buffer, self.input[0])

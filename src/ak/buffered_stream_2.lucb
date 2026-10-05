@@ -167,7 +167,7 @@ pub func output_buffered_seekable_write_some[T: IsSeekableStream](this: OutputBu
     let written = circular_buffer_write(&this.m_buffer, buffer)
 
     if circular_buffer_empty_space(&this.m_buffer) == 0:
-        discard(try circular_buffer_flush_to_stream(&this.m_buffer, stream))
+        _ = try circular_buffer_flush_to_stream(&this.m_buffer, stream)
 
     return written
 
@@ -190,7 +190,7 @@ pub func output_buffered_seekable_close[T: IsSeekableStream](this: OutputBuffere
 pub func output_buffered_seekable_flush_buffer[T: IsSeekableStream](this: const OutputBufferedSeekable[T]*) -> !:
     let mutable_this = (OutputBufferedSeekable[T]*)this
     while circular_buffer_used_space(&mutable_this.m_buffer) > 0:
-        discard(try circular_buffer_flush_to_stream(&mutable_this.m_buffer, mutable_this.m_stream.seekable_stream().stream()))
+        _ = try circular_buffer_flush_to_stream(&mutable_this.m_buffer, mutable_this.m_stream.seekable_stream().stream())
 
 ## Ported from AK/BufferedStream.h:435 AK::OutputBufferedSeekable::tell (override).
 # Since tell() doesn't involve moving the write offset, we can skip flushing the buffer here.

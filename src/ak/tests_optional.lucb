@@ -21,11 +21,11 @@ struct TestSentinelIntTraits: SentinelOptionalTraits[TestSentinelInt]:
     func is_sentinel(value: const TestSentinelInt*) -> bool: return value.value == u32_max
 
 func test_optional_make_ninety_nine(context: void*?) -> i32:
-    discard(context)
+    _ = context
     return 99
 
 func test_optional_fail(context: void*?) -> i32!:
-    discard(context)
+    _ = context
     error(ak_error, "callback failed")
 
 test "optional: comparisons":

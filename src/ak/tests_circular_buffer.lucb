@@ -101,7 +101,7 @@ test "byte_buffer: xor, overwrite, get_bytes_for_writing":
     byte_buffer_move_assign(&moved, &buffer)
     assert(byte_buffer_size(&buffer) == 0)
     assert(byte_buffer_size(&moved) == 10)
-    discard(other)
+    _ = other
     let leaked = byte_buffer_leak_outline_buffer(&moved)
     assert(leaked == none)
 
@@ -319,7 +319,7 @@ test "circular_buffer: copy_from_seekback and read_with_seekback":
     let back = circular_buffer_read_with_seekback(&circular_buffer, seek, 4) else trap("seekback failed")
     assert(bytes_equal(back, "bab".bytes))
     var failed = false
-    discard(circular_buffer_read_with_seekback(&circular_buffer, seek, 12) catch:
+    _ = circular_buffer_read_with_seekback(&circular_buffer, seek, 12) catch:
         failed = true
-        recover empty_span[u8]())
+        recover empty_span[u8]()
     assert(failed)

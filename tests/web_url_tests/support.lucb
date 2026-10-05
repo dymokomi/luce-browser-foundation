@@ -34,7 +34,7 @@ func must_parse_host(text: str) -> web_url.Host:
 func text_of(string: ak.String) -> str:
     # A short String keeps its bytes inline, in this frame's copy: copy them out.
     let bytes = ak.string_base_bytes(&string.string_base)
-    let copy = alloc u8[bytes.length] else trap("out of memory")
+    let copy = new u8[bytes.length] --- else trap("out of memory")
     memory.copy(copy, bytes, bytes.length)
     return (str)copy
 

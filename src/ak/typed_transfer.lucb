@@ -14,7 +14,7 @@
 pub func typed_transfer_move[T](destination: T*, source: const T*, count: usize):
     if count == 0:
         return
-    let bytes = count * sizeof(T)
+    let bytes = count * memory.size_of(T)
     memory.move(u8[]((u8*)destination, bytes), u8[]((u8*)source, bytes), bytes)
 
 ## Ported from AK/TypedTransfer.h:34 AK::TypedTransfer::copy.
@@ -24,7 +24,7 @@ pub func typed_transfer_copy[T](destination: T*, source: const T*, count: usize)
     if count == 1:
         *destination = *source
     else:
-        let bytes = count * sizeof(T)
+        let bytes = count * memory.size_of(T)
         memory.move(u8[]((u8*)destination, bytes), u8[]((u8*)source, bytes), bytes)
     return count
 
@@ -42,10 +42,10 @@ pub func typed_transfer_relocate[T](destination: T*, source: T*, count: usize):
     assert(source + count <= destination or destination + count <= source)
     if count == 0:
         return
-    let bytes = count * sizeof(T)
+    let bytes = count * memory.size_of(T)
     memory.copy(u8[]((u8*)destination, bytes), u8[]((u8*)source, bytes), bytes)
 
 ## Ported from AK/TypedTransfer.h:91 AK::TypedTransfer::delete_: nothing to destroy.
 pub func typed_transfer_delete[T](ptr: T*, count: usize):
-    discard(ptr)
-    discard(count)
+    _ = ptr
+    _ = count

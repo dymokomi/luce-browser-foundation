@@ -27,4 +27,4 @@ pub func conservative_vector_base_destroy(this: ConservativeVectorBase*):
 
 ## The ConservativeVectorBase whose m_list_node is `node` (IntrusiveList's container_of).
 func conservative_vector_base_from_list_node(node: ListNode*) -> ConservativeVectorBase*:
-    return (ConservativeVectorBase*)((u8*)node - offsetof(ConservativeVectorBase, m_list_node))
+    return (ConservativeVectorBase*)((u8*)node - memory.offset_of(ConservativeVectorBase, m_list_node))

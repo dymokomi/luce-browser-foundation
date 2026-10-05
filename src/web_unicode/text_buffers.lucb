@@ -20,11 +20,11 @@ struct CodePointBuffer:
     var items: u32[]
     var count: usize
 
-    static func create(capacity: usize = 16) -> CodePointBuffer:
+    func create(capacity: usize = 16) -> CodePointBuffer:
         let items = new u32[capacity if capacity > 0 else 1] else trap("out of memory")
         return CodePointBuffer(items = items, count = 0)
 
-    mutating func append(value: u32):
+    func append(value: u32):
         if self.count == self.items.length:
             let grown = new u32[self.items.length * 2] else trap("out of memory")
             for index in 0..<self.count:
@@ -33,7 +33,7 @@ struct CodePointBuffer:
         self.items[self.count] = value
         self.count += 1
 
-    mutating func append_all(values: const u32[]):
+    func append_all(values: const u32[]):
         for value in values:
             self.append(value)
 
@@ -108,11 +108,11 @@ struct ByteBuffer:
     var items: u8[]
     var count: usize
 
-    static func create(capacity: usize = 16) -> ByteBuffer:
+    func create(capacity: usize = 16) -> ByteBuffer:
         let items = new u8[capacity if capacity > 0 else 1] else trap("out of memory")
         return ByteBuffer(items = items, count = 0)
 
-    mutating func append(value: u8):
+    func append(value: u8):
         if self.count == self.items.length:
             let grown = new u8[self.items.length * 2] else trap("out of memory")
             for index in 0..<self.count:
@@ -160,11 +160,11 @@ struct UnitBuffer:
     var items: u16[]
     var count: usize
 
-    static func create(capacity: usize = 16) -> UnitBuffer:
+    func create(capacity: usize = 16) -> UnitBuffer:
         let items = new u16[capacity if capacity > 0 else 1] else trap("out of memory")
         return UnitBuffer(items = items, count = 0)
 
-    mutating func append(value: u16):
+    func append(value: u16):
         if self.count == self.items.length:
             let grown = new u16[self.items.length * 2] else trap("out of memory")
             for index in 0..<self.count:

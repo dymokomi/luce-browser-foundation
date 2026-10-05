@@ -41,7 +41,7 @@ pub func shift_jis_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_b
     var iterator = ak.utf8_view_begin(&input)
     while iterator != end:
         var item = ak.utf8_code_point_iterator_deref(&iterator)
-        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        _ = ak.utf8_code_point_iterator_inc(&iterator)
 
         # 1. If code point is end-of-queue, return finished.
 
@@ -108,7 +108,7 @@ pub func euckr_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byte:
     var iterator = ak.utf8_view_begin(&input)
     while iterator != end:
         let item = ak.utf8_code_point_iterator_deref(&iterator)
-        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        _ = ak.utf8_code_point_iterator_inc(&iterator)
 
         # 1. If code point is end-of-queue, return finished.
 
@@ -175,7 +175,7 @@ pub func big5_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byte: 
     var iterator = ak.utf8_view_begin(&input)
     while iterator != end:
         let item = ak.utf8_code_point_iterator_deref(&iterator)
-        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        _ = ak.utf8_code_point_iterator_inc(&iterator)
 
         # 1. If code point is end-of-queue, return finished.
 
@@ -226,7 +226,7 @@ func index_gb18030_ranges_pointer(code_point: u32) -> u32:
     #    or equal to code point and let pointer offset be its corresponding pointer.
     var last_index: usize = 0
     let comparator = ak.Function2[const u32*, const Gb18030RangeEntry*, i32](call = gb18030_ranges_compare_code_point, context = none)
-    discard(ak.binary_search(s_gb18030_ranges, code_point, &last_index, comparator))
+    _ = ak.binary_search(s_gb18030_ranges, code_point, &last_index, comparator)
     let offset = s_gb18030_ranges[last_index].code_point
     let pointer_offset = s_gb18030_ranges[last_index].pointer
 
@@ -252,7 +252,7 @@ pub func gb18030_encoder_process_impl(base: Encoder*, input: ak.Utf8View, on_byt
     var iterator = ak.utf8_view_begin(&input)
     while iterator != end:
         let item = ak.utf8_code_point_iterator_deref(&iterator)
-        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        _ = ak.utf8_code_point_iterator_inc(&iterator)
 
         # 1. If code point is end-of-queue, return finished.
 
@@ -345,7 +345,7 @@ pub func single_byte_encoder_process(this: SingleByteEncoder[u16]*, input: ak.Ut
     var iterator = ak.utf8_view_begin(&input)
     while iterator != end:
         let code_point = ak.utf8_code_point_iterator_deref(&iterator)
-        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        _ = ak.utf8_code_point_iterator_inc(&iterator)
 
         if code_point < 0x80:
             # 2. If code point is an ASCII code point, return a byte whose value is code point.
@@ -390,7 +390,7 @@ pub func isomorphic_encode(input: ak.StringView) -> ak.ByteString:
     var iterator = ak.utf8_view_begin(&view)
     while iterator != end:
         let code_point = ak.utf8_code_point_iterator_deref(&iterator)
-        discard(ak.utf8_code_point_iterator_inc(&iterator))
+        _ = ak.utf8_code_point_iterator_inc(&iterator)
 
         # VERIFY(code_point <= 0xFF);
         if code_point > 0xFF:

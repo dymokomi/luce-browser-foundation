@@ -86,7 +86,7 @@ pub func hash_table_should_grow[T, TT: Traits[T]](this: const HashTable[T, TT]*)
 
 ## Ported from AK/HashTable.h:584 AK::HashTable::size_in_bytes.
 pub func hash_table_size_in_bytes[T, TT: Traits[T]](capacity: usize) -> usize:
-    return sizeof(HashTableBucket[T]) * capacity
+    return memory.size_of(HashTableBucket[T]) * capacity
 
 # The bucket at `index` of the bucket array.
 func hash_table_bucket_at[T, TT: Traits[T]](this: const HashTable[T, TT]*, index: usize) -> HashTableBucket[T]*:
@@ -143,7 +143,7 @@ pub func hash_table_try_rehash[T, TT: Traits[T]](this: HashTable[T, TT]*, new_ca
 
     this.m_size = 0
     while let value = hash_table_iterator_next(&old_iter):
-        discard(hash_table_write_value(this, *value, HashSetExistingEntryBehavior.keep))
+        _ = hash_table_write_value(this, *value, HashSetExistingEntryBehavior.keep)
 
     kfree(buckets)
 
@@ -186,7 +186,7 @@ pub func hash_table_used_bucket_probe_length[T, TT: Traits[T]](this: const HashT
 ## Ported from AK/HashTable.h:693 AK::HashTable::bucket_state_for_probe_length: the state byte of
 ## a used bucket (a probe length + 1, or CalculateLength).
 pub func hash_table_bucket_state_for_probe_length[T, TT: Traits[T]](this: HashTable[T, TT]*, probe_length: usize) -> BucketState:
-    discard(this)
+    _ = this
     if probe_length > 253:
         return BucketState.calculate_length
     return (BucketState)(u8)(probe_length + 1)
