@@ -330,7 +330,7 @@ pub func hash_table_find_u32_tt_unary_predicate[T, TT: Traits[T]](this: HashTabl
 struct HashTableEqualsValue[T, TT: Traits[T]]:
     var value: T
 
-    func call(context: void*?, entry: const T*) -> bool:
+    static func call(context: void*?, entry: const T*) -> bool:
         let captures = (const HashTableEqualsValue[T, TT]*)(context else trap("HashTable: no captures"))
         var traits: TT = ---
         return traits.equals(entry, &captures.value)
@@ -357,7 +357,7 @@ pub func hash_table_find_t_const[T, TT: Traits[T]](this: const HashTable[T, TT]*
 struct HashTableEqualsKey[T, K, KT: HashCompatibleTraits[T, K]]:
     var value: K
 
-    func call(context: void*?, entry: const T*) -> bool:
+    static func call(context: void*?, entry: const T*) -> bool:
         let captures = (const HashTableEqualsKey[T, K, KT]*)(context else trap("HashTable: no captures"))
         var traits: KT = ---
         return traits.equals(entry, &captures.value)

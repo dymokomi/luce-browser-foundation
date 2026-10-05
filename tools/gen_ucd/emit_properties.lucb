@@ -59,7 +59,7 @@ struct HashIndex:
     var values: u32[]
     var used: bool[]
 
-    func create(capacity: usize) -> HashIndex!:
+    static func create(capacity: usize) -> HashIndex!:
         return HashIndex(keys = try new u64[capacity], values = try new u32[capacity], used = try new bool[capacity])
 
     ## The slot of `key` with `equal(value)`, or the free slot where it belongs.

@@ -34,7 +34,7 @@ pub func hash_map_entry_traits_equals[K, V, KT: Traits[K]](a: const HashMapEntry
 struct HashMapKeyEquals[K, V, KT: Traits[K]]:
     var key: K
 
-    func call(context: void*?, entry: const HashMapEntry[K, V]*) -> bool:
+    static func call(context: void*?, entry: const HashMapEntry[K, V]*) -> bool:
         let captures = (const HashMapKeyEquals[K, V, KT]*)(context else trap("HashMap: no captures"))
         var traits: KT = ---
         return traits.equals(&entry.key, &captures.key)
@@ -43,7 +43,7 @@ struct HashMapKeyEquals[K, V, KT: Traits[K]]:
 struct HashMapCompatibleKeyEquals[K, V, Key, KeyT: HashCompatibleTraits[K, Key]]:
     var key: Key
 
-    func call(context: void*?, entry: const HashMapEntry[K, V]*) -> bool:
+    static func call(context: void*?, entry: const HashMapEntry[K, V]*) -> bool:
         let captures = (const HashMapCompatibleKeyEquals[K, V, Key, KeyT]*)(context else trap("HashMap: no captures"))
         var traits: KeyT = ---
         return traits.equals(&entry.key, &captures.key)

@@ -20,7 +20,7 @@ struct CodePointBuffer:
     var items: u32[]
     var count: usize
 
-    func create(capacity: usize = 16) -> CodePointBuffer:
+    static func create(capacity: usize = 16) -> CodePointBuffer:
         let items = new u32[capacity if capacity > 0 else 1] else trap("out of memory")
         return CodePointBuffer(items = items, count = 0)
 
@@ -108,7 +108,7 @@ struct ByteBuffer:
     var items: u8[]
     var count: usize
 
-    func create(capacity: usize = 16) -> ByteBuffer:
+    static func create(capacity: usize = 16) -> ByteBuffer:
         let items = new u8[capacity if capacity > 0 else 1] else trap("out of memory")
         return ByteBuffer(items = items, count = 0)
 
@@ -160,7 +160,7 @@ struct UnitBuffer:
     var items: u16[]
     var count: usize
 
-    func create(capacity: usize = 16) -> UnitBuffer:
+    static func create(capacity: usize = 16) -> UnitBuffer:
         let items = new u16[capacity if capacity > 0 else 1] else trap("out of memory")
         return UnitBuffer(items = items, count = 0)
 

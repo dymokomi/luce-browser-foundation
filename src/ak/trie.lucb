@@ -29,7 +29,7 @@ struct TrieProvideMetadata[V, M, VT: Traits[V]]:
     var node: Trie2[V, M, VT]*
     var it: usize
 
-    func call(context: void*?) -> M?:
+    static func call(context: void*?) -> M?:
         let captures = (const TrieProvideMetadata[V, M, VT]*)(context else trap("Trie: no captures"))
         return function2_call(&captures.provide, captures.node, captures.it)
 

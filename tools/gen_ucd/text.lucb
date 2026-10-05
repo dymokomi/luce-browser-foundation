@@ -15,7 +15,7 @@ struct Lines:
     var data: const u8[]
     var offset: usize
 
-    func over(data: const u8[]) -> Lines:
+    static func over(data: const u8[]) -> Lines:
         return Lines(data = data, offset = 0)
 
     func next() -> str?:
@@ -38,7 +38,7 @@ struct Fields:
     var separator: u8
     var done: bool
 
-    func over(text: str, separator: u8) -> Fields:
+    static func over(text: str, separator: u8) -> Fields:
         return Fields(text = text, offset = 0, separator = separator, done = false)
 
     func next() -> str?:
@@ -108,7 +108,7 @@ struct U32List:
     var items: u32[]
     var count: usize
 
-    func create() -> U32List!:
+    static func create() -> U32List!:
         return U32List(items = try new u32[256], count = 0)
 
     func append(value: u32) -> !:
@@ -140,7 +140,7 @@ func same_u32s(a: const u32[], b: const u32[]) -> bool:
 struct SequencePool:
     var values: U32List
 
-    func create() -> SequencePool!:
+    static func create() -> SequencePool!:
         return SequencePool(values = try U32List.create())
 
     ## The offset of `sequence` in the pool, adding it when it is not there yet.

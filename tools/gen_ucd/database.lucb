@@ -91,7 +91,7 @@ struct Database:
     var emoji_sequences: U32List
     var emoji_sequence_properties: U32List
 
-    func create() -> Database!:
+    static func create() -> Database!:
         let n = code_point_count
         return Database(
             gc = try new u8[n], bc = try new u8[n], lb = try new u8[n], ea = try new u8[n],

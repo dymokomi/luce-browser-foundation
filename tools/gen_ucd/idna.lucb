@@ -24,7 +24,7 @@ struct IdnaTable:
     var mapping_length: u8[]
     var pool: SequencePool
 
-    func create() -> IdnaTable!:
+    static func create() -> IdnaTable!:
         var table = IdnaTable(status = try new u8[code_point_count],
                               mapping_offset = try new u32[code_point_count],
                               mapping_length = try new u8[code_point_count], pool = try SequencePool.create())
