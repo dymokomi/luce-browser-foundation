@@ -32,10 +32,10 @@ pub struct WeakHashSetInternalTraits[T]: ak.Traits[Weak[T]]:
 pub struct WeakHashSetIterator[T]: luce.Iterator[T*]:
     pub var m_iterator: ak.HashTableIterator[Weak[T]]
 
-    func next() -> T*?: return weak_hash_set_iterator_next(&self)
+    pub func next() -> T*?: return weak_hash_set_iterator_next(&self)
 
 ## `for value in weak_hash_set_values(&set)`: GC::WeakHashSet's begin()/end() as a loop.
 pub struct WeakHashSetValues[T]: luce.Iterable[T*, WeakHashSetIterator[T]]:
     pub var m_set: const WeakHashSet[T]*
 
-    func iterator() -> WeakHashSetIterator[T]: return WeakHashSetIterator[T](m_iterator = ak.hash_table_begin_const(&self.m_set.m_table))
+    pub func iterator() -> WeakHashSetIterator[T]: return WeakHashSetIterator[T](m_iterator = ak.hash_table_begin_const(&self.m_set.m_table))
