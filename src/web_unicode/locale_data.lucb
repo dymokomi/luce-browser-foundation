@@ -261,27 +261,36 @@ func define_locales_without_scripts(locales: ak.HashTable[ak.String, ak.StringTr
         let locale_without_script = ak.string_builder_to_string(&builder) else trap("MUST: String::formatted")
         _ = ak.hash_table_set(locales, locale_without_script)
 
-# The static available_locales of is_locale_available.
+# The static available_locales of is_locale_available. It lives as long as the process, so its
+# table and strings are made in the C heap with ak's atomic allocator unset: a web engine's
+# collected heaps come and go while it stays (luce-browser-engine's DESIGN.md §3.3 rule 7).
 var available_locales: ak.HashTable[ak.String, ak.StringTraits]
 var available_locales_initialized: bool
 
 ## Ported from Libraries/LibUnicode/Locale.cpp:531 Unicode::is_locale_available.
 pub func is_locale_available(locale: ak.StringView) -> bool:
     if not available_locales_initialized:
-        # icu::Locale::getAvailableLocales(), as language tags.
-        var list: ak.Vector[ak.String]
-        var start: usize = 0
-        let bytes = icu_available_locales.bytes
-        for index in 0..=bytes.length:
-            if index == bytes.length or bytes[index] == ' ':
-                ak.vector_append_t(&list, string_of(view_of_bytes(bytes[start..<index])))
-                start = index + 1
-        for tag in ak.vector_span_const(&list):
-            _ = ak.hash_table_set(&available_locales, tag)
-        define_locales_without_scripts(&available_locales, ak.vector_span_const(&list))
-        available_locales_initialized = true
+        let saved_atomic_allocator = ak.atomic_allocator
+        ak.atomic_allocator = none
+        defer ak.atomic_allocator = saved_atomic_allocator
+        with memory.heap:
+            build_available_locales()
 
     return ak.hash_table_contains_k[ak.String, ak.StringTraits, ak.StringView, ak.StringStringViewTraits](&available_locales, locale)
+
+## icu::Locale::getAvailableLocales(), as language tags, into available_locales.
+func build_available_locales():
+    var list: ak.Vector[ak.String]
+    var start: usize = 0
+    let bytes = icu_available_locales.bytes
+    for index in 0..=bytes.length:
+        if index == bytes.length or bytes[index] == ' ':
+            ak.vector_append_t(&list, string_of(view_of_bytes(bytes[start..<index])))
+            start = index + 1
+    for tag in ak.vector_span_const(&list):
+        _ = ak.hash_table_set(&available_locales, tag)
+    define_locales_without_scripts(&available_locales, ak.vector_span_const(&list))
+    available_locales_initialized = true
 
 ## Ported from Libraries/LibUnicode/Locale.cpp:557 Unicode::style_from_string.
 pub func style_from_string(style: ak.StringView) -> Style:
