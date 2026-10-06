@@ -160,7 +160,7 @@ struct SequencePool:
 # mark: Output ==================================================================================
 
 ## Fixed-width lowercase hexadecimal digits of `value`, appended to `out`.
-func put_hex(out: strings.Builder*, value: u64, digits: usize) -> !:
+func put_hex(out: collections.Buffer*, value: u64, digits: usize) -> !:
     var buffer: u8[16]
     assert(digits <= 16)
     var remaining = value
@@ -171,29 +171,29 @@ func put_hex(out: strings.Builder*, value: u64, digits: usize) -> !:
         buffer[index] = ('0' + digit) if digit < 10 else ('a' + digit - 10)
         remaining >>= 4
     assert(remaining == 0, "a value does not fit its hexadecimal width")
-    try out.put((str)buffer[..<digits])
+    try out.put_text((str)buffer[..<digits])
 
 ## `value` in decimal, appended to `out`.
-func put_decimal(out: strings.Builder*, value: u64) -> !:
+func put_decimal(out: collections.Buffer*, value: u64) -> !:
     var buffer: u8[32]
-    try out.put(try strings.format_u64(value, buffer))
+    try out.put_text(try strings.format_u64(value, buffer))
 
 ## The standard header box of a generated fragment.
-func put_header(out: strings.Builder*, name: str, summary: str, description: const str[]) -> !:
+func put_header(out: collections.Buffer*, name: str, summary: str, description: const str[]) -> !:
     let rule = "#=============================================================================================="
-    try out.put(rule)
-    try out.put("\n#\n#   ")
-    try out.put(name)
-    try out.put(" - ")
-    try out.put(summary)
-    try out.put("\n#\n#   DESCRIPTION:\n")
+    try out.put_text(rule)
+    try out.put_text("\n#\n#   ")
+    try out.put_text(name)
+    try out.put_text(" - ")
+    try out.put_text(summary)
+    try out.put_text("\n#\n#   DESCRIPTION:\n")
     for line in description:
         if line.length == 0:
-            try out.put("#\n")
+            try out.put_text("#\n")
         else:
-            try out.put("#       ")
-            try out.put(line)
-            try out.put("\n")
-    try out.put("#\n")
-    try out.put(rule)
-    try out.put("\n")
+            try out.put_text("#       ")
+            try out.put_text(line)
+            try out.put_text("\n")
+    try out.put_text("#\n")
+    try out.put_text(rule)
+    try out.put_text("\n")
