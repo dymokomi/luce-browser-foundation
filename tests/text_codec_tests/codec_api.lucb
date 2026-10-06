@@ -70,11 +70,11 @@ test "encoder_for goes through the label table":
 
 test "get_output_encoding":
     let a = tc.get_output_encoding(sv("UTF-16LE"))
-    assert(bytes_equal(ak.string_view_bytes(&a), "UTF-8".bytes))
+    assert(ak.string_view_bytes(&a) == "UTF-8".bytes)
     let b = tc.get_output_encoding(sv("replacement"))
-    assert(bytes_equal(ak.string_view_bytes(&b), "UTF-8".bytes))
+    assert(ak.string_view_bytes(&b) == "UTF-8".bytes)
     let c = tc.get_output_encoding(sv("Shift_JIS"))
-    assert(bytes_equal(ak.string_view_bytes(&c), "Shift_JIS".bytes))
+    assert(ak.string_view_bytes(&c) == "Shift_JIS".bytes)
 
 test "BOM sniffing":
     assert(tc.bom_sniff_to_decoder(view_of(b"\xef\xbb\xbfa")) == tc.decoder_for_exact_name(sv("utf-8")))
@@ -88,19 +88,19 @@ test "BOM sniffing":
 test "decode with a fallback decoder unless there is a byte order mark":
     let fallback = tc.decoder_for(sv("windows-1252")) else trap("no decoder")
     let plain = tc.convert_input_to_utf8_using_given_decoder_unless_there_is_a_byte_order_mark(fallback, view_of(b"\xe9")) else trap("MUST")
-    assert(bytes_equal(string_bytes(&plain), "é".bytes))
+    assert(string_bytes(&plain) == "é".bytes)
     let utf8 = tc.convert_input_to_utf8_using_given_decoder_unless_there_is_a_byte_order_mark(fallback, view_of(b"\xef\xbb\xbf\xc3\xa9")) else trap("MUST")
-    assert(bytes_equal(string_bytes(&utf8), "é".bytes))
+    assert(string_bytes(&utf8) == "é".bytes)
     let utf16 = tc.convert_input_to_utf8_using_given_decoder_unless_there_is_a_byte_order_mark(fallback, view_of(b"\xff\xfe\xe9\x00")) else trap("MUST")
-    assert(bytes_equal(string_bytes(&utf16), "é".bytes))
+    assert(string_bytes(&utf16) == "é".bytes)
 
 test "isomorphic decode and encode":
     let isomorphic = tc.isomorphic_decode(view_of(b"a\x80\xe9\xff"))
-    assert(bytes_equal(string_bytes(&isomorphic), "a\u{80}é\u{ff}".bytes))
+    assert(string_bytes(&isomorphic) == "a\u{80}é\u{ff}".bytes)
     let encoded = tc.isomorphic_encode(sv("a\u{80}é\u{ff}"))
-    assert(bytes_equal(ak.byte_string_bytes(&encoded), b"a\x80\xe9\xff"))
+    assert(ak.byte_string_bytes(&encoded) == b"a\x80\xe9\xff")
     let truncated = tc.isomorphic_encode(sv("\u{3042}"))
-    assert(bytes_equal(ak.byte_string_bytes(&truncated), b"\x42"))
+    assert(ak.byte_string_bytes(&truncated) == b"\x42")
 
 test "constructed single-byte codecs work like the registered ones":
     var decoder: tc.SingleByteDecoder[u16] = ---
@@ -114,7 +114,7 @@ test "constructed single-byte codecs work like the registered ones":
     var bytes = Bytes()
     var errors = CodePoints()
     encode((tc.Encoder*)&encoder, [0x61, 0x430, 0x42a, 0xe9], &bytes, &errors)
-    assert(bytes_equal(bytes.items[0..<bytes.count], b"a\xc1\xff"))
+    assert(bytes.items[0..<bytes.count] == b"a\xc1\xff")
     assert(code_points_equal(errors.items[0..<errors.count], [0xe9]))
 
 test "GBK's encoder is gb18030's with is_gbk":
@@ -123,7 +123,7 @@ test "GBK's encoder is gb18030's with is_gbk":
     var bytes = Bytes()
     var errors = CodePoints()
     encode((tc.Encoder*)&gbk, [0x20ac, 0x80], &bytes, &errors)
-    assert(bytes_equal(bytes.items[0..<bytes.count], b"\x80"))
+    assert(bytes.items[0..<bytes.count] == b"\x80")
     assert(code_points_equal(errors.items[0..<errors.count], [0x80]))
 
 test "incomplete tail lengths of the decoders that scan with ak":

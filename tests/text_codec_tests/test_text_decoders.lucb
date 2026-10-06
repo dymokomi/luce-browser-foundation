@@ -22,7 +22,7 @@ test "test_utf8_decode":
     assert(processed_code_points.items[0] == 0x1F600)
 
     let output = tc.decoder_to_utf8((tc.Decoder*)&decoder, test_string) else trap("MUST")
-    assert(bytes_equal(string_bytes(&output), "\u{1F600}".bytes))
+    assert(string_bytes(&output) == "\u{1F600}".bytes)
 
 test "test_utf16be_decode":
     var decoder = tc.Utf16BeDecoder(decoder_base = tc.Decoder(vtable = &tc.utf16_be_decoder_vtable.decoder_vtable, class_id = tc.utf16_be_decoder_class.first_id))
@@ -31,7 +31,7 @@ test "test_utf16be_decode":
 
     assert(tc.decoder_validate((tc.Decoder*)&decoder, test_string))
     let utf8 = tc.decoder_to_utf8((tc.Decoder*)&decoder, test_string) else trap("MUST")
-    assert(bytes_equal(string_bytes(&utf8), "säk😀".bytes))
+    assert(string_bytes(&utf8) == "säk😀".bytes)
 
 test "test_streaming_decoder_utf8_mid_sequence":
     let decoder = decoder_for("UTF-8")
@@ -117,4 +117,4 @@ test "test_utf16le_decode":
 
     assert(tc.decoder_validate((tc.Decoder*)&decoder, test_string))
     let utf8 = tc.decoder_to_utf8((tc.Decoder*)&decoder, test_string) else trap("MUST")
-    assert(bytes_equal(string_bytes(&utf8), "säk😀".bytes))
+    assert(string_bytes(&utf8) == "säk😀".bytes)

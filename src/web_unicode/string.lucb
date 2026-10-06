@@ -104,22 +104,14 @@ pub func string_equals_ignoring_case(this: const ak.String*, other: ak.String) -
     var rhs_builder = ByteBuffer.create(rhs.length + 1)
     build_casefold_string(view_of_bytes(rhs), &rhs_builder) else return false
 
-    return bytes_equal(lhs_builder.view(), rhs_builder.view())
-
-func bytes_equal(a: const u8[], b: const u8[]) -> bool:
-    if a.length != b.length:
-        return false
-    for index in 0..<a.length:
-        if a[index] != b[index]:
-            return false
-    return true
+    return lhs_builder.view() == rhs_builder.view()
 
 ## StringView::find: the first offset of `needle` in `haystack`.
 func find_bytes(haystack: const u8[], needle: const u8[]) -> usize?:
     if needle.length > haystack.length:
         return none
     for start in 0..=(haystack.length - needle.length):
-        if bytes_equal(haystack[start..<start + needle.length], needle):
+        if haystack[start..<start + needle.length] == needle:
             return start
     return none
 

@@ -15,7 +15,7 @@ func test_ms_sv_equals(view: StringView, text: str) -> bool:
     if view.m_length == 0:
         return true
     let characters = view.m_characters else return false
-    return bytes_equal(u8[]((u8*)characters, view.m_length), text.bytes)
+    return u8[]((u8*)characters, view.m_length) == text.bytes
 
 func test_allocating_stream() -> AllocatingMemoryStream:
     var stream: AllocatingMemoryStream = ---
@@ -96,11 +96,11 @@ test "memory_stream: allocating stream read, peek and read_until_eof":
     assert(allocating_memory_stream_used_buffer_size(&stream) == 4800)
     var peeked: u8[20]
     allocating_memory_stream_peek_some(&stream, peeked)
-    assert(bytes_equal(peeked[0..<16], "0123456789abcdef".bytes))
+    assert(peeked[0..<16] == "0123456789abcdef".bytes)
     assert(allocating_memory_stream_peek_some_contiguous(&stream).length == 4096)
     var chunk: u8[10]
     let read = stream_read_some(stream.stream(), chunk) else trap("read failed")
-    assert(bytes_equal(read, "0123456789".bytes))
+    assert(read == "0123456789".bytes)
     let rest = stream_read_until_eof(stream.stream(), 4096) else trap("read_until_eof failed")
     assert(byte_buffer_size(&rest) == 4790)
     assert(byte_buffer_at_const(&rest, 4789) == 'f')
@@ -117,7 +117,7 @@ test "memory_stream: fixed_memory_read_write":
     assert(stream_is_eof(stream.stream()))
     _ = seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     let contents = stream_read_until_eof(stream.stream(), 4096) else trap("read_until_eof failed")
-    assert(bytes_equal(byte_buffer_bytes_const(&contents), some_words.bytes))
+    assert(byte_buffer_bytes_const(&contents) == some_words.bytes)
 
 test "memory_stream: fixed_memory_close":
     var empty = byte_buffer_create_uninitialized(64) else trap("create failed")
@@ -130,7 +130,7 @@ test "memory_stream: fixed_memory_read_only":
     let some_words = "These are some words"
     var stream = test_fixed_stream(some_words.bytes)
     let contents = stream_read_until_eof(stream.stream(), 4096) else trap("read_until_eof failed")
-    assert(bytes_equal(byte_buffer_bytes_const(&contents), some_words.bytes))
+    assert(byte_buffer_bytes_const(&contents) == some_words.bytes)
     _ = seekable_stream_seek(stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     var failed = false
     _ = stream_write_some(stream.stream(), some_words.bytes) catch:
@@ -197,7 +197,7 @@ test "memory_stream: fixed_memory_read_in_place":
     assert(fixed_memory_stream_offset(&readonly_stream) == 0)
     # Reading const values should succeed.
     let characters = fixed_memory_stream_read_in_place_const_usize[u8](&readonly_stream, 20) else trap("read failed")
-    assert(bytes_equal(characters, some_words.bytes))
+    assert(characters == some_words.bytes)
     assert(stream_is_eof(readonly_stream.stream()))
 
     var copy: u8[20]
@@ -209,7 +209,7 @@ test "memory_stream: fixed_memory_read_in_place":
     assert(fixed_memory_stream_offset(&mutable_stream) == 1)
     _ = seekable_stream_seek(mutable_stream.seekable_stream(), 0, SeekMode.set_position) else trap("seek failed")
     let characters_again = fixed_memory_stream_read_in_place_const_usize[u8](&mutable_stream, 20) else trap("read failed")
-    assert(bytes_equal(characters_again, some_words.bytes))
+    assert(characters_again == some_words.bytes)
     assert(stream_is_eof(mutable_stream.stream()))
 
 test "memory_stream: read_value, write_value and discard":
@@ -291,13 +291,13 @@ test "memory_stream: input buffered seek and output buffered writes":
     let buffered = input_buffered_seekable_create(&input_stream, 8) else trap("create failed")
     var head: u8[4]
     let read = stream_read_some(buffered.stream(), head) else trap("read failed")
-    assert(bytes_equal(read, "Thes".bytes))
+    assert(read == "Thes".bytes)
     assert(input_buffered_seekable_buffer_size(buffered) == 8)
     # Seek forward within the buffered bytes, then past them.
     assert((seekable_stream_seek(buffered.seekable_stream(), 2, SeekMode.from_current_position) else trap("seek failed")) == 6)
     assert((seekable_stream_seek(buffered.seekable_stream(), 4, SeekMode.from_current_position) else trap("seek failed")) == 10)
     let next = stream_read_some(buffered.stream(), head) else trap("read failed")
-    assert(bytes_equal(next, "some".bytes))
+    assert(next == "some".bytes)
     assert(input_buffered_seekable_can_read_line(buffered) else trap("can_read_line failed"))
 
     var storage: u8[32]
@@ -308,5 +308,5 @@ test "memory_stream: input buffered seek and output buffered writes":
     assert((seekable_stream_tell(output.seekable_stream()) else trap("tell failed")) == 3)
     stream_write_until_depleted_span_u8(output.stream(), "defghijk".bytes) else trap("write failed")
     output_buffered_seekable_flush_buffer(output) else trap("flush failed")
-    assert(bytes_equal(storage[0..<11], "abcdefghijk".bytes))
+    assert(storage[0..<11] == "abcdefghijk".bytes)
     stream_close(output.stream())

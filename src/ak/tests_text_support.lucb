@@ -63,7 +63,7 @@ test "simdutf: UTF-16 to UTF-8":
     var output: u8[32]
     let written = simdutf_convert_utf16_to_utf8(units[..<4], output)
     assert(written == 7)
-    assert(tc_bytes_equal(output[..<written], b"\x41\xf0\x9f\x98\x80\xc3\xa9"))
+    assert(output[..<written] == b"\x41\xf0\x9f\x98\x80\xc3\xa9")
 
     let (result, partial) = simdutf_convert_utf16_to_utf8_with_errors(units, output)
     assert(result.error == SimdutfErrorCode.surrogate)
@@ -82,7 +82,7 @@ test "simdutf: UTF-16 bytes in either order":
     assert(well_formed[0] == 0x41 and well_formed[1] == 0xd83d and well_formed[2] == 0xde00 and well_formed[3] == 0xfffd)
     var output: u8[16]
     assert(simdutf_convert_utf16_bytes_to_utf8(big_endian[..<6], true, output) == 5)
-    assert(tc_bytes_equal(output[..<5], b"\x41\xf0\x9f\x98\x80"))
+    assert(output[..<5] == b"\x41\xf0\x9f\x98\x80")
 
 test "simdutf: UTF-32":
     let code_points: u32[4] = [0x41, 0xe9, 0x20ac, 0x1f600]
@@ -91,7 +91,7 @@ test "simdutf: UTF-32":
     var utf8: u8[16]
     let utf8_written = simdutf_convert_utf32_to_utf8(code_points, utf8)
     assert(utf8_written == 10)
-    assert(tc_bytes_equal(utf8[..<utf8_written], b"\x41\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80"))
+    assert(utf8[..<utf8_written] == b"\x41\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80")
     var utf16: u16[8]
     assert(simdutf_convert_utf32_to_utf16(code_points, utf16) == 5)
     assert(utf16[3] == 0xd83d and utf16[4] == 0xde00)
@@ -155,7 +155,7 @@ test "unicode utils: UTF-8 encoding":
 
     var utf8 = CodePointAsUtf8()
     assert(unicode_utils_code_point_to_utf8(0x20ac, &utf8) == 3)
-    assert(tc_bytes_equal(utf8.bytes[..<utf8.length], b"\xe2\x82\xac"))
+    assert(utf8.bytes[..<utf8.length] == b"\xe2\x82\xac")
     var too_large = CodePointAsUtf8()
     assert(unicode_utils_code_point_to_utf8(0x110000, &too_large) == -1)
     assert(too_large.length == 0)
@@ -198,13 +198,13 @@ test "string builder: UTF-8 code points":
     string_builder_append_code_point(&builder, 0x1f600)
     string_builder_append_code_point(&builder, 0x110000)
     let view = string_builder_string_view(&builder)
-    assert(tc_bytes_equal(string_view_bytes(&view), b"a\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80\xef\xbf\xbd"))
+    assert(string_view_bytes(&view) == b"a\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80\xef\xbf\xbd")
     assert(string_builder_length(&builder) == 13)
 
     try string_builder_try_append_code_point(&builder, 0x42)
     string_builder_trim(&builder, 4)
     let trimmed = string_builder_string_view(&builder)
-    assert(tc_bytes_equal(string_view_bytes(&trimmed), b"a\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80"))
+    assert(string_view_bytes(&trimmed) == b"a\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80")
 
     string_builder_clear(&builder)
     assert(string_builder_is_empty(&builder))
@@ -240,7 +240,7 @@ test "string builder: UTF-16 views appended in UTF-8 mode":
     string_builder_append_utf16_view(&builder, utf16_view_from_utf16(units))
     let view = string_builder_string_view(&builder)
     # The lonely low surrogate is encoded as three bytes (WTF-8).
-    assert(tc_bytes_equal(string_view_bytes(&view), b"\x41\xf0\x9f\x98\x80\xed\xb0\x80\x42"))
+    assert(string_view_bytes(&view) == b"\x41\xf0\x9f\x98\x80\xed\xb0\x80\x42")
 
 test "string builder: append_escaped_for_json":
     var builder = string_builder_new()

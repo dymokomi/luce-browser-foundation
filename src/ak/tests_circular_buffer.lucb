@@ -33,20 +33,20 @@ test "byte_buffer: equality_operator":
 
 test "byte_buffer: bytes_compare":
     let a = test_bb_copy("Hello, friend", 13)
-    assert(bytes_equal(byte_buffer_bytes_const(&a), "Hello, friend".bytes))
+    assert(byte_buffer_bytes_const(&a) == "Hello, friend".bytes)
 
 test "byte_buffer: zero_fill_new_elements_on_growth":
     var buffer = byte_buffer_create_uninitialized(5) else trap("create failed")
     memory.set(byte_buffer_span(&buffer), 1)
     let five: u8[5] = [1, 1, 1, 1, 1]
-    assert(bytes_equal(byte_buffer_span(&buffer), five))
+    assert(byte_buffer_span(&buffer) == five)
     byte_buffer_resize(&buffer, 8, ZeroFillNewElements.yes)
     let eight: u8[8] = [1, 1, 1, 1, 1, 0, 0, 0]
-    assert(bytes_equal(byte_buffer_span(&buffer), eight))
+    assert(byte_buffer_span(&buffer) == eight)
     memory.set(byte_buffer_span(&buffer), 2)
     byte_buffer_resize(&buffer, 10, ZeroFillNewElements.yes)
     let ten: u8[10] = [2, 2, 2, 2, 2, 2, 2, 2, 0, 0]
-    assert(bytes_equal(byte_buffer_span(&buffer), ten))
+    assert(byte_buffer_span(&buffer) == ten)
 
 test "byte_buffer: inline and outline storage":
     var buffer: ByteBuffer
@@ -80,7 +80,7 @@ test "byte_buffer: xor, overwrite, get_bytes_for_writing":
     let second: u8[3] = [0xff, 0xff, 0x0f]
     let result = byte_buffer_xor_buffers(first, second) else trap("xor failed")
     let expected: u8[3] = [0xf0, 0x0f, 0xa5]
-    assert(bytes_equal(byte_buffer_bytes_const(&result), expected))
+    assert(byte_buffer_bytes_const(&result) == expected)
     let short: u8[2] = [1, 2]
     byte_buffer_xor_buffers(first, short) catch failure:
         assert(failure.code == ak_errno_error)
@@ -88,12 +88,12 @@ test "byte_buffer: xor, overwrite, get_bytes_for_writing":
         recover ByteBuffer()
     var buffer = test_bb_copy("abcdef", 6)
     byte_buffer_overwrite(&buffer, 2, "XY".bytes.data, 2)
-    assert(bytes_equal(byte_buffer_bytes_const(&buffer), "abXYef".bytes))
+    assert(byte_buffer_bytes_const(&buffer) == "abXYef".bytes)
     let tail = byte_buffer_must_get_bytes_for_writing(&buffer, 3)
     tail[0] = 'g'
     tail[1] = 'h'
     tail[2] = 'i'
-    assert(bytes_equal(byte_buffer_bytes_const(&buffer), "abXYefghi".bytes))
+    assert(byte_buffer_bytes_const(&buffer) == "abXYefghi".bytes)
     var other = test_bb_copy("!", 1)
     byte_buffer_add_assign(&buffer, other)
     assert(byte_buffer_size(&buffer) == 10)
@@ -314,10 +314,10 @@ test "circular_buffer: copy_from_seekback and read_with_seekback":
     assert(copied == 9)
     var output: u8[11]
     let read = circular_buffer_read(&circular_buffer, output)
-    assert(bytes_equal(read, "abababababa".bytes))
+    assert(read == "abababababa".bytes)
     var seek: u8[3]
     let back = circular_buffer_read_with_seekback(&circular_buffer, seek, 4) else trap("seekback failed")
-    assert(bytes_equal(back, "bab".bytes))
+    assert(back == "bab".bytes)
     var failed = false
     _ = circular_buffer_read_with_seekback(&circular_buffer, seek, 12) catch:
         failed = true

@@ -43,7 +43,7 @@ test "construct_contents":
     assert(not byte_string_is_empty(&test_string))
     assert(byte_string_length(&test_string) == 6)
     assert(byte_string_length(&test_string) == tc_strlen(byte_string_characters(&test_string)))
-    assert(tc_bytes_equal(byte_string_bytes(&test_string), "ABCDEF".bytes))
+    assert(byte_string_bytes(&test_string) == "ABCDEF".bytes)
 
     assert(tc_bs_is(&test_string, "ABCDEF"))
     assert(not tc_bs_is(&test_string, "ABCDE"))

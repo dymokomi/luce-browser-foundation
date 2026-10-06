@@ -94,7 +94,7 @@ test "IdnaTestV2.txt toAsciiN":
             if idna_test_fields(line, &fields) < 7:
                 continue
             var source = ByteBuffer.create(fields[0].length + 1)
-            if not bytes_equal(fields[0], b"\"\""):
+            if fields[0] != b"\"\"":
                 unescape_idna_field(fields[0], &source)
             # toAsciiN, defaulting to toUnicode, defaulting to the source; its status,
             # defaulting to toUnicode's.
@@ -104,15 +104,15 @@ test "IdnaTestV2.txt toAsciiN":
             var expected = ByteBuffer.create(expected_field.length + 1)
             if expected_field.length == 0:
                 expected = source
-            elif not bytes_equal(expected_field, b"\"\""):
+            elif expected_field != b"\"\"":
                 unescape_idna_field(expected_field, &expected)
             var status = fields[4]
             if status.length == 0:
                 status = fields[2]
-            var expect_success = status.length == 0 or bytes_equal(status, b"[]")
+            var expect_success = status.length == 0 or status == b"[]"
             # ICU permits the empty root label after a trailing dot, which the file reports
             # as A4_2 (see uts46.cpp processUnicode); so does the port.
-            if bytes_equal(status, b"[A4_2]") and labels_fit_before_root(expected.view()):
+            if status == b"[A4_2]" and labels_fit_before_root(expected.view()):
                 expect_success = true
             cases += 1
             var info = IdnaInfo()
@@ -120,7 +120,7 @@ test "IdnaTestV2.txt toAsciiN":
             let success = not info.failed and info.errors == 0
             var ok = success == expect_success
             if ok and success:
-                ok = bytes_equal(result.view(), expected.view())
+                ok = result.view() == expected.view()
             if not ok:
                 failures += 1
                 if failures <= 10:

@@ -81,7 +81,7 @@ pub func byte_buffer_eq(this: const ByteBuffer*, other: const ByteBuffer*) -> bo
     if byte_buffer_size(this) != byte_buffer_size(other):
         return false
     # So they both have data, and the same length.
-    return bytes_equal(byte_buffer_bytes_const(this), byte_buffer_bytes_const(other))
+    return byte_buffer_bytes_const(this) == byte_buffer_bytes_const(other)
 
 # mark: Access ==================================================================================
 
@@ -353,15 +353,6 @@ pub func byte_buffer_try_ensure_capacity_slowpath(this: ByteBuffer*, new_capacit
     this.m_outline = true
 
 # mark: Span members the streams use ============================================================
-
-# Span<T>::operator== on bytes (memcmp of equal lengths).
-func bytes_equal(a: const u8[], b: const u8[]) -> bool:
-    if a.length != b.length:
-        return false
-    for i in 0..<a.length:
-        if a[i] != b[i]:
-            return false
-    return true
 
 # Span<T>::copy_trimmed_to: copies as many bytes as both spans hold (memmove) and answers how
 # many.

@@ -32,14 +32,6 @@ func string_bytes(string: const ak.String*) -> const u8[]:
     let view = ak.string_bytes_as_string_view(string)
     return ak.string_view_bytes(&view)
 
-func bytes_equal(a: const u8[], b: const u8[]) -> bool:
-    if a.length != b.length:
-        return false
-    for i in 0..<a.length:
-        if a[i] != b[i]:
-            return false
-    return true
-
 func code_points_equal(a: const u32[], b: const u32[]) -> bool:
     if a.length != b.length:
         return false
@@ -126,7 +118,7 @@ func expect_decode(name: str, input: const u8[], expected: const u32[], valid: b
         assert(code_points_equal(code_points.items[0..<code_points.count], expected))
     let output = tc.decoder_to_utf8(decoder, view_of(input)) else trap("MUST")
     var buffer: u8[256]
-    assert(bytes_equal(string_bytes(&output), utf8_of(expected, buffer)))
+    assert(string_bytes(&output) == utf8_of(expected, buffer))
     assert(tc.decoder_validate(decoder, view_of(input)) == valid)
 
 # expect_decode where process() and to_utf8() differ: UTF-8's process() passes a lonely surrogate
@@ -138,7 +130,7 @@ func expect_decode_processed(name: str, input: const u8[], processed: const u32[
     assert(code_points_equal(code_points.items[0..<code_points.count], processed))
     let output = tc.decoder_to_utf8(decoder, view_of(input)) else trap("MUST")
     var buffer: u8[256]
-    assert(bytes_equal(string_bytes(&output), utf8_of(expected, buffer)))
+    assert(string_bytes(&output) == utf8_of(expected, buffer))
     assert(tc.decoder_validate(decoder, view_of(input)) == valid)
 
 # Encodes with the encoder of the exact encoding name.
@@ -147,7 +139,7 @@ func expect_encode(name: str, code_points: const u32[], expected: const u8[], ex
     var bytes = Bytes()
     var errors = CodePoints()
     encode(encoder, code_points, &bytes, &errors)
-    assert(bytes_equal(bytes.items[0..<bytes.count], expected))
+    assert(bytes.items[0..<bytes.count] == expected)
     assert(code_points_equal(errors.items[0..<errors.count], expected_errors))
 
 # get_standardized_encoding(label).
@@ -155,7 +147,7 @@ func expect_label(label: str, expected: str?):
     let encoding = tc.get_standardized_encoding(sv(label))
     if let name = expected:
         let actual = encoding else trap("no encoding")
-        assert(bytes_equal(ak.string_view_bytes(&actual), name.bytes))
+        assert(ak.string_view_bytes(&actual) == name.bytes)
     else:
         assert(encoding == none)
 
@@ -170,12 +162,12 @@ func decoder_for(encoding: str) -> tc.Decoder*:
 # EXPECT_EQ(MUST(streaming_decoder.to_utf8(bytes)), expected).
 func expect_streaming(streaming_decoder: tc.StreamingDecoder*, bytes: const u8[], expected: const u8[]):
     let output = tc.streaming_decoder_to_utf8(streaming_decoder, bytes) else trap("MUST")
-    assert(bytes_equal(string_bytes(&output), expected))
+    assert(string_bytes(&output) == expected)
 
 # EXPECT_EQ(MUST(streaming_decoder.finish()), expected).
 func expect_finish(streaming_decoder: tc.StreamingDecoder*, expected: const u8[]):
     let output = tc.streaming_decoder_finish(streaming_decoder) else trap("MUST")
-    assert(bytes_equal(string_bytes(&output), expected))
+    assert(string_bytes(&output) == expected)
 
 # MUST(decoder.to_utf8(StringView(bytes))), as bytes into `buffer`.
 func decoded(decoder: tc.Decoder*, bytes: const u8[], buffer: u8[]) -> const u8[]:
