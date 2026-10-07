@@ -11,12 +11,18 @@
 #       `Allocator` (its methods are in types_heap.lucb), so ported code allocates blobs with
 #       plain `new` and `alloc` under `with heap`; releasing is a no-op, the sweep reclaims.
 #
+#       Blobs have size classes of their own, finer than the cells' (blob_size_classes).
 #       The *large-object space* holds blobs above the largest size class and cells too large for
 #       a heap block: each in its own mapping aligned to BLOCK_SIZE whose header begins with a
 #       HeapBlockBase, so Cell::heap() works for a large cell as for any other, kept in an array
 #       sorted by address for the pointer lookups of the conservative scans.
 #
 #==============================================================================================
+
+## The tag new blobs carry in their header's class_id, which a blob does not otherwise use: what
+## the thread was doing when it allocated them, so that a census of the heap can tell blobs apart
+## (the engine's webview memory census). 0 is untagged. (Addition, for diagnostics.)
+pub local var heap_blob_tag: u16 = 0
 
 ## The bytes before a blob's payload: its Cell header.
 pub let blob_header_size: usize = memory.size_of(Cell)
@@ -61,10 +67,29 @@ pub func heap_atomic_allocator(heap: Heap*) -> memory.Allocator:
 
 # mark: Blob allocation =========================================================================
 
+## The size classes of blobs, header included. They are finer than the cells' (64 to 3072), as
+## malloc's are: blobs hold what the donor keeps in malloc (AK's storage), and with the cells'
+## classes a blob just above one wasted up to half its cell, or most of a block above 3072 (a
+## large object maps at least a 16 KiB block). Each is a multiple of 16 (the payload's
+## alignment), and from 2720 on a block's storage (16,320 bytes) holds a whole number of them.
+let blob_size_classes: usize[28] = [32, 48, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768, 896, 1024, 1280, 1536, 1792, 2048, 2720, 3264, 4080, 5440, 8160]
+
+## The index of the smallest blob size class of at least `cell_size` bytes (at most the largest).
+func blob_size_class_index(cell_size: usize) -> usize:
+    var low: usize = 0
+    var high = blob_size_classes.length - 1
+    while low < high:
+        let middle = (low + high) // 2
+        if blob_size_classes[middle] >= cell_size:
+            high = middle
+        else:
+            low = middle + 1
+    return low
+
 ## The blob allocators of `heap`, scanned and atomic, one per size class.
 func heap_construct_blob_allocators(this: Heap*):
     this.m_atomic_allocator = HeapAtomicAllocator(m_heap = this)
-    for cell_size in cell_size_classes:
+    for cell_size in blob_size_classes:
         let allocator = (new CellAllocator in memory.heap) else trap("out of memory")
         cell_allocator_construct(allocator, cell_size, ak.sv("Blob"))
         gc_vector_append(&this.m_blob_allocators, allocator)
@@ -93,22 +118,18 @@ pub func heap_allocate_blob(this: Heap*, size: usize, alignment: usize, atomic: 
         return u8[]((u8*)blob_alignment, 0)
     if alignment > heap_block_base_block_size:
         return none
-    let largest = cell_size_classes[cell_size_classes.length - 1]
+    let largest = blob_size_classes[blob_size_classes.length - 1]
     var cell: Cell* = ---
     if alignment > blob_alignment or size > largest - blob_header_size:
         cell = heap_allocate_large_object(this, blob_header_size + size, alignment, false, false)
     else:
         heap_will_allocate(this, blob_header_size + size)
         let allocators = &this.m_atomic_blob_allocators if atomic else &this.m_blob_allocators
-        var chosen: CellAllocator*? = none
-        for allocator in gc_vector_span(allocators):
-            if cell_allocator_cell_size(allocator) >= blob_header_size + size:
-                chosen = allocator
-                break
-        let allocator = chosen else trap("no blob size class")
+        let allocator = gc_vector_at(allocators, blob_size_class_index(blob_header_size + size))
         cell = cell_allocator_allocate_cell(allocator, this)
         cell_initialize_header(cell, cell_allocator_cell_size(allocator))
     cell.vtable = &atomic_blob_vtable if atomic else &blob_vtable
+    cell.class_id = heap_blob_tag
     return u8[]((u8*)cell + blob_header_size, size)
 
 ## Whether the blob `block` has room for `size` bytes where it is.
@@ -175,7 +196,10 @@ func heap_allocate_large_object(this: Heap*, cell_size: usize, alignment: usize,
     gc_vector_insert(&this.m_large_objects, index, object)
 
     let cell = large_object_cell(object)
-    cell_initialize_header(cell, cell_size)
+    if map_aligned_block_is_zeroed:
+        cell_initialize_zeroed_header(cell)
+    else:
+        cell_initialize_header(cell, cell_size)
     return cell
 
 ## The large object whose mapping contains `address`, or none (a binary search by address).

@@ -158,6 +158,11 @@ pub func heap_allocate_cell_of_size(this: Heap*, cell_size: usize, allocator: Ce
 ## and a live, unmarked header whose vtable is Cell's own until the constructor sets its class's.
 func cell_initialize_header(cell: Cell*, cell_size: usize):
     memory.set(u8[]((u8*)cell, cell_size), 0)
+    cell_initialize_zeroed_header(cell)
+
+## cell_initialize_header for memory known to be zero already (a fresh mapping): only the header
+## is written, so the pages of a large cell become resident only as they are used.
+func cell_initialize_zeroed_header(cell: Cell*):
     cell.vtable = &cell_vtable
     cell.class_id = 0
     cell.m_mark = false

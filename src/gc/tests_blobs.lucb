@@ -53,13 +53,24 @@ noinline func run_allocator_conformance():
         let cell = (Cell*)((u8*)bytes.data - blob_header_size)
         assert(cell_is_blob(cell))
         assert(heap_block_cell_size(heap_block_from_cell(cell)) == 128)
-        assert(heap_block_cell_size(heap_block_from_cell((Cell*)((u8*)pair - blob_header_size))) == 64)
+        assert(heap_block_cell_size(heap_block_from_cell((Cell*)((u8*)pair - blob_header_size))) == 32)
         assert(view.resize(bytes, 112))
         assert(not view.resize(bytes, 113))
         let grown = memory.grow(bytes, 1000) else trap("no growth")
         assert(grown.length == 1000 and grown.data != bytes.data)
         free(pair)  # a no-op: the sweep reclaims
     destroy_test_heap(heap)
+
+test "blobs take the smallest size class that holds them, to 8160 bytes":
+    assert(blob_size_class_index(1) == 0 and blob_size_class_index(32) == 0 and blob_size_class_index(33) == 1)
+    assert(blob_size_classes[blob_size_class_index(3073)] == 3264)
+    assert(blob_size_classes[blob_size_class_index(8160)] == 8160)
+    for index in 0..<blob_size_classes.length:
+        let cell_size = blob_size_classes[index]
+        assert(cell_size % 16 == 0)
+        assert(blob_size_class_index(cell_size) == index)
+        if index > 0:
+            assert(blob_size_class_index(blob_size_classes[index - 1] + 1) == index)
 
 test "unreferenced blobs are collected; referenced ones survive":
     clobber_stack()
@@ -177,7 +188,7 @@ noinline func run_large_blobs():
     assert((usize)aligned.data % 4096 == 0)
     for _ in 0..<5:
         make_garbage_blob(heap, 40000, false)
-    make_garbage_blob(heap, 5000, true)
+    make_garbage_blob(heap, 9000, true)
     assert(gc_vector_size(&heap.m_large_objects) == 8)
     let middle = (usize)big.data + 50000  # an interior pointer keeps the whole object
     clobber_stack()

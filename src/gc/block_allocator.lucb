@@ -85,6 +85,10 @@ pub func block_allocator_blocks(this: const BlockAllocator*) -> const GcVector[v
 
 # mark: Mapping =================================================================================
 
+## Whether map_aligned_block's memory is zero: fresh pages from mach_vm_map and VirtualAlloc
+## are; posix_memalign's may not be.
+let map_aligned_block_is_zeroed: bool = os.macos or os.windows
+
 ## `size` bytes (a multiple of BLOCK_SIZE) aligned to BLOCK_SIZE, from the OS: the mapping half of
 ## allocate_block, shared with the large-object space (heap_blobs.lucb), which needs the same
 ## alignment so that HeapBlockBase::from_cell finds the heap of a large cell.
