@@ -28,10 +28,12 @@ of this repository.
 
 ## Testing
 
-`./test.sh` type-checks every module (failing on any `-W` warning) and runs the unit tests of
-every module and of the `tests` package (ported from `Tests/AK`, `Tests/LibGC`, `Tests/LibURL`,
-`Tests/LibTextCodec`, `Tests/LibUnicode` and `Tests/LibWeb`, and focused cases pinned to the
-reference build).
+`luc test` runs the unit tests of every module and two programs: `tests/suites` runs the
+test packages under `tests/` (they use the package as a dependent does), and `tests/generated`
+regenerates web_unicode's tables with `tools/gen_ucd` and compares them with the committed ones.
+The tests are ported from `Tests/AK`, `Tests/LibGC`, `Tests/LibURL`, `Tests/LibTextCodec`,
+`Tests/LibUnicode` and `Tests/LibWeb`, with focused cases pinned to the reference build.
+`tools/check.sh` is the lint: formatting and `-W`.
 
 ## License
 

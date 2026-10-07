@@ -1,0 +1,16 @@
+# The test packages beside this program, tests/text_codec_tests (Tests/LibTextCodec) and
+# tests/web_url_tests (Tests/LibURL and cases pinned to the donor), use the package as a
+# dependent does (tests/package.prisma), so their test blocks run with `luce-base test`.
+from luce_std import process
+
+let failed = ErrorCode.package(1)
+
+pub func main(arguments: list[str]) -> int!:
+    let base = process.variable("LUCE_BASE") else "luce-base"
+    for suite in ["text_codec_tests", "web_url_tests"]:
+        let done = process.run(base, ["test", f"tests/{suite}"])
+        let lines = done.output.trim_end().lines()
+        if done.exit_code != 0:
+            error(failed, f"tests/{suite}: exit status {done.exit_code}\n{done.output}{done.error_output}")
+        print(f"ok    tests/{suite}: {lines[lines.length - 1]}")
+    return 0

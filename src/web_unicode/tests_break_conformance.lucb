@@ -40,7 +40,7 @@ extern func fopen(path: const u8*, mode: const u8*) -> void*?
 extern func fread(buffer: void*, size: usize, count: usize, stream: void*) -> usize
 extern func fclose(stream: void*) -> i32
 
-## The bytes of the test data file at `path` (relative to the package, where test.sh runs),
+## The bytes of the test data file at `path` (relative to the package, where luc test runs),
 ## read with the C library (the module does not import luce-std's files for its tests).
 func read_test_file(path: str) -> u8[]!:
     let stream = fopen(path.bytes.data, "rb".bytes.data) else error(ak.ak_error, "cannot open a test data file")
