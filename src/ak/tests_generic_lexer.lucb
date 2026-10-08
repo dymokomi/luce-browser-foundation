@@ -275,67 +275,69 @@ test "GenericLexer: consume_decimal_integer_correctly_parses":
         assert((utf16_generic_lexer_consume_decimal_integer_i64(&utf16_lexer) else trap("i64")) == expected)
         test_check_lexer_position(&lexer, &utf16_lexer, text.length)
 
-## The errno name a consume_decimal_integer call failed with, or "" when it succeeded.
-func test_decimal_integer_error(text: str, type_name: str) -> (str, str):
+## The errno name a consume_decimal_integer call failed with, or "" when it succeeded,
+## copied into `char_room` and `utf16_room`: a caught failure's message lives only until its
+## handler finishes (luce-base base.md §11.3).
+func test_decimal_integer_error(text: str, type_name: str, char_room: u8[], utf16_room: u8[]) -> (str, str):
     var lexer = generic_lexer_new(sv(text))
     var utf16_lexer = utf16_generic_lexer_new(utf16_sv(text))
     var char_error = ""
     var utf16_error = ""
     if type_name == "u8":
         _ = generic_lexer_consume_decimal_integer_u8(&lexer) catch failure:
-            char_error = failure.message
+            char_error = number_strings.copy_into(char_room, failure.message)
             recover 0
         _ = utf16_generic_lexer_consume_decimal_integer_u8(&utf16_lexer) catch failure:
-            utf16_error = failure.message
+            utf16_error = number_strings.copy_into(utf16_room, failure.message)
             recover 0
     elif type_name == "u16":
         _ = generic_lexer_consume_decimal_integer_u16(&lexer) catch failure:
-            char_error = failure.message
+            char_error = number_strings.copy_into(char_room, failure.message)
             recover 0
         _ = utf16_generic_lexer_consume_decimal_integer_u16(&utf16_lexer) catch failure:
-            utf16_error = failure.message
+            utf16_error = number_strings.copy_into(utf16_room, failure.message)
             recover 0
     elif type_name == "u32":
         _ = generic_lexer_consume_decimal_integer_u32(&lexer) catch failure:
-            char_error = failure.message
+            char_error = number_strings.copy_into(char_room, failure.message)
             recover 0
         _ = utf16_generic_lexer_consume_decimal_integer_u32(&utf16_lexer) catch failure:
-            utf16_error = failure.message
+            utf16_error = number_strings.copy_into(utf16_room, failure.message)
             recover 0
     elif type_name == "u64":
         _ = generic_lexer_consume_decimal_integer_u64(&lexer) catch failure:
-            char_error = failure.message
+            char_error = number_strings.copy_into(char_room, failure.message)
             recover 0
         _ = utf16_generic_lexer_consume_decimal_integer_u64(&utf16_lexer) catch failure:
-            utf16_error = failure.message
+            utf16_error = number_strings.copy_into(utf16_room, failure.message)
             recover 0
     elif type_name == "i8":
         _ = generic_lexer_consume_decimal_integer_i8(&lexer) catch failure:
-            char_error = failure.message
+            char_error = number_strings.copy_into(char_room, failure.message)
             recover 0
         _ = utf16_generic_lexer_consume_decimal_integer_i8(&utf16_lexer) catch failure:
-            utf16_error = failure.message
+            utf16_error = number_strings.copy_into(utf16_room, failure.message)
             recover 0
     elif type_name == "i16":
         _ = generic_lexer_consume_decimal_integer_i16(&lexer) catch failure:
-            char_error = failure.message
+            char_error = number_strings.copy_into(char_room, failure.message)
             recover 0
         _ = utf16_generic_lexer_consume_decimal_integer_i16(&utf16_lexer) catch failure:
-            utf16_error = failure.message
+            utf16_error = number_strings.copy_into(utf16_room, failure.message)
             recover 0
     elif type_name == "i32":
         _ = generic_lexer_consume_decimal_integer_i32(&lexer) catch failure:
-            char_error = failure.message
+            char_error = number_strings.copy_into(char_room, failure.message)
             recover 0
         _ = utf16_generic_lexer_consume_decimal_integer_i32(&utf16_lexer) catch failure:
-            utf16_error = failure.message
+            utf16_error = number_strings.copy_into(utf16_room, failure.message)
             recover 0
     else:
         _ = generic_lexer_consume_decimal_integer_i64(&lexer) catch failure:
-            char_error = failure.message
+            char_error = number_strings.copy_into(char_room, failure.message)
             recover 0
         _ = utf16_generic_lexer_consume_decimal_integer_i64(&utf16_lexer) catch failure:
-            utf16_error = failure.message
+            utf16_error = number_strings.copy_into(utf16_room, failure.message)
             recover 0
     # The position is rolled back on failure.
     test_check_lexer_position(&lexer, &utf16_lexer, 0)
@@ -365,6 +367,8 @@ test "GenericLexer: consume_decimal_integer_fails_with_correct_error":
         ("9223372036854775808", "i64", "ERANGE"),
     ]
     for (text, type_name, expected) in cases:
-        let (char_error, utf16_error) = test_decimal_integer_error(text, type_name)
+        var char_room: u8[32]
+        var utf16_room: u8[32]
+        let (char_error, utf16_error) = test_decimal_integer_error(text, type_name, char_room, utf16_room)
         assert(char_error == expected)
         assert(utf16_error == expected)

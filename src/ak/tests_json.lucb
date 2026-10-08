@@ -300,9 +300,10 @@ test "fallible_json_object_for_each":
 
     json_object_try_for_each_member(object, succeeding_member_callback, none) else trap("MUST")
 
+    var room: u8[32]
     var message = ""
     json_object_try_for_each_member(object, failing_member_callback, none) catch failure:
-        message = failure.message
+        message = number_strings.copy_into(room, failure.message)
         recover ()
     assert(message == "nanananana")
 
@@ -312,8 +313,9 @@ test "fallible_json_array_for_each":
 
     json_array_try_for_each_const(array, succeeding_element_callback, none) else trap("MUST")
 
+    var room: u8[32]
     var message = ""
     json_array_try_for_each_const(array, failing_element_callback, none) catch failure:
-        message = failure.message
+        message = number_strings.copy_into(room, failure.message)
         recover ()
     assert(message == "nanananana")
